@@ -30,8 +30,10 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
+# local env files (.env.example is committed as the template)
+.env
 .env*.local
+supabase/functions/.env
 
 # typescript
 *.tsbuildinfo
@@ -41,3 +43,6 @@ example
 # generated native folders
 /ios
 /android
+
+# session handoff notes
+.claude/HANDOFF.md

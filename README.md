@@ -1,56 +1,127 @@
-# Welcome to your Expo app 👋
+# V2.2 — Running Training Plan Builder
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+An Expo / React Native app that turns a runner's intake answers (goal, experience, schedule,
+target race) into a structured, week-by-week training plan. Part of the **PACE family**: it is
+deliberately narrow — it builds plans, it is not a training log.
 
-## Get started
+## Status
 
-1. Install dependencies
+**Scaffold / pre-implementation.** This repo is currently a stock Expo SDK 54 app
+(expo-router template) with no product code written yet — no auth, no database, no plan
+generation, no Supabase dependency, no tests. Everything described below past this section is
+the *design*, not shipped behavior. See `planning/` for the full spec:
 
-   ```bash
-   npm install
-   ```
+- [`planning/01-brainstorm.md`](planning/01-brainstorm.md) — goal, milestones, open questions
+- [`planning/02-product-requirements.md`](planning/02-product-requirements.md) — who it's for, tiers, user flow, milestones
+- [`planning/03-engineering-requirements.md`](planning/03-engineering-requirements.md) — stack, architecture, edge functions, DB schema, security
 
-2. Start the app
+## Stack (planned)
 
-   ```bash
-   npx expo start
-   ```
+| Layer | Choice | Notes |
+|-------|--------|-------|
+| App | Expo / React Native + TypeScript, expo-router | |
+| Auth | Supabase Auth — Google OAuth + Sign in with Apple + email/password | Required sign-up, no guest mode in v1 |
+| Database | Supabase Postgres | New project, separate from other PACE-family apps |
+| Server logic | Supabase Edge Functions (Deno) | AI calls + quota enforcement live here, never in the client |
+| AI | Claude API (`claude-sonnet-5`) via edge function | API key stays server-side, never in the app bundle |
+| Payments | Dummy (v1) → RevenueCat/StoreKit (v2) | Apple requires real IAP for public release; dummy is TestFlight-only |
+| Hosting/builds | EAS Build, TestFlight | |
 
-In the output, you'll find options to open the app in a
+## Tiers (planned)
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+| Tier | Plans | Engine | Quality |
+|------|-------|--------|---------|
+| **Free** | 1 total | Templates only | Basic hard-coded plan for the chosen distance/duration |
+| **Pro** | 3 / month | AI + template hybrid | Personalized paces, HR zones, warm-ups/drills, coach-style "why" per week |
+| **Elite** | 10 / month | Fully AI-personalized | Everything in Pro plus mid-plan adjustments, race-day strategy, deeper periodization |
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+Quotas reset monthly for Pro/Elite (Free is 1 plan total) and are enforced **server-side** in
+the `generate-plan` edge function — the client never decides or tracks its own quota. The Elite
+extras above are still marked "proposed, to confirm" in the product requirements doc.
 
-## Get a fresh project
-
-When you're ready, run:
+## Getting started
 
 ```bash
-npm run reset-project
+npm install
+cp .env.example .env   # then fill in the values, see Environment below
+npx expo start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Other scripts (from `package.json`):
 
-### Other setup steps
+```bash
+npm run ios      # expo start --ios
+npm run android  # expo start --android
+npm run web      # expo start --web
+npm run lint     # expo lint
+```
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+## Environment
 
-## Learn more
+`.env` is gitignored and holds your real values; `.env.example` is the committed template —
+copy it, don't edit it in place.
 
-To learn more about developing your project with Expo, look at the following resources:
+- **Client variables** must be prefixed `EXPO_PUBLIC_`. Expo inlines these in plain text into
+  the compiled app bundle, so treat anything with this prefix as public. The two client vars are:
+  - `EXPO_PUBLIC_SUPABASE_URL`
+  - `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` — safe to ship publicly because Postgres Row Level
+    Security (RLS) is what actually protects the data, not secrecy of this key.
+- **The Anthropic API key never goes in `.env` and never gets an `EXPO_PUBLIC_` prefix.** It is
+  an edge-function secret, set with `supabase secrets set ANTHROPIC_API_KEY=sk-ant-...`. For
+  local edge-function development it lives in `supabase/functions/.env` instead (also
+  gitignored).
+- Supabase automatically injects `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEYS`, and
+  `SUPABASE_SECRET_KEYS` into edge functions at runtime — you don't set those yourself.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## Project structure
 
-## Join the community
+What exists today:
 
-Join our community of developers creating universal apps.
+```
+src/
+  app/            # expo-router screens — currently the create-expo-app template
+    _layout.tsx
+    index.tsx
+    explore.tsx
+  components/     # template UI components (themed-text, themed-view, app-tabs, ...)
+  constants/
+    theme.ts
+  hooks/
+```
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Planned layout (not yet built — see `planning/03-engineering-requirements.md`):
+
+```
+src/app/
+  (auth)/sign-in, sign-up
+  (tabs)/index         # Home / Create plan
+  (tabs)/plans         # My Plans (history)
+  intake/               # onboarding questionnaire
+  plan/[id]             # plan view
+  paywall, settings
+
+lib/
+  supabase.ts           # client init
+  planTemplates.ts      # free-tier hard-coded plans
+  planTypes.ts          # shared Plan/Week/Workout types
+  subscription.ts       # tier read + dummy purchase
+
+supabase/functions/
+  generate-plan/        # core plan-generation edge function
+```
+
+## Roadmap
+
+- **M1 — Foundation**: Expo app scaffolded, Supabase project, required sign-up working.
+- **M2 — Intake**: onboarding questionnaire persists to the database.
+- **M3 — Plan engine**: free template plans + paid AI plans generate reliably; plan view renders.
+- **M4 — Tiers & quotas**: dummy paywall, tier and quota enforcement server-side.
+- **M5 — My Plans**: history tab, plan persistence, re-open past plans.
+- **M6 — Polish & TestFlight**: empty states, errors, loading, app icon/splash, TestFlight build.
+
+Full milestone "done" criteria are in `planning/02-product-requirements.md`.
+
+## License
+
+MIT — see [`LICENSE`](LICENSE). Note the license file currently carries the copyright of
+650 Industries, Inc. (Expo) from the `create-expo-app` template it was generated from.
