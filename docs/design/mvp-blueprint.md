@@ -15,15 +15,27 @@
 
 ## Part 0 — What ships
 
-**Eight screens.** Sign-in · Sign-up · Intake (8-10 questions + review) · Home/Create ·
-Configure (modal) · Generating (terminal state of that modal) · Plan view · My Plans.
+**Ten screens.** Sign-in · Sign-up · Intake (8-10 questions + review) · Home/Create ·
+Configure (modal) · Generating (terminal state of that modal) · Plan view · My Plans · Paywall ·
+Settings-lite.
 
-**Not in the MVP:** paywall, Settings. The tab bar ships with **two tabs** and holds a third slot
-in reserve (Part 7).
+**Restored to the MVP (decision 1, 2026-07-10):** a minimal dummy paywall and a settings-lite
+screen (sign out, tier display, restore purchases). Both were cut in the blueprint's first pass;
+M4's done-definition, the `402` path, and the user flow all require a paywall, and cutting
+Settings removed the app's only sign-out. They ship in the tab bar's third slot, reserved from
+day one (Part 8).
+
+**Also cut for MVP (decision 5, 2026-07-10):** the next-workout card and all "current week"
+semantics. Days are unnamed and there are no check-offs, so "next" has no well-defined meaning
+without inventing calendar arithmetic the product doesn't have. Home shows the plan link (or
+"Create a plan") and quota state only — see "Home / Create" in Part 7, rewritten accordingly.
 
 **Engineering facts the UI depends on**, decided outside this document but load-bearing inside it:
 
-- A **fallback plan never burns quota** (`count(plans) where is_fallback = false`).
+- A **fallback plan never burns quota** (`count(plans) where is_fallback = false`), capped at
+  **3 quota-exempt fallbacks per period** so the free-text notes field can't farm unlimited
+  template plans. Any fallback copy shown to the user must say plainly that the attempt didn't
+  use one of their plans — never "this month," for any tier (Free's quota is 1 total, forever).
 - `generate-plan` carries an **idempotency key**, minted when the configure modal opens.
 - Plans are **immutable JSONB**. "Regenerate" makes a new plan and spends a slot. There is no editing.
 - Quota periods anchor to the **purchase day** (May 26 → June 26), clamped at month end.
@@ -83,11 +95,12 @@ wave, one per question along the intake rule, one per position along the generat
 coarse subset carries a mono numeral (every second or fourth), the way a real ruler labels every
 fifth mark and lets the rest imply themselves.
 
-**Registration ticks.** Tiny corner crosshairs, reserved **exclusively** for the two surfaces in
-the whole app permitted a real shadow — the next-workout card, and modals/sheets. They mark *this
-object is being measured*, the way lab equipment ships with calibration marks on its housing. If a
-third element starts wanting registration ticks, the shadow budget is being violated. Catch it in
-review.
+**Registration ticks.** Tiny corner crosshairs, reserved **exclusively** for modals/sheets — the
+one surface in the whole app permitted a real shadow now that the next-workout card is cut for
+MVP (decision 5, 2026-07-10; the shadow-and-tick budget previously had two members). They mark
+*this object is being measured*, the way lab equipment ships with calibration marks on its
+housing. If a second element starts wanting registration ticks, the shadow budget is being
+violated. Catch it in review.
 
 **Readout brackets.** A small hairline flank on either side of a genuinely **measured** mono numeral
 — a real pace range, a real HR zone.
@@ -117,7 +130,10 @@ what makes the motif satisfy the project's own rule that colour is never the onl
 **The periodization wave (macro).** A monochrome bronze Skia area chart of weekly load, deliberately
 outside the effort palette so volume is never misread as intensity. Once per plan, at the top of
 plan view. On My Plans it becomes a **pre-rasterized bitmap** sparkline — zero live canvases on that
-screen.
+screen. **Rasterization strategy (Ruling 17, 2026-07-10): lazy, on first render** — not at
+generation time — **cached in memory for the session**, keyed by plan ID plus a hash of the load
+array. No `expo-file-system` persistence in v1; the cache is rebuilt (once, cheaply) the next time
+the app cold-starts.
 
 **The ghost ribbon.** Seven desaturated gray bars on their baseline, cropped at the screen edge.
 Plain Views, not Skia. It appears on sign-in, sign-up, and both empty states — the motif established
@@ -221,10 +237,18 @@ This is what makes the handoff trivial: "freeze the ribbon's screen position" me
 transform to it at all.* There is nothing to reconcile between two layouts, because there was only
 ever one layout.
 
+> **Ruling 14 (2026-07-10): this claim only holds horizontally.** The shared cell geometry above
+> guarantees the *row's* width and inset match, but says nothing about the ribbon's *vertical*
+> position — the modal sits full-bleed while plan view has a header, nameplate, and (once built)
+> the wave above the ribbon. Reconciling that vertical geometry, plus the modal-dismiss +
+> router-push orchestration underneath it, is unsolved and is the likeliest silent time-sink in
+> the build. **v1 ships the honest crossfade in "The handoff" below; the bespoke frozen-ribbon
+> handoff described there is attempted only after M6 is otherwise done.**
+
 ### Pending
 
-All seven fills sit at a shared neutral scale (~45%) in `color.progress` gray — inert, at rest,
-reading as *a bar not yet resolved.* **Never pulsing.**
+All seven fills sit at a shared neutral scale (~45%) in `color.progressDisabled` gray — inert, at
+rest, reading as *a bar not yet resolved.* **Never pulsing.**
 
 Beneath, the step list. Each row has a hollow ink ring that crossfades to a **filled ink dot** the
 instant its step becomes active, and **stays lit** — a lamp that records ground covered, not a
@@ -276,9 +300,17 @@ nothing wouldn't read as an impact. It marks itself as the cause of the cascade,
 
 ### The handoff
 
-Because the geometry was shared from the start, the ribbon gets **no transform**. Everything else —
-backdrop, step list, card chrome — crossfades to zero over ~200–250ms while plan view's header, tier
-nameplate, and wave-axis furniture crossfade in around the untouched ribbon.
+**v1 ships this as an honest crossfade (Ruling 14, 2026-07-10).** Modal chrome — backdrop, step
+list, card frame — fades to zero over ~200–250ms while plan view's header, tier nameplate, and (if
+built) wave-axis furniture fade in. The router push to `plan/[id]` happens once the modal
+dismisses. This is a straightforward, low-risk transition, not the bespoke frozen-ribbon handoff
+below — that one is attempted only after M6 is otherwise done, once the vertical-geometry gap
+flagged in "Geometry, decided first" has an actual answer.
+
+**The bespoke handoff, once attempted:** because the geometry was shared from the start, the
+ribbon gets **no transform**. Everything else — backdrop, step list, card chrome — crossfades to
+zero over ~200–250ms while plan view's header, tier nameplate, and wave-axis furniture crossfade
+in around the untouched ribbon.
 
 **Only once the modal chrome has fully reached zero and unmounted** does the wave begin its 650ms
 stroke-draw. That sequencing is load-bearing: the Reanimated cascade and the Skia stroke must never
@@ -351,33 +383,36 @@ structurally different from the reveal's compress-and-bounce, keeping that langu
 
 ### Home / Create · *system theme*
 
+**Rewritten for decision 5 (2026-07-10): no next-workout card, no current-week ribbon row, no
+"current week" arithmetic of any kind.** Days are unnamed and there are no check-offs, so a
+well-defined "next" doesn't exist without inventing calendar math the product doesn't have. Home
+shows **the plan link and quota state, and nothing else.**
+
 **Empty.** Frame grid faint behind a single ghost-ribbon row on its baseline — the auth screen's
 motif, now in daylight. Beneath it the quota pip row; below that the screen's one hivis element,
 "Create a plan."
 
-**Populated.** The grid recedes — real content earns its own structure. The focal point becomes the
-**next-workout card**: raised surface, one of the app's two sanctioned shadows, hivis edge and hivis
-"View", and the app's only other user of **registration ticks** — four faint corner crosshairs
-marking it as the one measured, important object on screen. A sample under a loupe.
-
-Directly beneath, one current-week ribbon row on its baseline, mono week-number gutter. "Create a
-plan" persists as a demoted outline button, because the hivis slot has moved to the card. A Free user
-who has spent their plan sees a plain link there, never a dead disabled button.
+**Populated.** The grid recedes — real content earns its own structure. The focal point becomes a
+**plain plan-link row**: the same flat, hairline-separated, no-shadow, no-registration-tick
+construction as a My Plans card (an index entry, not an instrument reading) — title, tier pill,
+generation date — that pushes straight to `plan/[id]` on tap. It carries the screen's hivis slot as
+"View plan," and "Create a plan" persists as a demoted outline button beneath it. A Free user who
+has spent their plan sees a plain link there instead, never a dead disabled button.
 
 *Motion:* while `quota-status` is in flight, the pip row shows dim ungrouped placeholder dots that
 pulse — the one sanctioned "working" treatment — and **the pulse is killed the instant data lands**,
 not allowed to finish its cycle. Once resolved, pips never animate again.
 
 The **moment a plan is generated and the user returns** is a real state transition and earns
-choreography: the ghost ribbon crossfades out as the next-workout card and week row crossfade in, and
-**the hivis slot relocates** — "Create a plan" demotes via a plain colour/border crossfade at the same
-instant the card's edge picks up its glow. Only one object holds the accent in any frame; the handoff
-is instant, never a blend between two accent states.
+choreography: the ghost ribbon crossfades out as the plan-link row crossfades in, and **the hivis
+slot relocates** — "Create a plan" demotes via a plain colour/border crossfade at the same instant
+the plan-link row appears. Only one object holds the accent in any frame; the handoff is instant,
+never a blend between two accent states.
 
 The quota caption updates with a plain crossfade — **no count-up animation on the numeral.** A rolling
 odometer would misrepresent a discrete server fact as a gradual local one.
 
-Tapping the ribbon row is an **ordinary stack push**, not a shared-element grow-into-place. That
+Tapping the plan-link row is an **ordinary stack push**, not a shared-element grow-into-place. That
 bespoke handoff is reserved for the reveal; spending it on a daily action would cost complexity for no
 communicative gain.
 
@@ -393,6 +428,13 @@ Two large binary cards (race-driven / fixed-duration); selecting one reveals sub
 belongs here: the **8/12/16-week segmented control reads as a three-detent dial** — tick marks between
 the settings, condensed numerals at each stop, the active detent taking the ink-capsule treatment.
 Bottom-anchored hivis "Generate my plan."
+
+**Free-tier gating (decision 4, 2026-07-10).** Free sees every distance chip and every length
+option, never a trimmed menu. A selection outside Free's reach (anything past a ≤12-week 5K)
+renders in a **locked state** — same shape and position as every other chip/detent, an ink-at-low-
+opacity treatment plus a small lock glyph, never removed from layout — and tapping it routes to the
+paywall instead of selecting it. **Never a dead disabled control**: a locked option is still a real
+tap target with a real destination, just not the one its label implies yet.
 
 *Motion:* the sheet rises on `springGentle`; the scrim fades in **solid**, never blurred. Sub-field
 reveals reuse the one sanctioned accordion technique (measured once, cached, UI-thread shared value) —
@@ -421,15 +463,17 @@ The header reads as an **equipment nameplate**, not a caption: title at 24–32,
 mono metadata line, uppercase tokens separated by middots — `TIER · PRO   GENERATED · 07.10.26` — the
 way a serial plate reads, not a casual sentence.
 
-Below it, the wave gets the fullest grid treatment in the app: faint horizontal load-interval
-gridlines behind the bronze fill, a solid zero-axis baseline, week-number ticks along the bottom with
-mono numerals at coarse intervals, and a single "taper" label pointing at one specific tick near the
-close. **The grid and axis are present from frame zero as static hairlines; only the bronze stroke and
-fill perform the one-time draw over them** — a chart recorder's pen sweeping across a pre-printed
-sheet.
+Below it, the wave gets the fullest grid treatment in the app **at Elite density** — faint
+horizontal load-interval gridlines behind the bronze fill, a solid zero-axis baseline, week-number
+ticks along the bottom with mono numerals at coarse intervals, and a single "taper" label pointing
+at one specific tick near the close. **The grid and axis are present from frame zero as static
+hairlines; only the bronze stroke and fill perform the one-time draw over them** — a chart
+recorder's pen sweeping across a pre-printed sheet.
 
-If a next workout exists, the same registration-ticked, shadowed card from Home reappears beneath the
-wave. Reused, not reinvented.
+> **Ruling 16 (2026-07-10): wave annotation scales by tier — this section describes Elite's
+> treatment, and Part 9 wins over the default-Elite reading of it.** Free is unlabelled beyond
+> start and end; Pro adds the week-number ticks; only Elite adds the "taper" label on top of
+> that. Do not render the full annotation set above for Free or Pro plans — see Part 9.
 
 Then the ribbon: one row per week, mono week-number gutter, seven height-and-colour bars rising from
 an **unbroken baseline**, rest days as gaps in the bars but never in the rule. Expanding a week reveals
@@ -471,9 +515,26 @@ very first render pass. Any card mounting later — via scroll, pagination, or l
 at full opacity immediately. **There is exactly one first paint per app-open, and only that paint
 fades.**
 
+### Paywall · Settings-lite *(restored, decision 1, 2026-07-10)*
+
+This blueprint cut both in its first pass; `frontend-design-brief.md` never did — its Part 5
+already carries full screen designs for **Paywall** (pinned dark, full-bleed, the product's own
+workout row shown twice at Free vs. Pro density as the hero, vertical tier cards, one
+bottom-anchored hivis CTA) and **Settings** (system theme, deliberately the calmest screen in the
+app — no motif, no texture, no hivis anywhere; grouped rows for Account, Subscription, Legal, App
+info). Those designs are authoritative for both screens; this document doesn't re-derive them. The
+only addition here is where they live: Settings-lite is the tab-bar's third slot (Part 8), and its
+Subscription row is the paywall's entry point from inside the app, alongside the `402`-triggered
+entry point from Configure.
+
 ---
 
-## Part 8 — The two-tab bar
+## Part 8 — The three-tab bar
+
+**Updated for decision 1 (2026-07-10): Settings-lite ships in MVP, so the bar is three live tabs
+from day one, not two-plus-a-reserved-slot.** The layout below is unchanged from the original
+design — it was drawn for three columns from the start — only the "reserved, non-interactive"
+framing for the third slot is gone, since it now holds a real screen.
 
 Flat `surface.raised`, a single top hairline, **no shadow** (that budget is spent elsewhere). Icons
 are thin line marks matched to the hairline's own visual weight, so the bar reads as schematic rather
@@ -481,13 +542,14 @@ than illustrative.
 
 **The active state never touches hivis.** The active tab's icon and label render in `text.primary`,
 with a short **hairline tick beneath the label** — a caliper mark indicating *current setting* on a
-dial, not a filled pill or a coloured dot. Inactive tabs render in `color.progress`, no tick.
+dial, not a filled pill or a coloured dot. Inactive tabs render in `color.progressInformative`
+(they're a meaningful navigational state, not decoration — this is one of the two contrast
+failures that motivated Ruling 13's token split), no tick.
 
-**Reserving the third slot.** The bar's content width is divided into **three equal columns from day
-one.** Home and My Plans occupy the first two; they do not stretch to fill 50/50. The third column is a
-genuinely reserved slot, marked with a very faint hairline outline where a future icon will sit — a
-blank instrument-panel knockout, not empty space that reads as a layout bug. Non-interactive, nearly
-subliminal. When Settings ships, it drops in exactly as drawn. **Nothing about Home or My Plans moves.**
+**Three equal columns from day one.** Home, My Plans, and Settings-lite each occupy one column;
+none stretches to fill more. Settings-lite carries a paywall entry point (Subscription row) and the
+account actions (sign out, restore purchases) — see "Paywall · Settings-lite" in Part 7. **Nothing
+about Home or My Plans moves** now that the third column is populated instead of reserved.
 
 ---
 
@@ -497,13 +559,15 @@ subliminal. When Settings ships, it drops in exactly as drawn. **Nothing about H
 |---|---|---|---|
 | **Free** | chip · label · condensed distance · *qualitative* effort string | — | **No.** Nothing was measured. |
 | **Pro** | chip · label · condensed distance · **mono pace range + HR zone** | indented, dimmer weekly coach "why" | Yes, on both |
-| **Elite** | chip · label · condensed distance · **mono pace + HR zone** (same measured numerals as Pro) | longer, per-workout "why", often wrapping, plus (if confirmed) the extras stack | Yes, on both |
+| **Elite** | chip · label · condensed distance · **mono pace + HR zone** (same measured numerals as Pro) | longer, per-workout "why", often wrapping | Yes, on both |
 
 **Crop the tier pill out of a screenshot and the row anatomy alone tells you the tier.** Chip / label /
 distance / qualitative-text is unmistakably Free. Bracketed pace-and-HR-zone plus one short weekly
-why-line is unmistakably Pro. The identical bracketed numerals plus a longer, per-workout why-line
-(and, once confirmed, the extras stack) is unmistakably Elite — the row is taller because it explains
-more, not because it measures more.
+why-line is unmistakably Pro. The identical bracketed numerals plus a longer, per-workout why-line is
+unmistakably Elite — the row is taller because it explains more, not because it measures more.
+*(Extras are cut for MVP — decision 7, 2026-07-10, not merely pending confirmation. `Plan.extras`
+can absorb them later without a redesign, but nothing populates it, and no v1 row reserves space for
+it.)*
 
 The wave scales the same way — unlabelled beyond start and end for Free, week markers for Pro, taper
 annotation plus whatever multi-peak shape richer periodization actually produces for Elite. **No fake
@@ -558,7 +622,7 @@ was tested against. Getting this wrong is exactly the trap `AGENTS.md` warns abo
 > **With the sand-man deferred, Skia's only remaining consumer is the periodization wave.** If the
 > wave is also deferred, Skia leaves the v1 dependency set entirely — and with it the heaviest native
 > module and the biggest engineering risk in the blueprint. Plan view remains fully usable without
-> the wave: nameplate, next-workout card, ribbon.
+> the wave: nameplate, ribbon.
 >
 > The CTA's hivis→hivisDeep gradient is **decoration** — it encodes nothing, so by this document's own
 > manifesto it should be a flat hivis fill until something justifies the gradient. That drops
@@ -589,23 +653,27 @@ placeholder title `"Aanya's baby"` at `src/app/index.tsx:38`.
 
 1. **The periodization wave.** Now the only thing keeping Skia in the dependency set. Cutting it
    removes a native module, a rebuild cycle, and the persisted reveal-tracking bookkeeping. Plan view
-   keeps its nameplate, next-workout card, and ribbon — the ribbon was always the screen's real
-   information. My Plans loses its sparkline and falls back to label + date range.
+   keeps its nameplate and ribbon — the ribbon was always the screen's real information. My Plans
+   loses its sparkline and falls back to label + date range.
 2. **The CTA gradient** → a flat hivis fill. It encodes nothing; it fails the manifesto's own test.
    Drops `expo-linear-gradient`.
 3. **Haptics** → let the calls no-op. Drops `expo-haptics` and its rebuild. The reveal still works;
    it just loses its punctuation.
 4. **The review screen's staggered row settle** → one simultaneous crossfade.
 5. **Sign-in's single-tap error nudge** → plain crossfade of the error text and border.
-6. **Registration ticks and the reserved-tab ghost outline.** Polish on an already-functional layout.
+6. **Registration ticks.** Polish on an already-functional layout. *(The reserved-tab ghost outline
+   this item originally paired with is moot as of decision 1, 2026-07-10 — the third tab ships a
+   real Settings-lite screen from day one, not a reserved slot; see Part 8.)*
 7. **The reveal's spring overshoot magnitude**, as a last resort.
 
 > Cuts 1–3 together take v1's native-module additions to **zero**. Everything left is Reanimated
 > (already installed), plain Views, and three font packages.
 
 > **What must survive any cut:** the honesty-gated client timeline, the discrete colour swap hidden in
-> the compression trough, the single haptic on the first colour-resolving cell, and the frozen-ribbon
-> handoff. **That structure, not the flourish on top of it, is what is actually being sold.**
+> the compression trough, and the single haptic on the first colour-resolving cell. **That
+> structure, not the flourish on top of it, is what is actually being sold.** (The frozen-ribbon
+> handoff itself is not part of v1's baseline — Ruling 14, 2026-07-10 — so it isn't something a
+> time-pressured cut needs to preserve; v1's honest crossfade already is the cut version.)
 
 ### Where the two passes disagreed
 
@@ -615,11 +683,32 @@ Resolved toward the owner's own words (*"a man made out of sand running, then it
 while keeping the visual pass's assembly opening: **assemble → hold → dissolve → residue settles into
 the terrain.** That resolution is preserved in Part 4 for v2. It is not built in v1.
 
-**Grain colour.** Visual pass said graphite/ink; motion pass said `color.progress` gray. Same family;
-resolved to the neutral gray the ghost ribbon already uses, so the achromatic motifs on the auth screen
-share one register. Also deferred with Part 4.
+**Grain colour.** Visual pass said graphite/ink; motion pass said `color.progressDisabled` gray. Same
+family; resolved to the neutral gray the ghost ribbon already uses, so the achromatic motifs on the
+auth screen share one register. Also deferred with Part 4.
 
 **Both passes independently nominated the sand-man as the first thing to cut** — the visual pass because
 it is the one element in the system encoding no information, and therefore the only thing that fails the
 manifesto's own test; the motion pass because its static degrade path must exist anyway. The owner then
 cut it to get the core loop working first. **Three independent reasons, one conclusion.**
+
+---
+
+## Part 13 — Routine states this document skipped (Ruling 20, 2026-07-10)
+
+This blueprint designs the happy path in detail and several failure states (Part 6, `isFallback`,
+generating's failure exits in `frontend-design-brief.md`), but skipped these ordinary, non-exotic
+states. Each is a design TODO, not yet specified — flagged here rather than invented on the spot:
+
+- **Plan view opened cold from My Plans** — the loading state while `plan/[id]` fetches, and the
+  error state if that fetch fails (deleted underlying data, network failure, etc.).
+- **My Plans list loading** — the state between tab mount and the list resolving, before the
+  documented empty-state copy ("No plans yet") is known to apply.
+- **Home when `quota-status` fails** — Home's pip row and CTA gating both depend on a successful
+  `quota-status` read; what renders when that call itself errors is undesigned.
+- **Intake save failure (offline)** — `docs/mvp-build-prompt.md` Phase 3 flags the same gap for the
+  upsert to `intake_responses`; the UI state for it (retry affordance? silent local queue?) isn't
+  designed here.
+- **Routing for a signed-in user with an incomplete intake** — session routing must send this user
+  back into the intake stack (resume, not restart) rather than to Home or a tab bar that assumes a
+  completed profile.

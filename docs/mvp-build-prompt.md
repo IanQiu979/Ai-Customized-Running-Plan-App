@@ -87,8 +87,8 @@ These were resolved by evidence during the audit. They are not open questions.
    `loadRules.ts`). Delete `docs/mvp-progress.md`'s stale 🟠 risk claiming 20–30% is
    authoritative and "the port enforces 20–30%" — both halves are false. Never "fix" the band
    backwards.
-2. **Intake is 10 fields** (8 always asked; goal-time + recent-time appear with a race), per the
-   change_log supersession. Fix the stale "Intake is 8 fields" line in `CLAUDE.md`/`AGENTS.md`
+2. **Intake is 10 fields** (8 always asked; goal-time + race-date appear only with a race —
+   recent-time is always asked, optional to answer), per the change_log supersession. Fix the stale "Intake is 8 fields" line in `CLAUDE.md`/`AGENTS.md`
    §Coaching domain, and the "eight fields" mentions in `docs/reference/coaching/00-README.md`
    and `training-zones.md`. Re-check the coaching applicability filter against the 10-field set
    (goal-time and recent-time now drive paces — confirm no rule was filtered out that these two

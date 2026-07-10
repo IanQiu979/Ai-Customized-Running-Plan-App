@@ -6,7 +6,7 @@
 > Milestone definitions live in [`planning/02-product-requirements.md`](../planning/02-product-requirements.md).
 > Decision history lives in [`change_log.md`](change_log.md).
 
-**Last updated:** 2026-07-10
+**Last updated:** 2026-07-10 (Phase 0 of `docs/mvp-build-prompt.md` complete)
 
 ---
 
@@ -21,9 +21,12 @@
 | M5 — My Plans (history) | Not started |
 | M6 — Polish & TestFlight | Not started |
 
-**The honest summary:** planning, design, and domain research are done to an unusual depth.
-**No product code exists.** `src/lib/supabase.ts` is the only non-template file in the app. Nothing
-generates a plan. The gap between "designed" and "working" is the entire remaining project.
+**The honest summary:** planning, design, and domain research are done to an unusual depth, and
+Phase 0's paper-reconciliation pass is now done too. **Almost no product code exists.**
+`src/lib/supabase.ts`, `planTypes.ts`, and `loadRules.ts` are the only non-template files in the
+app — the shared vocabulary and the safety arithmetic, not yet a template engine, a screen, or a
+backend. Nothing generates a plan. The gap between "designed" and "working" is still nearly the
+entire remaining project.
 
 ---
 
@@ -52,6 +55,24 @@ generates a plan. The gap between "designed" and "working" is the entire remaini
 - [x] `main` in sync with `origin/main`, no stray branches or worktrees
 - [x] **Full audit run.** No HIGH or exploitable findings. Secrets posture clean three ways
 - [x] **DB audit run.** Live project matches the repo (nothing deployed); zero advisor lints
+- [x] **All docs committed** (`7b4ae77`, 2026-07-10) — `docs/`, `planning/`, and this file are no
+      longer untracked. The stale 🔴 risk recording the opposite is removed below.
+
+### Phase 0 (`docs/mvp-build-prompt.md`) — done 2026-07-10
+- [x] Repo hygiene committed (`7b4ae77`) — plan-shape spec, 5K golden fixture, build prompt itself
+- [x] All 20 audit rulings (§0-B) applied across the doc set — see `docs/change_log.md`
+- [x] Decision gate (§0-C) answered — 13 Ian decisions, recorded in `docs/change_log.md` and this
+      file's "Decided" section below
+- [x] **Model ID verified live**: `claude-sonnet-5` confirmed against the Anthropic Models API
+      with the project's server-side key — real model ("Claude Sonnet 5," 1M input tokens, 128K
+      max output)
+- [x] **Ruling 2 re-check clean**: the 8→10-field intake change drops no coaching rule that
+      wasn't already excluded for other reasons (every NOT-ported rule needs logging/wearables/
+      sex data the two new time fields don't provide). The one real gap found — no numeric
+      race-time → training-pace method in the source — is closed by decision 13 below.
+
+**Next work: Phase 1 — plan engine on a screen**, per `docs/mvp-build-prompt.md`'s build-phase
+orchestration (`src/lib/planTemplates.ts`, the theme rewrite, plan view on a local fixture).
 
 ### Design
 - [x] `docs/design/frontend-design-brief.md` — token layer with **computationally verified** contrast,
@@ -68,10 +89,10 @@ generates a plan. The gap between "designed" and "working" is the entire remaini
 - [x] Independent fact-check produced **six corrections** (see `change_log.md`)
 - [x] Market research: Strava discontinued its own plan builder and acquired Runna (July 2026);
       Runna has documented injury reports traced to an unconstrained algorithm
-- [x] **Coaching library ported — done.** Six files under `docs/reference/coaching/`
+- [x] **Coaching library ported — done.** Seven files under `docs/reference/coaching/`
       (`00-README.md`, `load-rules.md`, `training-zones.md`, `workout-library.md`,
-      `injury-rules.md`, `plan-structure.md`), PACE-branded, filtered to what a one-time 8-field
-      intake can drive, with the six evidence corrections applied.
+      `injury-rules.md`, `plan-structure.md`, `example-plan-5k-pro.md`), PACE-branded, filtered
+      to what a one-time 10-field intake can drive, with the six evidence corrections applied.
 
 ---
 
@@ -110,25 +131,39 @@ with **no backend at all**.
 
 ## Blocked / awaiting a decision
 
+Only genuinely open items remain here. Everything resolved by the 2026-07-10 decision gate moved
+to "Decided" below.
+
 | Item | Blocks | Who decides |
 |---|---|---|
-| **The goal-vs-current improvement threshold.** If a goal time implies a large improvement over the recent time, training paces must come from the recent time. How large is "large"? | `planTemplates`, every paid pace | Ian |
-| **Does "experienced — I've trained for races before" map to intermediate or advanced?** Mapped *down* for now, since a lower level means tighter caps (`toExperienceLevel()`) | Volume ceilings, long-run caps | Ian |
-| **Intermediate deload cadence: every 3 or 4 weeks?** Source says "3–4"; using 4 so cadence tightens monotonically with experience (`deloadEveryWeeks()`) | Plan shape | Ian |
-| App name | app icon, wordmark, store listing | Ian |
-| Elite extras (race-day strategy, mid-plan adjustment) | paywall copy, plan view's extras stack | Ian |
-| iPad / tablet a v1 target? | responsive work, orientation | Ian |
-| Password minimum length | sign-up copy | Verify vs Supabase config |
-| Shape of the intake `injuries` field (free text vs. structured symptom picker) | Whether a declared symptom can be routed deterministically into `load-rules.md` Rule 5's three trigger tiers | Ian |
+| App name | app icon, wordmark, store listing; needed by M6, not before | Ian |
+| Password minimum length | sign-up copy | Verify against what the live Supabase project actually enforces — Phase 2 |
 | Whether Rule 5's "Monitoring" tier applies to a one-time pre-run intake at all | Rule 5's Monitoring-tier triggers ("new muscular soreness," "joint stiffness > 10 min") are worded for something noticed during/after a run, not a signup-time self-report; wiring `injury-rules.md` to intake | Ian |
-| Where the mandatory disclaimers (`load-rules.md` Rule 10) render in the UI | Every plan? Every week? A persistent footer? Not specified by the coaching source | Ian |
+
+## Decided (2026-07-10) — decision gate closed
+
+Full rationale for each is in `docs/change_log.md`'s "2026-07-10 (Phase 0)" entry.
+
+| Item | Decision |
+|---|---|
+| Goal-vs-recent improvement threshold | **10%, gating race-pace session targets only (R-A addendum).** ≤10% implied improvement over the recent-time equivalent → goal-pace sessions use the raw goal pace; beyond 10% → goal-pace sessions use the recent-time-equivalent pace instead. Training paces are **unconditionally** recent-time-derived — the goal never drives everyday paces at any threshold. |
+| "Experienced" maps to intermediate or advanced? | **Intermediate** (kept as coded) — safer, tighter caps. |
+| Intermediate deload cadence | **4 weeks** (kept as coded); 50+ still always forces 3. |
+| Shape of the intake `injuries` field | Closed-set `InjuryFlag` flags + optional free-text notes (length-limited/sanitized). Flags alone drive Rule 5's triage; notes inform paid prompts only. |
+| Where Rule 10 disclaimers render | Static footer section on every plan view + one line in the generating modal's fine print. |
+| Elite extras | **Cut for MVP.** Elite = richest personalization prompt + per-workout "why" only; `Plan.extras` can carry them later without a schema change. |
+| iPad / tablet a v1 target? | **No — phone-only v1.** iPad and desktop/computer support move to v2 (Ian: "phone only for phase 1, then ipad and computer in phase two"). |
+| Paywall + Settings in MVP? | **Restored.** Minimal dummy paywall + settings-lite (sign out, tier display, restore), in the blueprint's reserved third tab slot. |
+| Does a fallback plan burn quota? | **Not the first 3 in a period** (`is_fallback` filter in both `generate-plan` and `quota-status`; `notes` length-limited and sanitized). **A 4th+ fallback in the same period keeps the already-reserved slot (R-B addendum)** — nobody is refused, but that attempt counts against quota, and the fallback card must say so. |
+| Free-tier configure gating | Free sees all options; out-of-tier selections render locked and route to the paywall on tap — never a dead disabled button. |
+| "Next workout" / "current week" card | **Dropped.** Home shows the plan link + quota state only. No current-week arithmetic exists in v1. |
+| Red-flag injury protocol representation | Rendered as a conservative fixed-length plan whose weeks carry the protocol's phases, plus a pain-gated-progression `extras` `PlanSection`, plus Rule 10 disclaimers. Does not consume quota. |
+| Pace-derivation method | Cross-distance equivalency via the Riegel formula (`T2 = T1 × (D2/D1)^1.06`); training paces anchored to the source's own relative rules. Any remaining numeric gap goes back to Ian — nothing invented. |
 
 ---
 
 ## Known debt and risks
 
-- 🔴 **`docs/` is entirely untracked.** Every design doc, the architecture, the change log, and this
-  file exist only on disk. **Commit them.**
 - 🔴 **`supabase secrets set` has never been run.** Production has no `ANTHROPIC_API_KEY`. Hard blocker
   the moment `generate-plan` deploys.
 - 🟠 **Supabase CLI is not logged in, and `supabase init` was never run** — there is no `config.toml`,
@@ -138,13 +173,8 @@ with **no backend at all**.
 - 🟠 **Deep-link scheme `v22workoutplangenerator://` not confirmed on Supabase's redirect allowlist**
   (Authentication → URL Configuration). Google OAuth will dead-end without it. UNVERIFIED — this
   setting could not be read.
-- 🟠 `expo-glass-effect ~0.1.10` is installed and contradicts the design's no-blur depth rule. Remove
-  it or fence it off in review.
-- 🟠 **Ian's own `workout_library.md` worked deload examples reduce volume by ~35–45%** (Beginner
-  ~40%, Intermediate ~45%, Advanced ~35–40% — three independent examples), exceeding the 20–30% band
-  he made authoritative (`load-rules.md` Rule 1; see `plan-structure.md`). Unresolved: either the
-  20–30% rule is too shallow, or the source's worked examples are sloppy. The port currently enforces
-  20–30% regardless.
+- 🟠 `expo-glass-effect ~0.1.10` is installed and contradicts the design's no-blur depth rule.
+  **Remove it** (Ruling 18 — no fence-off alternative; this system has no sanctioned blur use).
 - 🟡 Stock Expo template not yet deleted — `src/app/explore.tsx` and the other create-expo-app
   screens are still boilerplate, not yet replaced with real screens, and the hero title still reads
   **"Aanya's baby"** (`src/app/index.tsx:38`).

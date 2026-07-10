@@ -18,8 +18,10 @@ src/
   constants/theme.ts     # stock Expo template palette — see "Proposed visual direction" below
   hooks/                 # use-theme, use-color-scheme
   lib/
-    supabase.ts          # the only app-specific (non-template) code that exists today
-    __tests__/supabase.test.ts
+    supabase.ts          # env-guarded Supabase client
+    planTypes.ts          # canonical — shared Plan/Week/Workout/Tier vocabulary
+    loadRules.ts           # canonical — deterministic safety arithmetic, 19 unit tests
+    __tests__/supabase.test.ts, loadRules.test.ts
 ```
 
 `src/lib/supabase.ts` exports `supabase`, built with
@@ -37,9 +39,14 @@ src/
   / `stopAutoRefresh()` as the app foregrounds/backgrounds, so a backgrounded app stops issuing
   token refreshes.
 
-There is no `src/lib/planTemplates.ts`, `planTypes.ts`, or `subscription.ts` yet; no auth
-screens; no intake screen; no plan view; no `supabase/functions/`; no `supabase/migrations/`.
-`tsconfig.json` maps `@/*` → `./src/*` and `@/assets/*` → `./assets/*`.
+`src/lib/planTypes.ts` and `src/lib/loadRules.ts` **exist and are canonical** — pure TypeScript,
+no runtime deps, imported by both the Expo app and (once written) the Deno edge functions.
+`loadRules.ts` carries 19 passing unit tests. **When this document and the types disagree, the
+types win** — `planTypes.ts` is the source of truth, this file is a description of it.
+
+There is no `src/lib/planTemplates.ts` or `subscription.ts` yet; no auth screens; no intake
+screen; no plan view; no `supabase/functions/`; no `supabase/migrations/`. `tsconfig.json` maps
+`@/*` → `./src/*` and `@/assets/*` → `./assets/*`.
 
 ## Planned — route tree
 
@@ -48,19 +55,36 @@ src/app/
   (auth)/sign-in, sign-up
   (tabs)/index          # Home / Create plan
   (tabs)/plans          # My Plans (history)
+  (tabs)/settings       # third tab — dummy paywall + settings-lite (decision 1, 2026-07-10)
   intake/                # onboarding questionnaire (stack)
   plan/[id]              # plan view
-  paywall, settings
 ```
+
+**Decision 1 (2026-07-10):** the paywall and a settings-lite screen (sign out, tier display,
+restore purchases) are restored to MVP scope, using the blueprint's reserved third tab slot
+(`docs/design/mvp-blueprint.md` Part 8) rather than shipping as detached modal-only routes.
+
+**Decision 5 (2026-07-10):** Home shows the plan link (or "Create a plan") and quota state only —
+no "next workout" or "current week" card. No current-week arithmetic exists in v1; days are
+unnamed and there are no check-offs, so "next" has no well-defined meaning without one. This is
+Ian's override of the recommended `floor(days since created_at / 7) + 1` design.
 
 ## Planned — `src/lib/` layout
 
 ```
 src/lib/
   supabase.ts            # exists today
-  planTemplates.ts        # planned — free-tier hard-coded plans (5K/10K/half/marathon x 8/12/16wk)
-  planTypes.ts             # planned — shared Plan/Week/Workout/Tier types, one source of truth
-                            #           for the app and the edge functions
+  planTypes.ts             # exists today — shared Plan/Week/Workout/Tier types, one source of
+                            #                truth for the app and the edge functions
+  loadRules.ts              # exists today — deterministic safety arithmetic, 19 unit tests
+  planTemplates.ts        # planned — the free-tier engine AND the fallback engine for Pro/Elite.
+                            #          A parametric generator, not a fixed matrix: any distance,
+                            #          any legal week count (per the plan-shape rules in
+                            #          `planning/02-product-requirements.md`), any days/week, any
+                            #          starting mileage. Free's 12-week/5K limit is a UI/quota
+                            #          gate applied on top of this engine, not a limit of the
+                            #          engine itself — a Pro/Elite fallback still needs, say, a
+                            #          26-week marathon template.
   subscription.ts          # planned — tier read + dummy purchase
 ```
 
@@ -69,24 +93,58 @@ src/lib/
 The core of the app. Full tier/quota/validation detail:
 [`docs/reference/plan-generation.md`](reference/plan-generation.md).
 
-1. Authenticate the JWT — reject anonymous requests.
-2. Read tier + `count(plans)` in the current period, server-side; reject requests over quota.
-3. Branch by tier. **All three tiers build on the same coach-authored template skeleton — it is
+1. **Auth** — verify the JWT, reject anonymous requests.
+2. **Idempotency replay** — `GeneratePlanRequest.idempotencyKey` is minted client-side when the
+   configure modal opens. If `(user_id, idempotency_key)` already has a row in `plans`, return
+   that row instead of generating again. This is what makes a network-timeout retry safe.
+3. **Atomic quota gate** — a single SECURITY DEFINER RPC checks the tier limit, counts
+   non-fallback plans in the current period, and reserves the slot in one transaction (no bare
+   count-then-insert — that has a TOCTOU race with a window as wide as the generation itself).
+   Over quota → `402` with a structured body. Fallback plans (`is_fallback: true`) never count
+   against quota, capped at 3 quota-exempt fallbacks per period so the free-text `notes` field
+   can't be used to farm unlimited template plans.
+4. **Reconcile plan length** — a race farther out than the tier's max plan length gets a delayed
+   start so the taper lands on race day (ported from Echo V1's `reconcilePlanLength`); a
+   compressed race gets an honest short plan. **Never refuse.** A declared red-flag injury
+   produces the return-to-running protocol as a plan, never a rejection, and does not consume
+   quota.
+5. **Build the template skeleton** — parametric, from `planTemplates.ts` and the coaching docs:
+   phases, deload cadence, weekly volumes under `loadRules.ts` caps, workout primitives from
+   `workout-library.md`. **All three tiers build on this same coach-authored skeleton — it is
    never removed.** What scales across tiers is how much of the runner the plan reasons about and
-   how much it explains, never how much of the coach's judgment is taken away. **Free** → select +
-   lightly parametrize the skeleton, no AI call, effort descriptions only. **Pro** → the skeleton +
-   Claude personalizes workouts, paces, HR zones, and a weekly "why" within it. **Elite** → the same
-   skeleton, customized far more heavily: richest prompt (injury history, periodization nuance, race
-   context), a per-workout "why", plus any confirmed extras — still inside the skeleton.
-4. Validate the result structurally; on failure retry once; on a second failure fall back to
-   the matching template plan and mark it `is_fallback: true`.
-5. Insert into `plans`, return the plan.
+   how much it explains, never how much of the coach's judgment is taken away.
+6. **Free tier stops here.** Template + effort descriptions only. No AI call, ever.
+7. **Pro/Elite — one Claude call** (`claude-sonnet-5`). The skeleton goes into the prompt as the
+   fixed structure; Claude personalizes **one representative week per phase**, not all 24–30
+   weeks — a full plan does not fit a single model response (ported from Echo V1's token
+   strategy: brevity mandate, forced tool call for guaranteed JSON, SSE streaming, truncation
+   detection). Pro gets paces (only if a recent time exists), HR zones, warm-ups/drills, and a
+   weekly "why". Elite gets the same, plus a per-workout "why" and the richest prompt (injury
+   history, race context, periodization nuance) — **still inside the skeleton**. `engine: 'ai'`
+   is never emitted in v1; every paid plan is skeleton-constrained `hybrid` (see `planTypes.ts`'s
+   `Engine` comment).
+8. **Deterministic expander** — typed code materializes every calendar week from the
+   representative weeks, scaling distances along the phase's load curve.
+9. **Clamp** — `loadRules.ts` re-checks every week (weekly increase cap, deload band 35–45%,
+   long-run share/spike/time caps) identically across all three tiers. A model cannot emit an
+   unsafe week because this code rejects the number before the user sees it.
+10. **Validate structurally, loosely** — shape only. Fail → retry once. Fail again → fall back to
+    the pure template plan, `is_fallback: true`, rendered at Free density.
+11. **Insert** the `plans` row (immutable JSONB, `tier_at_generation`, `engine`, `is_fallback`,
+    `idempotency_key`) and return `{ plan, planId, isFallback }`.
 
 The deterministic load-rule clamp (volume caps, deload cadence, long-run caps) applies identically
 to all three tiers — while building the template for Free, and as a post-generation clamp on
 Claude's output for Pro and Elite. See
 [`docs/reference/plan-generation.md`](reference/plan-generation.md) for why: selling the top tier
 as the one with the guardrail removed would be backwards.
+
+### Quota periods
+
+Computed **arithmetically at read time** from the purchase-day anchor (e.g. May 26 → June 26,
+clamped at month end: Jan 31 → Feb 28 → Mar 31). No cron job, no rollover write. One pure shared
+function, `currentPeriod(anchorDate, now)`, used by both `generate-plan` and `quota-status`. A
+user with no `subscriptions` row is `free`.
 
 ## Planned — API
 
@@ -96,9 +154,9 @@ RLS.
 
 | Method / Route | Auth | Body | Returns | Notes |
 |---|---|---|---|---|
-| `POST /functions/v1/generate-plan` | JWT | `{ goalType: "race"\|"duration", raceDistance?, raceDate?, durationWeeks?, notes? }` | `{ plan, planId, isFallback }` or `402` over-quota / `403` anon | Enforces tier + quota server-side, branches by tier, validates, persists. |
+| `POST /functions/v1/generate-plan` | JWT | `{ goalType: "race"\|"duration", raceDistance?, raceDate?, durationWeeks?, notes?, idempotencyKey }` | `{ plan, planId, isFallback }` or `402` over-quota / `403` anon | Enforces tier + quota server-side (atomic RPC), branches by tier, validates, persists. `idempotencyKey` is minted client-side when the configure modal opens; a duplicate key returns the existing plan instead of generating twice. |
 | `POST /functions/v1/purchase-tier` | JWT | `{ tier: "pro"\|"elite", source: "dummy" }` | `{ tier, periodStart, periodEnd }` | v1 dummy flow. v2 swaps `source` to `"revenuecat"` and verifies the receipt — same route, same table write. |
-| `GET /functions/v1/quota-status` | JWT | — | `{ tier, used, limit, periodEnd }` | Drives the Home "2 of 3 plans left" UI. Computed from `count(plans)`, never a client counter. |
+| `GET /functions/v1/quota-status` | JWT | — | `{ tier, used, limit, periodEnd }` | Drives the Home "2 of 3 plans left" UI. `used` is a count of **non-fallback** plans (`is_fallback = false`) in the current purchase-anchored period, never a client counter — matching decision 2's fallback exemption exactly. |
 
 Direct Supabase-client reads (RLS-guarded, `user_id = auth.uid()`): read/write own
 `intake_responses` (upsert on the intake screen); list own `plans` (My Plans tab — select only,
@@ -124,15 +182,24 @@ subscriptions     (user_id, tier free|pro|elite, period_start, period_end,
                    source dummy|revenuecat)          -- source column = painless v2 swap
 plans             (id, user_id, tier_at_generation, engine template|hybrid|ai,
                    goal_type race|duration, race_date, duration_weeks,
-                   plan jsonb, is_fallback bool, created_at)
+                   plan jsonb, is_fallback bool, idempotency_key, created_at)
+  -- UNIQUE (user_id, idempotency_key) — lets generate-plan detect a retried request and
+  --                                     return the existing plan instead of generating twice.
 ```
 
-Quota check = `count(plans) where user_id = X and created_at in current period` compared
-against the tier limit — no separate counter table to drift out of sync.
+Quota check is an **atomic SECURITY DEFINER RPC**, not a bare `count(plans)` read followed by an
+insert — a count-then-insert has a TOCTOU race with a window as wide as the generation itself. The
+RPC checks the tier limit, counts non-fallback plans (`is_fallback = false`) in the current
+period, and reserves the slot in one transaction; N concurrent requests at 2-of-3 quota must
+yield exactly one success. There is no separate counter table to drift out of sync with `plans`
+itself. Quota periods are computed arithmetically from the purchase-day anchor — see "Quota
+periods" above — not stored or rolled over.
 
 **RLS rule for every table**: `user_id = auth.uid()` for select/insert of the caller's own
-rows. Tier and quota columns are only ever written by edge functions running as the service
-role — the client can never write its own tier or quota.
+rows. **`plans` grants select/insert only — never update or delete.** Count-based quota depends
+on this: a delete policy would let a user reset their own count. Tier and quota columns are only
+ever written by edge functions running as the service role — the client can never write its own
+tier or quota.
 
 ## Proposed visual direction (not yet in `theme.ts`)
 
@@ -148,8 +215,10 @@ is recorded here so it isn't lost before implementation.
 - **Effort scale** — the palette *is* the information, not decoration: `recovery #6FA8C9`,
   `easy #4FA97E`, `steady #C9A227`, `tempo #D9772B`, `interval #C6402F`. A color always means an
   intensity.
-- One accent, `hivis #D8F14A`, reserved exclusively for "your next workout" and the primary
-  CTA — boldness spent in exactly one place.
+- One accent, `hivis #D8F14A`, reserved exclusively for the single primary forward-action of
+  whatever screen you're on — boldness spent in exactly one place. (There is no "next workout"
+  card in v1 — decision 5, 2026-07-10 — so hivis does not move to one; it stays on the primary
+  CTA.)
 - Type: a condensed grotesque for display and numerals (running is numbers — distance, pace,
   splits), a neutral body face, a mono face for split tables. Scale 32/24/20/17/15/13.
 - **Signature element — the "week ribbon"**: each training week renders as seven cells colored
@@ -159,3 +228,15 @@ is recorded here so it isn't lost before implementation.
   with a text label, so the plan stays legible to color-blind users.
 - Standing rule (already in the engineering spec): theme tokens only, no hardcoded colors or
   spacing in components.
+
+## Owner design directions (recorded 2026-07-10)
+
+- **Screens are composed like a website**: long, scrolling surfaces, not fixed-viewport panels.
+  A later, post-MVP phase adds website-style scroll-driven animations (scroll-triggered reveals,
+  scroll-linked motion). **MVP ships plain native scroll** — the mvp-blueprint's rule stands for
+  v1 (no parallax, no shrinking headers, no scroll-linked worklets) — but nothing may be built
+  that precludes scroll-driven animation later: screens stay on Reanimated-compatible scroll
+  containers, no nested-scroll traps, no layout hard-pinned to a static viewport.
+- The v1 aesthetic is the blueprint's **Instrument & Matter** system
+  (`docs/design/mvp-blueprint.md` Part 1). Its banned list — glow, glassmorphism, ambient/idle
+  motion, frosted panels — applies to the future scroll-driven animations too, not just to v1.

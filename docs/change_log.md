@@ -5,6 +5,74 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-07-10 (Phase 0) — audit rulings applied, decision gate closed
+
+Doc-sync pass following `docs/mvp-build-prompt.md`'s Phase 0 (§0-B rulings, §0-C decision gate).
+Full detail for each item lives in the file it changed; this entry is the index.
+
+- **All 20 audit rulings in `docs/mvp-build-prompt.md` §0-B applied** across `CLAUDE.md`,
+  `docs/architecture.md`, `docs/reference/plan-generation.md`, `docs/reference/coaching/`,
+  `planning/02-` and `03-*.md`, `docs/design/frontend-design-brief.md`,
+  `docs/design/mvp-blueprint.md`, `docs/mvp-progress.md`, and `src/lib/planTypes.ts` (comment
+  only). See that file rather than restating all 20 here — nothing was re-litigated or softened.
+- **Decision gate — 13 rulings, Ian, 2026-07-10:**
+  1. **Paywall + Settings restored to MVP.** Minimal dummy paywall (M4 needs it — without it
+     nobody reaches Pro/Elite) + settings-lite (sign out, tier display, restore), in the
+     blueprint's reserved third tab slot.
+  2. **Fallback plans do not burn quota.** `is_fallback` filter in both `generate-plan` and
+     `quota-status`, capped at 3 quota-exempt fallbacks/period so free-text `notes` can't farm
+     unlimited template plans; `notes` is length-limited and sanitized.
+  3. **Goal-vs-recent pace threshold = 10%, gating race-pace session targets only (refined by
+     addendum R-A below).** Training paces are **unconditionally** derived from the recent time —
+     the goal never drives everyday paces, at any improvement size. The threshold decides only
+     which pace the goal-pace *session itself* is prescribed at.
+  4. **Free configure gating.** Free sees every option; out-of-tier selections render locked and
+     route to the paywall on tap — never a dead disabled button.
+  5. **"Next workout" card dropped** (Ian's override of the recommended current-week
+     arithmetic). Home shows the plan link + quota state only; no current-week concept exists.
+  6. **Red-flag injury protocol** renders as a conservative fixed-length plan whose weeks carry
+     the protocol's phases, plus a pain-gated-progression `extras` section, plus Rule 10
+     disclaimers — and does not consume quota.
+  7. **Elite extras cut for MVP.** Elite = richest personalization prompt + per-workout "why"
+     only; `Plan.extras` can carry confirmed extras later without a schema change.
+  8. **"Experienced" keeps mapping to intermediate** — the safer, tighter-caps reading.
+  9. **Intermediate deload cadence stays 4 weeks** (50+ still always forces 3).
+  10. **Injuries intake field: closed-set `InjuryFlag` flags + optional free-text notes**
+      (length-limited/sanitized); flags alone drive safety triage, notes inform paid prompts only.
+  11. **Rule 10 disclaimers**: a static footer section on every plan view + one line in the
+      generating modal's fine print.
+  12. **Phone-only v1; iPad and desktop/computer support move to v2** (Ian: "phone only for
+      phase 1, then ipad and computer in phase two"). App name stays open until M6; password
+      minimum to be verified against the live Supabase project in Phase 2.
+  13. **Pace-derivation method** (closes Ruling 2's re-check gap): cross-distance equivalency via
+      the published Riegel formula (`T2 = T1 × (D2/D1)^1.06`); training paces anchored to the
+      source's own relative rules (e.g. Zone 2 ≈ marathon pace to slightly faster; tempo = 30–60
+      s/km faster than easy pace by level). Any remaining numeric gap goes back to Ian as a
+      specific question — nothing invented.
+- **Addenda, same day (Ian's follow-up rulings, sharpening decisions 3 and 2 above):**
+  - **R-A — the 10% threshold gates race-pace session targets only.** If the goal implies ≤10%
+    improvement over the recent-time equivalent (Riegel), goal-pace sessions use the raw goal
+    pace; beyond 10%, goal-pace sessions are prescribed at the recent-time-equivalent pace
+    instead. **Training paces are unconditionally recent-time-derived** — the `planTypes.ts`
+    contract (`recentPerformance` drives every pace; `goalTimeSec` drives race-pace sessions
+    only) stands exactly as coded; the goal never drives everyday paces, regardless of the
+    threshold. This corrects decision 3's original wording, which read as if training paces
+    themselves became goal-derived under the threshold.
+  - **R-B — a 4th+ quota-exempt fallback in a period burns quota.** Decision 2's 3-per-period
+    fallback exemption is a cap, not an unlimited allowance: once a user has 3 quota-exempt
+    fallbacks in a period, the already-reserved slot for a 4th+ fallback is **kept, not
+    released** — nobody is refused a plan, but that attempt counts against quota. The
+    fallback-card copy must say so honestly when it applies (see
+    `docs/design/frontend-design-brief.md`).
+- **Ruling 19 done: `claude-sonnet-5` verified live** against the Anthropic Models API with the
+  project's server-side key today — a real model ("Claude Sonnet 5," 1M input tokens, 128K max
+  output). V1 runs `claude-sonnet-4-6`; this confirms the new string actually exists.
+- **Ruling 2 re-check done: no source coaching rule was wrongly filtered out by the 8→10-field
+  intake change.** Every rule marked NOT-ported in `docs/reference/coaching/00-README.md` needs
+  logging, wearable, or sex data that the two new time fields don't supply. The one real gap the
+  re-check found — no numeric race-time → training-pace method anywhere in the source — is closed
+  by decision 13 above.
+
 ## 2026-07-10 (later still) — plan shape spec + build prompt
 
 - **Plan shape spec added to `planning/02-product-requirements.md`.** "Fixed duration (8 / 12 /

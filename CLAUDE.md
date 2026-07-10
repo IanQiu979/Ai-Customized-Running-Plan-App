@@ -82,8 +82,11 @@ clean `typecheck && lint && test`. Never force-push without explicit user approv
   Consequence: the only levers against a declared injury are volume and intensity.
 - **Days are unnamed.** A week is Day 1 … Day 7; rest days are real slots, not absences. The runner
   places them on a calendar themselves. Never emit Mon–Sun.
-- **Intake is 8 fields, including age.** Max HR is estimated `220 − age`, so no HR zone is computable
-  without it, and 50+ forces a 3-week deload cadence.
+- **Intake is 10 fields, including age.** Eight are always asked — goal, age, experience,
+  days/week, weekly volume, target race distance, a recent time at any distance (optional to
+  answer, but always asked), and injuries. Race date and goal time appear **only** once a target
+  race is chosen. Max HR is estimated `220 − age`, so no HR zone is computable without age, and
+  50+ forces a 3-week deload cadence.
 
 ## Testing
 

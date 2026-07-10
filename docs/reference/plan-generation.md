@@ -1,8 +1,9 @@
 # Plan generation
 
-> **Status: designed, not built.** No `supabase/functions/generate-plan`,
-> `src/lib/planTemplates.ts`, `src/lib/planTypes.ts`, or `src/lib/subscription.ts` exist yet.
-> This document describes the design in
+> **Status: `src/lib/planTypes.ts` and `src/lib/loadRules.ts` exist and are canonical** (19
+> passing unit tests on `loadRules.ts`) — when this document and the types disagree, the types
+> win. `supabase/functions/generate-plan`, `src/lib/planTemplates.ts`, and
+> `src/lib/subscription.ts` are still designed, not built. This document describes the design in
 > [`planning/02-product-requirements.md`](../../planning/02-product-requirements.md) and
 > [`planning/03-engineering-requirements.md`](../../planning/03-engineering-requirements.md).
 > See [`docs/architecture.md`](../architecture.md) for how it fits the rest of the system and
@@ -34,8 +35,8 @@ a declared red-flag injury still produces a plan — the return-to-running proto
 | Tier | Plans | Engine | Quality |
 |---|---|---|---|
 | Free | 1 total | Template only — no AI call | Basic hard-coded plan for the chosen distance/duration |
-| Pro | 3 / month | Template skeleton + Claude personalization | Personalized paces, HR zones, warm-ups/drills, coach-style "why" per week |
-| Elite | 10 / month | Same skeleton, customized far more heavily — richest prompt | Everything in Pro plus a per-workout "why" and any confirmed extras (mid-plan adjustments, race-day strategy, deeper periodization — **still marked "proposed, confirm" in `planning/02-product-requirements.md`, unconfirmed**, see `docs/mvp-progress.md` "Blocked / awaiting a decision") |
+| Pro | 3 / period | Template skeleton + Claude personalization | Personalized paces, HR zones, warm-ups/drills, coach-style "why" per week |
+| Elite | 10 / period | Same skeleton, customized far more heavily — richest prompt | Everything in Pro plus a per-workout "why" — the richest personalization prompt, nothing more. **Extras (mid-plan adjustment, race-day strategy, deeper periodization) are cut for MVP (decision, 2026-07-10)**; `Plan.extras` (`PlanSection[]`) can carry them later without a schema change. |
 
 **All three tiers build on the same coach-authored template skeleton. The skeleton is never
 removed.** What scales across tiers is how much of the runner the plan reasons about and how much
@@ -46,21 +47,75 @@ it explains — never how much of the coach's judgment is taken away.
 - **Pro**: the skeleton supplies the structural shape for the chosen distance/duration; Claude
   personalizes workouts, paces, HR zones, and a weekly "why" within it.
 - **Elite**: the same skeleton, customized far more heavily — the richest prompt available (injury
-  history, periodization nuance, race context), a per-workout "why", and any confirmed extras.
-  Still inside the skeleton.
+  history, periodization nuance, race context) and a per-workout "why". Still inside the
+  skeleton. Extras are cut for MVP (decision, 2026-07-10) — see the tiers table above.
 
 > Why the skeleton is never removed, even at the top tier: Runna's publicly reported injury cases
 > trace to an algorithm that "takes the runner at their word," and Düking et al. 2024 found
 > LLM-generated plans were not rated optimal by coaching experts without oversight. Selling the top
 > tier as the one with the guardrail removed would be backwards.
 
+## The generation pipeline
+
+All eleven steps run inside the single `generate-plan` edge function, in order:
+
+1. **Auth** — verify the JWT, reject anonymous requests.
+2. **Idempotency replay** — `GeneratePlanRequest.idempotencyKey` is minted client-side when the
+   configure modal opens. A duplicate `(user_id, idempotency_key)` returns the existing plan
+   instead of generating again — this is what makes a network-timeout retry safe.
+3. **Atomic quota gate** — the SECURITY DEFINER RPC described under "Quotas" below.
+4. **Reconcile plan length** — a race farther out than the tier's max plan length gets a delayed
+   start so the taper lands on race day (ported from Echo V1's `reconcilePlanLength`); a
+   compressed race gets an honest, short plan. **Never refuse.** A declared red-flag injury
+   produces the return-to-running protocol as a plan (see "Coaching source of truth" above), not
+   a rejection, and does not consume quota.
+5. **Build the parametric template skeleton** — from `planTemplates.ts` and the coaching docs:
+   phases, deload cadence, weekly volumes under `loadRules.ts` caps, workout primitives from
+   `workout-library.md`, Day 1–7 slots with real rest days.
+6. **Free tier stops here.** Template + effort descriptions. No AI call, ever.
+7. **Pro/Elite — one Claude call** (`claude-sonnet-5`, verified live 2026-07-10). The skeleton
+   goes into the prompt as the fixed structure; Claude personalizes **one representative week per
+   phase**, not all 24–30 weeks — a full plan does not fit a single model response. Ported from
+   Echo V1's token strategy: a brevity mandate, a `max_tokens` ceiling, a **forced tool call** for
+   guaranteed JSON, **SSE streaming** so the edge function isn't CPU-killed mid-response, and
+   truncation detection. Personalization is paces (**only if a recent time exists — otherwise no
+   numeric pace is emitted at any tier**), HR zones (from age), warm-ups/drills, a weekly "why"
+   (Pro) or per-workout "why" (Elite).
+8. **Deterministic expander** — typed code materializes every calendar week from the
+   representative weeks, scaling distances along the phase's load curve (Echo V1's expander is
+   the reference).
+9. **Clamp** — `loadRules.ts` re-checks every week (weekly increase cap, deload band 35–45%,
+   long-run share/spike/time caps), identically across all three tiers.
+10. **Validate structurally, loosely; retry once; fall back.** See "Validation" below. A second
+    failure falls back to the pure template plan, `is_fallback: true`, rendered at **Free
+    density** — a template has no "why"; fabricating one would lie.
+11. **Insert** the `plans` row (immutable JSONB — no update/delete RLS grant — carrying
+    `tier_at_generation`, `engine`, `is_fallback`, `idempotency_key`) and return
+    `{ plan, planId, isFallback }`.
+
 ## Quotas
 
-Free is 1 plan **total**, not monthly. Pro is 3/month, Elite is 10/month; both reset monthly.
-Quotas are always counted **server-side**, inside the edge function, as
-`count(plans) where user_id = X and created_at in current period` compared against the tier
-limit — never a client-side counter, and never trusted from client input. There is no separate
-counter table to drift out of sync with the `plans` table itself.
+Free is 1 plan **total**, not monthly. Pro is 3/period, Elite is 10/period. Periods are **not**
+calendar months: they're computed **arithmetically at read time** from the purchase-day anchor
+(e.g. May 26 → June 26, clamped at month end: Jan 31 → Feb 28 → Mar 31), by one pure shared
+function `currentPeriod(anchorDate, now)` used by both `generate-plan` and `quota-status`. No
+cron, no rollover write. A user with no `subscriptions` row is `free`.
+
+The check itself is a **SECURITY DEFINER RPC**, not a bare `count(plans)` read followed by an
+insert — a count-then-insert has a TOCTOU race with a window as wide as the generation itself
+(tens of seconds). The RPC checks the tier limit, counts **non-fallback** plans
+(`is_fallback = false`) in the current period, and reserves the slot atomically in one
+transaction — N concurrent requests at 2-of-3 quota must yield exactly one success. There is no
+separate counter table to drift out of sync with the `plans` table itself. Quotas are always
+enforced **server-side**, never a client-side counter, and never trusted from client input.
+
+**Fallback plans are quota-exempt (decision, 2026-07-10).** `is_fallback: true` rows are excluded
+from the count in both `generate-plan` and `quota-status`, capped at **3 quota-exempt fallbacks
+per period** so the free-text `notes` field can't be used to farm unlimited template plans (each
+attempt still costs up to 2 Claude calls before falling back). `notes` and `injury_notes` are
+length-limited and sanitized for the same reason. **Past the 3-per-period cap (addendum R-B,
+2026-07-10): a 4th+ fallback in the same period keeps the already-reserved quota slot instead of
+being excluded** — nobody is refused a plan, but that attempt counts against quota like any other.
 
 ## Validation: structural, not strict-content
 
@@ -92,5 +147,7 @@ or appear in the app bundle. Full policy: `CLAUDE.md` "Secrets & env".
 ## Request/response contract
 
 See `docs/architecture.md`, "Planned — `generate-plan` edge function flow" and "Planned — API",
-for the endpoint signatures and step-by-step flow (auth → server-side quota check → branch by
-tier → structural validation → retry once → fall back to template → insert → return).
+for the endpoint signatures. The step-by-step flow is "The generation pipeline" above (auth →
+idempotency replay → atomic quota gate → reconcile plan length → build skeleton → Free stops /
+Pro-Elite AI call → expand → clamp → validate → retry once → fall back to template → insert →
+return).

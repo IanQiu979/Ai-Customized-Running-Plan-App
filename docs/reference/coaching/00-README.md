@@ -31,10 +31,12 @@ are kept as-is even though they no longer spell the product name.
 ## The applicability filter — why most of the source didn't make the cut
 
 ECHO was a training log with wearable data: it saw every run, every RPE rating, every morning
-resting heart rate, indefinitely. V2.2 collects **eight fields once, at signup** — goal, age,
-experience, days_per_week, weekly_km, race_distance (optional), race_date (optional), injuries —
-and never sees the runner again. No logging, no wearables, no check-offs, no ongoing data. A rule
-only survives this port if a one-time intake can actually drive it.
+resting heart rate, indefinitely. V2.2 collects **ten fields once, at signup**, and never sees the
+runner again. **Eight are always asked**: goal, age, experience, days_per_week, weekly_km, a
+race-distance choice, a recent performance at any distance (optional to *answer*, but always
+*asked*), and injuries. **Two appear only once a target race is chosen**: race_date and goal_time —
+so the flow is 8 questions, or 10 with a race. No logging, no wearables, no check-offs, no ongoing
+data. A rule only survives this port if a one-time intake can actually drive it.
 
 ## Ported
 
@@ -93,6 +95,23 @@ how the ported rules get used. Applied without second-guessing:
    "Exception — Recovery Weeks" clause already permits it. See `plan-structure.md`. The 5K plan's
    Week 4, whose volume *rises* while labelled a deload, remains an error either way.
 5. **The 10–15% weekly cap stays, plus a new long-run spike cap.** See corrections (a) and (b).
+6. **Injuries intake field shape (decision gate #10, 2026-07-10).** Closed-set `InjuryFlag` flags
+   plus an optional free-text `injury_notes` field. The flags, and only the flags, drive
+   `load-rules.md` Rule 5's deterministic triage tiers; the free text is context handed to the
+   model on paid tiers and never gates a safety decision. Resolves the "shape of the `injuries`
+   intake field" gap below.
+7. **Rule 10 disclaimer placement (decision gate #11, 2026-07-10).** A static footer section on
+   every plan view, plus one line in the generating modal's fine print. Resolves the "where the
+   mandatory disclaimers render" gap below.
+8. **Pace-derivation method (decision gate #13, 2026-07-10) — closes the Ruling 2 re-check gap.**
+   Cross-distance race-time equivalency uses the published Riegel formula,
+   `T2 = T1 × (D2/D1)^1.06`, to convert a runner's recent performance to an equivalent time at the
+   goal/training distance. Training paces are then anchored to the source's own relative rules
+   (e.g. Zone 2 ≈ marathon pace to slightly faster; tempo = 30–60 s/km faster than easy pace by
+   level) rather than any new invented numeric table. Any numeric gap the source's relative rules
+   don't cover goes back to Ian as a specific question before Phase 1 codes it — nothing is
+   invented. This is the "no numeric race-time → training-pace method in the source" gap the
+   2026-07-10 re-check found; decision 13 is its resolution, not a new coaching rule.
 
 ## Corrections made while porting
 
@@ -139,21 +158,24 @@ Each is evidence-driven and cited inline at its source location. Summary:
 
 ## Open gaps — `NOT SPECIFIED IN SOURCE — needs Ian`
 
-- **Shape of the `injuries` intake field.** Routing a declared injury into `load_rules.md` Rule
-  5's three trigger tiers (Immediate Stop / Reduce Volume / Monitor) needs to know what the
-  runner actually typed or selected. Neither the coaching source nor
-  `planning/03-engineering-requirements.md`'s `intake_responses.injuries` column specifies free
-  text vs. a structured symptom picker. This is a product/engineering decision, not a coaching
-  one, but the coaching rules can't be wired up without it.
-- **Whether "Monitoring" tier flags should surface at intake at all.** Rule 5's triggers in that
-  tier ("new muscular soreness in unfamiliar area," "joint stiffness > 10 min") are worded as
-  things noticed *during or after a run* — not something a runner would confidently self-report
-  once at signup, before taking a single run on the plan. The source doesn't say whether a
-  one-time intake should act on this tier or only on the two more severe ones.
-- **Where/how often the Rule 10 disclaimers render in the UI** (every plan? every week? a
-  persistent footer?). Rule 10 mandates *that* they appear on every injury-related and
-  health-guidance output; it doesn't specify UI placement, which is out of coaching-content
-  scope.
+- **Shape of the `injuries` intake field. RESOLVED 2026-07-10 (decision gate #10) — see "Ian's
+  decisions, applied exactly" item 6 above.** Left here for history: routing a declared injury
+  into `load_rules.md` Rule 5's three trigger tiers (Immediate Stop / Reduce Volume / Monitor)
+  needs to know what the runner actually typed or selected. Neither the coaching source nor
+  `planning/03-engineering-requirements.md`'s `intake_responses.injuries` column specified free
+  text vs. a structured symptom picker at the time this gap was logged. Answered: closed-set
+  `InjuryFlag` flags plus optional free-text notes; the flags alone drive the safety triage.
+- **Whether "Monitoring" tier flags should surface at intake at all.** Still open. Rule 5's
+  triggers in that tier ("new muscular soreness in unfamiliar area," "joint stiffness > 10 min")
+  are worded as things noticed *during or after a run* — not something a runner would confidently
+  self-report once at signup, before taking a single run on the plan. The source doesn't say
+  whether a one-time intake should act on this tier or only on the two more severe ones.
+- **Where/how often the Rule 10 disclaimers render in the UI. RESOLVED 2026-07-10 (decision gate
+  #11) — see "Ian's decisions, applied exactly" item 7 above.** Left here for history: Rule 10
+  mandates *that* the disclaimers appear on every injury-related and health-guidance output; it
+  didn't specify UI placement at the time this gap was logged, which is out of coaching-content
+  scope. Answered: a static footer section on every plan view, plus one line in the generating
+  modal's fine print.
 
 Cross-references: [`docs/reference/plan-generation.md`](../plan-generation.md) (how the tiers call
 these rules) and

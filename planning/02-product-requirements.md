@@ -21,10 +21,11 @@ coaching app (the exact feedback that Echo V1 got: too many features).
 1. **Sign up** (required): Google, Sign in with Apple, or email/password. (Apple sign-in is
    required by App Store rules whenever Google sign-in is offered, so it ships in v1.) No guest
    mode in v1 — a guest account is deferred to v2.
-2. **Intake**: onboarding questionnaire (based on Echo V1's onboarding, extended) — goal, **age**,
-   experience level, days/week available, current mileage, target race + date (optional),
-   **goal time** (only when a race is chosen), **a recent time at any distance** (optional), and
-   injuries/constraints. **Ten fields.**
+2. **Intake**: onboarding questionnaire (based on Echo V1's onboarding, extended). **Eight fields
+   always asked**: goal, **age**, experience level, days/week available, current mileage, a
+   target-race distance choice, **a recent time at any distance** (optional to answer, always
+   asked), and injuries/constraints. **Two more appear only once a target race is chosen**: race
+   date and **goal time**. **Ten fields, or 8 questions without a race.**
 
    Three of them are not cosmetic:
    - *Age* → max HR is estimated `220 − age`, so **no HR zone is computable without it**, and the
@@ -34,18 +35,23 @@ coaching app (the exact feedback that Echo V1 got: too many features).
      the runner hasn't achieved would prescribe paces they cannot sustain. Without a recent time the
      plan emits **no numeric paces at any tier** — only effort language.
 
-   > **Safety clamp.** If the goal time implies a large improvement over the runner's recent
-   > performance, training paces are computed from the recent time, not the goal. The goal still
-   > shapes race-specific work. *(The improvement threshold is NOT SPECIFIED — needs Ian.)* This is
-   > a direct answer to the failure mode behind Runna's reported injuries: an algorithm that "takes
-   > the runner at their word."
+   > **Safety clamp (decision, 2026-07-10; refined by addendum R-A, same day).** Training paces are
+   > **unconditionally** computed from the recent time, never the goal — this doesn't change at any
+   > improvement size. What the goal drives is the goal-pace session's own target: if the goal time
+   > implies **≤10% improvement** over the recent-time equivalent, goal-pace sessions use the raw
+   > goal pace; beyond 10%, they use the recent-time-equivalent pace instead. This is a direct
+   > answer to the failure mode behind Runna's reported injuries: an algorithm that "takes the
+   > runner at their word."
 3. **Generate a plan**, tiered by subscription:
 
 | Tier | Plans | Engine | Quality |
 |------|-------|--------|---------|
 | **Free** | 1 total (to try the app) | Templates only | Basic hard-coded plan for the chosen distance/duration |
-| **Pro** | 3 / month | AI + template hybrid | Deep personalization, pace targets, HR zones, warm-ups/drills, coach-style "why" per week |
-| **Elite** | 10 / month | Same skeleton, customized far more heavily — richest prompt | Everything in Pro **plus** (proposed, confirm): mid-plan adjustments/regeneration (shift days, change race date), race-day strategy section, deeper periodization tuned to injury history |
+| **Pro** | 3 / period† | AI + template hybrid | Deep personalization, pace targets, HR zones, warm-ups/drills, coach-style "why" per week |
+| **Elite** | 10 / period† | Same skeleton, customized far more heavily — richest prompt | Everything in Pro, plus a per-workout "why" — the richest personalization prompt (injury history, periodization nuance, race context), nothing more. **Extras cut for MVP** (decision, 2026-07-10) — see the v2 list below |
+
+† A **period** is anchored to the purchase day (e.g. May 26 → June 26, clamped at month end), not
+a calendar month. User-facing copy never says "this month" — see "User flow" below.
 
 All three tiers build on the same coach-authored template skeleton (see
 [`03-engineering-requirements.md`](03-engineering-requirements.md), `generate-plan`). It is never
@@ -55,7 +61,16 @@ load-rule clamp applies identically to all three tiers.
 4. **Plan view**: week-by-week schedule; each workout has type, distance/duration, pace/effort,
    and (paid) the coaching explanation.
 5. **My Plans tab**: all generated plans stored and accessible; free users see their single plan.
-6. **Dummy paywall** (v1): same pattern as Echo V1 — fake payment flow gates Pro/Elite.
+6. **Dummy paywall + settings-lite** (v1, restored by decision, 2026-07-10): same dummy-payment
+   pattern as Echo V1 — a fake payment flow gates Pro/Elite — plus a minimal settings screen (sign
+   out, tier display, restore purchases). Both live behind the third tab slot the design blueprint
+   already reserves (`docs/design/mvp-blueprint.md` Part 8).
+
+### Free-tier configure gating (decision, 2026-07-10)
+
+Free sees **every** distance and plan-length option on the configure screen, never a trimmed menu.
+A selection outside Free's reach (anything but a ≤12-week 5K) renders in a **locked state** that
+routes to the paywall on tap — an honest upsell, never a dead disabled control.
 
 ### Plan shape
 - **Race-date driven** when the user sets a target race: plan spans today → race day.
@@ -88,14 +103,19 @@ load-rule clamp applies identically to all three tiers.
 ```
 Launch → Sign up / Log in
       → Intake questionnaire (first run)
-      → Home: "Create a plan" + tier status (e.g. Pro: 2 of 3 plans left this month)
-      → Configure plan (goal, race/date or duration) → [paywall if over quota/tier]
+      → Home: "Create a plan" + tier status (e.g. Pro: "2 of 3 plans left. More on {resetDate}."
+        — never "this month"; periods are purchase-day-anchored, not calendar months)
+         — no "next workout" or "current week" card (decision, 2026-07-10); Home shows only
+           the plan link and quota state
+      → Configure plan (goal, race/date or duration) → [paywall if over quota/tier or an
+        out-of-tier selection]
       → Generating… → Plan view
       → Tab 2: My Plans (history list → plan view)
-      → Settings: account, subscription (dummy), restore
+      → Tab 3: Settings-lite (account, subscription/paywall (dummy), restore)
 ```
 
-Two tabs + a stack: **Home/Create** and **My Plans**, plus Settings. Deliberately small.
+Three tabs: **Home/Create**, **My Plans**, and **Settings-lite** (paywall + account, restored to
+MVP scope by decision, 2026-07-10 — see "What it does (v1)" above). Deliberately small.
 
 ## Milestones & definition of done
 
@@ -107,7 +127,7 @@ Two tabs + a stack: **Home/Create** and **My Plans**, plus Settings. Deliberatel
   *Done when: all three tiers produce a valid, complete plan for 5K/10K/half/marathon and
   fixed-duration goals, and a malformed AI response never reaches the user (falls back).*
 - **M4 — Tiers & quotas**: dummy paywall, tier stored server-side, quotas enforced server-side
-  (Free 1 total, Pro 3/mo, Elite 10/mo).
+  (Free 1 total, Pro 3/period, Elite 10/period — purchase-anchored, not calendar months).
   *Done when: quota can't be bypassed by the client, and the paywall shows at the right moments.*
 - **M5 — My Plans**: history tab, plan persistence, re-open past plans.
   *Done when: every generated plan is retrievable after app restart.*
@@ -128,6 +148,12 @@ Two tabs + a stack: **Home/Create** and **My Plans**, plus Settings. Deliberatel
   features; dummy payment is TestFlight-only). RevenueCat + StoreKit.
 - **Guest account** — try the app without signing up (likely gets the same Free 1-plan limit,
   then a prompt to create a real account to keep the plan). Deferred from v1.
+- **iPad and desktop/computer support** (decision, 2026-07-10). v1 ships phone-only, per Ian:
+  "phone only for phase 1, then ipad and computer in phase two."
+- **Elite extras** — mid-plan adjustment/regeneration (shift days, change race date), a race-day
+  strategy section, and periodization tuned to injury history beyond what the richest prompt
+  already covers. Cut from v1 (decision, 2026-07-10); `Plan.extras` can carry them later without a
+  schema change.
 - Plan export (PDF / calendar).
 - Mid-plan adjustments for Pro (if Elite-only proves too restrictive).
 - Completed-workout check-offs (deliberately excluded from v1 — that's Echo territory;

@@ -9,7 +9,15 @@
 
 export type Tier = 'free' | 'pro' | 'elite';
 
-/** How a plan was produced. `template` never calls the model. */
+/**
+ * How a plan was produced. `template` never calls the model.
+ *
+ * `'ai'` is never emitted in v1 — all paid (Pro/Elite) plans are skeleton-constrained `'hybrid'`.
+ * An earlier "unconstrained Elite" design, where the top tier would drop the template skeleton
+ * entirely, was corrected 2026-07-10 (see `docs/change_log.md`): the skeleton and its
+ * deterministic `loadRules.ts` clamp apply identically to every tier. Never branch Elite
+ * off-skeleton, and never have any code path emit `engine: 'ai'`.
+ */
 export type Engine = 'template' | 'hybrid' | 'ai';
 
 export type GoalType = 'race' | 'duration';

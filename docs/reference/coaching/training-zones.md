@@ -1,7 +1,7 @@
 # Training Zones
 
 Ported subset of `training_zones.md`. The whole zone model survives the port because max HR is
-computed from age (`220 − age`), and age is one of the eight intake fields.
+computed from age (`220 − age`), and age is one of the ten intake fields.
 
 ## Max heart rate estimation
 
