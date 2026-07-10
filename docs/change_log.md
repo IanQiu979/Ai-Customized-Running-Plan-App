@@ -5,33 +5,28 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
-## 2026-07-09
+## 2026-07-10 (later still) — plan shape spec + build prompt
 
-- Rewrote `README.md` from the create-expo-app boilerplate into a real project doc (status,
-  stack, tiers, environment, structure, roadmap).
-- Fixed `.gitignore`, which previously ignored only `.env*.local` and would have committed the
-  real `.env`.
-- Added `.env.example` and `supabase/functions/.env.example` as committed templates for the
-  client and edge-function env files.
-- Provisioned the Supabase project `v2.2_plan_generation` (ref `vvvcaulmbwbujeszfvbo`, region
-  ap-northeast-1, Free plan) and deleted the empty `DashboardFeature` project to free a
-  Free-plan project slot.
-- Enabled Google OAuth and email auth on the new Supabase project (`apple` and
-  `anonymous_users` remain off).
-- Installed `@supabase/supabase-js`, `@react-native-async-storage/async-storage`,
-  `react-native-url-polyfill`.
-- Added `src/lib/supabase.ts`, the shared Supabase client (env-guarded at import, native
-  session persistence, AppState-driven auto-refresh).
-- Installed `jest-expo` and added `src/lib/__tests__/supabase.test.ts` covering the env
-  contract (3 tests, all passing).
-- Added `typecheck` and `test` npm scripts.
-- Corrected `AGENTS.md`'s Expo docs link from v57 (no such SDK is installed) to v54, matching
-  the pinned `expo ~54.0.0`.
-- Force-pushed the local history over the remote's stub initial commit on
-  `IanQiu979/WorkoutGenerationv2.2`.
-- Rewrote `CLAUDE.md` and added `docs/architecture.md`, `docs/change_log.md`, `docs/status.md`,
-  and `docs/reference/plan-generation.md` to give future sessions persistent, accurate project
-  memory.
+- **Plan shape spec added to `planning/02-product-requirements.md`.** "Fixed duration (8 / 12 /
+  16 weeks)" is replaced by rules ported from `ECHO_Training_Plans_McMillan.md §
+  Customization Guidelines`:
+  - **Never refuse.** A race three weeks out gets an honest three-week plan (race-specific work,
+    final week a taper) instead of being turned away.
+  - **Plan length is keyed to race distance, not experience**: 5K 12–14 weeks, 10K 14–16, half
+    16–20, marathon 24–30. Ultra is deferred to v2 — no source content exists for it.
+  - **Maximum plan length is a tier feature**: Free 12 weeks, Pro 24, Elite 30+. Consequence
+    stated plainly: Free can only reach a 5K plan; a 10K needs 14 weeks minimum.
+  - **Days available shape the week** (`§ Weekly Availability`): under 3 days → a 3-run week
+    (easy, tempo, long); 3–4 days → add steady/interval; 5–6 days → the full program.
+  - **v2 section explains the ultra deferral**, naming both blockers: no source content exists
+    (5K/10K/half/marathon only in the library — not ours to invent per `CLAUDE.md`'s coaching
+    domain rule), and `load-rules.md` Rule 4's ceilings (110 km/week, 35 km longest run) cannot
+    express an ultra distance even if content existed.
+- Added `docs/reference/coaching/example-plan-5k-pro.md` — a hand-derived, fully worked 12-week
+  5K Pro-tier plan tracing every number to a source rule or intake arithmetic; it doubles as the
+  golden fixture `src/lib/planTemplates.ts` must reproduce.
+- Added `docs/mvp-build-prompt.md` — the audited, multi-session build prompt (three-lens audit:
+  spec consistency, design blueprint, live DB state) the MVP build will follow phase by phase.
 
 ## 2026-07-10 — Coaching domain decisions
 
@@ -136,3 +131,31 @@ make a behavior-changing commit, add a bullet under today's date — create a ne
 - `.claude/HANDOFF.md` deleted — 161 lines of stale notes from an unrelated debugging session,
   asserting this project is on Expo SDK 56. It is pinned to SDK 54.
 - `AGENTS.md` gains a rule: no agent changes a coaching rule, formula, or clinical claim without Ian.
+
+## 2026-07-09
+
+- Rewrote `README.md` from the create-expo-app boilerplate into a real project doc (status,
+  stack, tiers, environment, structure, roadmap).
+- Fixed `.gitignore`, which previously ignored only `.env*.local` and would have committed the
+  real `.env`.
+- Added `.env.example` and `supabase/functions/.env.example` as committed templates for the
+  client and edge-function env files.
+- Provisioned the Supabase project `v2.2_plan_generation` (ref `vvvcaulmbwbujeszfvbo`, region
+  ap-northeast-1, Free plan) and deleted the empty `DashboardFeature` project to free a
+  Free-plan project slot.
+- Enabled Google OAuth and email auth on the new Supabase project (`apple` and
+  `anonymous_users` remain off).
+- Installed `@supabase/supabase-js`, `@react-native-async-storage/async-storage`,
+  `react-native-url-polyfill`.
+- Added `src/lib/supabase.ts`, the shared Supabase client (env-guarded at import, native
+  session persistence, AppState-driven auto-refresh).
+- Installed `jest-expo` and added `src/lib/__tests__/supabase.test.ts` covering the env
+  contract (3 tests, all passing).
+- Added `typecheck` and `test` npm scripts.
+- Corrected `AGENTS.md`'s Expo docs link from v57 (no such SDK is installed) to v54, matching
+  the pinned `expo ~54.0.0`.
+- Force-pushed the local history over the remote's stub initial commit on
+  `IanQiu979/WorkoutGenerationv2.2`.
+- Rewrote `CLAUDE.md` and added `docs/architecture.md`, `docs/change_log.md`, `docs/status.md`,
+  and `docs/reference/plan-generation.md` to give future sessions persistent, accurate project
+  memory.

@@ -26,6 +26,7 @@ are kept as-is even though they no longer spell the product name.
 | [`workout-library.md`](workout-library.md) | Running session primitives (easy, tempo, intervals, long run, ...) |
 | [`injury-rules.md`](injury-rules.md) | Return-to-running protocol for a declared injury |
 | [`plan-structure.md`](plan-structure.md) | Phases, the Day 1…Day 7 model, deload cadence, how a plan is composed |
+| [`example-plan-5k-pro.md`](example-plan-5k-pro.md) | Worked 12-week 5K Pro-tier plan, hand-derived from the library — the golden fixture `planTemplates.ts` must reproduce |
 
 ## The applicability filter — why most of the source didn't make the cut
 

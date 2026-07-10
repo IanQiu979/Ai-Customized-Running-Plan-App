@@ -59,7 +59,24 @@ load-rule clamp applies identically to all three tiers.
 
 ### Plan shape
 - **Race-date driven** when the user sets a target race: plan spans today → race day.
-- **Fixed duration** (8 / 12 / 16 weeks) for general goals ("get fitter", "build base").
+- **Never refuse.** A race three weeks out gets a three-week plan: race-specific work, final week
+  a taper. Short is honest; refusing is not.
+- **Plan length is keyed to race distance, not experience**
+  (`ECHO_Training_Plans_McMillan.md § Customization Guidelines › Goal Race`):
+
+  | Distance | Program length |
+  |---|---|
+  | 5K | 12–14 weeks |
+  | 10K | 14–16 weeks |
+  | Half | 16–20 weeks |
+  | Marathon | 24–30 weeks |
+  | Ultra | v2 — no source content exists yet |
+
+- **Maximum plan length is a tier feature.** Free 12 weeks · Pro 24 · Elite 30+.
+  Consequence, stated plainly: **Free can only reach a 5K plan.** A 10K needs 14 weeks minimum.
+- **Days available shape the week**
+  (`§ Customization Guidelines › Weekly Availability`): under 3 days → a 3-run week (easy, tempo,
+  long); 3–4 days → add steady/interval; 5–6 days → the full program.
 - **Running only.** A v1 plan contains runs and rest days. No prehab strength, no cross-training,
   no mobility sessions. (Echo's McMillan plans include prehab; V2.2 deliberately drops it.)
   Consequence: the engine's only levers against a declared injury are **volume and intensity**.
@@ -99,6 +116,14 @@ Two tabs + a stack: **Home/Create** and **My Plans**, plus Settings. Deliberatel
 
 ## v2 (after launch learnings)
 
+- **Ultra distances** (50K / 50 mile / 100K / 100 mile — exact set TBD). Deferred from v1 for two
+  concrete reasons, both of which must be resolved before it can be built:
+  1. **No source content exists.** The coaching library covers 5K, 10K, half, and marathon only.
+     Ultra plan structure has to be authored by Ian; it is not ours to invent (`CLAUDE.md`,
+     "Coaching domain").
+  2. **The load rules cannot express it.** `load-rules.md` Rule 4 caps advanced runners at
+     110 km/week and a 35 km longest run ("marathon-specific only"). A 100-mile plan does not fit
+     inside those ceilings. Rule 4 needs an ultra tier before an ultra plan can be generated safely.
 - **Real payments** — required for public App Store release (Apple mandates IAP for digital
   features; dummy payment is TestFlight-only). RevenueCat + StoreKit.
 - **Guest account** — try the app without signing up (likely gets the same Free 1-plan limit,
