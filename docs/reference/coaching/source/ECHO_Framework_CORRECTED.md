@@ -47,6 +47,8 @@ All three may be running in Zone 1 (easy) for THEIR individual baseline.
 DO NOT use age-predicted zones (e.g., "220 - age").
 Instead: Establish individual heart rate baselines through testing.
 
+> ℹ️ **NOTE — INTERNAL CONTRADICTION, SCOPED BY RULING (Ian, 2026-07-10):** This instruction contradicts `training_zones.md`, which builds all of its zone tables on 220 − age. Ian — shown Tanaka et al. 2001 (208 − 0.7 × age is more accurate; ±10-12 bpm scatter around any age formula) — ruled to keep 220 − age as the estimate *where no individual data exists*. That is exactly V2.2's situation: a one-time 8-field intake with no logging, so age is the only HR input available. Both positions stand, scoped: 220 − age is the no-data default; this pillar's individual-baseline principle applies whenever longitudinal HR data exists (Ian's live coaching, any future product with run logging).
+
 Economy Measurement Methods:
 1. Heart rate at a given pace (declining HR week-to-week = better economy)
    → Track individual's own trend, not against age-predicted targets
@@ -110,6 +112,8 @@ General Guidelines (NOT absolute rules):
 - Race pace: 175-185 SPM (but range is 165-195)
 - Hard efforts (Zone 3-4): 185-195 SPM (but range is 175-200)
 - Strides / max efforts: 190+ SPM (but range is 180-210)
+
+> ℹ️ **EVIDENCE NOTE (per Ian's 2026-07-10 cadence ruling):** This pillar's individual-baseline position is the evidence-supported one. The intervention with trial support is a **5-10% step-rate increase above the runner's own baseline** (Br J Sports Med 2022 step-rate meta-analysis), and the ubiquitous 180-SPM figure traces to Jack Daniels counting elite runners at the 1984 Olympics — an observation of elites, never a prescription. Be aware the library contradicts itself: `training_zones.md`'s "Cadence Targets by Zone" table and the injury patterns in `load_rules.md` Rule 6 / `injury_flags.md` still prescribe absolute SPM floors; those spots carry matching annotations. Where the two positions collide, this pillar's is the evidence-aligned one.
 
 Your baseline cadence should be established through:
 1. Testing your comfortable running cadence (natural stride)
@@ -556,6 +560,8 @@ Zone 5 (Maximum Effort): 95-100% max HR
 
 ⚠️ Zone 5 is ONLY used for short sprints and maximum efforts.
 Not for sustained workouts. 30-60 second maximum efforts.
+
+> ⚠️ **GAP — NEEDS IAN:** These zone boundaries disagree with `training_zones.md`: here Zone 3 = 80-90% and Zone 4 = 90-95% of max HR; there Zone 3 = 80-87% and Zone 4 = 87-95%. Zone 2's physiology also differs ("right at lactate threshold boundary" here vs "marathon pace to slightly faster" there). A generator emitting HR ranges needs one authoritative set. Which governs?
 
 THREE PACING STRATEGIES:
 

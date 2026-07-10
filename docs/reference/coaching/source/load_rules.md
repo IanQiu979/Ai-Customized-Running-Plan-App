@@ -4,12 +4,16 @@
 
 These rules are deterministic and absolute. They apply equally to all runners regardless of fitness level, goal, or preference. The AI coaching system must enforce these rules and never override them, even if a user requests it.
 
+> 📎 **V2.2 SCOPE NOTE:** Rules 2 (RPE), 3 (resting HR), and the sleep-based adjustments in Rule 8 depend on ongoing logged data. V2.2 generates a plan once from an 8-field intake and does no logging, so the app cannot enforce them. They remain in force for Ian's live coaching business and for any future product with run logging — do not delete them.
+
 ---
 
 ## Rule 1: Weekly Volume Increase Cap
 
 **MAXIMUM INCREASE:** 10-15% per week  
-**Verified:** McMillan methodology, industry standard
+**Status:** Coaching convention
+
+> 📌 **RULING (Ian, 2026-07-10):** The line above previously read "Verified: McMillan methodology, industry standard." The 10-15% figure stays, but the "verified" claim does not: Buist et al. 2008 (Am J Sports Med, RCT, 532 novice runners) found injury incidence of 20.8% under a 10%-rule graded program vs 20.3% without one (p=.90), and a 2022 systematic review covering 23,047 runners concluded the 10% rule "is not justified." The cap is retained as Ian's coaching convention, not as an evidence-verified injury-prevention threshold.
 
 ### Calculation
 
@@ -37,11 +41,15 @@ The planning system must calculate proposed weekly km. If proposed total exceeds
 
 ### Exception — Recovery Weeks
 
-Volume can decrease by any amount during deload weeks. There is no minimum decrease required — even 50% reduction is fine.
+The increase cap applies to increases only — deload-week decreases are exempt from it. Deload weeks reduce volume by 35-45% (see Deload Trigger below).
+
+> 📌 **RULING (Ian, 2026-07-10):** **Deload = 35-45% volume reduction. Authoritative everywhere.** This clause previously read "Volume can decrease by any amount during deload weeks... even 50% reduction is fine." The library carried four different deload numbers: 20-30% (Deload Trigger below, `training_zones.md` Deload Frequency, and `workout_library.md` Part 3's Standard Protocol), "any amount... even 50%" (this clause), "50% volume" (`ECHO_Training_Plans_McMillan.md` General Principles), and ~35-45% (`workout_library.md` Part 3's worked examples: ~40% beginner, ~45% intermediate, 35-40% advanced). Ian ruled the worked examples reflect his actual practice; 35-45% now governs in all files.
 
 ### Deload Trigger
 
-Every 3-4 weeks, reduce volume 20-30%.
+Every 3-4 weeks, reduce volume 35-45%.
+
+> 📌 **RULING (Ian, 2026-07-10):** Previously "reduce volume 20-30%." Reconciled to the authoritative 35-45% — see the ruling under "Exception — Recovery Weeks" above for the full history.
 
 | Level | Frequency |
 |-------|-----------|
@@ -113,6 +121,8 @@ Resting HR should be less than 60 bpm for trained runners, or within 10-15 bpm o
 
 ## Rule 4: Weekly Volume Safety Thresholds by Level
 
+> 📌 **RULING (Ian, 2026-07-10):** Experience level is determined **primarily by current weekly volume** — ≤30 km/week = beginner, >30 and <70 km = intermediate, ≥70 km = advanced — with years running as a secondary signal. Where the two disagree, **volume wins**, and the app asks the runner to confirm. This also resolves a contradiction: `ECHO_Training_Plans_McMillan.md`'s Customization Guidelines previously defined Intermediate as "1-2 years" while this rule says "6 months - 3 years"; the years bands below stand as the secondary signal, and the Customization Guidelines have been aligned to them.
+
 ### Beginner (0-6 months running experience)
 
 | Metric | Value |
@@ -148,6 +158,8 @@ Resting HR should be less than 60 bpm for trained runners, or within 10-15 bpm o
 | Deload frequency | Every 3 weeks |
 
 **Note:** Requires adequate recovery infrastructure and strength training.
+
+> ⚠️ **GAP — NEEDS IAN:** No ultra-distance content exists anywhere in the library, and this rule's ceilings (110 km/week maximum, 35 km longest run, "marathon-specific only") cannot express an ultra plan at all. Ultra support is planned for v2 of the app; before then, Ian needs to supply ultra volume ceilings, long-run rules (including back-to-back long runs), and time-on-feet guidance — nothing here can be extrapolated safely.
 
 ---
 
@@ -193,6 +205,8 @@ Resting HR should be less than 60 bpm for trained runners, or within 10-15 bpm o
 ## Rule 6: Injury Pattern Detection
 
 Detect from run history and respond proactively.
+
+> ℹ️ **EVIDENCE NOTE (per Ian's 2026-07-10 cadence ruling — annotate, don't alter):** The knee and shin patterns below treat "cadence below 170 SPM" as an absolute injury cause. The evidence keys cadence intervention to a 5-10% increase above the runner's *own* baseline (Br J Sports Med 2022 step-rate meta-analysis), not to an absolute 170 floor — see the matching annotations in `training_zones.md` (Cadence Targets by Zone) and `ECHO_Framework_CORRECTED.md` Pillar 2, which already takes the individual-baseline position.
 
 ### Knee Pain
 
@@ -308,6 +322,8 @@ Detect from run history and respond proactively.
 | < 6 hours average | Training adaptation STOPS entirely |
 
 ⚠️ **Critical:** Less than 6 hours = training stress without recovery = net negative effect
+
+> ℹ️ **EVIDENCE NOTE (per Ian's 2026-07-10 ruling — annotate, don't alter):** The figures in the table above appear to derive from Milewski et al. 2014 (J Pediatr Orthop), which found injury risk increased ~70% below **8 hours** of sleep — in **adolescent athletes**, not adults. The "<6 hours: adaptation STOPS entirely" cliff has no identifiable source. The direction (short sleep → higher injury risk, worse adaptation) is well supported; the specific thresholds and percentages as stated are misattributed. Treat the table as directional guidance, not as sourced clinical thresholds.
 
 ### Sleep-Based Plan Adjustment
 

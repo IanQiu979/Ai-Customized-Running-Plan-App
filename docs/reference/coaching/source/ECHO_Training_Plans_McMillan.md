@@ -11,11 +11,17 @@ TRAINING PLAN PHILOSOPHY:
 - Time ranges for long/recovery runs; specific distances for intervals/structured work
 - Multiple running types to prevent boredom and build comprehensive fitness
 
+> ⚠️ **GAP — NEEDS IAN:** Only three worked plans exist in this file (beginner 5K, intermediate 10K, advanced marathon) — there is no per-experience-level variant of any distance, and no half-marathon example at all despite the Customization Guidelines listing 16-20 week half-marathon programs. A generator cannot interpolate plans from three examples; it needs the *rules* used to build them: weekly structure per level × distance × days available, session selection and ordering, and progression formulas. The examples stay valuable as validation targets for generated output.
+
+> 📎 **V2.2 SCOPE NOTE:** These examples include prehab/strength days. V2.2 plans are running-only — runs and rest days (see `CLAUDE.md`, "Coaching domain") — so generated plans treat those slots as rest. The strength content stays; it serves Ian's coaching business.
+
 ================================================================
 EXAMPLE 1: BEGINNER 5K TRAINING (12 weeks to race)
 Goal: Complete 5K, sub-30 min if possible
 Experience: <6 months running experience
 Weekly availability: 3-4 days/week
+
+> ⚠️ **GAP — NEEDS IAN:** Throughout Example 1, the stated "Weekly Total" exceeds the sum of the listed day distances by roughly 3-6 km (e.g., Week 1 lists 3-4 + 3-4 + 4-5 = 10-13 km of running but states "~13-17 km"). Which is authoritative for a generator — the day-by-day distances or the weekly totals?
 
 PHASE 1: HEALTH & EARLY AEROBIC FOUNDATION (Weeks 1-4)
 
@@ -116,16 +122,18 @@ Day 7: Rest
 
 Weekly Total: ~17-19 km running + 1 strength session
 
-WEEK 4 (Consolidate, assess):
+WEEK 4 (Deload — consolidate, assess):
+
+> 📌 **RULING (Ian, 2026-07-10):** As originally written, this week was labelled a deload ("This is deload week, keep it easy") but its volume *rose* from Week 3 (~17-19 km → ~18-19 km; days were 4 km / 4 km / 6-7 km). That was an error. Corrected below to a 35-45% reduction from Week 3 per the authoritative deload ruling (see `load_rules.md` Rule 1), preserving the day-by-day shape.
 
 Day 1: Easy Run
-  Distance: 4 km
+  Distance: 3 km (was 4 km)
   Zone: 1
 
 Day 2: Rest
 
 Day 3: Easy Run
-  Distance: 4 km
+  Distance: 3 km (was 4 km)
   Zone: 1
   Cadence focus throughout
 
@@ -135,13 +143,14 @@ Day 5: Prehab Strength
   Duration: 30 min
 
 Day 6: Easy Run (Longer)
-  Distance: 6-7 km
+  Distance: 4-5 km (was 6-7 km)
   Zone: 1
   This is deload week, keep it easy
 
 Day 7: Rest
 
-Weekly Total: ~18-19 km running + 1 strength session
+Weekly Total: ~10-12 km running + 1 strength session
+  (35-45% below Week 3's ~17-19 km; previously stated ~18-19 km)
 
 PHASE 2: EARLY AEROBIC TRAINING (Weeks 5-8)
 
@@ -407,6 +416,8 @@ Goal: Sub-45 min 10K (4:30/km pace)
 Experience: 1-2 years consistent running
 Weekly availability: 4-5 days/week
 Current weekly volume: 30-35 km
+
+> ⚠️ **GAP — NEEDS IAN:** The header says "16 weeks to race," but the schedule below runs 15 weeks — race day is Week 15, Day 7. An off-by-one matters to a generator that reads program lengths from these headers. Which is intended? (Note also this runner profile — "1-2 years" at 30-35 km/week — classifies as intermediate under both the old years bands and the new volume-primary rule, so the plan itself is unaffected by the experience-level ruling.)
 
 PHASE 1: HEALTH & EARLY AEROBIC WORK (Weeks 1-4)
 
@@ -1258,14 +1269,19 @@ For any runner, customize based on:
 
 1. EXPERIENCE LEVEL:
    Beginner (<6 months): Focus on consistency, base building, injury prevention
-   Intermediate (1-2 years): Add structure, introduce intervals, speed work
+   Intermediate (6 months - 3 years): Add structure, introduce intervals, speed work
    Advanced (3+ years): High-intensity work, race-specific prep, multiple goals
+
+> 📌 **RULING (Ian, 2026-07-10):** Two changes. (1) Intermediate previously read "1-2 years," contradicting `load_rules.md` Rule 4's "6 months - 3 years" — aligned to Rule 4, whose band tiles cleanly between the beginner (<6 months) and advanced (3+ years) bands both files already agreed on. (2) Overriding rule: experience level is determined **primarily by current weekly volume** — ≤30 km/week = beginner, >30 and <70 km = intermediate, ≥70 km = advanced — with years running as a secondary signal. Where the two disagree, **volume wins**, and the app asks the runner to confirm.
 
 2. GOAL RACE:
    5K: 12-14 week programs (shorter focus)
    10K: 14-16 week programs (balance speed and stamina)
    Half Marathon: 16-20 week programs (stamina emphasis)
    Marathon: 24-30 week programs (full periodization)
+
+> 📌 **RULING (Ian, 2026-07-10):** If the runner's race is closer than the recommended program length, **never refuse** — build a short race-specific plan with a taper week.
+> ⚠️ **GAP — NEEDS IAN:** The construction rules for that short plan are unspecified: at what runway does it become taper-only, which phases get dropped first, and what intensity is safe with no base phase behind it? A generator needs these rules; nothing in the library can be extrapolated to answer them.
 
 3. WEEKLY AVAILABILITY:
    <3 days/week: 3-run programs (easy, tempo, long)
@@ -1284,11 +1300,17 @@ For any runner, customize based on:
    Boredom prevention: Vary interval formats, add fartlek, change routes
 
 GENERAL PRINCIPLES:
-  • Volume increases gradually (8-10% per week max)
+  • Volume increases gradually (10-15% per week max)
   • Hard sessions spaced 48+ hours apart
-  • Every 3-4 weeks: Deload week (50% volume)
+  • Every 3-4 weeks: Deload week (reduce volume 35-45%)
   • Long runs build 1-2 km per week max
   • Strength work 1-2x per week (non-negotiable for injury prevention)
   • Prehab continues throughout all phases
+
+> 📌 **RULING (Ian, 2026-07-10):** Two corrections above. (1) The volume cap previously read "8-10% per week max," contradicting `load_rules.md` Rule 1's 10-15%; Ian ruled **10-15%**. (2) The deload line previously read "(50% volume)"; Ian ruled deload = **35-45% volume reduction** everywhere (see `load_rules.md` Rule 1 for the four conflicting numbers this reconciles).
+
+> ⚠️ **GAP — NEEDS IAN:** Long-run growth is contradictory. "1-2 km per week max" here is absolute; Ian has separately said "10-20%" (relative). They agree only near a 10 km long run — at 16 km, 20% is 3.2 km, well past the 2 km ceiling. Which governs, and does the answer change with experience level or long-run length?
+
+> ⚠️ **GAP — NEEDS IAN:** A taper rule *does* exist (`training_zones.md` Phase 4: "final 2 weeks, 50% of peak week, intensity maintained") and it is well supported — Bosquet et al. 2007 (*Med Sci Sports Exerc*, meta-analysis of 27 studies) found the optimal taper is ~2 weeks, volume reduced 41–60%, with **intensity and frequency held constant**. The problem is that the three worked examples do not follow it: the 5K tapers 1 week, the 10K ~2 weeks, the marathon ~3 weeks including race week. A generator needs the rule keyed to race distance — taper length per distance, the volume percentage, and confirmation that intensity is retained.
 
 ================================================================

@@ -8,6 +8,8 @@
 
 The ECHO coaching system uses 5 training zones based on heart rate percentage, RPE (Rate of Perceived Exertion), and pace feel. All zone targets must be calibrated to the individual runner's max heart rate and current fitness level.
 
+> ⚠️ **GAP — NEEDS IAN:** The zone boundaries in this file disagree with `ECHO_Framework_CORRECTED.md` Pillar 4: here Zone 3 = 80-87% and Zone 4 = 87-95% of max HR; the framework has Zone 3 = 80-90% and Zone 4 = 90-95% (Zone 2's physiology also differs — "marathon pace to slightly faster" here vs "right at lactate threshold boundary" there). A generator emitting HR ranges needs one authoritative set. Which governs?
+
 ### Max Heart Rate Estimation
 
 **Formula:** 220 - age (estimate only)
@@ -15,6 +17,8 @@ The ECHO coaching system uses 5 training zones based on heart rate percentage, R
 **Example:** Age 35 runner = estimated max HR 185 bpm
 
 **Important:** This is an estimate. A field test (hill sprint or track time trial) gives more accurate individual max HR.
+
+> 📌 **RULING (Ian, 2026-07-10):** **Keep 220 − age.** Ian was shown Tanaka et al. 2001 (meta-analysis: 351 studies, 18,712 subjects), which found 208 − 0.7 × age more accurate and ±10-12 bpm of individual scatter around *any* age formula — and chose to keep 220 − age. Do not "fix" this formula without a new ruling from Ian. (Note the ±10-12 bpm scatter when interpreting any age-derived zone: it is an estimate either way.)
 
 ---
 
@@ -213,6 +217,8 @@ When used: After easy runs or day before hard session
 
 A runner with lower cadence at higher effort = overstriding under pressure. This is an **injury risk pattern** — flag it in coaching feedback.
 
+> ℹ️ **EVIDENCE NOTE — INTERNAL CONTRADICTION (per Ian's 2026-07-10 ruling — annotate, don't delete):** This section prescribes absolute per-zone SPM targets, but `ECHO_Framework_CORRECTED.md` Pillar 2 argues cadence is "NOT one-size-fits-all" and that forcing it above a runner's natural rhythm is "counterproductive and injury-prone" — the library contradicts itself, and the evidence sides with the framework. The intervention with trial support is a **5-10% step-rate increase above the runner's own baseline** (Br J Sports Med 2022 step-rate meta-analysis), not an absolute floor; the ubiquitous 180-SPM figure traces to Jack Daniels counting elite runners at the 1984 Olympics — an observation of elites, not a prescription. The tables above stand as typical observed ranges, not as targets to force on any individual runner.
+
 ---
 
 ## Weekly Training Intensity Distribution
@@ -252,13 +258,17 @@ A runner with lower cadence at higher effort = overstriding under pressure. This
 
 ### The Problem
 
-Most recreational runners do the **reverse** — too much moderate effort, not enough truly easy running. This is the **polarized training model**, and it's the most effective approach.
+Most recreational runners do the **reverse** — too much moderate effort, not enough truly easy running.
+
+> 📌 **RULING (Ian, 2026-07-10):** This section previously labelled the library's approach "the polarized training model." With ~20% of volume at Zone 3 (threshold) prescribed in the race-specific phase (Phase 3 below), what this library actually prescribes is a **pyramidal** distribution (Seiler; Stöggl & Sperlich 2014) — most volume easy, progressively less at each higher intensity — not polarized, which minimizes the threshold middle. The 80/20 easy-hard emphasis itself is well supported and stands unchanged.
 
 ---
 
 ## Heart Rate Zone Calculation by Age
 
 **Formula:** Max HR = 220 - age (use as estimate, test for accuracy)
+
+> 📌 See the ruling under "Max Heart Rate Estimation" above: Ian chose to keep 220 − age with full knowledge of Tanaka et al. 2001. Do not change this table's basis without a new ruling.
 
 | Age | Max HR | Z1 Range | Z2 Range | Z3 Range | Z4 Range |
 |-----|--------|----------|----------|----------|----------|
@@ -382,9 +392,13 @@ Track for 7 days, calculate average. This is the baseline.
 | Intensity | Same or slightly higher (keep legs sharp) |
 | Purpose | Allow adaptation, arrive fresh to race |
 
+> ⚠️ **GAP — NEEDS IAN:** "Final 2 weeks / 50% of peak" is the closest thing to a taper rule in the library, and the worked plans do not follow it consistently: the 5K example tapers 1 week, the 10K ~2 weeks, the marathon ~3 weeks including race week. A generator needs a taper rule keyed to race distance (length, weekly volume percentages, what intensity is retained). See the fuller gap note under General Principles in `ECHO_Training_Plans_McMillan.md`.
+
 ### Deload Frequency
 
-**Every 3-4 weeks, reduce volume 20-30%.**
+**Every 3-4 weeks, reduce volume 35-45%.**
+
+> 📌 **RULING (Ian, 2026-07-10):** Previously "reduce volume 20-30%." Deload = **35-45% volume reduction** everywhere — see `load_rules.md` Rule 1 for the reconciliation of the four conflicting numbers the library used to carry.
 
 | Setting | Intensity |
 |---------|-----------|

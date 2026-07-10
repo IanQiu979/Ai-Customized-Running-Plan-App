@@ -8,6 +8,10 @@
 
 The coaching system should detect injury patterns from logged run data, RPE reports, and user messages. When patterns emerge, proactively flag and adjust the plan.
 
+> 📎 **V2.2 SCOPE NOTE:** The patterns below assume logged run data, and their responses prescribe prehab, mobility, and surface changes that V2.2 cannot emit — the app takes a one-time 8-field intake, outputs runs and rest days only, and its only levers against a declared injury are volume and intensity (see `CLAUDE.md`, "Coaching domain"). Everything here remains authoritative for Ian's coaching business. Do not delete.
+
+> ℹ️ **EVIDENCE NOTE (per Ian's 2026-07-10 cadence ruling — annotate, don't alter):** Several patterns below treat "cadence below 170 SPM" as a causal injury threshold. Per the annotations in `training_zones.md` (Cadence Targets by Zone) and `ECHO_Framework_CORRECTED.md` Pillar 2, the evidence keys cadence intervention to a 5-10% increase above the runner's *own* baseline (Br J Sports Med 2022 step-rate meta-analysis), not to an absolute 170 floor.
+
 ---
 
 ### Knee Pain Pattern
@@ -127,6 +131,8 @@ The coaching system should detect injury patterns from logged run data, RPE repo
 - Beginner runner: 8-12 weeks minimum
 - Intermediate: 10-14 weeks
 - Advanced: 12-16 weeks (more muscle mass = more bone load)
+
+> ⚠️ **EVIDENCE ANNOTATION — HIGHEST-SEVERITY ITEM IN THE LIBRARY (per Ian's 2026-07-10 ruling — annotate prominently, don't alter):** These timelines are keyed to *experience level*, but the clinical evidence keys return-to-running to fracture **site and grade**, not runner tier: a low-risk metatarsal shaft stress fracture returns in roughly **6-8 weeks**, while high-risk sites — **navicular, femoral neck** — need **4-6 months minimum** and specialist management. An "advanced" runner with a navicular fracture given "12-16 weeks" by this table could be returned to running months too early, with catastrophic downside (femoral neck completion = surgical emergency). Note also this file gives two *contradictory* rationales for the same tiering: here, advanced runners take longer because "more muscle mass = more bone load"; in Part 2, because "muscle loss = slower comeback." Any generator or coaching output must defer to the treating clinician's site-specific guidance — never to these tier-based numbers alone.
 
 ---
 
@@ -276,6 +282,8 @@ Stress fractures are the **longest injuries** for runners.
 - Intermediate runner: 10-14 weeks
 - Advanced runner: 12-16 weeks (muscle loss = slower comeback)
 
+> ⚠️ **EVIDENCE ANNOTATION (see the prominent annotation in Part 1):** Return-to-running after a stress fracture is determined by fracture **site and grade** (low-risk metatarsal shaft ~6-8 weeks; navicular and femoral neck 4-6 months minimum), not by runner experience tier. Also note the rationale here ("muscle loss = slower comeback") contradicts Part 1's ("more muscle mass = more bone load") for the exact same tiering. Defer to the treating clinician's site-specific guidance.
+
 **Recovery Protocol:**
 
 **Weeks 1-4: Absolute Rest (No impact whatsoever)**
@@ -340,6 +348,8 @@ Stress fractures are the **longest injuries** for runners.
 - Young runner stress fracture: 6-8 weeks
 - 50+ runner stress fracture: 12-16 weeks
 - Coach all injuries with more conservative timelines for 50+ runners
+
+> ℹ️ This is the library's *third* stress-fracture timeline, keyed to age (Parts 1 and 2 key theirs to experience tier). See the annotations there: fracture **site and grade**, not age or tier, determine return time. Conservative timelines for 50+ runners remain sound coaching; the specific week counts are not clinically load-bearing.
 
 **Deconditioning Faster:**
 - Missing 2 weeks = more significant loss than younger runners

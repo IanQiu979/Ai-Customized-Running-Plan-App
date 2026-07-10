@@ -140,6 +140,8 @@ Tempo runs should be run **at or SLIGHTLY BELOW lactate threshold** — not righ
 | Intermediate | 45-60 sec/km faster than easy pace |
 | Advanced | Race-specific threshold pace |
 
+> ⚠️ **GAP — NEEDS IAN:** **This is the library's single biggest gap: no pace derivation exists anywhere.** This table defines tempo relative to "easy pace," but easy pace is never given a formula in any of the six files — no VDOT table, no equivalent-performance chart, no McMillan pace calculator. Consequence for the plan generator: from a runner's recent 5K time it can compute goal race pace (arithmetic) and HR zones (from age), but it **cannot compute easy, tempo, or interval pace at all.** Pro and Elite tiers sell "pace targets" — this blocks them outright. Needed from Ian: the pace tables or calculator method he actually uses to derive training paces from a recent race result.
+
 ### Post-Run Feedback Example
 
 > Your tempo pace was consistent throughout (5:28, 5:30, 5:29, 5:31/km). That is excellent execution — controlled and even. Your cadence held at 179 SPM for the first 20 min then dropped to 173 SPM in the final 10 min. Cadence fatigue is the area to improve. Next session: focus on maintaining 178+ SPM even as legs tire.
@@ -209,6 +211,8 @@ First interval and last interval should be within 5-8 seconds of each other per 
 
 ⚠️ **Most critical recovery window of all session types.**
 
+> ℹ️ **EVIDENCE NOTE (per Ian's 2026-07-10 ruling — annotate, don't alter):** The 30-minute "anabolic window" is not supported at this precision. Aragon & Schoenfeld 2013 (J Int Soc Sports Nutr) and the ISSN 2017 position stand find the effective post-exercise window is a matter of **hours**, not minutes, and that total daily protein intake matters far more than timing. Eating soon after hard sessions remains reasonable practice; the "within 30 minutes or the window closes" urgency is overstated. (The same caveat applies to the long-run note in Session Type 5.)
+
 ---
 
 ## Session Type 5: Long Run (Zone 1, with Optional Finish Build)
@@ -272,6 +276,8 @@ First interval and last interval should be within 5-8 seconds of each other per 
 60-80g carbs + 20-25g protein **ASAP (within 30 minutes)**
 
 ⚠️ **Second most critical recovery window**
+
+> ℹ️ See the evidence note under Session Type 4: the effective window is hours, not 30 minutes, and total daily protein dominates. Prompt refuelling is still good practice after long runs (glycogen restoration for the next session), but the deadline framing is overstated.
 
 ---
 
@@ -450,6 +456,8 @@ Strides maintain neuromuscular activation and speed without the fatigue of full 
 ---
 
 ## Part 2: Cross-Training Library
+
+> 📎 **V2.2 SCOPE NOTE:** V2.2 plans are running-only — runs and rest days, no cross-training, strength, or prehab (see `CLAUDE.md`, "Coaching domain"). This entire part is out of scope for the app but remains authoritative for Ian's coaching business. Do not delete.
 
 ---
 
@@ -688,7 +696,9 @@ Never on day before hard running sessions.
 
 A deload week is a **planned reduction in training stress** (volume, intensity, or both) to allow adaptation, recovery, and accumulation of training benefits. Without deload, runners stagnate or get injured.
 
-**Standard Protocol:** Every 3-4 weeks, reduce volume by 20-30%.
+**Standard Protocol:** Every 3-4 weeks, reduce volume by 35-45%.
+
+> 📌 **RULING (Ian, 2026-07-10):** Previously "20-30%," which contradicted this file's own worked examples below (beginner ~40%, intermediate ~45%, advanced 35-40% reductions). Ian ruled the worked examples reflect his actual practice: deload = **35-45% volume reduction**, now consistent across the library (see `load_rules.md` Rule 1 for the full reconciliation). The worked examples below are unchanged — they are the basis of the ruling.
 
 ---
 
@@ -793,6 +803,8 @@ A deload week is a **planned reduction in training stress** (volume, intensity, 
 | Low-volume beginners (under 30 km/week) | Every 4-5 weeks |
 | Runners 50+ | Every 3 weeks (mandatory — slower recovery) |
 | High stress life periods | Every 3 weeks regardless of level |
+
+> ⚠️ **GAP — NEEDS IAN:** This table gives low-volume beginners a deload every 4-5 weeks, but `load_rules.md` Rule 1 and Rule 4 say beginners deload every 4 weeks. Which governs for the generator? (The 50+ every-3-weeks row agrees with Rule 1 and is already in the app spec.)
 
 ---
 
