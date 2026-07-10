@@ -41,12 +41,33 @@ supabase/functions/
 
 1. Authenticate the user (JWT) — reject anon.
 2. Read tier + count plans this period **server-side**; reject over quota (Free 1 total, Pro 3/mo, Elite 10/mo).
-3. Branch by tier:
-   - **Free** → select + lightly parametrize a template from `planTemplates` (no AI call).
-   - **Pro** → template skeleton for the distance/duration + Claude personalizes workouts, paces, explanations.
-   - **Elite** → fully AI-generated with the richest prompt (injury history, periodization, race strategy).
-4. Validate structure → on failure, retry once → on second failure, fall back to the template plan and flag it.
-5. Insert into `plans`, return the plan.
+3. Branch by tier. **All three tiers build on the same coach-authored template skeleton. The
+   skeleton is never removed — it is the safety guarantee and the product's differentiation.**
+   What scales across tiers is how much of the runner the plan reasons about, and how much it
+   explains. It is never how much of the coach's judgment is taken away.
+   - **Free** → select + lightly parametrize the skeleton (no AI call). Effort *descriptions* only.
+   - **Pro** → the skeleton + Claude personalizes workouts, paces, HR zones, and a weekly "why"
+     *within* it.
+   - **Elite** → the same skeleton, customized far more heavily: the richest prompt (injury history,
+     periodization nuance, race context), a per-workout "why", and any confirmed extras. Still
+     inside the skeleton.
+
+   > Why: Runna's publicly reported injury cases trace to an algorithm that "takes the runner at
+   > their word," and Düking et al. 2024 found LLM-generated plans were not rated optimal by coaching
+   > experts without oversight. Selling the top tier as the one with the guardrail removed would be
+   > backwards.
+
+4. Clamp the result against the deterministic coaching rules in
+   [`docs/reference/coaching/load-rules.md`](../docs/reference/coaching/load-rules.md) — the
+   weekly volume increase cap, the long-run percentage cap, the **long-run spike cap** (no long
+   run may exceed the plan's own previous longest long run generated so far by more than 10%),
+   the long-run time cap (~2.5–3 hr), and deload-week volume reduction (35–45%, a band with both
+   a floor and a ceiling).
+   These run in typed code and apply **identically to all three tiers** — while building the
+   template for Free, and as a post-generation clamp on Claude's output for Pro and Elite. The
+   model cannot emit an unsafe week, because the code rejects the number before the user sees it.
+5. Validate structure → on failure, retry once → on second failure, fall back to the template plan and flag it.
+6. Insert into `plans`, return the plan.
 
 **Lesson carried from Echo V1** (`lib/planGenerator.ts`): keep validation *structural*, not
 strict-content — over-tight validation caused more bad fallback plans than it prevented.
@@ -82,8 +103,17 @@ with a stack trace); all tier/quota logic lives here and is never trusted from t
 
 ```sql
 profiles          (id → auth.users, created_at, display_name)
-intake_responses  (user_id, goal, experience, days_per_week, weekly_km,
-                   race_distance, race_date, injuries, updated_at)
+intake_responses  (user_id, goal, age, experience, days_per_week, weekly_km,
+                   race_distance, race_date, goal_time_sec,
+                   recent_perf_distance, recent_perf_time_sec,
+                   injuries, injury_notes, updated_at)
+  -- age required: max HR = 220 - age; 50+ forces a 3-week deload cadence
+  -- goal_time_sec        drives RACE-PACE sessions ONLY. Never everyday training paces.
+  -- recent_perf_*        drives EVERY training pace. Absent -> the plan emits no numeric
+  --                      paces at any tier, only effort language. This is why the "readout
+  --                      bracket" in the design can never render a lie.
+  -- injuries             closed-set flags. These, and only these, drive the safety rules.
+  -- injury_notes         free text. Context for the model on paid tiers. Never gates safety.
 subscriptions     (user_id, tier free|pro|elite, period_start, period_end,
                    source dummy|revenuecat)          -- source column = painless v2 swap
 plans             (id, user_id, tier_at_generation, engine template|hybrid|ai,

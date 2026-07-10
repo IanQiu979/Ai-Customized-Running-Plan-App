@@ -93,4 +93,6 @@ Built-ins also available: `Explore`, `Plan`, `general-purpose`. Plugin agents ar
   `prompt-engineer` follow [`docs/reference/plan-generation.md`](docs/reference/plan-generation.md):
   validate shape, retry once, fall back to a template.
 - **Docs are part of the change.** After a behavior-changing commit, `doc-writer` updates
-  `docs/change_log.md`, `docs/status.md`, and `docs/architecture.md`.
+  `docs/mvp-progress.md`, `docs/change_log.md`, and `docs/architecture.md`.
+- **Coaching content is never invented.** `docs/reference/coaching/` is a port of Ian's
+  McMillan-based library. No agent changes a training rule, formula, or clinical claim without him.

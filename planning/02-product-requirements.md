@@ -21,16 +21,36 @@ coaching app (the exact feedback that Echo V1 got: too many features).
 1. **Sign up** (required): Google, Sign in with Apple, or email/password. (Apple sign-in is
    required by App Store rules whenever Google sign-in is offered, so it ships in v1.) No guest
    mode in v1 — a guest account is deferred to v2.
-2. **Intake**: onboarding questionnaire (based on Echo V1's onboarding, extended) — goal,
+2. **Intake**: onboarding questionnaire (based on Echo V1's onboarding, extended) — goal, **age**,
    experience level, days/week available, current mileage, target race + date (optional),
-   injuries/constraints.
+   **goal time** (only when a race is chosen), **a recent time at any distance** (optional), and
+   injuries/constraints. **Ten fields.**
+
+   Three of them are not cosmetic:
+   - *Age* → max HR is estimated `220 − age`, so **no HR zone is computable without it**, and the
+     load rules make a 3-week deload cadence mandatory for runners 50+.
+   - *Goal time* → drives **race-pace sessions only**.
+   - *Recent time* → drives **every other training pace**. Deriving easy or tempo pace from a goal
+     the runner hasn't achieved would prescribe paces they cannot sustain. Without a recent time the
+     plan emits **no numeric paces at any tier** — only effort language.
+
+   > **Safety clamp.** If the goal time implies a large improvement over the runner's recent
+   > performance, training paces are computed from the recent time, not the goal. The goal still
+   > shapes race-specific work. *(The improvement threshold is NOT SPECIFIED — needs Ian.)* This is
+   > a direct answer to the failure mode behind Runna's reported injuries: an algorithm that "takes
+   > the runner at their word."
 3. **Generate a plan**, tiered by subscription:
 
 | Tier | Plans | Engine | Quality |
 |------|-------|--------|---------|
 | **Free** | 1 total (to try the app) | Templates only | Basic hard-coded plan for the chosen distance/duration |
 | **Pro** | 3 / month | AI + template hybrid | Deep personalization, pace targets, HR zones, warm-ups/drills, coach-style "why" per week |
-| **Elite** | 10 / month | Fully AI-personalized | Everything in Pro **plus** (proposed, confirm): mid-plan adjustments/regeneration (shift days, change race date), race-day strategy section, deeper periodization tuned to injury history |
+| **Elite** | 10 / month | Same skeleton, customized far more heavily — richest prompt | Everything in Pro **plus** (proposed, confirm): mid-plan adjustments/regeneration (shift days, change race date), race-day strategy section, deeper periodization tuned to injury history |
+
+All three tiers build on the same coach-authored template skeleton (see
+[`03-engineering-requirements.md`](03-engineering-requirements.md), `generate-plan`). It is never
+removed — Elite customizes it far more heavily than Pro, it does not remove it. The deterministic
+load-rule clamp applies identically to all three tiers.
 
 4. **Plan view**: week-by-week schedule; each workout has type, distance/duration, pace/effort,
    and (paid) the coaching explanation.
@@ -40,6 +60,11 @@ coaching app (the exact feedback that Echo V1 got: too many features).
 ### Plan shape
 - **Race-date driven** when the user sets a target race: plan spans today → race day.
 - **Fixed duration** (8 / 12 / 16 weeks) for general goals ("get fitter", "build base").
+- **Running only.** A v1 plan contains runs and rest days. No prehab strength, no cross-training,
+  no mobility sessions. (Echo's McMillan plans include prehab; V2.2 deliberately drops it.)
+  Consequence: the engine's only levers against a declared injury are **volume and intensity**.
+- **Days are unnamed.** Sessions are Day 1 … Day 7 within a 7-day cycle, never Mon–Sun — the runner
+  places them. Rest days are real slots in that cycle, not absences.
 
 ## User flow (v1)
 

@@ -1,0 +1,228 @@
+/**
+ * Shared plan vocabulary. Imported by both the Expo app and the Supabase edge
+ * functions (Deno), so this module must stay pure: types and const literals only.
+ * No React, no Deno, no Node, no AsyncStorage. A runtime-specific import here
+ * breaks one of the two consumers.
+ *
+ * Coaching semantics come from `docs/reference/coaching/`. Do not invent values.
+ */
+
+export type Tier = 'free' | 'pro' | 'elite';
+
+/** How a plan was produced. `template` never calls the model. */
+export type Engine = 'template' | 'hybrid' | 'ai';
+
+export type GoalType = 'race' | 'duration';
+
+export type RaceDistance = '5k' | '10k' | 'half' | 'marathon';
+
+export const RACE_DISTANCE_KM: Record<RaceDistance, number> = {
+  '5k': 5,
+  '10k': 10,
+  half: 21.0975,
+  marathon: 42.195,
+};
+
+/**
+ * Effort is the plan's primary information channel. The five levels are ordered
+ * by intensity; that order is load-bearing — the UI encodes it as both colour and
+ * bar height so the plan stays readable without colour vision.
+ */
+export type EffortLevel = 'recovery' | 'easy' | 'steady' | 'tempo' | 'interval';
+
+export const EFFORT_LEVELS: readonly EffortLevel[] = [
+  'recovery',
+  'easy',
+  'steady',
+  'tempo',
+  'interval',
+] as const;
+
+/** 0-based position in the intensity ramp. Presentation layers derive from this. */
+export const EFFORT_ORDINAL: Record<EffortLevel, number> = {
+  recovery: 0,
+  easy: 1,
+  steady: 2,
+  tempo: 3,
+  interval: 4,
+};
+
+/** Zones 1–5, from `docs/reference/coaching/training-zones.md`. */
+export type HrZone = 1 | 2 | 3 | 4 | 5;
+
+export type Phase = 'base' | 'build' | 'peak' | 'taper';
+
+export type ExperienceLevel = 'beginner' | 'intermediate' | 'advanced';
+
+/** Intake's five answers collapse to the three levels the load rules are written against. */
+export type ExperienceAnswer =
+  | 'new'
+  | 'some'
+  | 'regular'
+  | 'experienced'
+  | 'competitive';
+
+/** Closed set. Only these drive the deterministic injury rules; free text never does. */
+export type InjuryFlag =
+  | 'knee'
+  | 'ankle_achilles'
+  | 'shin_splints'
+  | 'it_band'
+  | 'hip_glute'
+  | 'lower_back'
+  | 'none';
+
+// ---------------------------------------------------------------------------
+// Performances and paces
+// ---------------------------------------------------------------------------
+
+/** A time over a known distance. Seconds, so no float drift on arithmetic. */
+export interface Performance {
+  distance: RaceDistance;
+  timeSec: number;
+}
+
+/** An inclusive pace band, seconds per kilometre. */
+export interface Pace {
+  lowSecPerKm: number;
+  highSecPerKm: number;
+}
+
+// ---------------------------------------------------------------------------
+// The plan
+// ---------------------------------------------------------------------------
+
+/**
+ * Rest is not an `EffortLevel`. It is the absence of stimulus, and keeping it
+ * outside the enum is what lets the week ribbon render it as a gap rather than as
+ * a very-low-intensity bar.
+ */
+export interface RestDay {
+  kind: 'rest';
+}
+
+/** Plans are running-only: no strength, cross-training, or mobility sessions. */
+export interface Workout {
+  kind: 'run';
+  effort: EffortLevel;
+  /** "Easy run", "Intervals", "Long run". Always paired with `effort` — colour is never the only signal. */
+  label: string;
+  /** Exactly one of these is set. */
+  distanceKm?: number;
+  durationMin?: number;
+  /** Always present. On Free this is the only pace signal a runner gets. */
+  effortDescription: string;
+  /** Measured. Requires a recent performance to derive from; absent otherwise. */
+  pace?: Pace;
+  /** Measured. Requires `age`. Paid tiers only. */
+  hrZone?: HrZone;
+  /** "1 km easy, 3 km steady, 1 km easy". */
+  structure?: string;
+  /** Coach's reasoning. Paid tiers only; a template genuinely has none. */
+  why?: string;
+  isLongRun?: boolean;
+}
+
+export type Day = RestDay | Workout;
+
+export type Week7<T> = readonly [T, T, T, T, T, T, T];
+
+/**
+ * A week is a 7-day cycle with unnamed days — Day 1 … Day 7, never Mon–Sun. The
+ * runner places them on a calendar themselves. Rest days are real slots.
+ */
+export interface Week {
+  weekNumber: number;
+  totalWeeks: number;
+  phase: Phase;
+  isDeload: boolean;
+  /** Total running kilometres this week. Also the wave's data point. */
+  volumeKm: number;
+  days: Week7<Day>;
+  /** Coach's reasoning for the week. Paid tiers only. */
+  why?: string;
+}
+
+/** Additive only. Never makes a plan mutable. Elite's confirmed extras land here. */
+export interface PlanSection {
+  type: string;
+  title: string;
+  body: string;
+}
+
+export interface Plan {
+  title: string;
+  goalType: GoalType;
+  raceDistance?: RaceDistance;
+  /** ISO date. Present when `goalType === 'race'`. */
+  raceDate?: string;
+  durationWeeks: number;
+
+  /**
+   * The tier the plan was *built at*, not the user's current tier. A plan renders
+   * at its own density forever, so a downgrade never retroactively strips content
+   * from a plan the user already paid for.
+   */
+  tierAtGeneration: Tier;
+  engine: Engine;
+  /** True when AI output failed structural validation twice and a template was served. */
+  isFallback: boolean;
+
+  /** One entry per week. Present for every tier, including Free — the wave charts real volume. */
+  weeklyLoad: number[];
+  weeks: Week[];
+  extras: PlanSection[];
+  /** Paid tiers only. */
+  coachIntro?: string;
+  /** Rule 10. Legally required; never empty. */
+  disclaimers: string[];
+}
+
+// ---------------------------------------------------------------------------
+// Intake
+// ---------------------------------------------------------------------------
+
+export interface IntakeResponses {
+  goal: string;
+  age: number;
+  experience: ExperienceAnswer;
+  daysPerWeek: number;
+  weeklyKm: number;
+
+  raceDistance?: RaceDistance;
+  raceDate?: string;
+  /** The runner's target. Drives race-pace sessions only — never everyday training paces. */
+  goalTimeSec?: number;
+  /** Drives every training pace. Without it, the plan emits effort language and no numbers. */
+  recentPerformance?: Performance;
+
+  /** Closed set. These, and only these, drive the deterministic injury rules. */
+  injuries: InjuryFlag[];
+  /** Context for the model on paid tiers. Must never gate a safety decision. */
+  injuryNotes?: string;
+}
+
+/** What `generate-plan` accepts. Per-generation, distinct from the intake profile. */
+export interface GeneratePlanRequest {
+  goalType: GoalType;
+  raceDistance?: RaceDistance;
+  raceDate?: string;
+  durationWeeks?: number;
+  notes?: string;
+  /** Minted when the configure modal opens; dedupes a retried request. */
+  idempotencyKey: string;
+}
+
+export interface GeneratePlanResponse {
+  plan: Plan;
+  planId: string;
+  isFallback: boolean;
+}
+
+export interface QuotaStatus {
+  tier: Tier;
+  used: number;
+  limit: number;
+  /** ISO date. Anchored to the purchase day, not the calendar month. */
+  periodEnd: string;
+}

@@ -33,7 +33,13 @@ the *design*, not shipped behavior. See `planning/` for the full spec:
 |------|-------|--------|---------|
 | **Free** | 1 total | Templates only | Basic hard-coded plan for the chosen distance/duration |
 | **Pro** | 3 / month | AI + template hybrid | Personalized paces, HR zones, warm-ups/drills, coach-style "why" per week |
-| **Elite** | 10 / month | Fully AI-personalized | Everything in Pro plus mid-plan adjustments, race-day strategy, deeper periodization |
+| **Elite** | 10 / month | Same skeleton, customized far more heavily — richest prompt | Everything in Pro plus mid-plan adjustments, race-day strategy, deeper periodization |
+
+All three tiers build on the same coach-authored template skeleton — it is never removed. Elite
+customizes it far more heavily than Pro (richest prompt, per-workout "why," any confirmed extras);
+it does not trade away the skeleton for an unconstrained AI plan. The deterministic load-rule clamp
+(volume caps, deload cadence, long-run caps) applies identically to all three tiers. See
+`docs/reference/plan-generation.md` for the full design.
 
 Quotas reset monthly for Pro/Elite (Free is 1 plan total) and are enforced **server-side** in
 the `generate-plan` edge function — the client never decides or tracks its own quota. The Elite

@@ -1,0 +1,105 @@
+# Plan Structure — Phases, the Day Model, and Composing a Plan
+
+Ported subset of `training_zones.md` § McMillan Periodization Cycles, `ECHO_Training_Plans_McMillan.md`,
+and `workout_library.md` Part 3 (Deload Week Architecture), plus one design rule that is Ian's
+decision about how V2.2 uses the ported red-flag rules — not a literal source quote.
+
+## The Day 1…Day 7 model
+
+**Days are unnamed.** A week is Day 1 … Day 7 in a 7-day cycle; rest days are real slots the
+runner still sees, not absences. The app never emits Mon–Sun — the runner places the plan on
+their own calendar (Ian's decision). This isn't an override of the source:
+`ECHO_Training_Plans_McMillan.md` already does this — *"Use Day 1, Day 2, Day 3 (not Mon/Tue/Wed)
+for flexibility"* (`ECHO_Training_Plans_McMillan.md § Training Plan Philosophy`) — so the port
+confirms it rather than overriding it.
+
+## Running only
+
+Plans contain runs and rest days — no prehab strength, no cross-training, no mobility sessions,
+even though the McMillan example plans in the source interleave prehab strength 1–2×/week
+throughout (every example week in `ECHO_Training_Plans_McMillan.md` includes a "Prehab Strength"
+day). Consequence: the engine's only levers against a declared injury are **volume and
+intensity** — there's no third lever (Ian's decision; see `00-README.md` and `CLAUDE.md`
+"Coaching domain").
+
+## Phases
+
+`training_zones.md § McMillan Periodization Cycles` describes a general 4-phase model for a
+12–24 week macrocycle:
+
+| Phase | Typical weeks | Intensity distribution | Long run | Hard sessions/week |
+|---|---|---|---|---|
+| 1 — Build | 1–6 | 90% Z1, 10% Z2 | Building from current base, +10%/week | 0–1 |
+| 2 — Progressive | 7–12 | 70% Z1, 20% Z2, 10% Z3 | Maintaining + moderate finish efforts | 1–2 |
+| 3 — Race-Specific | 13–18 | 60% Z1, 15% Z2, 20% Z3, 5% Z4 | Race-simulation, goal-pace sections | 2–3 |
+| 4 — Taper | Final 2 weeks | Same or slightly higher intensity | 50% of peak-week volume | — |
+
+The worked examples in `ECHO_Training_Plans_McMillan.md` don't reuse this exact 4-phase naming —
+they scale phase count and names to the goal and total plan length instead: the 5K example
+(12 weeks) uses 4 phases named Health & Early Aerobic Foundation / Early Aerobic Training /
+Intervals & Maximum Aerobic Training / Race-Specific Preparation; the 10K example (16 weeks) uses
+4 differently-named phases ending in a dedicated Race Week; the marathon example (30 weeks) uses
+5 phases, adding a distinct Strength/Hill phase between Build and Race-Specific. Treat the table
+above as the general shape — build aerobic base → introduce structure/threshold → race-pace
+specificity → taper — scaled proportionally to the plan's total length, rather than a fixed
+4-phase contract. That's how the source itself handles different race distances and durations.
+
+## Deload cadence and the 35–45% rule
+
+**Ian's decision (authoritative, 2026-07-10 — superseding an earlier 20–30% call the same day):**
+deload weeks reduce volume **35–45%**. See `load-rules.md` Rule 1 for the deload-frequency table by
+level, and for why this reconciles rather than contradicts the source.
+
+The source disagrees with itself three ways, and the worked examples won:
+
+| Level (source example) | Normal volume | Deload volume | Reduction |
+|---|---|---|---|
+| Beginner | ~2.5 hr running | ~1.5 hr running | ~40% |
+| Intermediate | ~5 hr running | ~2.75 hr running | ~45% |
+| Advanced | 65–75 km | 40–45 km | ~35–40% |
+
+*(workout_library.md § Part 3 › Beginner/Intermediate/Advanced Deload)*
+
+All three of Ian's own worked examples sit in the 35–45% band, not the 20–30% one his Deload Trigger
+table states. His separate "Exception — Recovery Weeks" clause already permits "any amount… even 50%
+reduction," so 35–45% is consistent with the source's own allowance. The fact-check found **no direct
+RCT evidence for any specific deload magnitude** — it is coaching convention either way, which is why
+the coach's own practice is the tiebreak.
+
+The engine computes deload volume at the 40% midpoint and clamps model output to `[0.35, 0.45]`
+(`isValidDeload()` in `src/lib/loadRules.ts`).
+
+**The source's Week 4 example remains an error, not an alternative.** In the 5K plan it is labelled a
+deload ("Day 6: … This is deload week, keep it easy" — `ECHO_Training_Plans_McMillan.md § Example 1,
+Week 4`) while its weekly total *rises* from Week 3's ~17–19 km to Week 4's ~18–19 km. A deload week
+that doesn't reduce volume isn't a deload week.
+
+The source's day-by-day example tables for the three levels above are also not ported: they name days
+(Monday/Wednesday/Saturday, not Day 1…Day 7) and, for the intermediate example, place a rest/mobility
+slot that reads as cross-training-adjacent — both inconsistent with Ian's decisions #1 and #2.
+
+**What is ported as-is** from `workout_library.md` Part 3, because it's level-agnostic guidance
+that doesn't conflict with anything above:
+
+- **Definition:** a deload week is a planned reduction in training stress to allow adaptation and
+  recovery; without it, runners stagnate or get injured.
+- **Intensity during deload:** Zone 1 only, no hard efforts; strides may continue for
+  "speedster"-type runners, to maintain neuromuscular activation without adding load.
+- **What not to do during deload:** switch to hill repeats or speed work; try a new race distance
+  or fitness test; ignore the deload and train normally; feel guilty about the reduced volume —
+  it's part of the plan.
+- **Expected outcomes across the week:** may feel sluggish at first (normal — the body is
+  absorbing training), energy returns a couple of days in, slight performance improvement on easy
+  efforts follows, and a "breakthrough" feeling often shows up the week after, where harder
+  workouts feel more manageable.
+
+## Design rule: a declared red-flag injury still produces a plan
+
+**Ian's decision**, not a literal source quote — this is how V2.2 uses the ported red-flag rules
+(`load-rules.md` Rule 5) and return-to-running protocol (`injury-rules.md`) together:
+
+When a runner declares a red-flag injury at intake (per `load-rules.md` Rule 5 / `injury-rules.md`),
+the app **still generates a plan** — it generates the **return-to-running protocol** instead of a
+normal training plan, symptom-gated, with a prominent "seek imaging / see a professional" notice
+attached (the `load-rules.md` Rule 10 disclaimers). It never refuses outright, and it never
+prescribes intervals or hard efforts through a suspected bone stress injury.

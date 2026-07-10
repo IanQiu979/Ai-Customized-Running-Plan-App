@@ -1,0 +1,894 @@
+# V2.2 — Frontend Design Brief
+
+> Plain-English design document. No code. Written for two readers: a **designer** translating this
+> into Claude Design, and an **implementer** building it afterwards.
+>
+> Assembled from eight specialist passes (ground truth, market research, visual design, token
+> system, motion, copy, responsive, accessibility). Where those passes disagreed, the conflict is
+> resolved here and recorded in Part 10 — nothing was averaged or papered over.
+>
+> Status: the app is a bare Expo template. Every screen below is built from zero.
+
+---
+
+## Part 0 — The law
+
+These come from `planning/01-brainstorm.md`, `02-product-requirements.md`,
+`03-engineering-requirements.md`. They are not design choices and cannot be traded away.
+
+**The product does one thing.** A runner answers an intake questionnaire and gets a week-by-week
+training plan. It is **not a training log**. No workout check-offs, no "completed vs. upcoming"
+states, no logging affordances, no progress-against-plan tracking. Any design that implies
+check-off is out of scope.
+
+**The tiers.**
+
+| Tier | Quota | Engine | What the runner gets |
+|---|---|---|---|
+| Free | **1 plan total, forever** — not monthly | Template only, no AI call | Structure only. No pace targets, no coach notes |
+| Pro | 3 plans **per month** | Template skeleton + AI personalization | Pace targets, HR zones, warm-ups/drills, a coach's "why" per week |
+| Elite | 10 plans **per month** | Same skeleton, customized far more heavily — richest prompt | Everything in Pro, richer, tuned to injury history |
+
+**Elite is not "the tier with the guardrail removed."** All three tiers build on the same
+coach-authored template skeleton, and it is never removed — Elite just customizes it far more
+heavily (richest prompt, per-workout "why," any confirmed extras). What scales across tiers is how
+much of the runner the plan reasons about and how much it explains, never how much of the coach's
+judgment is taken away. The deterministic load-rule clamp applies identically to all three tiers.
+
+Getting *"1 total"* vs *"per month"* wrong is a factual error, not a copy nuance.
+
+**Quota and tier are server-authoritative.** The client displays them and is never the authority.
+Home reads a `quota-status` endpoint; it never counts anything itself.
+
+**Intake is ten fields.** Goal, **age**, experience level, days per week, current weekly mileage,
+target race distance, target race date *(only if a race is chosen)*, **goal time** *(only if a race
+is chosen)*, **a recent time at any distance** *(optional)*, injuries/constraints. Do not add an
+eleventh.
+
+Eight are always asked. Race date and goal time appear only when the runner picks a target race, so
+the flow is **8 questions, or 10 with a race**.
+
+> **Three of these are load-bearing, not demographic.**
+>
+> **Age** → max HR is estimated `220 − age`, so every heart-rate zone is uncomputable without it,
+> and Pro and Elite explicitly sell HR zones. The load rules also make a 3-week deload cadence
+> mandatory for runners 50+. Store an integer age, never a date of birth.
+>
+> **Goal time** → drives **race-pace sessions only**.
+>
+> **Recent time** → drives **every other training pace**. Deriving easy or tempo pace from a goal
+> the runner hasn't achieved prescribes paces they cannot sustain. **Without a recent time, the plan
+> emits no numeric paces at any tier** — only effort language.
+>
+> That last rule is why the **readout bracket** (Part 2) can never render a lie: the bracket flanks
+> a measured numeral, and if nothing was measured, no numeral exists to flank. The type system
+> enforces it — `pace` and `hrZone` are optional on `Workout`.
+
+**Two different "goal" concepts. Never merge them.** `intake.goal` is a one-time general training
+goal captured at onboarding. Configure-plan's `goalType` is chosen on *every* generation: a target
+**race** (plan spans today → race day) or a fixed **duration** (8, 12, or 16 weeks).
+
+**Sign-up is required.** Google, Apple, email/password. No guest mode in v1 — never write "continue
+as guest" or "skip for now" on auth. Apple Sign-In must appear in the design even though it is not
+yet configured server-side (App Store rules require it once Google is offered).
+
+**`isFallback`.** When AI output fails structural validation twice, the system serves a template
+plan and flags the row. The backend contract is settled; **the UI treatment was specified nowhere**
+and is invented in this document (Part 5).
+
+**Errors.** `402` = over quota → route to paywall. `403` = anonymous → defensive only.
+
+**The app has no name.** Do not design a wordmark, a logo lockup, or name-dependent app-icon
+typography. Identity comes from palette, type, and motif alone. Copy uses `{AppName}`.
+
+**Elite's extras are unconfirmed.** Mid-plan adjustment, race-day strategy, and deeper periodization
+are marked "proposed, confirm." Do not build dedicated screens or flows for them, and do not promise
+them in paywall copy. The Elite plan view is designed to *absorb* one or two extra sections later
+without a redesign.
+
+### Explicitly forbidden, despite being good ideas
+
+Market research surfaced these from best-in-class apps. The spec forbids them. Borrow the visual
+language; do not borrow the feature.
+
+1. **No drag-to-reschedule / mid-plan editing** (Runna). That's an unconfirmed Elite extra.
+2. **No completed/upcoming states or check-offs** (every fitness app). This is not a log.
+3. **No projected race-time reveal** ("without us 1:59, with us 1:51" — Runna). The spec grants no
+   such feature and the app cannot honestly compute it.
+4. **No "notify me when done"** (Lensa). No background-generation affordance exists.
+
+---
+
+## Part 1 — Open decisions that block a clean build
+
+These surfaced during design. Each needs a human answer. Four of them change code, not just pixels.
+
+1. **Does a fallback plan consume the user's quota?** The spec is silent. Recommendation: **no.**
+   Charging someone's quota for the personalized product they didn't receive is the fastest way to
+   destroy trust in an app whose entire value is personalization. This is an **engineering change**:
+   quota is `count(plans)`, which currently has no way to exclude `is_fallback` rows. Either exclude
+   them from the count or add a credit-back step. **If neither is built, the copy string "This
+   attempt didn't use one of your plans this month" is a lie and must be cut before ship.**
+
+2. **Is iPad / Android tablet a v1 target?** Nothing in the planning docs commits to it, but
+   `MaxContentWidth = 800` implies someone anticipated it. This determines whether the orientation
+   and wave-scaling work in Part 8 matters at all for v1.
+
+3. **Does the configure-plan notes field appear for Free users?** Their plans are templates and the
+   notes are never read by an AI. Recommendation: hide it, or show it disabled with an honest line,
+   rather than silently collecting text that goes nowhere.
+
+4. **Password minimum length.** Copy assumes 8 characters. Confirm against what Supabase Auth is
+   actually configured to enforce and match the string to it.
+
+5. **`expo-glass-effect` is installed (`~0.1.10`)** and directly contradicts this design's "no blur,
+   no glass — depth comes from surfaces and hairlines" rule. Remove it, or explicitly fence it off in
+   review. Left in place, it is a standing temptation to build the wrong thing.
+
+6. **Elite extras** — confirm or cut. Until confirmed, they appear in no copy and no screen.
+
+---
+
+## Part 2 — The global system
+
+### Bases and text
+
+Deliberately not pure black and white.
+
+| Token | Light | Dark | Rule |
+|---|---|---|---|
+| `surface.base` | `#F7F7F4` chalk | `#14171C` asphalt | The page canvas |
+| `surface.raised` | `#EDEDE8` | `#1D2128` | Cards, rows, inputs, chips, sheets. In light mode it is *darker* than base (no shadow is separating it); in dark mode *lighter* |
+| `surface.overlay` | asphalt @ 55% | asphalt @ 80% | Solid modal scrim. **Never a blur** |
+| `hairline` | asphalt @ 10% | chalk @ 12% | The only separator in the app, outside the two shadow users |
+| `text.primary` | asphalt | chalk | 16.74:1 both ways |
+| `text.secondary` | `#5A6069` graphite | **needs a lifted value** | See the defect below |
+
+> **Verified defect.** `graphite #5A6069` on chalk measures **5.91:1** (passes AA). On asphalt it
+> measures **2.83:1 — fails AA.** The recorded palette calls graphite "secondary text" without
+> qualifying the mode. Dark mode needs its own lifted secondary-text value, verified at ≥4.5:1
+> against asphalt. **This is mandatory**, not optional, because four screens are pinned dark and a
+> user cannot escape it by switching themes.
+
+### The effort scale — the palette *is* the information
+
+A color always means an intensity. It never decorates.
+
+| Effort | Dark-mode fill | Light-mode fill | Bar height |
+|---|---|---|---|
+| recovery | `#6FA8C9` | `#5196BE` | 40% |
+| easy | `#4FA97E` | `#4A9F76` | 55% |
+| steady | `#C9A227` | `#AB8A21` | 70% |
+| tempo | `#D9772B` | `#D87427` | 85% |
+| interval | `#C6402F` | `#C6402F` | 100% |
+
+> **Verified defect and its real fix.** As flat swatches against chalk, four of five hues fail the
+> 3:1 non-text bar: recovery 2.41:1, easy 2.68:1, steady 2.25:1, tempo 2.95:1. Only interval (4.69:1)
+> passes. **Dark mode is fine** — all five land between 3.57:1 and 7.43:1.
+>
+> A proposed fix — give every swatch a 1px ink stroke — was **rejected on review as a
+> rationalization.** The stroke is identical across all five hues, so it does nothing to make
+> `steady` distinguishable from `tempo`, and nothing for the fill's own perceptibility. It fixes a
+> boundary-visibility technicality while leaving the actual failure intact.
+>
+> The real fix has two parts, both mandatory: **(a)** use the darker light-mode fills in the table
+> above, each computed to clear 3:1 against chalk; **(b)** add the **bar-height channel** below.
+
+**The height channel is not decoration — it is the accessibility fix.** Under deuteranopia and
+protanopia, `easy`(green) / `steady`(gold) / `tempo`(orange) / `interval`(red) collapse toward one
+warm smear. That is four of five levels — the entire graduated-intensity read that the barcode
+exists to show. Only `recovery` (blue) survives. Encoding intensity **also** as a monotonic bar
+height means the ribbon survives colorblindness, grayscale, glare, and a photograph. It adds a
+channel rather than removing the motif, and it adds no text.
+
+**Rule, from `architecture.md:144-145`, now actually satisfied:** an effort color is never the only
+signal. In the collapsed ribbon the second signal is height. Everywhere else it is an adjacent text
+label. An effort hue is **never** a text color and never sits beneath a text glyph.
+
+### The accent
+
+`hivis #D8F14A`. Theme-invariant. It has exactly **two** sanctioned uses:
+
+1. The **next-workout card**.
+2. The **single primary forward-action** of whatever screen you are on.
+
+It is banned from selection states, focus states, the tab bar's active state, quota pips, links, and
+the wave chart. Those use an ink-colored border or capsule instead. One hivis slot per screen — on
+Home, that slot belongs to "Create a plan" until a plan exists, at which point it moves to the
+next-workout card and "Create a plan" demotes to an outline button.
+
+Because hivis is light, text on it is always `text.onAccent` = asphalt (**14.20:1**, clears AAA).
+Chalk on hivis is **1.18:1** and must never occur.
+
+`accent.hivisDeep #BBD911` exists solely as the second stop of the primary CTA's gradient. It is
+never used standalone, never for text, never anywhere else — that is what stops it becoming a second
+accent by accident.
+
+### Supporting tokens
+
+- `color.progress` — light `#8D93A0`, dark `#4B5561`. Progress fills, quota pips, disabled states.
+  Explicitly not hivis and not any effort hue.
+- `status.error` — dark `#DE5482` (4.87:1), light `#AB214F` (6.39:1). Hue ~340°, roughly 27° off
+  `interval`, with a cooler pink undertone so it never reads as "a shade of interval."
+- `status.success` — dark `#37BEB9` (7.89:1), light `#206F6C` (5.51:1). Pushed toward cyan to clear
+  `easy`. This is the tighter of the two separations; worth a second look in practice.
+- `chart.loadLine` — dark `#BCA98F`, light `#745E3E`. Desaturated bronze.
+- `chart.loadFill` — graphite at 12% (light) / 18% (dark).
+
+> Why the chart gets its own hue family: the wave charts training **volume**. The ribbon encodes
+> **intensity**. If the wave borrowed the effort palette, a volume chart would be fighting an
+> intensity legend on the same screen. Keeping the wave monochrome and the ribbon multi-hue is what
+> lets both coexist. This separation is load-bearing.
+
+### Type
+
+Six steps, fixed: **32 / 24 / 20 / 17 / 15 / 13**.
+
+- **Barlow Condensed** (600/700/800) — display text and **every numeral in the app**. Running is
+  numbers: pace, distance, splits, week counts, prices, the intake stepper.
+- **Inter** (400/500/600/700) — body copy and UI chrome.
+- **IBM Plex Mono** (400/500/600) — pace splits, HR zones, unit labels, ribbon week numbers. Being
+  genuinely monospace, tabular figures come free from the font; no unreliable `fontVariant` workaround.
+
+> "Condensed for all numerals" means a number appearing inline inside Inter body copy needs its own
+> styled wrapper — React Native does not substitute fonts per character range. Every primitive below
+> already isolates numerals into their own slot, but it is a trap for future body-copy components.
+
+### Spacing, radii, depth
+
+Existing ramp: `half 2 · one 4 · two 8 · three 16 · four 24 · five 32 · six 64`.
+
+**One step must be added.** The ramp decelerates (16→24 is ×1.5, 24→32 is ×1.33) then jumps ×2 to 64.
+There is no "large section gap," which this design needs between the next-workout card and the ribbon
+below it, and under the bottom-anchored CTA on tall devices. Insert **48**. Since names are ordinal,
+`six` becomes 48 and the old 64 is renamed `seven`.
+
+> **Migration:** exactly two call sites use `Spacing.six` today, both in `src/app/explore.tsx`
+> (lines 30 and 144). Both must move to `Spacing.seven` in the same commit or they silently render
+> at 48 instead of 64. (`explore.tsx` is stock template slated for deletion anyway, which makes this
+> migration free if the rename lands after the delete.)
+
+`radius.control` = **12** (buttons, chips, inputs, segmented tracks). `radius.card` = **20** (cards,
+sheets, modals). An 8px gap between them — deliberately distinct, not the "two values 2px apart" trap.
+
+**There is no usable backdrop blur on Android** — `expo-blur` degrades to a flat overlay. Depth
+therefore comes from the surface ladder plus hairlines, never glass. **Exactly two things in the
+entire app get a real shadow:** the next-workout hero card, and true modals/sheets. Everything else
+— plan cards, workout rows, chips, tier pills — is flat, separated by hairline only. A third shadow
+user is a review violation, not a judgment call.
+
+**Four screens are pinned dark** regardless of OS theme: sign-in, sign-up, generating, paywall.
+These are deliberate, attention-holding moments. Everything else follows the system preference,
+because both asphalt and chalk are first-class bases, not one a fallback for the other.
+
+### Base components
+
+Every interactive target is **≥44×44** unless noted.
+
+- **Primary CTA** — full-width, bottom-anchored, `radius.control`, hivis→hivisDeep gradient, label in
+  asphalt, condensed bold. Height 52–56. Pressed: 8% asphalt wash. Disabled: fill drops to
+  `color.progress` and the gradient is removed entirely, so "disabled" never looks like a dimmed
+  version of the one reserved accent.
+- **Outline button** — 1.5px ink border, ink label. Never a hivis border.
+- **Text link** — no container, ink, underlined. Deliberately given no accent color; that is what
+  keeps hivis scarce.
+- **Input** — `surface.raised` well, hairline border, `radius.control`. Focused: 2px ink border.
+  Error: `status.error` border plus helper text below.
+- **Selectable card** — selected is an ink border plus a filled checkmark. Never color-coded.
+- **Chip** — two kinds. A neutral utility chip; and an **effort chip**, a pure 8–12px colored swatch
+  with its label always rendered *beside* it, never inside.
+- **Segmented control** — ink capsule for the active segment, never hivis.
+- **Numeral stepper** — large condensed numeral, mono unit label, `−`/`+` at **48×48** (bumped above
+  baseline; they take repeated rapid taps).
+- **Quota pip row** — filled = available, hollow ring = used. Grouped in fives for Elite's ten.
+  Rendered in `color.progress`, always paired with a plain-text count. Non-interactive.
+- **Workout row** — effort chip + text label + condensed numeral distance + mono pace, with an
+  optional dimmer indented "why" line on paid tiers. Flat, hairline-separated, no card shell.
+- **Week ribbon row** — mono two-digit week number + seven effort **bars** (height-encoded per the
+  table above), rest days as visible **gaps**, not empty cells. The whole row is one tap target.
+- **Plan card** — `surface.raised`, `radius.card`, hairline, flat, **no shadow**, carrying the wave
+  sparkline and a tier pill.
+- **Tier pill** — neutral, never color-coded, identical construction across all three tiers, so it
+  can't visually alias with `steady`'s gold or the chart's bronze.
+- **Informational card** — used for the `isFallback` notice. Neutral. Explicitly never `status.error`.
+- **Modal / sheet** — one of the two shadow recipients, on a solid scrim.
+
+### Token discipline — what stops this rotting
+
+- Hivis has two uses. Selection and tab-bar-active are the two a contributor will reach for out of
+  habit; both are handled by ink instead.
+- Effort hues never appear outside effort encoding. Not as a chart color, not as a status color, not
+  as decoration.
+- Status colors never borrow effort hues.
+- No token gets a flat hex where ink-at-alpha is more correct (`hairline`, `chart.loadFill`).
+- **No single hex clears 4.5:1 against both asphalt and chalk.** Any token proposed as "one value,
+  both modes" — other than the three theme-invariant accent tokens — is a latent bug.
+
+---
+
+## Part 3 — The signature motif
+
+Two scales, deliberately kept on **separate color systems** so they cannot be confused for one another.
+
+### The week ribbon (micro)
+
+Each training week renders as one row: a mono two-digit week number, then seven bars. Bar **color**
+is that day's effort. Bar **height** is that day's effort, on the monotonic ramp above. Rest days are
+**gaps** — no bar at all, which is what keeps "no stimulus" categorically distinct from any low
+intensity, including `recovery`.
+
+A 16-week plan reads as a barcode of periodization: you can see the build, the recovery weeks, and
+the taper without reading a single word. The plan view leads with this, not with a list.
+
+Because the height channel carries the same information as the hue channel, the barcode still reads
+in grayscale, under glare, and to a colorblind user. That is the point.
+
+The ribbon appears at three scales: one week inline on Home; every week as an expandable accordion on
+plan view; and desaturated to `color.progress` gray as a **ghost ribbon** on sign-in, sign-up, and
+empty states — the motif teased before it means anything.
+
+### The periodization wave (macro)
+
+A single smoothed, gradient-filled area chart of weekly training load, building through the plan and
+resolving into a taper. Monochrome bronze. It appears **once per plan**, at the top of plan view,
+annotated with coarse week markers and a single "taper" label near the closing downslope so the shape
+reads to someone who has never seen a training-load chart. On My Plans it recurs as a tiny
+unannotated sparkline that serves as each plan's at-a-glance identity.
+
+The wave is **honest**: it charts weekly volume the generator already produces, for every tier
+including Free's template. It never implies data the app does not have.
+
+> **A real architectural conflict, resolved.** "One Skia canvas per screen" and "a sparkline on every
+> My Plans card" cannot both hold once the list has two rows. **Resolution:** My Plans gets **zero**
+> live canvases. Each sparkline is rasterized once to a bitmap (offscreen Skia snapshot at generation
+> time, or lazily on first render), cached by plan ID plus a hash of the load array, and rendered as
+> a plain image. Plan view holds the app's only live canvas.
+
+### Texture
+
+One low-contrast topographic contour texture at 4–6% opacity — a nod to terrain, not abstract
+decoration. It is a **static tiled asset**, never a Skia canvas, so the Skia budget stays with the
+wave. It appears in exactly four places: the hero zones of sign-in/sign-up, the generating backdrop,
+the empty states, and the paywall hero. It never sits behind dense data — plan view has none.
+
+---
+
+## Part 4 — Motion
+
+Ten values total. If a screen seems to need an eleventh, it is reaching for the wrong one of these.
+
+**Durations.** `instant` 100ms (press feedback) · `quick` 180ms (state crossfades) · `standard`
+250ms (the default; entrances) · `slow` 350ms (full-screen pushes) · `reveal` 650ms (**reserved
+exclusively** for the wave's one-time stroke-draw; if it gets reused, the reveal is losing its
+specialness).
+
+**Curves.** `easeOut` for anything arriving. `easeIn` for anything leaving. `linear` for progress
+hairlines and quota fills **only** — a progress bar that eases is lying about pace. `springSnappy`
+(damping ~0.6, one crisp overshoot) for direct manipulation and the reveal bounce. `springGentle`
+(damping ~0.85) for accordions and sheet arrivals.
+
+The rule: informational content that appears uses a duration + curve. A direct physical response to a
+gesture, or a snap into place, uses a spring. Literal proportion uses `linear`, always.
+
+### The centerpiece — "your plan is ready"
+
+This is the moment the paid product is selling. Roughly 1.4–1.6 seconds end to end.
+
+During generation a grid of ribbon-shaped cells sits in `color.progress` gray — pending, not yet real
+data. Beneath it, step lines name the **real** work happening, each crossfading pending → active →
+done at `quick`. A light tick haptic fires once per step, on the pending→active flip — it marks "now
+doing this," not "just finished," so the rhythm reads as forward progress.
+
+**Free tier's step list is genuinely shorter** (two steps; there is no AI call). Two things stop that
+feeling broken: the card is pre-sized to the *longest* possible list across all tiers, so it never
+visibly shrinks; and each step holds its active state for a ~400ms floor, so Free's total lands
+around 1.2–1.8s rather than a jarring 200ms flash.
+
+On completion: the last step dims, then a deliberate **~100ms breath** so the haptic lands clean.
+Then, left to right across the seven cells — rest-day gaps staying gaps — each cell compresses to
+0.92, springs past 1.0 to ~1.06, and settles, staggered 45ms apart. The cascade resolves around
+t=600ms.
+
+**The color change is a swap, not an interpolation.** Effort colors are discrete semantic categories,
+not a gradient; crossfading gray into them would pass through muddy intermediate hues that mean
+nothing and look like a rendering bug. Instead the color flips instantly at the compressed bottom of
+each cell's bounce, hidden inside the impact. It reads as *revealed through impact*. It is also
+cheaper — a conditional swap in a worklet, not a color interpolation across the full range.
+
+**One** success-weight haptic fires, timed to the **first** cell's swap, not the last — so it reads
+as the cause of the cascade rather than an afterthought.
+
+**The handoff.** Hold the revealed grid ~200ms. Then do **not** slide the modal down while plan view
+slides up — that guarantees a visible seam where the ribbon reflows. Instead freeze the ribbon's
+screen position, crossfade the modal's chrome to zero, and settle plan view's header and wave in
+around the still-frozen ribbon. That ribbon simply *becomes* the top row of plan view's list. Zero
+position jump.
+
+### Elsewhere
+
+- **The wave's stroke-reveal** plays once per plan, ever. Gate it on a **persisted** set of plan IDs
+  (AsyncStorage, not session memory — otherwise relaunching the app replays it every time). A freshly
+  generated plan has a new ID by definition, so it always reveals the first time and never again.
+- **Accordion expand/collapse** is the one sanctioned layout animation: gesture-driven, one row at a
+  time, never looping. Measure each week's height once and cache it; drive it from a UI-thread shared
+  value, not a state-triggered re-render.
+- **Plan view's long ribbon list** uses plain native scroll. No parallax, no shrinking header, no
+  scroll-linked worklets — that category looks fine in a simulator and janks on mid-range Android.
+- **Skeletons** pulse only while work is genuinely ongoing, and the pulse is killed the instant data
+  lands rather than being allowed to finish its cycle.
+- **The `isFallback` card** enters as ordinary content, present from the first frame — opacity plus a
+  6–8px drift. No haptic, no toast, no attention device. It is durable information, not an event.
+
+### Reduced motion
+
+Not "disable everything." Transforms and staggered travel are removed; opacity, color, and haptics
+survive. **The reveal must still be a moment.** So: no stagger, no bounce, no travel — all seven cells
+crossfade gray→true-color simultaneously over 250ms, the whole grid ducks once to 0.85 opacity and
+back in the same window, and the success haptic still fires. Now the haptic carries more of the
+moment, because it isn't sharing attention with choreography.
+
+That grid duck is **single-shot**. A repeating brightness oscillation would reintroduce exactly the
+motion the user opted out of, even though it is "just opacity."
+
+Drive this from the OS signal (`isReduceMotionEnabled`), never an in-app toggle the user has to find
+twice. Note that iOS handles reduced motion for native stack transitions automatically and Android
+does not — check the flag and force a crossfade on both, because consistency matters more here than
+platform-idiom purity.
+
+---
+
+## Part 5 — Screen by screen
+
+### Sign-in · *pinned dark*
+
+The top 40% is deliberately empty stage: spotlight gradient, topo texture, and the first brand tease
+— a single row of seven ribbon bars rendered large, cropped at the screen edge, desaturated to gray
+because no plan exists yet. The barcode is established as a texture before the user has done anything.
+
+Below: a condensed headline at 32, one graphite sub-line at 15. Then Apple, then Google, each rendered
+in **their own mandated brand button styles**, not reskinned in app tokens. A plain "or" divider. Two
+inputs on raised surfaces. The **only** hivis element on the screen is the "Sign in" button beneath
+them. Sign-up is a plain underlined text link — never a second button, because two competing calls to
+action is precisely the failure this system exists to prevent.
+
+Field errors render inline beneath the relevant input in `status.error`. Never `interval` red.
+
+> Copy — heading **"Sign in"**, sub **"Pick up where you left off."** Buttons **"Sign in with Apple" /
+> "Sign in with Google"**. Link **"Forgot password?"** Switch **"Don't have an account? Create one"**.
+
+### Sign-up · *pinned dark*
+
+A visual twin. Same shell, same hivis rule, ghost ribbon cropped slightly less — a continuity touch,
+not a redesign. Confirm-password appears only on the email path. There is no "welcome" screen; it
+hands straight off to intake.
+
+> Copy — **"Create your account"**, sub **"Start with a free plan. No credit card required."**
+> Password helper **"Use 8 characters or more."** *(Confirm against Supabase's actual policy — Part 1.)*
+
+### Intake — 8-10 questions + 1 review · *system theme, motif deliberately absent*
+
+One question per screen. Progress is a thin proportional hairline in `color.progress` at the top —
+**no visible numeric counter**. The question sits in the top third at 24, left-aligned. A bottom-anchored
+hivis "Continue" dims to ~30% opacity (never recolored) when a required step is unanswered.
+
+Controls, by field: **goal** as large tappable cards · **age** as a condensed-numeral stepper ·
+**experience** as a segmented row · **days per week** and **weekly mileage** as big condensed-numeral
+steppers with a mono unit label (reusing the numeral-forward identity rather than a generic slider) ·
+**race distance** as a chip row · **race date** as a native picker · **goal time** and **recent time**
+as mono time entries (hh:mm:ss), the recent one paired with its own distance chip row · **injuries** as
+multi-select chips with a one-tap "None right now" so nobody has to type, plus a free-text field.
+
+The optional steps (race date, goal time, recent time, constraints) show a visible plain-text **Skip**.
+Required steps — including **age** — show only Back and Continue.
+
+**The last screen is a review, not a question** — every answer as a label/value row, each with an
+inline Edit that jumps back to that step. This is the Runna/Noom "recap before the next big moment"
+device, earned without inventing an extra field.
+
+> **Accessibility ruling (resolves a designer-vs-copywriter conflict).** The hairline stays the only
+> *visible* indicator. But the element carries `accessibilityRole="progressbar"` and its accessible
+> name is the copywriter's string, **"Question {n} of {total}"** — where `total` is 8, or 10 when a
+> target race was chosen. A bare hairline is not "less precise" to a screen reader — it is *silent*,
+> on a flow where not knowing your position drives abandonment. Both authors get what they wrote, for
+> their respective audience.
+
+> Copy — Q1 **"What's your main goal right now?"** · Q2 **"How would you describe your running
+> experience?"** · Q3 **"How many days a week can you run?"** *("Count the days you can realistically
+> train, not your ideal week.")* · Q4 **"What's your current weekly mileage?"** *("A rough average over
+> the last month is fine — this sets a safe starting point, not a judgment on your training.")* ·
+> Q5 **"Do you have a target race?"** · Q6 **"When's race day?"** · Q7 **"Any injuries or physical
+> limits we should plan around?"** *("This keeps your plan honest — we won't schedule speed work through
+> a lingering injury. Nothing here is diagnosis or medical advice.")*
+
+### Home / Create · *system theme*
+
+Two states, and the focal point moves between them.
+
+**Empty.** Mid-screen, a single desaturated ghost-ribbon row with a short caption framing it as a
+preview of what a plan looks like — the motif is the first thing this screen shows, ahead of any
+button. Beneath it the quota pip row. Below that, the screen's one hivis element: **"Create a plan."**
+
+**Populated.** The pip row moves up under a small header as secondary context. The focal point becomes
+the **next-workout card** — raised surface, hivis edge-glow, hivis "View" action, with the workout's own
+effort chip and text label inside it doing a completely different job (*what kind of run*, not *look
+here*). Directly beneath, one current-week ribbon row; tapping it jumps into plan view scrolled to that
+week. "Create a plan" persists but demotes to an outline button, because the hivis slot is taken.
+
+A Free user who has spent their one plan sees that button replaced by a plain **"See what Pro unlocks"**
+link — not a dead disabled control.
+
+> Copy — heading **"Your next plan starts here."**
+> Free, unused: **"Free: 1 plan available, ever."** · Free, used: **"Free: you've used your one plan,
+> ever."** · Pro: **"Pro: {plansLeft} of 3 plans left this month."** · Elite: **"Elite: {plansLeft} of
+> 10 plans left this month."**
+> At cap: **"Pro: 0 of 3 plans left this month. More on {resetDate}."**
+> **Free never says "this month."** "Ever" carries the cadence instead of a time window.
+
+### Configure plan · *modal · system theme · deliberately motif-free*
+
+No ribbon, no wave. This is a decision screen, not a celebration screen — withholding the motif here is
+what makes its arrival at the reveal feel *earned* rather than wallpapered everywhere.
+
+Two large cards offer the binary: **race-driven** or **fixed-duration**. Selecting one reveals its
+sub-fields beneath — distance chips and a date picker, or an 8/12/16 segmented numeral control. A short
+reassurance line makes explicit that this is a per-plan choice that won't touch the saved intake profile,
+directly addressing the two-different-"goal"-concepts trap. An optional notes field sits collapsed behind
+a disclosure. Bottom-anchored hivis **"Generate my plan."**
+
+> Copy — **"What's this plan for?"** · **"Train for a race"** *("Build toward a specific race day.")* ·
+> **"Set a duration"** *("Train for a fixed number of weeks, no race attached.")*
+> Caption under the CTA, by tier: Free **"This will be a template plan, matched to your distance and
+> schedule."** · Pro **"This plan will be personalized to your training data."** · Elite **"This plan will
+> be fully personalized, tuned to your training history."**
+
+### Generating · *pinned dark · terminal state of the configure modal*
+
+Not its own route (see below). Full-bleed. The pending cell grid centre-stage; step lines beneath it.
+No progress percentage, no time estimate, no cancel, no "notify me" — there is nothing to interact with,
+which is the honest representation of a call the client cannot influence.
+
+**Free's steps are honestly shorter**, because no AI runs. Showing a fake "personalizing" step for a
+template engine would misrepresent what is happening; the visibly shorter list is itself a wordless,
+honest signal that a different engine ran.
+
+> Copy — heading **"Building your plan"**.
+> **Pro / Elite steps:** "Reading your intake" → "Choosing your periodization model" → "Writing your
+> weeks" → "Checking the result".
+> **Free steps:** "Reading your intake" → "Matching your template" → "Checking the result".
+> Long wait, **paid only**: **"Still working — personalized plans take a little longer than templates.
+> Almost there."** *(This line must never render for Free, for whom it is nonsense.)*
+
+### Plan view · *system theme · the hero screen*
+
+Header: plan title at 24–32, metadata line beneath in graphite (tier pill, generation date).
+
+Immediately below, the **periodization wave** — full-width, about a fifth of screen height, drawn once,
+annotated with coarse week markers and a single "taper" label.
+
+If the plan has a next workout, the same hivis-glowing card from Home appears beneath the wave — reused,
+not reinvented.
+
+Then the **week ribbon**: one row per week, mono two-digit week number, seven height-and-colour bars,
+rest days as gaps, a trailing chevron that expands an **in-place accordion** rather than pushing a new
+screen — so the whole plan keeps reading as one continuous scrollable barcode. Inside an expanded week,
+each workout is an effort chip, a text label, a condensed numeral distance, a mono pace, and — paid tiers
+only — a dimmer indented "why" line.
+
+**Nothing here is tappable beyond expand/collapse.** No check-offs, no drag handles, no completed states.
+
+Below the ribbon, the screen ends in a flexible stack of homogeneous cards reserved for Elite's unconfirmed
+extras. Zero, one, or two can be added later without touching the screen's shape, because they are just
+more cards of a type that already exists.
+
+> Copy — race plan: **"{raceDistance} plan"**, sub **"{numberOfWeeks} weeks to race day, {raceDate}"**.
+> Duration plan: **"{durationWeeks}-week plan"**. Week heading **"Week {n} of {total}"**. Rest day
+> **"Rest day — recovery is training too."** Paid explanation section label: **"Why this week"**.
+> Free pace reads **"Effort: easy, conversational pace"**; paid reads **"Pace: {low}–{high} /mi · HR zone {n}"**.
+
+### How the three tiers differ *visually*
+
+The tier pill is neutral and identical across tiers. **The real differentiation is structural — crop the
+badge out of a screenshot and you should still know the tier.**
+
+- **Free** rows are the shortest in the app: chip, label, distance, and a qualitative effort
+  description. No pace, no HR zone, no brackets — nothing was measured.
+- **Pro** rows show the same measured numerals as Elite — a bracketed mono pace range and HR
+  zone — plus a second line, the indented weekly coach "why." Every row is visibly taller than Free.
+- **Elite** rows show the identical bracketed pace-and-HR-zone numerals as Pro, plus a longer,
+  per-workout "why" (and, once confirmed, the extras stack). The tallest, densest rows in the app —
+  because Elite explains more, not because it measures more.
+
+The wave scales the same way: Free's is unlabelled beyond start and end, Pro's adds week markers, Elite's
+adds the taper annotation and simply renders whatever more nuanced multi-peak shape its richer
+periodization actually produces. **No fake embellishment — more considered underlying data, drawn honestly.**
+
+And the extras stack is empty for Free and Pro, so an Elite plan is *physically longer when scrolled*.
+More plan for more money, as a felt difference rather than a stated one.
+
+On Home, the pip row scales the same idea to one glance: one pip, three pips, ten pips in two rows of five.
+
+### The `isFallback` treatment — invented here
+
+No modal, no toast, no warning triangle. That vocabulary belongs to errors, and a fallback plan is a valid,
+fully usable plan.
+
+A calm informational card sits in plan view **directly beneath the tier pill and above the wave** — raised
+surface, hairline border, neutral tone, never `status.error`, never hivis. Placement is deliberate: "PRO"
+and "this one's a template" sit in the same glance, so nothing is hidden on either axis, and the retry sits
+right there to resolve the gap.
+
+**A fallback plan's workout rows render at Free density regardless of the user's actual tier**, because a
+template genuinely has no "why" content and fabricating one would be dishonest. The card explains exactly
+why the rows look sparser than the user is used to, so the reduced richness is *accounted for* rather than
+silently confusing.
+
+My Plans tags the row **"Template"** before it is even opened.
+
+> Copy — **"This plan wasn't personalized."**
+> "We tried twice to build your personalized plan and couldn't validate the result, so this is a template
+> plan for your distance and schedule instead — no pace targets, HR zones, or coach notes. This attempt
+> didn't use one of your plans this month."
+> Button **"Regenerate"**, caption **"Uses one plan from this month."**
+>
+> ⚠️ **The sentence "This attempt didn't use one of your plans this month" is currently false.** It
+> depends on open decision #1 in Part 1. If fallback rows are not excluded from the quota count, cut that
+> sentence before ship.
+
+### My Plans · *system theme*
+
+Plan cards, most recent first, each carrying that plan's **wave sparkline** as its at-a-glance identity —
+deliberately the wave, not the ribbon, so the index screen has its own signature distinct from plan view's.
+Alongside: label, neutral tier pill, date range, and a quiet "Template" tag where applicable.
+
+Free users always see exactly one card. There is no generate-another affordance buried here; that upsell
+lives on Home.
+
+> Copy — empty state **"No plans yet"** / "Your training plans will show up here once you create one." /
+> **"Create your first plan"**.
+
+### Paywall · *pinned dark, full-bleed*
+
+Not a blurred sheet — depth comes from typography and layout, per the Android blur constraint.
+
+The hero is **not** a feature-bullet wall. It is the product's own workout row, shown twice, stacked: a
+Free row (chip, label, distance, pace) directly above the same slot at Pro density (the same row, plus the
+"why" line). The user is shown the literal, pixel-level richness delta they would be paying for, rather
+than marketing iconography.
+
+Below, tier cards stack **vertically**, Pro above Elite — two full cards side by side on a phone forces the
+type too small to stay premium. Each carries a pip row previewing capacity, a short differentiator list, and
+price shown Calm/Headspace-style: the annual plan's effective monthly cost large in condensed numerals, the
+plain monthly price smaller alongside as the comparison.
+
+**One bottom-anchored hivis CTA**, matching every other primary CTA's shape and position; the cards carry a
+neutral selection state and the CTA label follows the selection. *(This resolves a conflict — see Part 10.)*
+
+Since payment is dummy in v1, confirmation is an honest in-app loading-then-check state, **not a mimicked
+native payment sheet**, so v2's real IAP swap doesn't leave a fake StoreKit affordance behind.
+
+> Copy — headline **"Train with a plan that adapts to you."**
+> Free bullets: "1 training plan, ever" · "Template-based" · "No pace targets or coach notes".
+> Pro: "3 plans a month" · "AI-personalized pace targets and HR zones" · "Warm-ups and drills built into
+> every workout" · "A coach's reasoning behind every week".
+> Elite: "10 plans a month" · "Everything in Pro" · "Deeper periodization tuned to your injury history".
+> Disclosure: **"This build uses test payments only. Choosing a plan won't charge any card. Real payments
+> arrive in a future update."**
+> **Mid-plan adjustments and race-day strategy appear nowhere** until confirmed.
+
+### Settings · *system theme · deliberately the calmest screen*
+
+No motif, no texture, no gradients, **no hivis anywhere** — its actions are administrative, not the
+primary-action-of-the-screen that earns the accent. Grouped rows on raised surfaces: Account, Subscription
+(reusing the pip component a fourth time), Legal, App info.
+
+> Copy — Delete account confirmation: **"Delete your account?"** / "This permanently deletes your account,
+> your intake answers, and every plan you've generated. This can't be undone." / **"Delete account forever"**.
+
+### Where configure-plan and generating live
+
+Neither is named as a route in the spec — they appear only in prose flow. **Recommendation:**
+
+**Configure-plan is a modal-presented stack screen**, triggered from Home's CTA and from the paywall's
+post-upgrade return path. It is a short, repeatable, single-purpose decision; modal presentation signals
+"quick decision, then back to Home."
+
+**Generating is not its own route.** It is the terminal, non-dismissable state of that same modal — no back
+button, no swipe-to-dismiss, no cancel — because it genuinely has no navigational actions available. Giving
+it an independent route would imply a freedom that does not exist. The moment the crossfade into generating
+begins, the sheet's grab handle visibly disappears, because removing a gesture with no visual acknowledgement
+feels like a bug rather than a decision.
+
+On completion the modal dismisses itself and the app performs a normal push to `plan/[id]` — the transient
+transaction ends when its purpose ends, and the plan lives at its own permanent, revisitable route.
+
+If the modal is interrupted mid-generation, **no "resume" UI is needed.** The edge function is the source of
+truth for whether a plan was created; it either appears in My Plans or it was never created. The client never
+reconciles a state it was never authoritative over.
+
+---
+
+## Part 6 — Error and edge states
+
+- **402, Free, already spent.** "You've used your one free plan." / "Free includes a single plan, forever —
+  not a monthly refill. Upgrade to Pro or Elite to generate more." → **"See Pro and Elite"** / "Not now".
+- **402, Pro or Elite at cap.** "You're out of plans for this month." / "You've used all {planLimit} of your
+  {tierName} plans this month. More unlock on {resetDate}." Pro sees an Elite upsell; Elite sees none.
+- **Generation failed outright.** "Your plan didn't generate." / "We hit an error creating your plan. Your
+  quota wasn't used — try again."
+  > This follows from the schema: quota is `count(plans)`, and a row is only inserted after a successful or
+  > fallback generation, so a total failure creates nothing to count. **Re-verify once `generate-plan` exists.**
+- **Offline.** "You're offline." / "You'll need a connection to generate a plan. Your answers are saved."
+- **Sign-in.** Wrong credentials: "Incorrect email or password." OAuth cancelled: "Sign-in cancelled." — a
+  light toast with no further prompt, because that is a choice, not an error. OAuth genuinely failed: "We
+  couldn't complete sign-in. Try again."
+- **Free user viewing a plan with no coach notes** — the moment paid value is visible by its absence. Shown
+  **once**, near the top, never repeated per week card: "No coach notes on this plan." / "Free plans are
+  templates — solid structure, no personalized pacing or weekly coaching notes. Pro adds pace targets, HR
+  zones, and a coach's reasoning for every week." → **"See Pro"**.
+
+---
+
+## Part 7 — The accessibility floor
+
+Non-negotiable. Everything here is a **must**, not a nice-to-have.
+
+1. **The collapsed ribbon must carry a non-hue channel.** Bar height, per Part 2. Without it, the signature
+   motif violates the project's own written rule and loses four of its five levels to red-green colorblindness.
+2. **Use the darker light-mode effort fills.** The originals fail the 3:1 non-text bar against chalk. The 1px
+   ink stroke is *not* the fix — it is uniform across hues and fixes nothing about hue perceptibility. Keep it
+   for edge definition if you like; never log it as the compliance fix.
+3. **Dark mode needs a lifted `text.secondary`.** Graphite on asphalt is 2.83:1. Mandatory, because four
+   screens are pinned dark and the user has no escape hatch.
+4. **The ribbon row is one accessible node.** Its seven bars must be hidden from the accessibility tree, or a
+   screen-reader user hits 112 dead stops across a 16-week plan. The row needs a composed label ("Week 3,
+   expand. Monday steady, Tuesday rest…") and its expanded state exposed as state, not just visually.
+5. **The wave and the sparkline are silent by default.** A Skia canvas has no accessibility tree; a rasterized
+   bitmap has no alt text. Both need a text summary — "Training load, weeks 1–16, builds to a peak around week
+   12, tapers weeks 14–16." The sparkline must not be independently focusable inside an already-tappable card.
+6. **The generation reveal must announce itself.** A color-snap and a haptic tell a screen-reader user nothing.
+   Fire an explicit completion announcement.
+7. **The intake hairline needs a role and an accessible name** — `progressbar`, named "Question 3 of 7."
+   Visually it stays a bare hairline.
+8. **Quota pips must be hidden from the accessibility tree** so the paired text count is read once, rather than
+   ten dots being narrated.
+9. **Focus and selected states must be visually distinct.** Both currently render as "ink border + checkmark."
+   For keyboard and Switch Control users these are different things. Focus = ink ring; selected = ink border +
+   checkmark; both = combine.
+10. **Pinned-dark screens must still honour Increase Contrast / reduce-transparency**, rather than ignoring OS
+    accessibility settings because the screen is theme-locked.
+11. **The ribbon row needs an explicit minimum height** (≥44). A thin barcode strip is easy to build under
+    target size by accident.
+12. **Gradients need contrast checked at the lightest and darkest point text actually crosses**, not at the
+    midpoint. Verifying the midpoint and shipping an edge failure is the classic gradient defect.
+13. **Verify nothing sets `allowFontScaling={false}`**, especially at the 13pt step. Condensed faces at small
+    sizes are the classic truncation trap.
+14. **The reduced-motion grid pulse is single-shot.** A repeating oscillation reintroduces the motion the user
+    opted out of.
+
+---
+
+## Part 8 — Responsive
+
+This design has exactly **one** width threshold and **one** text-scale threshold. Everything else is continuous.
+
+**`MaxContentWidth` 800** is applied unconditionally to every screen's outer container and centred. No phone
+(360–430pt) ever reaches it, so on phones it is invisible. It binds on iPad, tablets, unfolded foldables, and
+resizable web. When it binds, a "full-width" bottom CTA means full width **of the capped column**, not the screen.
+
+**The accessibility text-size threshold** (iOS AX sizes; Android font scale beyond ~1.3×) is computed once as a
+single derived boolean and reused everywhere. It is the only thing that changes a component's *structure*.
+
+**The ribbon.** Cell width is fractional — `(row width − gutter − 6 gaps) ÷ 7` — so the row structurally cannot
+overflow; it can only get too small to read. Floor **28pt**. The inter-bar gap shrinks first, floor
+`Spacing.half`. The week-number gutter never shrinks; it is capped on the *growth* side instead. **The row never
+wraps** — a wrapped week destroys the barcode read. At 375pt this never actually binds; the floor is a guardrail
+against large text sizes and Android's separate display-size setting.
+
+**The wave.** Height ≈ ⅕ of *available* height (screen minus insets minus tab bar minus CTA), computed from live
+layout, **clamped** to floor 120pt and ceiling 220pt. Below 120pt a recovery dip and a peak crest become
+indistinguishable — a meaningless squiggle. On an SE-class phone ⅕ falls below the floor, so the wave clamps *up*
+and takes proportionally more of the screen: an unreadable chart is worse than a slightly large one, and
+everything under it scrolls anyway.
+
+**Above the fold on the smallest phone.** Home: title + quota line (the CTA is pinned, so it is always visible by
+construction). Plan view: the wave **plus at least week 1's ribbon row** — if you must scroll to see even one row,
+the "barcode at a glance" premise is dead on the smallest device on day one. Paywall: headline + the Pro card's
+header.
+
+**Extra height on large phones is not stretched.** Cards and rows never grow taller because the screen is. Extra
+height surfaces as more of the same-sized content visible before scrolling, the wave continuing toward (not past)
+its ceiling, and a small clamped amount of extra breathing room.
+
+**Pips never scale with text size.** They are colour glyphs, like ribbon bars and effort chips. The paired text
+count scales freely and may wrap to a second line, but must **never truncate** — a user paying for Elite needs to
+read the full quota, not "8 of 1…".
+
+**The workout row is where large text breaks.** Past the accessibility threshold it restructures — the one place
+in the app where text size changes structure. Row 1: chip + wrapping label. Row 2: the numerals as explicit
+"label: value" pairs ("Distance 10km", "Pace 7:45/mi", "Zone 3"), wrapping rather than clipping. Row 3: the "why"
+line, full width, **never clamped or truncated** — it is paid explanatory copy, and truncating it is the failure a
+paying user notices fastest.
+
+**Safe areas.** On the four full-bleed screens, the background layer bleeds under the Dynamic Island, the home
+indicator, and Android's nav bar. Everything readable or tappable sits inside a container applying live insets —
+never a guessed constant. Bottom padding is `max(insets.bottom, Spacing.three)`, because gesture-nav Android can
+report near-zero.
+
+**`BottomTabInset` applies only to Home and My Plans**, the two screens inside the tab navigator. Applying it
+everywhere produces a floating dead gap on the other eight; applying the safe-area rule inside the tab bar
+double-pads. This distinction is easy to get wrong.
+
+**Keyboard.** The bottom CTA must be the **last child inside** the keyboard-avoiding scroll container, not an
+absolutely-positioned sibling. Then its anchor is "bottom of the keyboard-shrunk content area," which equals the
+physical bottom exactly when the keyboard is closed. The two multiline fields (injuries, notes) get a min height
+computed from line-height and a **capped max visible height**, beyond which they scroll internally — unbounded
+growth would otherwise push the CTA off the top of a small phone's shrunken viewport.
+
+**Orientation.** Lock portrait below `sw600dp`; allow free rotation at or above it. The ribbon and workout list are
+inherently vertical-scan content, and phone landscape gains nothing while the keyboard would claim half the
+viewport. Tablets are a different matter — but see open decision #2, because nothing commits to tablet as a v1 target.
+
+---
+
+## Part 9 — Implementation prerequisites
+
+**Nothing below is installed. All of it is needed.**
+
+| Package | Needed for | Note |
+|---|---|---|
+| `@shopify/react-native-skia` | The periodization wave | Config plugin, no bare workflow |
+| `expo-linear-gradient` | CTA gradient, wave fill | Trivial add |
+| `expo-haptics` | Every haptic beat in the reveal | **Native module — needs a dev-client rebuild, not an OTA update** |
+| `@expo-google-fonts/barlow-condensed` | Display + all numerals | — |
+| `@expo-google-fonts/inter` | Body, UI chrome | — |
+| `@expo-google-fonts/ibm-plex-mono` | Pace splits, HR zones, week numbers | — |
+
+**Already present:** `react-native-reanimated ~4.1.1`, `react-native-gesture-handler ~2.28.0`,
+`expo-font ~14.0.12` (with **zero font files bundled**), `react-native-safe-area-context ~5.6.0`.
+
+**Do not install `expo-blur`.** This system has no sanctioned blur use.
+**Consider removing `expo-glass-effect ~0.1.10`**, which is installed and contradicts the depth rules.
+**Do not install `lottie-react-native`.** Build the celebration with Reanimated.
+
+**Also required before build:**
+- Replace every value in `src/constants/theme.ts` (the shape stays; the stock Expo values go).
+- Add `48` to the spacing ramp; rename the old `six`→`seven`; migrate two call sites in `explore.tsx`.
+- Delete the stock template: `explore.tsx`, `animated-icon.*`, `hint-row.tsx`, `web-badge.tsx`, and the
+  current `app-tabs.*` two-tab structure.
+- Fix the placeholder hero title "Aanya's baby" at `src/app/index.tsx:38`.
+
+---
+
+## Part 10 — Conflicts between specialists, and how they were resolved
+
+Recorded rather than silently averaged.
+
+1. **Intake progress: numeric or not?** The designer rejected "Question {n} of {total}" as visually noisy; the copywriter
+   wrote it. **Resolved on accessibility grounds:** the hairline is the only *visible* indicator, and the same
+   element carries `role=progressbar` with "Question {n} of {total}" as its accessible name. A silent hairline is not
+   less precise to a screen reader — it is zero information. Both authors get what they wrote.
+
+2. **Generating steps: one list or per-tier?** The copywriter wrote one four-step list including "personalized
+   plans take a little longer than templates." The designer specified that Free's list is honestly shorter because
+   no AI runs. **Resolved for the designer**, because the copywriter's long-wait line is nonsense to a Free user
+   who never triggered an AI call. Free gets a three-step list; the long-wait line is paid-only.
+
+3. **Paywall: one CTA or one per card?** The designer specified a single bottom-anchored hivis button acting on a
+   selected card. The copywriter wrote "Get Pro" / "Get Elite" per card. **Resolved for the designer**, because
+   "exactly one hivis primary action per screen" is a load-bearing, app-wide rule and per-card buttons would put
+   two competing accents on the most important screen in the product. The cards take a neutral selection state and
+   the CTA label follows the selection. Note the structural consequence flagged by the responsive pass: the scroll
+   content must reserve bottom padding so the last card is never hidden behind the pinned button.
+
+4. **The light-mode contrast fix.** The token pass proposed a 1px ink stroke on every effort swatch. The
+   accessibility pass rejected it as a rationalization — a uniform stroke cannot make `steady` distinguishable from
+   `tempo`. **Resolved for accessibility:** darker light-mode fills, plus the bar-height channel. The stroke may
+   remain for edge definition; it is not the compliance fix.
+
+5. **Ribbon tap target.** Seven cells, or one row? The responsive pass showed that seven 44×44 targets cannot
+   coexist with a legible barcode on a 360pt phone; the designer had independently specified that nothing is
+   tappable beyond expand/collapse. **They agree: the row is one target.**
+
+6. **Sparkline vs. "one Skia canvas per screen."** Irreconcilable as stated once My Plans has two rows.
+   **Resolved by the motion pass:** rasterize each sparkline once to a cached bitmap; My Plans gets zero live
+   canvases; plan view holds the only one.

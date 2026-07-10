@@ -1,0 +1,160 @@
+# Coaching Reference Library (PACE)
+
+Ported subset of Ian's McMillan-certified coaching library, rebranded ECHO → PACE, filtered down
+to what a **one-time intake** can actually drive. This is a port, not new authorship: every rule
+below traces to a specific source file and section, cited inline like `(load_rules.md § Rule 1)`.
+Where the source is silent on something the engine needs, it's marked
+`NOT SPECIFIED IN SOURCE — needs Ian` rather than filled in. See also `CLAUDE.md` "Coaching
+domain" for the standing rules this library exists to satisfy.
+
+**Source** (read-only, outside this repo, belongs to Ian's separate running-coach business):
+`~/Desktop/Running Bussiness Files/4th Edition/Final Txt Files/` — `load_rules.md`,
+`training_zones.md`, `workout_library.md`, `injury_flags.md`, `ECHO_Training_Plans_McMillan.md`,
+`ECHO_Framework_CORRECTED.md`.
+
+**Rebrand note:** where the source names the coaching system "ECHO" or labels its coaching
+commentary "ECHO Cues," this port renames it "PACE" / "PACE cues." The four pillar names inside
+that framework — Economy, Cadence, Harmony, Optimization — are coaching content, not branding, and
+are kept as-is even though they no longer spell the product name.
+
+**Files in this folder:**
+
+| File | Covers |
+|---|---|
+| [`load-rules.md`](load-rules.md) | Deterministic safety arithmetic — volume caps, deload cadence, injury red flags, disclaimers |
+| [`training-zones.md`](training-zones.md) | The 5-zone model, max-HR estimation, intensity distribution |
+| [`workout-library.md`](workout-library.md) | Running session primitives (easy, tempo, intervals, long run, ...) |
+| [`injury-rules.md`](injury-rules.md) | Return-to-running protocol for a declared injury |
+| [`plan-structure.md`](plan-structure.md) | Phases, the Day 1…Day 7 model, deload cadence, how a plan is composed |
+
+## The applicability filter — why most of the source didn't make the cut
+
+ECHO was a training log with wearable data: it saw every run, every RPE rating, every morning
+resting heart rate, indefinitely. V2.2 collects **eight fields once, at signup** — goal, age,
+experience, days_per_week, weekly_km, race_distance (optional), race_date (optional), injuries —
+and never sees the runner again. No logging, no wearables, no check-offs, no ongoing data. A rule
+only survives this port if a one-time intake can actually drive it.
+
+## Ported
+
+- **Volume caps & deload cadence** — `load_rules.md` Rule 1 (weekly increase cap, long-run cap,
+  deload trigger) and Rule 4 (weekly volume thresholds by level). Both are pure arithmetic on
+  numbers the engine already generates. → `load-rules.md`
+- **Injury red flags, triage subset** — `load_rules.md` Rule 5, the parts a *declared* symptom at
+  signup can drive (as opposed to a per-run report). → `load-rules.md`, `injury-rules.md`
+- **Disclaimers** — `load_rules.md` Rule 10, verbatim, non-negotiable. → `load-rules.md`
+- **Training zones, whole model** — `training_zones.md`. Zones are computed from age
+  (`220 − age`), which V2.2 collects, so the whole zone table is drivable. → `training-zones.md`
+- **Running sessions** — `workout_library.md` Part 1, all 9 session types, minus the fuel/fueling
+  sub-sections (out of scope, see below). → `workout-library.md`
+- **Return-to-running protocol** — `injury_flags.md` Part 2. → `injury-rules.md`
+
+## NOT ported (and why)
+
+- `load_rules.md` **Rule 2** (RPE fatigue detection) — needs per-session RPE logging; V2.2 has
+  none.
+- `load_rules.md` **Rule 3** (resting-HR spike) — needs a daily resting-HR reading; V2.2 has none.
+- `load_rules.md` **Rules 7, 8, 9** (illness, sleep, altitude) — each needs ongoing self-report
+  V2.2 never collects.
+- `load_rules.md` **Rule 6** (injury pattern detection from cadence/mileage logs, prescribing
+  prehab) — not explicitly named in the porting brief, but it fails on both counts that rule out
+  other sections below: it detects patterns *from logged run data* (none exists — same reason as
+  `injury_flags.md` Part 1) and its remedy is a prehab exercise library (out of scope — same
+  reason as Part 4). Noted here for completeness.
+- `injury_flags.md` **Part 1** (injury pattern detection from run data) — no run data exists;
+  V2.2 never sees a run after it's assigned.
+- `injury_flags.md` **Part 3** (special populations) — the female-specific rules need **sex**,
+  which V2.2 does not collect (age is collected and is used elsewhere). The Runners-50+
+  sub-section's *age-keyed stress-fracture timeline* is also dropped — see correction (f) below,
+  same reasoning as the experience-keyed timelines.
+- `injury_flags.md` **Part 4** (prehab exercise library) — plans are running-only; no prehab is
+  ever emitted.
+- `workout_library.md` **Part 2** (cross-training equivalences) — plans are running-only.
+- **All nutrition/fueling content** — the "Fuel" sub-section on every session type, and the
+  fueling guidance embedded in the long-run and marathon-pacing content — out of scope for a plan
+  generator.
+
+## Ian's decisions, applied exactly
+
+These aren't corrections to the source's coaching content — they're V2.2 product decisions about
+how the ported rules get used. Applied without second-guessing:
+
+1. **Plans are running only.** Runs and rest days — no prehab, no cross-training, no mobility.
+   Consequence: the engine's only levers against a declared injury are volume and intensity.
+2. **Days are unnamed.** Day 1 … Day 7 in a 7-day cycle, never Mon–Sun. (`ECHO_Training_Plans_McMillan.md`
+   already does this — "Use Day 1, Day 2, Day 3 (not Mon/Tue/Wed) for flexibility" — so this
+   confirms the source rather than overriding it.)
+3. **Max HR stays `220 − age`.** Ian was shown that Tanaka (2001) finds this the least accurate of
+   the common max-HR formulas (±10–12 bpm scatter) and chose to keep it anyway — an informed
+   decision, not an oversight. See `training-zones.md`.
+4. **Deload weeks reduce volume 35–45%** (2026-07-10, superseding an earlier 20–30% call the same
+   day). Ian's own three worked examples in `workout_library.md` all land in this band, and his
+   "Exception — Recovery Weeks" clause already permits it. See `plan-structure.md`. The 5K plan's
+   Week 4, whose volume *rises* while labelled a deload, remains an error either way.
+5. **The 10–15% weekly cap stays, plus a new long-run spike cap.** See corrections (a) and (b).
+
+## Corrections made while porting
+
+Each is evidence-driven and cited inline at its source location. Summary:
+
+- **(a) Relabel the 10–15% weekly cap "coaching convention," not "verified."**
+  `load_rules.md` labels this "Verified: McMillan methodology, industry standard." Buist et al.
+  2008 (*Am J Sports Med*, RCT, 532 novices) found injury incidence 20.8% under a 10%-rule graded
+  program vs. 20.3% without (p = .90) — no measurable effect — and a 2022 systematic review
+  (23,047 runners) concluded the rule "is not justified." The cap stays in the engine as prudent
+  practice; the "verified" label does not survive the port. → `load-rules.md` Rule 1.
+- **(b) New long-run spike cap.** A 2025 BJSM cohort (5,205 runners, 588,071 sessions) found
+  weekly volume change was a poor injury predictor, while a single run exceeding ~10% of the
+  runner's longest run in the prior 30 days raised overuse-injury rates. Nielsen 2014 (*JOSPT*,
+  874 novices) found >30% progression over two weeks is the risky band. Because V2.2 generates
+  every week itself, this is fully deterministic: **no long run may exceed the plan's own
+  previous longest long run by more than 10%.** → `load-rules.md`, new rule.
+- **(c) Daniels' long-run time cap.** ~2.5–3 hours regardless of percentage of weekly volume. The
+  source omits this cap entirely; added per Ian. → `load-rules.md`, new rule.
+- **(d) Cadence: qualitative cue only, no absolute SPM targets.** The source prescribes absolute
+  targets (170–180 SPM) and blames knee/shin injury on cadence below 170 — the 180-SPM myth.
+  Optimal cadence is individual (~150–200+ SPM); the supported intervention is a 5–10% increase
+  above the runner's *own* baseline (*Br J Sports Med* 2022 step-rate meta-analysis). V2.2 never
+  collects cadence, so there's no baseline to increase from. Absolute SPM numbers are removed from
+  everything the plan emits; cadence survives only as a qualitative cue ("quick, light feet").
+  Notably, `ECHO_Framework_CORRECTED.md` § Pillar 2 already argues against one-size-fits-all SPM
+  targets — the source contradicts itself between files. → `training-zones.md`,
+  `workout-library.md`.
+- **(e) "Polarized" → "pyramidal."** `training_zones.md` calls its intensity distribution
+  polarized, but its own Phase 3 prescribes ~20% Zone 3 (threshold) work — that's a
+  pyramidal/threshold distribution, not polarized (Seiler; Stöggl & Sperlich 2014). Relabeled. The
+  80/20 easy-hard emphasis itself is supported and unchanged. → `training-zones.md`.
+- **(f) Stress-fracture return timelines de-keyed from tier/age, made symptom-gated.**
+  `injury_flags.md` keys return timelines to *experience level* (beginner 8–12 wk, intermediate
+  10–14, advanced 12–16) in two places with two contradictory rationales — "more muscle mass =
+  more bone load" (§ Stress Fracture Pattern, Recovery Timeline) vs. "muscle loss = slower
+  comeback" for the identical 12–16-week advanced-runner figure (§ Special Case: Stress Fracture,
+  Timeline) — plus a third, age-keyed version for 50+ runners (§ Runners 50+, Recovery Timeline
+  Longer) reconciled with neither. The evidence keys return time to fracture **site and grade**
+  (low-risk metatarsal ~6–8 wk; navicular and femoral neck 4–6 months), neither of which V2.2
+  collects. All three fixed timelines are removed; the return protocol advances on the source's
+  own pain-during / pain-after / next-morning checkpoints instead and never promises a week
+  number. → `injury-rules.md`.
+
+## Open gaps — `NOT SPECIFIED IN SOURCE — needs Ian`
+
+- **Shape of the `injuries` intake field.** Routing a declared injury into `load_rules.md` Rule
+  5's three trigger tiers (Immediate Stop / Reduce Volume / Monitor) needs to know what the
+  runner actually typed or selected. Neither the coaching source nor
+  `planning/03-engineering-requirements.md`'s `intake_responses.injuries` column specifies free
+  text vs. a structured symptom picker. This is a product/engineering decision, not a coaching
+  one, but the coaching rules can't be wired up without it.
+- **Whether "Monitoring" tier flags should surface at intake at all.** Rule 5's triggers in that
+  tier ("new muscular soreness in unfamiliar area," "joint stiffness > 10 min") are worded as
+  things noticed *during or after a run* — not something a runner would confidently self-report
+  once at signup, before taking a single run on the plan. The source doesn't say whether a
+  one-time intake should act on this tier or only on the two more severe ones.
+- **Where/how often the Rule 10 disclaimers render in the UI** (every plan? every week? a
+  persistent footer?). Rule 10 mandates *that* they appear on every injury-related and
+  health-guidance output; it doesn't specify UI placement, which is out of coaching-content
+  scope.
+
+Cross-references: [`docs/reference/plan-generation.md`](../plan-generation.md) (how the tiers call
+these rules) and
+[`planning/03-engineering-requirements.md`](../../../planning/03-engineering-requirements.md) (the
+engine's responsibilities, including the new long-run spike cap).
