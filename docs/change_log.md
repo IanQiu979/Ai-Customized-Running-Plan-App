@@ -5,6 +5,41 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-07-12 — docs stale-reference sweep (closes #37)
+
+Doc-only pass reconciling files that still described the Phase 1 plan-engine work and the
+`145d7e0` theme rewrite as pending, even though both had landed. `docs/architecture.md`,
+`docs/mvp-progress.md`, and `docs/design/mvp-blueprint.md` were already reconciled by an earlier
+pass (commit `75b8aba`) and were left untouched.
+
+- **`README.md`** — "What exists today" code block rewritten to the real `src/` tree: real plan UI
+  under `src/app/(tabs)/` and `src/app/plan/[id].tsx`, `src/components/plan/`, and `src/lib/`
+  (`loadRules.ts`, `notation.ts`, `planTypes.ts`, `supabase.ts`, `fixtures/examplePlan.ts` —
+  deliberately *not* listing `planTemplates.ts` or `paceDerivation.ts`, which don't exist yet even
+  though their tests do). The "Planned layout" block no longer lists `(tabs)/index`, `plan/[id]`,
+  `planTypes.ts`, or `supabase.ts` as unbuilt; auth, intake, paywall, settings, `(tabs)/plans`,
+  `planTemplates.ts`, `subscription.ts`, and `generate-plan` stay listed as planned.
+- **`docs/mvp-build-prompt.md`** — Ruling 18 (`expo-glass-effect` removal) and the Phase 1
+  `design-system` task bullet (theme rewrite, font bundling, glass-effect removal, stock-template
+  deletion) both annotated as landed in `145d7e0`, without deleting the historical instruction
+  text or renumbering the ruling list.
+- **`docs/design/frontend-design-brief.md`** — open-question item 5 (`expo-glass-effect`) marked
+  RESOLVED 2026-07-10 (Ruling 18, `145d7e0`), matching item 6's existing RESOLVED convention. The
+  now-moot `Spacing.six`-migration blockquote removed (its two call sites lived in `explore.tsx`
+  and died with it), keeping the design rationale for the 48 spacing step directly above it. Part
+  9's prerequisite table and checklist updated: the three Google Fonts packages marked installed,
+  `expo-font`'s stale "zero font files bundled" note corrected, `expo-glass-effect` marked removed
+  rather than "consider removing," and the "required before build" checklist rewritten past tense
+  as done (`145d7e0`).
+- **`docs/reference/coaching/example-plan-5k-pro.md`** — the "Cycle-2 note" on
+  `paceDerivation.test.ts` rewritten in past tense: the resync to ruling 3's goal-pace convergence
+  landed (verified against the live test file — `deriveRacePaceTarget` now asserts
+  `{ pace: { lowSecPerKm: 240, highSecPerKm: 240 }, source: 'goal' }` for the fixture runner, and
+  the old >10%-goal-improvement gate is gone). Open item 5's stale "still applies it" / "being
+  resynced this cycle" clauses fixed to past tense; the actual open question — whether to warn,
+  cap, or trust an implausibly fast declared goal — is untouched and still needs Ian's ruling.
+- Closes GitHub issue #37.
+
 ## 2026-07-11 (cycle 3) — AGENTS.md rewritten as a 3-tier Subagent Usage Policy
 
 Process/tooling decision, not a coaching or code change — logged because it changes how every

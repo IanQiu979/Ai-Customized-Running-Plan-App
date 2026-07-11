@@ -85,14 +85,25 @@ What exists today:
 
 ```
 src/
-  app/            # expo-router screens — currently the create-expo-app template
+  app/
     _layout.tsx
-    index.tsx
-    explore.tsx
-  components/     # template UI components (themed-text, themed-view, app-tabs, ...)
+    (tabs)/
+      _layout.tsx
+      index.tsx          # Home
+      glossary.tsx        # run-type abbreviations glossary
+    plan/[id].tsx          # plan view
+  components/
+    plan/                  # plan-view UI: nameplate, effort chip, workout row, week accordion, ...
   constants/
-    theme.ts
+    theme.ts                # "Instrument & Matter" design tokens
   hooks/
+    use-color-scheme.ts, use-color-scheme.web.ts, use-theme.ts
+  lib/
+    loadRules.ts             # deterministic safety clamp
+    notation.ts               # run-type abbreviations + structure-string shorthand
+    planTypes.ts               # shared Plan/Week/Workout types
+    supabase.ts                 # client init
+    fixtures/examplePlan.ts      # golden fixture plan
 ```
 
 Planned layout (not yet built — see `planning/03-engineering-requirements.md`):
@@ -100,16 +111,12 @@ Planned layout (not yet built — see `planning/03-engineering-requirements.md`)
 ```
 src/app/
   (auth)/sign-in, sign-up
-  (tabs)/index         # Home / Create plan
   (tabs)/plans         # My Plans (history)
   intake/               # onboarding questionnaire
-  plan/[id]             # plan view
   paywall, settings
 
 lib/
-  supabase.ts           # client init
-  planTemplates.ts      # free-tier hard-coded plans
-  planTypes.ts          # shared Plan/Week/Workout types
+  planTemplates.ts      # free-tier hard-coded plans (parametric template generator)
   subscription.ts       # tier read + dummy purchase
 
 supabase/functions/
