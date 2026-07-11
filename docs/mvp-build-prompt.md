@@ -203,8 +203,7 @@ Present these with the recommended defaults so Ian can accept or override in one
     encodes the closed set.*
 11. **Rule 10 disclaimer placement.** *Recommended: static footer section on every plan view +
     one line in the generating modal's fine print.*
-12. **App name** (blocks icon/wordmark/store listing — needed by M6, not before) and
-    **iPad support** (*recommended: phone-only v1*), **password minimum** (*verify what the
+12. **iPad support** (*recommended: phone-only v1*), **password minimum** (*verify what the
     live Supabase project actually enforces; align sign-up copy to it*).
 
 Once answered: `doc-writer` records every ruling + decision in `docs/change_log.md` and syncs
@@ -376,8 +375,9 @@ The demoable core: a real template plan rendered on a real screen, zero network.
    then `accessibility-implementer` fixes the reviewer's findings.
 3. `ux-copywriter`: empty states, every error state from Ruling 20, offline copy.
 4. Run the `frontend-audit` skill; feed findings to `fix-batch`.
-5. `mobile-release`: `eas init`, new bundle ID, icon/splash (needs the app name from the
-   decision gate), TestFlight build.
+5. `mobile-release`: `eas init` (still to do — EAS is unlinked; bundle ID is already settled,
+   `com.ian.paceblueprint`, committed in `app.json`), icon/splash (name decided, no longer
+   gated — art itself still to be made), TestFlight build.
 6. Final gate (M6 done): a stranger can go sign-up → plan without a dead end. Then run the
    `full-audit` skill once over the finished codebase and fix HIGHs before inviting testers.
 

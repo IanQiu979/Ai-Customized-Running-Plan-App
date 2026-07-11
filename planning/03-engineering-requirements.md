@@ -213,7 +213,7 @@ Solo project, but pinning these so the build stays consistent:
 
 ## Infrastructure to provision (before coding)
 
-- [ ] New Supabase project (name: `v22-plan-builder` or final app name) — enable **Google OAuth + Sign in with Apple + email/password** auth (set up Google OAuth client ID/secret and Apple Services ID/key; guest/anon deferred to v2)
+- [ ] New Supabase project (name: `pace-blueprint`) — enable **Google OAuth + Sign in with Apple + email/password** auth (set up Google OAuth client ID/secret and Apple Services ID/key; guest/anon deferred to v2)
 - [ ] Anthropic API key (separate key from Echo, for usage tracking per app)
 - [ ] Apple Developer: new bundle ID
 - [ ] EAS project (`eas init`)

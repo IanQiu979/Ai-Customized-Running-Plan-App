@@ -29,5 +29,6 @@ The **project spec doc** is the two Part-A / Part-B files (02 and 03).
 
 ## Still open before coding
 1. Confirm/edit the **Elite extras** (tier table in 02).
-2. Pick the **app name**.
-3. **Provision infra** (checklist at the bottom of 03).
+2. **Provision infra** (checklist at the bottom of 03).
+
+(App name decided 2026-07-12 — **Pace Blueprint**, see `docs/change_log.md`.)

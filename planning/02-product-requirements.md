@@ -1,6 +1,7 @@
 # V2.2 — Product Requirements (Part A: What & Why)
 
-> Status: draft from brainstorm (2026-07-07). Working name TBD (part of the PACE family, not Echo).
+> Status: draft from brainstorm (2026-07-07). Named **Pace Blueprint** (decided 2026-07-12; part
+> of the PACE family, not Echo).
 
 ## Who it's for
 
