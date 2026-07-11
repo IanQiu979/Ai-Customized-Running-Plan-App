@@ -17,7 +17,7 @@ make a behavior-changing commit, add a bullet under today's date — create a ne
   `Pace Blueprint`, `expo.slug` → `pace-blueprint`, `expo.scheme` → `paceblueprint`,
   `expo.ios.bundleIdentifier` → `com.ian.paceblueprint`, `expo.android.package` →
   `com.ian.paceblueprint` (newly added); `package.json` name → `pace-blueprint`; Home title in
-  `src/app/index.tsx` → "Pace Blueprint." `package-lock.json` regenerated to match.
+  `src/app/(tabs)/index.tsx` → "Pace Blueprint." `package-lock.json` regenerated to match.
   `typecheck && lint && test` all pass (22 tests).
 - **Why the identifiers landed now, not at M6 — revises the issue's own premise.** The issue said
   the name was "needed by M6, not before." True of the *art* (icon, wordmark, splash, store
@@ -37,6 +37,255 @@ make a behavior-changing commit, add a bullet under today's date — create a ne
   `145d7e0`), `CLAUDE.md` ("What this is" now names the app), `planning/02-product-requirements.md`
   (status line no longer says "Working name TBD"), and `planning/README.md` ("Pick the app name"
   removed from "Still open before coding").
+
+## 2026-07-11 (cycle 3) — AGENTS.md rewritten as a 3-tier Subagent Usage Policy
+
+Process/tooling decision, not a coaching or code change — logged because it changes how every
+future session routes work in this repo.
+
+- **`AGENTS.md`'s old size-based "Routing rules" (small/big) replaced with Ian's 3-tier severity
+  policy**: LOW (single file, no schema/API change, easily reversible — proceed directly or with
+  at most one subagent), MEDIUM (multi-file, new features, refactors touching shared code —
+  minimum planning → implementation → testing → `doc-writer` if user-facing), HIGH/CRITICAL
+  (schema/migrations, auth/security, production config, cross-service, or anything the user flags
+  risky — full chain ending in branch + PR via `github-ops`, never a direct commit). The old
+  "always big" list (auth, RLS, schema, payments, secrets/env, edge functions, plan generation,
+  adding a dependency) folds into the HIGH tier definition unchanged. Skipping a required step for
+  a tier is disallowed unless the user overrides it in the same message; the old "unsure → treat
+  as big" rule becomes "unsure → default to the higher tier," with `task-router` kept as an
+  optional escalation path.
+- **New § "Subagent selection — category lookup" table** maps severity → category (planning,
+  implementation by domain, testing, review/security, docs, QA/verification) → specific subagent,
+  so routing is a lookup rather than a guess. Grounded directly against the 70 real subagent
+  definitions at `~/.claude/agents/*.md` (name + description read for every file first) — no
+  subagent name in the new policy is invented; the pre-existing "Full roster (70)" section
+  cross-checks cleanly against it.
+- **"Task → chain" table kept, given a `Tier` column**, and every row's chain brought in line with
+  its tier's minimum requirements (e.g. the DB-schema, auth, edge-function, `generate-plan`,
+  env/secrets, Expo-SDK-bump, and TestFlight-ship rows all gained the `doc-writer` → `github-ops`
+  (branch + PR) tail HIGH now requires; a new "Add any new npm dependency" row was added since the
+  old table never gave dependency additions their own line despite always being in the "always
+  big" list).
+- **Carried forward unchanged, under a new § "Standing rules"**: parallel dispatch only when tasks
+  share no files; read-only agents report/never fix (with all seven existing pairings); all
+  git/GitHub actions via `github-ops`; `verifier` = `npm run typecheck && npm run lint && npm
+  test`, required before every commit at every tier.
+- **`CLAUDE.md` checked, left untouched.** Its Git etiquette section ("branch when a change is
+  multi-file, touches auth/payments/RLS/edge functions, or is worth a review pass") is coarser than
+  the new HIGH tier but not contradicted by it — HIGH is a subset of that existing rule, and this
+  predates the rewrite rather than being introduced by it. Flagged, not fixed, since fixing it
+  wasn't this pass's scope: CLAUDE.md's "multi-file" branching trigger and the new policy's
+  MEDIUM tier (which doesn't itself mandate branch + PR) can disagree on an ordinary multi-file
+  feature — worth Ian's eye in a future pass.
+- **`Full roster (70)`, `V2.2 guardrails agents must respect`, and the file's intro/`Expo HAS
+  CHANGED` sections are untouched** — none referenced the old small/big language.
+
+## 2026-07-11 (cycle 2) — review-and-refine: doc-side corrections to the 3/10-review rebuild
+
+A code-review pass over cycle 1's rebuild (same day, entry below) found five internal
+contradictions in the doc set plus one coverage gap worth closing while everything was already
+open. This entry is the doc-side fix; code/tests are a separate, parallel pass this same cycle
+(`src/lib/notation.ts`'s `STRUCTURE_SHORTHAND` gaining `·`, an accessibility fix to the structure
+readout, and the `paceDerivation.test.ts` resync noted below).
+
+- **Recovery-menu alignment: week 9's interval jog was outside `workout-library.md`'s own
+  recovery menu.** The menu prescribes a 300–400 m jog after 600 m reps (40–67% of rep distance);
+  week 9's `8 × 600 m` session used a 200 m jog (33%), contradicting it. Fixed to `w/ 300 m jog`.
+  Ripple, all re-verified: week 9's headline INT distance 10 → **11 km** (WU 2 + 4.8 quality +
+  2.1 jog + CD 2 = 10.9, rounded); week 9 total **44 → 45 km** (11 ER + 9 TR + 11 INT + 14 LR);
+  volume-table note −8.3% → **−6.3%** vs week 7; week 10's note +9.1% → **+6.7%** (48 off 45);
+  long-run share 14/45 = 31.1%, still inside the documented under-1-km-over-30% tolerance; the
+  easy-run ≤ 80%-of-long-run check (11 ≤ 11.2) still holds. Marked in `example-plan-5k-pro.md` as
+  a cycle-2 correction, with the alternative (widening the menu to ~33–67% instead) noted for Ian
+  if he prefers the original 200 m jog.
+- **Daniels 10%-of-weekly-volume brake was mis-scoped as an enforced rule.**
+  `workout-library.md` had listed it as "used by this app" with "the smaller number wins" — but
+  the app's own golden plan violates it in every quality week (10% of this plan's 34–48 km weeks
+  is 3.4–4.8 km, under the 4.0–5.0 km band this app enforces). Re-scoped to advisory context from
+  a different methodology, not an enforced constraint; the false "smaller number wins" line is
+  removed. Whether it should ever override the band's floor for a genuinely low-volume runner is
+  now an explicit open question (`example-plan-5k-pro.md` Open item 6), not a resolved rule.
+- **"Reps are prescribed as distance × count" was backwards everywhere it appeared** — the
+  grammar table and every emitted string are `count × distance` (`"8 × 600 m"`, count first).
+  Fixed in `notation.md`, `example-plan-5k-pro.md` (the header bullet and § Session sizing), and
+  this file's own cycle-1 entry below (ruling-2 bullet).
+- **`notation.md`'s canonical structure-string example anchored an `INT` session `@ GP`**,
+  contradicting ruling 3 (only race-specific-phase `RP` sessions anchor to goal pace; `INT`
+  anchors to current fitness). Replaced with two worked examples — an `INT` session at a literal
+  current-fitness pace band, and a separate `RP` session `@ GP` — so the doc no longer implies
+  goal-pace anchoring for ordinary intervals. The `INT` example's recovery jog was also updated
+  200 m → 300 m for the same reason as the week-9 fix above.
+- **Tempo-band phrasing drifted between docs.** `example-plan-5k-pro.md` § Session sizing said
+  "20–30 minutes" where `workout-library.md`'s own rule is 15–30; harmonized — the band is
+  15–30 minutes, this plan's sessions sit in the 20–30 minute upper region, now stated that way in
+  both places. Also reworded `workout-library.md`'s "bounded well under 10 km" to **"≤ 10 km"**,
+  since week 10's tempo session is exactly 10 km — "well under" was false on the doc's own numbers.
+- **Strides extended to one easy day per loading week** (weeks 1, 2, 3, 5, 6, 7, 9, 10, 11 — up
+  from weeks 1–2 and 12 only), sourced from the 2026-07-11 market-research report's finding that
+  strides are standard weekly maintenance in the McMillan/Runna/RunnersConnect convention and the
+  ported library's own "optional 4–6 × 20 sec strides at the end" clause (`workout-library.md` §
+  Session 1). Deload weeks 4 and 8 stay strides-free by choice, not rule — the library permits
+  deload strides for "speedster" types; the alternative is noted, not adopted. No headline-distance
+  arithmetic changes anywhere; flagged for Ian's sign-off (`example-plan-5k-pro.md` Open item 7),
+  same status as the still-pending abbreviation-set sign-off (Open item 4).
+- **`paceDerivation.test.ts` resync flagged, not yet landed.** That test's `deriveRacePaceTarget`
+  section still encodes the 2026-07-10 R-A addendum's >10%-goal-improvement gate, which for this
+  runner (11.1% implied improvement) pins the race-pace target flat at 270 s/km — contradicting
+  ruling 3's week-11 goal-pace prescription (240 s/km / 4:00/km) in the golden plan. A test agent
+  is resyncing that test to ruling 3 this same cycle; documented in `example-plan-5k-pro.md`'s
+  "Pace bands" section as a cycle-2 note so the golden plan isn't read as contradicting a test that
+  hasn't caught up yet. The gate also surfaced a genuinely open question ruling 3 doesn't answer —
+  new Open item 5, "goal-realism handling": when a declared goal is implausibly faster than the
+  runner's recent-equivalent performance, should the app warn, cap, or trust the goal? Not decided
+  here.
+- **Tracker sync.** `docs/mvp-progress.md` corrected: the fixture rebuild, `notation.ts`, the
+  glossary tab, and the passing test suite are moved from "not done" to done (they already existed
+  in the working tree, just weren't reflected); the stale "Aanya's baby" / `src/app/index.tsx:38`
+  debt entry is removed (`src/app/index.tsx` was renamed to `src/app/(tabs)/index.tsx` and
+  rewritten in the theme commit; `explore.tsx` no longer exists).
+- **Correction, doc-audit pass, same day: the "paceDerivation.test.ts resync flagged, not yet
+  landed" bullet above was wrong by the time this pass checked the actual files.**
+  `src/lib/__tests__/paceDerivation.test.ts`, `src/lib/__tests__/planTemplates.golden.test.ts`,
+  and `src/lib/fixtures/examplePlan.ts` all already assert cycle-2's numbers: week 9 at 45 km with
+  a 300 m interval jog, and `paceDerivation.test.ts`'s `deriveRacePaceTarget` section already
+  replaces the stale >10%-goal-improvement gate with a test asserting ruling 3's goal-pace
+  convergence (240 s/km), plus an `it.todo` naming the still-open goal-realism question (Open item
+  5) rather than inventing an answer to it. None of the three files needed further resyncing.
+  `docs/mvp-progress.md`'s "In flight," "Next" step 3, and "Known debt" sections repeated this same
+  now-corrected claim and are fixed in this pass too. `planTemplates.ts` and `paceDerivation.ts`
+  themselves genuinely don't exist yet — that part of the original claim stands.
+- Constraints respected: HR-zone tables, `load-rules.md` and `injury-rules.md`'s numeric rules,
+  the Day 1…Day 7 model, and running-only scope are all untouched. `training-zones.md`,
+  `load-rules.md`, `injury-rules.md`, and `planning/` were not opened for this pass.
+
+## 2026-07-11 — Ian's 3/10 review: session-sizing correction, notation system, pace-anchor supersession
+
+Ian reviewed the rendered 5K plan and scored it **3/10**, naming one concrete defect: the tempo
+session grew 9 → 10 → 11 → 12 → 12 → 14 km across the plan to absorb rising weekly volume,
+producing a 14 km tempo run at 4:30 pace inside a 5K plan — *"makes no sense."* Five rulings
+followed. A market-research pass on published 5K plans (Higdon, McMillan, Daniels, Pfitzinger,
+RunnersConnect, Runna, Nike Run Club) was run first to check the fix against real coaching
+practice rather than inventing one; findings are cited inline in the docs below (report:
+[`docs/reference/market-research-5k-plans.md`](reference/market-research-5k-plans.md), preserved
+into the repo at the end of the session since the coaching docs cite it as a source).
+
+- **Ruling 1 — quality-session sizing is keyed to race distance, never scaled with weekly
+  volume.** Tempo and interval session size is now a fixed physiological band (5K: tempo 15–30 min
+  sustained; interval quality volume 4.0–5.0 km off the McMillan rep menu), independent of the
+  week's total volume — matches every source in the research pass, none of which scale a 5K
+  session by weekly-mileage tier. Surplus volume goes to easy runs and the long run instead, inside
+  the existing long-run share cap. New section: `docs/reference/coaching/workout-library.md` §
+  "Session sizing by race distance," clearly marked as Ian's ruling + research-sourced, not a port.
+- **Ruling 2 — reps are prescribed as count × distance**, never a bare distance or bare time
+  (`"4 × 600 m"` style), with recovery and target pace stated. The source library only has
+  time-based structures (`6 × 3 min`); the distance-rep menu (400/600/800/1000 m, McMillan's own
+  four interchangeable designs) is adopted from the research pass under this ruling, added to
+  `workout-library.md` § VO2 Max Intervals.
+- **Ruling 3 — race-pace-rep anchoring converges from current fitness to goal pace, superseding
+  part of the 2026-07-10 correction.** Ian: *"your goal is to run at your goal pace, might be
+  slower in the beginning."* Early-plan interval sessions run at current-fitness interval pace;
+  race-specific-phase race-pace-rep sessions run at goal pace directly. This is the McMillan
+  position (Higdon and Runna also anchor to goal pace); Daniels forbids goal-pace anchoring
+  outright and anchors to current fitness only — Ian is McMillan-certified and ruled for McMillan,
+  with the early-plan moderation answering Daniels' overtraining concern. **This supersedes, not
+  deletes, the 2026-07-10 correction that pinned week-11 race-pace reps flat at this runner's
+  current pace (270 s/km) throughout** — recorded with the supersession explicit in
+  `example-plan-5k-pro.md`'s "Open" section, not silently overwritten.
+- **Ruling 4 — run-type labels are abbreviated, never spelled out, except Strides.** Ian's
+  examples: `ER` (easy run), `TR` (tempo run). New canonical set, **marked "proposed... pending
+  Ian's sign-off"**: `ER`, `RR`, `TR`, `INT`, `RP`, `LR`, `SR`, composite `ER + Strides`,
+  unabbreviated `Race Day`; in-structure shorthand `WU`/`CD`/`GP`/`w/`/`@`. New file:
+  `docs/reference/coaching/notation.md` — the abbreviation table (written full-name-first, one
+  line each, so it drops into the planned in-app abbreviations glossary tab unchanged), the
+  structure-string grammar with worked examples, and the strides rule.
+- **Ruling 5 — praised, unchanged.** The plan staying within the runner's weekly volume capability,
+  and the HR zones. Neither `training-zones.md` nor `load-rules.md`'s numeric rules were touched.
+- **Headline-number convention decided and documented (a deliberate divergence, flagged for Ian):**
+  published plans headline quality *work only* and itemize warm-up/cool-down separately (research
+  §5); this app's `Workout.distanceKm` is instead the **total** kilometres run that day (WU + work
+  + CD + recovery jog), so each day sums cleanly into the week's volume the wave chart renders —
+  the thing ruling 5 praised. The `structure` string still itemizes WU/work/CD so the true
+  quality-work size is never hidden. Documented in `notation.md`.
+- **`docs/reference/coaching/example-plan-5k-pro.md` rebuilt** under all five rulings: same runner,
+  HR zones, phase names, deload architecture (weeks 4/8, ~40% off the last loading week), and 4-day
+  Day 1/3/5/6 pattern; every tempo/interval/race-pace session resized to the fixed band above, with
+  the arithmetic shown (sustained minutes × ~4:45–4:50/km, inside the derived 281–294 s/km tempo
+  band); every day label abbreviated per `notation.md`.
+  **Volume-table consequence, stated as a rule, not an accident: weekly volume is now the *sum* of
+  correctly-sized sessions, not a target the sessions are stretched to fill.** The old 52–54 km
+  peak weeks only existed because the tempo/interval sessions were inflated past their sizing band
+  — the exact defect ruling 1 removes. With sessions right-sized, this runner's 4-day week cannot
+  fill 52–54 km without breaking the long-run cap, so the new peak lands at **48 km** (weeks 7 and
+  10, tied) instead. New volume table, week → km: 1→34, 2→35, 3→38, 4→23 (deload), 5→41, 6→45,
+  7→48, 8→30 (deload), 9→44, 10→48, 11→40, 12→28. Two small consequences flagged for Ian in the doc
+  itself: week 1 lands 1 km under the runner's declared 35 km/week baseline (the 80%-of-long-run
+  cap on easy runs is the binding constraint), and every loading week's long run rounds 0.5–0.8 km
+  over a strict 30%-of-volume reading once each day is a whole kilometre (mechanical rounding, not
+  the cap being ignored — both inside the ±1 km tolerance this revision uses when the caps
+  interact). The "Bug found while building this" `clampWeeklyVolume()` note stays, still unfixed in
+  code (`planTemplates.ts` doesn't exist yet).
+- **Pace bands section rewritten to reflect it's largely resolved, not open.** The doc's original
+  "pace gap" (no tempo/easy pace formula anywhere in the source) was already closed by the
+  2026-07-10 decision-13 Riegel-based method and is now implemented in the in-flight
+  `paceDerivation.ts` module — the doc was still describing it as open. Updated to show this
+  runner's actual derived bands (tempo 281–294 s/km, interval 262–270 s/km, easy 326–354 s/km) and
+  to note the one genuinely still-open piece: no relative rule exists for steady/Zone 2 pace.
+- **Cross-references added**, nothing else changed: `plan-structure.md` and `00-README.md` now
+  point to `notation.md`. Swept `docs/` and `planning/` for the old inflated numbers and labels
+  ("Tempo 14," "54 km," full-name day labels) — found none outside `example-plan-5k-pro.md` itself
+  and the quotes of Ian's words added above; `docs/mvp-build-prompt.md`,
+  `planning/02-product-requirements.md`, and `docs/reference/plan-generation.md` never restated
+  specific session sizes, so nothing there needed a fix.
+- Constraints respected: HR-zone tables, deload rules/cadence, `load-rules.md`'s numeric rules,
+  injury rules, the Day 1…Day 7 model, and running-only scope are all untouched.
+- **Correction, same day: this entry originally claimed "no code file was edited" — that was
+  wrong even at the time of writing.** Cycle 1 also shipped `src/lib/notation.ts` (the
+  `RUN_TYPE_ABBREVIATIONS` / `STRUCTURE_SHORTHAND` code counterpart of `notation.md`, with
+  `expandLabel()` for screen-reader text), the abbreviations glossary tab
+  (`src/app/(tabs)/glossary.tsx`), the rebuilt golden fixture (`src/lib/fixtures/examplePlan.ts`),
+  and three test files (`notation.test.ts`, `examplePlan.fixture.test.ts`, plus the still-failing
+  TDD suites `planTemplates.golden.test.ts` and `paceDerivation.test.ts`, which intentionally fail
+  on missing modules — `planTemplates.ts` and `paceDerivation.ts` don't exist yet). 52 tests pass.
+  `src/lib/planTemplates.ts` and `src/lib/paceDerivation.ts` themselves are still the next
+  session's work, as the superseded sentence correctly said.
+- **Second correction, doc-audit pass, same day: "52 tests pass" above was also wrong, even at the
+  time of writing.** Summing the four passing suites' actual test counts (`supabase.test.ts` 3,
+  `loadRules.test.ts` 19, `notation.test.ts` 13, `examplePlan.fixture.test.ts` 29) gives **64**,
+  matching `npm test`'s live output (`Tests: 64 passed, 64 total`, `Test Suites: 2 failed, 4
+  passed, 6 total`). `docs/mvp-progress.md`'s occurrences of the same figure are corrected to 64
+  in this pass.
+
+## 2026-07-10 (evening) — theme rewrite: "Instrument & Matter" tokens land in code
+
+**Missing from this log until now — added in this doc-audit pass.** Commit `145d7e0` shipped
+between Phase 0's decision gate (below) and Ian's 3/10 review above (the review's rendered plan
+and the golden fixture's components already consume these tokens), but was never given its own
+entry.
+
+- **`src/constants/theme.ts` and `src/hooks/use-theme.ts` rewritten** from the stock Expo template
+  palette to the full "Instrument & Matter" token system specified in
+  `docs/design/frontend-design-brief.md` Part 2: `Colors` (light/dark bases, effort scale,
+  `grid.*`), `Accent`, `FontFamily`/`FontSize`, `Spacing`, `Radius`, and `Motion`. Two contrast
+  values the brief left unresolved were computed to the documented 4.5:1 floor rather than
+  guessed: `text.secondary` dark `#7E8590` (4.83:1 on `#14171C`) and `progress.informative` light
+  `#676D7B` (4.83:1 on `#F7F7F4`) / dark `#788696` (4.83:1 on `#14171C`).
+- **Spacing ramp gains a step.** `48` inserted between the old `five` (32) and `six` (64); the old
+  `six` is renamed `seven`. The only two call sites using the old name were in the now-deleted
+  `explore.tsx`.
+- **Bundled the three font families** (`@expo-google-fonts/barlow-condensed`, `-inter`,
+  `-ibm-plex-mono`) via `npx expo install`; `src/app/_layout.tsx` now loads them with `useFonts`
+  and keeps the native splash screen up until they resolve.
+- **Removed `expo-glass-effect`** — banned by the no-blur depth rule (Phase 0 Ruling 18); this
+  system has no sanctioned blur use. Resolves the corresponding 🟠 risk in
+  `docs/mvp-progress.md`'s "Known debt," removed in this pass.
+- **Deleted the stock Expo template surface**: `src/app/explore.tsx`, `animated-icon*`,
+  `hint-row.tsx`, `web-badge.tsx`, `app-tabs*`, `themed-text.tsx`, `themed-view.tsx`,
+  `external-link.tsx`, `ui/collapsible.tsx`, and `src/global.css`.
+- **`src/app/index.tsx` → `src/app/(tabs)/index.tsx`, rewritten** as a token-only placeholder Home
+  screen proving the font/token pipeline boots. The stock template's placeholder title `"Aanya's
+  baby"` is gone.
+- Verification before commit: `typecheck`, `lint`, 22/22 tests, and `npx expo export --platform
+  web` all ran clean.
 
 ## 2026-07-10 (Phase 0) — audit rulings applied, decision gate closed
 

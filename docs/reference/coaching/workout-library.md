@@ -92,6 +92,31 @@ next session.
 **Cues:** hard but consistent, not "blowing up interval 1 and dying in interval 6" — that
 consistency, not raw speed, is what the session is training.
 
+**Rep-distance menu and pace convergence (Ian's ruling, 2026-07-11 — research-sourced, not a
+port).** The source above only gives time-based structures (`5–6 × 3–4 min`). It has no
+distance-rep menu and no pace-anchor rule. Both are adopted here from the 2026-07-11
+market-research pass, under Ian's ruling, and are additions to the source, not from it:
+
+- **Rep-distance menu** (see `workout-library.md` § "Session sizing by race distance" below for
+  the full sizing rule): 400 m, 600 m, 800 m, and 1000 m reps are all valid choices for the same
+  session slot — McMillan's own four interchangeable "Best 5K Workout" designs land in the same
+  4.0–5.0 km quality-volume band regardless of which rep distance is used. Recovery is a jog sized
+  to the rep: roughly 40–67% of the rep distance (200–300 m jog after 400 m reps; 300–400 m after
+  600 m; 400–500 m after 800 m; 400–600 m after 1000 m).
+- **Pace anchor: goal race pace, converging from current fitness (Ian's ruling 3, 2026-07-11).**
+  Two disagreeing, real methodologies exist: McMillan, Higdon, and Runna anchor interval reps to
+  the runner's **goal** race pace; Daniels anchors to **current-fitness** pace and calls goal-pace
+  anchoring in training "the cardinal sin... the express route to overtraining and injury." Ian is
+  McMillan-certified and ruled for the McMillan position — *"your goal is to run at your goal
+  pace, might be slower in the beginning"* — with an explicit early-plan moderation that covers
+  Daniels' concern: **early-plan interval sessions run at the runner's current-fitness interval
+  pace; sessions converge toward goal pace as the plan approaches the race-specific phase.** A
+  runner is never asked to hold a pace they haven't demonstrated they can hold, and by the time
+  goal pace is prescribed outright (race-pace-rep sessions, late in the plan), it is being
+  rehearsed, not guessed at. See `example-plan-5k-pro.md` for this applied to a worked plan, and
+  its "Open" section for the history of this ruling (it supersedes part of a narrower
+  2026-07-10 correction that had pinned race-pace reps flat at current-fitness pace throughout).
+
 ## Session 5: Long Run (Zone 1, optional finish build)
 
 *(workout_library.md § Session Type 5)*
@@ -188,3 +213,61 @@ speed (never a flying start), full recovery jog (90 sec minimum) between each.
 
 **When to use:** end of easy runs (2–3×/week); the day before a hard session (1×/week); during
 deload weeks, to maintain the feel for speed without adding fatigue. Never after hard sessions.
+
+## Session sizing by race distance (Ian's ruling, 2026-07-11 — research-sourced, not a port)
+
+Not in the source, and it corrects a real defect the source's own port allowed through: nothing
+above Sessions 1–8 bounds *how big* a tempo or interval session gets as weekly volume rises. The
+generated 5K plan Ian reviewed grew its tempo session 9 → 10 → 11 → 12 → 12 → 14 km across the
+plan — a **14 km tempo run at 4:30 pace inside a 5K plan**, in Ian's words, **"makes no sense."**
+His ruling, stated plainly:
+
+**Quality-session size (tempo and interval work) is a fixed physiological band keyed to the
+runner's *race distance*, not to that week's weekly volume. It does not grow as volume grows.**
+Surplus weekly volume goes to easy runs and the long run instead (within the long-run share cap
+in `load-rules.md`) — never to the quality sessions.
+
+This is not a one-off correction; it matches every source consulted in the 2026-07-11
+market-research pass (`market-research-5k-plans.md` §§1–2, "Tempo sizing" and "Interval
+prescriptions") — none of them scale a 5K-specific quality session by weekly mileage tier:
+
+- **McMillan** ([5K Training Plan Guide](https://www.mcmillanrunning.com/5k-training-plan-guide/)):
+  tempo is "a continuous run lasting 15–40 minutes," a fixed band regardless of the runner's
+  weekly volume.
+- **Jack Daniels' Running Formula**: T-pace is defined as the pace sustainable for 60 minutes —
+  a hard physiological ceiling — with a secondary rule that no single session should exceed
+  roughly **10% of weekly mileage**. The two rules together cap even a very high-volume runner's
+  tempo well under 14 km; they never scale linearly with mileage.
+- **RunnersConnect** ([Workouts for the 5K](https://runnersconnect.net/workouts-for-the-5k/)): 5K
+  tempo work is 12–20 minutes continuous (up to 30 for advanced runners), wrapped in a fixed
+  10 min warm-up / 5–10 min cool-down.
+- **Pete Pfitzinger** ("Faster Road Racing") — the clearest direct evidence for *why* the size
+  must key to race distance, not volume: his **marathon**-plan LT sessions (same author, same
+  lactate-threshold concept, a much longer target race) run 8–10 km continuous inside an 8–9 mile
+  session — roughly triple the continuous-effort volume every 5K-focused source above prescribes.
+  Same coach, same concept, scaled up only because the target race itself is ~8x longer. A 14 km
+  tempo in a 5K plan is a marathon-plan number wearing a 5K plan's clothes.
+
+**5K-specific bands, enforced by this app** (the Daniels reference row at the bottom is context,
+not one of them — see the enforcement note below the table):
+
+| Session | Band | Source |
+|---|---|---|
+| Tempo, sustained work | **15–30 minutes continuous** | McMillan 15–40 min; RunnersConnect 12–20 (up to 30 advanced); consensus across the research pass §1 |
+| Tempo, full session incl. WU/CD | **≤ 10 km for a sub-5:00/km-tempo runner** — see the worked arithmetic in `example-plan-5k-pro.md` | Research pass §1; never the old defect's 14 km |
+| Interval, quality volume (reps only, excl. WU/CD/jog) | **4.0–5.0 km**, using the McMillan rep menu below | McMillan's four interchangeable "Best 5K Workout" designs, research pass §2 |
+| Interval, rep menu | 5×1000 m, 8×600 m, 6×800 m, or 10–12×400 m — **all converge on 4.0–5.0 km** regardless of rep length chosen | McMillan flagship workout, research pass §2 |
+| *Reference only, not enforced* — Daniels' weekly-volume brake | Daniels: a single session should ideally not exceed **~10% of that week's total volume** | Research pass §1–2; a different methodology's rule, not adopted as an app constraint — see the enforcement note below |
+
+**Enforcement note (re-scoped 2026-07-11, cycle 2 — the original wording here was wrong): the
+5K physiological band above is this app's enforced constraint. The Daniels 10%-of-weekly-volume
+brake is advisory context from a different methodology, not an enforced rule, and "the smaller
+number wins" — this doc's earlier claim — does not hold up against the app's own golden plan:**
+`example-plan-5k-pro.md`'s quality weeks run 34–48 km, and 10% of that range is 3.4–4.8 km —
+under this table's own 4.0–5.0 km interval-quality-volume band for every one of those weeks
+(the plan's actual sessions land at 4.8–5.0 km, at the high end of the band, which only makes the
+mismatch starker). Enforcing "smaller number wins" as written would have silently undersized the
+app's own reference plan. The brake would only bind meaningfully for a genuinely low-volume
+runner, where 10% of the week could fall under the band's floor on its own — whether it should
+override the band minimum in that case is a real, still-open coaching question, not a resolved
+rule. Flagged for Ian; see `example-plan-5k-pro.md`'s Open section.

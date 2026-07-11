@@ -103,3 +103,10 @@ the app **still generates a plan** — it generates the **return-to-running prot
 normal training plan, symptom-gated, with a prominent "seek imaging / see a professional" notice
 attached (the `load-rules.md` Rule 10 disclaimers). It never refuses outright, and it never
 prescribes intervals or hard efforts through a suspected bone stress injury.
+
+## See also
+
+How each day's run type is labelled (`ER`, `TR`, `INT`, `RP`, `LR`, `SR`, `ER + Strides`) and how a
+workout's `structure` string is written (`WU`/`CD`/`GP`/`w/`/`@`, reps as count × distance) is
+[`notation.md`](notation.md), not this file — this file governs the week's shape (phases, the Day
+1…Day 7 slots, deload cadence), not what each day is called.
