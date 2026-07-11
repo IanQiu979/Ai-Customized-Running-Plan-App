@@ -5,6 +5,41 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-07-12 — integration pass: five PRs merged to `main`, `main` returned to green
+
+Repo-state change, not a coaching or product decision. Merged every open PR into `main` in one
+pass, resolving the conflicts between them (all five had added a `2026-07-12` entry to this file;
+several also touched `docs/mvp-progress.md` and `example-plan-5k-pro.md`).
+
+- **Merged, in order:** PR #42 (doc stale-reference sweep, closes #37), PR #38 (units ruled
+  km-only, closes #36), PR #40 (app named Pace Blueprint, closes #35), PR #43 (Ian's issue #34
+  coaching rulings, closes #34, #19, #29), PR #44 (goal-realism ruling, closes #33). Conflict
+  resolution was a union in every case — no ruling was dropped. `example-plan-5k-pro.md`'s open-items
+  list 4–7 is the clearest example: #43 resolved items 4, 6 and 7, #44 resolved item 5, and the
+  merged file shows all four RESOLVED.
+- **`main` is green again — the two orphaned TDD suites are QUARANTINED (issue #41).**
+  `planTemplates.golden.test.ts` and `paceDerivation.test.ts` import `planTemplates.ts` /
+  `paceDerivation.ts`, which don't exist; PR #2 merged the tests without their modules, leaving
+  `main` failing `typecheck` (3 × TS2307), `lint` (2 × `import/no-unresolved`) and 2 of 6 test
+  suites — so every branch cut from `main` inherited a red build and nobody could satisfy
+  `CLAUDE.md`'s "clean typecheck && lint && test before every commit" gate. Both files are now
+  excluded from `jest.config.js`, `tsconfig.json` and `eslint.config.js`, and carry a banner
+  explaining why. **This is the alternative issue #41's own text offered** ("revert/quarantine the
+  two orphaned test files so `main` is green again in the meantime") — chosen over building the
+  engine, which is coaching work (issue #3) and must not be auto-generated. Un-quarantining them is
+  now part of issue #3's done-when. Verified after the merge: `typecheck` clean, `lint` clean,
+  **82/82 tests passing across 4 suites**.
+- **Also fixed: `jest` and `eslint` were scanning `.claude/worktrees/`** — the local agent worktrees
+  are full copies of the repo, so every suite was running once per worktree (32 suites, not 4).
+  Both now ignore that path, and `.gitignore` excludes it so the gitlinks can't be committed.
+- **Apple Developer Program work parked.** Ian doesn't hold the membership yet. GitHub issue #18
+  (M6 release — `eas init`, TestFlight, store listing) was **permanently deleted** at his request
+  and preserved verbatim in the new [`docs/apple-dev-blocked.md`](apple-dev-blocked.md); the Apple
+  Sign-In bullet was carved out of issue #7, which stays open and workable (email/password, Google
+  OAuth, session routing need nothing from Apple). That file also records what only *looks*
+  Apple-gated (#20, #17, #15 — none of it is) and the leftovers from work that was attempted but
+  not finished (#3, #22, #20, #41).
+
 ## 2026-07-12 — Goal-realism ruling: warn at 10%, cap at 15%
 
 Coaching decision by Ian. Closes Open item 5 (`example-plan-5k-pro.md`) and GitHub issue #33, which
