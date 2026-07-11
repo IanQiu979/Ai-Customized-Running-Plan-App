@@ -1,7 +1,10 @@
 import { RACE_DISTANCE_KM } from '../planTypes';
 import type { Performance } from '../planTypes';
 import {
+  GOAL_AMBITIOUS_THRESHOLD_PCT,
+  GOAL_IMPLAUSIBLE_THRESHOLD_PCT,
   RIEGEL_EXPONENT,
+  assessGoalRealism,
   deriveRacePaceTarget,
   deriveTrainingPaces,
   paceSecPerKm,
@@ -19,6 +22,32 @@ const RECENT_5K: Performance = { distance: '5k', timeSec: 1350 };
 function riegelExpected(t1Sec: number, d1Km: number, d2Km: number): number {
   return Math.round(t1Sec * Math.pow(d2Km / d1Km, RIEGEL_EXPONENT));
 }
+
+/**
+ * The capped time an implausible goal is pinned to: the recent-equivalent improved by
+ * exactly the implausible threshold. Derived from the constant rather than written as a
+ * literal 0.85, so moving the threshold moves every expectation below with it instead of
+ * leaving them silently asserting a retired cap. The threshold *values* themselves are
+ * pinned once, in the "ruled thresholds" block below — that is what stops this from
+ * merely re-deriving whatever the implementation happens to say.
+ */
+function cappedExpected(equivalentTimeSec: number): number {
+  return Math.round(
+    equivalentTimeSec * (1 - GOAL_IMPLAUSIBLE_THRESHOLD_PCT / 100),
+  );
+}
+
+describe('goal-realism thresholds', () => {
+  // Ian's ruling, 2026-07-12 (docs/superpowers/specs/2026-07-12-goal-realism-design.md).
+  // The coaching source has no goal-realism rule to port — `COMPLETENESS.md` lists it under
+  // what the library is missing — so these two numbers are his, and nothing but his ruling
+  // may change them. Pinned literally here, and only here; every other expectation in this
+  // file derives from them.
+  it('warns above 10% implied improvement and caps above 15%', () => {
+    expect(GOAL_AMBITIOUS_THRESHOLD_PCT).toBe(10);
+    expect(GOAL_IMPLAUSIBLE_THRESHOLD_PCT).toBe(15);
+  });
+});
 
 describe('riegelEquivalentSec', () => {
   it('predicts 3K time from a 5K performance', () => {
@@ -102,7 +131,9 @@ describe('deriveRacePaceTarget', () => {
   // race-specific phase) — it does not answer the separate, still-open question of what to do
   // when a declared goal looks implausible in the first place (Open item 5). No threshold or
   // fallback behavior is invented here to fill that gap; the old gated-boundary test is
-  // retired in favour of an `it.todo` naming the open question below.
+  // retired in favour of an `it.todo` naming the open question below. RESOLVED 2026-07-12 by
+  // the goal-realism ruling (`docs/superpowers/specs/2026-07-12-goal-realism-design.md`): the
+  // `it.todo` below is replaced with real tests, and `assessGoalRealism()` is the answer.
 
   it("anchors to goal pace even when the goal implies a large improvement over recent form (ruling 3 — fixture: 20:00 goal vs 22:30 recent, an 11.1% implied improvement, the exact case the old gate fired on)", () => {
     const target = deriveRacePaceTarget({
@@ -110,9 +141,14 @@ describe('deriveRacePaceTarget', () => {
       raceDistance: '5k',
       recent: RECENT_5K,
     });
+    const equivalentTimeSec = riegelExpected(1350, 5, 5);
+    const impliedImprovementPct =
+      ((equivalentTimeSec - 1200) / equivalentTimeSec) * 100;
     expect(target).toEqual({
       pace: { lowSecPerKm: 240, highSecPerKm: 240 },
       source: 'goal',
+      realism: 'ambitious',
+      impliedImprovementPct,
     });
   });
 
@@ -122,7 +158,15 @@ describe('deriveRacePaceTarget', () => {
       raceDistance: '5k',
       recent: RECENT_5K,
     });
-    expect(target?.source).toBe('goal');
+    const equivalentTimeSec = riegelExpected(1350, 5, 5);
+    const impliedImprovementPct =
+      ((equivalentTimeSec - 1400) / equivalentTimeSec) * 100;
+    expect(target).toEqual({
+      pace: { lowSecPerKm: paceSecPerKm(1400, 5), highSecPerKm: paceSecPerKm(1400, 5) },
+      source: 'goal',
+      realism: 'realistic',
+      impliedImprovementPct,
+    });
   });
 
   it('returns undefined without a recent performance, even with a goal time', () => {
@@ -137,13 +181,206 @@ describe('deriveRacePaceTarget', () => {
     ).toBeUndefined();
   });
 
-  // docs/reference/coaching/example-plan-5k-pro.md, "Open — needs Ian", item 5: "when a
-  // declared goal is implausibly faster than the runner's recent-equivalent performance ...
-  // should the app warn at intake, cap the race-pace-rep target, or trust the goal outright?
-  // Ruling 3 answers *when* a session converges to goal pace across a plan; it does not answer
-  // what to do when the goal itself looks unrealistic. No threshold or behavior is assumed
-  // here — needs Ian's call."
-  it.todo(
-    'goal-realism handling for an implausible goal (warn at intake vs. cap the race-pace target vs. trust it outright) — Open item 5, needs Ian before this is testable',
-  );
+  it("caps the RP anchor and reports source: 'capped' for an implausible goal (declared 18:00 vs 22:30 recent, a 20% implied improvement)", () => {
+    const target = deriveRacePaceTarget({
+      goalTimeSec: 1080,
+      raceDistance: '5k',
+      recent: RECENT_5K,
+    });
+    const equivalentTimeSec = riegelExpected(1350, 5, 5);
+    const impliedImprovementPct =
+      ((equivalentTimeSec - 1080) / equivalentTimeSec) * 100;
+    const cappedTimeSec = cappedExpected(equivalentTimeSec);
+    const cappedPace = paceSecPerKm(cappedTimeSec, 5);
+    expect(target).toEqual({
+      pace: { lowSecPerKm: cappedPace, highSecPerKm: cappedPace },
+      source: 'capped',
+      realism: 'implausible',
+      impliedImprovementPct,
+    });
+  });
+
+  // The two tests below guard the seam between `assessGoalRealism` (which decides the
+  // verdict) and `deriveRacePaceTarget` (which picks the anchor). The spec's whole safety
+  // claim is that these cannot disagree, because both read the same function. Nothing
+  // enforces that unless a test sits exactly on the boundary — so these do.
+
+  it("does not cap a goal sitting exactly on the implausible threshold — 15.0% is still 'ambitious', so the anchor is the raw goal pace", () => {
+    // A 33:20 recent 5K makes the 15% boundary land on a whole second (2000 -> 1700), which
+    // is what lets this test address the boundary exactly. An implementation that caps on
+    // `>= 15` instead of `> 15` returns source 'capped' here and fails — which is the entire
+    // point of the test.
+    const recent: Performance = { distance: '5k', timeSec: 2000 };
+    const goalTimeSec = 2000 * (1 - GOAL_IMPLAUSIBLE_THRESHOLD_PCT / 100);
+    const target = deriveRacePaceTarget({
+      goalTimeSec,
+      raceDistance: '5k',
+      recent,
+    });
+    const goalPace = paceSecPerKm(goalTimeSec, RACE_DISTANCE_KM['5k']);
+    expect(target).toEqual({
+      pace: { lowSecPerKm: goalPace, highSecPerKm: goalPace },
+      source: 'goal',
+      realism: 'ambitious',
+      impliedImprovementPct: ((2000 - goalTimeSec) / 2000) * 100,
+    });
+  });
+
+  it('crosses the cap without a cliff: one second of extra ambition flips the anchor from goal to capped but must not move the prescribed rep pace', () => {
+    // The fixture runner is the one that makes this real: 1350 x 0.85 = 1147.5, a NON-integer,
+    // so `Math.round` in the cap is live rather than a no-op. Straddle it with integer goal
+    // times — the only kind a runner can enter.
+    const justUnder = deriveRacePaceTarget({
+      goalTimeSec: 1148, // 14.96% — ambitious, anchored at the raw goal pace
+      raceDistance: '5k',
+      recent: RECENT_5K,
+    });
+    const justOver = deriveRacePaceTarget({
+      goalTimeSec: 1147, // 15.04% — implausible, anchored at the cap
+      raceDistance: '5k',
+      recent: RECENT_5K,
+    });
+
+    expect(justUnder?.source).toBe('goal');
+    expect(justOver?.source).toBe('capped');
+
+    // Both land on 3:50/km — the pace the ruling names by hand for this runner. Shaving one
+    // second off the goal must not visibly move the session, or the cap reads as a bug.
+    expect(justUnder?.pace).toEqual({ lowSecPerKm: 230, highSecPerKm: 230 });
+    expect(justOver?.pace).toEqual({ lowSecPerKm: 230, highSecPerKm: 230 });
+  });
+});
+
+describe('assessGoalRealism', () => {
+  // `impliedImprovementPct` is asserted with `toEqual` — bit-exact float equality — so it
+  // must be computed as the ruling spells it, literally:
+  //
+  //     (equivalentSec - goalTimeSec) / equivalentSec * 100
+  //
+  // A mathematically identical rewrite does NOT pass. `(1 - goal/equiv) * 100` yields
+  // 9.999999999999998 where this expects 10, and would fail every case here while being
+  // behaviourally correct. Keep the spelling.
+  //
+  // Distinct from the fixture runner (RECENT_5K), used only so the exact-percent
+  // boundary math below lands on whole-second goal times. Goal and recent share a
+  // distance, so the Riegel equivalent equals the recent time directly (see
+  // "returns the input time unchanged..." in the `riegelEquivalentSec` block above).
+  const BOUNDARY_RECENT: Performance = { distance: '5k', timeSec: 2000 };
+
+  it('is realistic when the goal is slower than the recent-equivalent time (negative implied improvement)', () => {
+    const assessment = assessGoalRealism({
+      goalTimeSec: 2100,
+      raceDistance: '5k',
+      recent: BOUNDARY_RECENT,
+    });
+    const impliedImprovementPct = ((2000 - 2100) / 2000) * 100;
+    expect(assessment).toEqual({
+      realism: 'realistic',
+      impliedImprovementPct,
+      equivalentTimeSec: 2000,
+    });
+  });
+
+  it('is realistic within the 0%-10% band', () => {
+    const assessment = assessGoalRealism({
+      goalTimeSec: 1900,
+      raceDistance: '5k',
+      recent: BOUNDARY_RECENT,
+    });
+    const impliedImprovementPct = ((2000 - 1900) / 2000) * 100;
+    expect(assessment).toEqual({
+      realism: 'realistic',
+      impliedImprovementPct,
+      equivalentTimeSec: 2000,
+    });
+  });
+
+  it('is realistic at exactly the ambitious threshold (inclusive at the top of the realistic band)', () => {
+    const goalTimeSec = 2000 * (1 - GOAL_AMBITIOUS_THRESHOLD_PCT / 100);
+    const assessment = assessGoalRealism({
+      goalTimeSec,
+      raceDistance: '5k',
+      recent: BOUNDARY_RECENT,
+    });
+    const impliedImprovementPct = ((2000 - goalTimeSec) / 2000) * 100;
+    expect(assessment).toEqual({
+      realism: 'realistic',
+      impliedImprovementPct,
+      equivalentTimeSec: 2000,
+    });
+  });
+
+  it('is ambitious between the two thresholds (ruling-3 fixture: 11.1% implied improvement)', () => {
+    const assessment = assessGoalRealism({
+      goalTimeSec: 1200,
+      raceDistance: '5k',
+      recent: RECENT_5K,
+    });
+    const equivalentTimeSec = riegelExpected(1350, 5, 5);
+    const impliedImprovementPct =
+      ((equivalentTimeSec - 1200) / equivalentTimeSec) * 100;
+    expect(assessment).toEqual({
+      realism: 'ambitious',
+      impliedImprovementPct,
+      equivalentTimeSec,
+    });
+  });
+
+  it('is ambitious at exactly the implausible threshold — the cap does not engage yet', () => {
+    const goalTimeSec = 2000 * (1 - GOAL_IMPLAUSIBLE_THRESHOLD_PCT / 100);
+    const assessment = assessGoalRealism({
+      goalTimeSec,
+      raceDistance: '5k',
+      recent: BOUNDARY_RECENT,
+    });
+    const impliedImprovementPct = ((2000 - goalTimeSec) / 2000) * 100;
+    expect(assessment).toEqual({
+      realism: 'ambitious',
+      impliedImprovementPct,
+      equivalentTimeSec: 2000,
+    });
+  });
+
+  it('is implausible and capped strictly above the implausible threshold', () => {
+    const thresholdGoalTimeSec = 2000 * (1 - GOAL_IMPLAUSIBLE_THRESHOLD_PCT / 100);
+    const goalTimeSec = thresholdGoalTimeSec - 1;
+    const assessment = assessGoalRealism({
+      goalTimeSec,
+      raceDistance: '5k',
+      recent: BOUNDARY_RECENT,
+    });
+    const impliedImprovementPct = ((2000 - goalTimeSec) / 2000) * 100;
+    const cappedTimeSec = cappedExpected(2000);
+    expect(assessment).toEqual({
+      realism: 'implausible',
+      impliedImprovementPct,
+      equivalentTimeSec: 2000,
+      cappedTimeSec,
+    });
+  });
+
+  it('returns undefined without a recent performance, even with a goal time', () => {
+    expect(
+      assessGoalRealism({ goalTimeSec: 1200, raceDistance: '5k' }),
+    ).toBeUndefined();
+  });
+
+  it('caps the canonical fantasy case (25:00 5K recent -> sub-3:00 marathon goal, 24.93% implied improvement)', () => {
+    const recent: Performance = { distance: '5k', timeSec: 1500 };
+    const assessment = assessGoalRealism({
+      goalTimeSec: 10800,
+      raceDistance: 'marathon',
+      recent,
+    });
+    const equivalentTimeSec = riegelExpected(1500, 5, RACE_DISTANCE_KM.marathon);
+    const impliedImprovementPct =
+      ((equivalentTimeSec - 10800) / equivalentTimeSec) * 100;
+    const cappedTimeSec = cappedExpected(equivalentTimeSec);
+    expect(assessment).toEqual({
+      realism: 'implausible',
+      impliedImprovementPct,
+      equivalentTimeSec,
+      cappedTimeSec,
+    });
+  });
 });

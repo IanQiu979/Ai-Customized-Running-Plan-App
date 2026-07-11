@@ -73,11 +73,20 @@ Boundaries are inclusive at the top of each band: exactly 10.0% is `realistic`, 
 `impliedImprovementPct` is an **unrounded float** — the presentation layer rounds it for copy. Tests
 compare against the computed value, never a hand-rounded one.
 
-**The cap is continuous at the boundary.** A goal at exactly 15.0% is anchored at its raw goal pace;
-a goal at 15.01% is capped — and both land on the same pace (3:50/km for the fixture runner). There
-is no cliff where one second of extra ambition produces a visible jump in the prescribed rep pace.
-This is a property worth a test, because it is the thing that would most obviously look like a bug
-to a runner nudging their goal time.
+**The cap is continuous at the boundary, over every input a runner can actually enter.** A goal at
+exactly 15.0% is anchored at its raw goal pace; a goal one second faster is capped — and both land
+on the same pace (3:50/km for the fixture runner). There is no cliff where one second of extra
+ambition produces a visible jump in the prescribed rep pace. This is the property most likely to
+look like a bug to a runner nudging their goal time, so it carries a test.
+
+Stated precisely, because a code review found the loose version of this claim to be false:
+continuity holds **over integer goal times**, which is the only kind the intake can produce. The
+stronger claim — that `pace(equiv × 0.85) === pace(round(equiv × 0.85))` for *all reals* — is not
+true; it fails for a few hundred equivalents in realistic range (e.g. a 10K equivalent of 1629 s,
+where `1384.65 / 10` rounds to 138 but `round(1384.65) / 10` rounds to 139). Reaching one of those
+requires a fractional goal time, which no runner can enter. Over integer goals the anchor is
+monotone with a maximum step of 1 s/km across all four distances — ordinary pace quantization.
+**The cap is correct; do not "fix" it on the strength of the stronger claim.**
 
 **Thresholds are flat.** They do not scale with age, experience, or plan length. The library gives
 no per-week or per-age improvement rate to port, and inventing one would be exactly the kind of

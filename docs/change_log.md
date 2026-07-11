@@ -5,6 +5,71 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-07-12 — Goal-realism ruling: warn at 10%, cap at 15%
+
+Coaching decision by Ian. Closes Open item 5 (`example-plan-5k-pro.md`) and GitHub issue #33, which
+blocked `deriveRacePaceTarget()`. Full reasoning, worked cases, and the type contract:
+`docs/superpowers/specs/2026-07-12-goal-realism-design.md`.
+
+- **The question.** When a declared goal is implausibly faster than the runner's Riegel
+  recent-equivalent time — the canonical case being a 25-minute 5K runner asking for a sub-3
+  marathon — should the app warn, cap, or trust the goal? This was genuinely open, not merely
+  undocumented: `COMPLETENESS.md` lists "goal unrealistic for current fitness" under **what the
+  coaching library is missing**. There was no threshold anywhere in the source to port. **Both
+  numbers below are Ian's own, and nothing but his ruling may change them.**
+- **Why ruling 3 didn't already answer it.** Ruling 3 (2026-07-11) anchors race-pace (`RP`) sessions
+  in the race-specific phase directly at goal pace, and was decided on the fixture runner, whose
+  goal implies an 11.1% improvement — ambitious but real. It settles *when* a session converges to
+  goal pace; it says nothing about a goal that is a fantasy. Meanwhile the 2026-07-10 R-A addendum's
+  10% pace gate — the only thing that would have caught one — had been retired as stale. So **"trust
+  the goal outright" was the de facto behavior**, leaving open exactly the failure mode
+  `planning/03-engineering-requirements.md` names: an algorithm that takes the runner at their word
+  and prescribes reps at a pace they cannot hold.
+- **Ruled: two bands, warn then cap.** Riegel-equivalent the recent performance to the goal
+  distance, then measure `impliedImprovementPct = (equivalentSec − goalTimeSec) / equivalentSec ×
+  100`. **≤10% → `realistic`:** silent, `RP` anchors at the raw goal pace. **10–15% → `ambitious`:**
+  warn, but `RP` *still* anchors at the raw goal pace — **ruling 3 holds even under a warning**.
+  **>15% → `implausible`:** warn **and cap** the `RP` anchor at the recent-equivalent improved by
+  exactly 15%. Boundaries are inclusive at the top of each band (10.0% is `realistic`, 15.0% is
+  `ambitious`); the cap engages only strictly above 15%. **Thresholds are flat** — no scaling by
+  age, experience, or plan length, because the source offers no per-week or per-age rate to port and
+  inventing one is precisely what this project forbids.
+- **Worked, both ways.** The fixture runner (22:30 5K recent → 20:00 goal, 11.1%) is `ambitious`,
+  warned, **not capped** — `RP` still 4:00/km, i.e. ruling 3's week-11 prescription is untouched,
+  which is the point. The canonical fantasy (25:00 5K → sub-3 marathon, 24.93%) is `implausible` and
+  caps to a 3:23:49 anchor (4:50/km) instead of the 4:16/km the goal implies.
+- **The 10% is a *different* 10% from R-A's.** R-A's 10% was a **pace gate** (which pace anchors the
+  session). Ruling 3 killed that. This 10% is a **warning line** (whether we say anything). Same
+  number, different job — do not read the R-A row in `mvp-progress.md`'s 2026-07-10 "Decided" table
+  as live behavior; it is now marked superseded.
+- **Blast radius is one number.** Training paces (easy/tempo/interval) remain **unconditionally**
+  recent-derived at any goal size. A fantasy goal cannot corrupt everyday paces, which is why
+  capping the `RP` anchor alone is a sufficient fix.
+- **One function, two callers, so warning and cap cannot disagree.** A pure `assessGoalRealism()`
+  is called by the client at **both** goal-entry points — the intake review screen *and* the
+  configure modal, since goal time travels per-generation — so the runner is warned **before**
+  burning a generation (on Free, 1 of 3). The engine calls the same function to cap the anchor and
+  stamps the verdict onto the immutable plan (`Plan.goalRealism`), so the plan explains its own
+  numbers. Advisory and non-blocking; it never gates the Generate button. This does not breach "no
+  business rules in the client" — the client renders a pure computation and is never the authority,
+  the same posture already taken with tier state.
+- **Code landed:** `src/lib/planTypes.ts` gains `GoalRealism`, `GoalRealismAssessment`, and the
+  additive optional `Plan.goalRealism`. `src/lib/__tests__/paceDerivation.test.ts` gains the ruling
+  as real tests — the `it.todo` that stood in for this question is gone, the two existing
+  `deriveRacePaceTarget()` tests are widened for the new return shape (`source` widens to
+  `'goal' | 'capped'`), and the ruling-3 assertion (fixture runner anchors at 240 s/km from
+  `source: 'goal'`) is deliberately preserved intact as a regression guard.
+- **Not built yet: `src/lib/paceDerivation.ts` itself** (issue #3). This entry is the *contract*,
+  not the engine. The test suite therefore stays red exactly as it already was — `typecheck`,
+  `lint`, and `test` each fail only on `Cannot find module '../paceDerivation'` / `'../planTemplates'`,
+  with 64 tests still passing. Unchanged before and after.
+- **Two doc tensions found and recorded as known debt, deliberately not fixed here.** (1)
+  `GeneratePlanRequest` has **no `goalTimeSec` field**, so the per-generation goal that
+  `mvp-build-prompt.md:332` promises cannot reach the engine at all — the realism check depends on
+  it; belongs to issue #9's `generate-plan` contract. (2) The configure-modal spec
+  (`frontend-design-brief.md:564`) never mentions goal time, contradicting the same line and leaving
+  the warning's second home unspecified; belongs to issue #13.
+
 ## 2026-07-11 (cycle 3) — AGENTS.md rewritten as a 3-tier Subagent Usage Policy
 
 Process/tooling decision, not a coaching or code change — logged because it changes how every

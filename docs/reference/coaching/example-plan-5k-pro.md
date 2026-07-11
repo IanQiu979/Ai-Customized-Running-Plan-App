@@ -367,8 +367,8 @@ sizing" above).
    (intermediate-level) easy-pace bands from a recent performance; see "Pace bands" above for this
    runner's actual numbers. **Still open within this: no relative rule exists anywhere in the
    source for steady/Zone 2 pace** — `paceDerivation.ts` deliberately never returns one. (See Open
-   item 5 for a related but separate question this cycle surfaced: what to do about the goal
-   itself, not the pace derivation, when it looks implausible.)
+   item 5 — RESOLVED 2026-07-12 — for a related but separate question this cycle surfaced: what to
+   do about the goal itself, not the pace derivation, when it looks implausible.)
 2. **`clampWeeklyVolume()` must compare against the last *loading* week**, not literally last
    week, or every post-deload week gets crushed. Still open — not yet fixed in `loadRules.ts` as
    of this revision (`src/lib/planTemplates.ts` doesn't exist yet either, so nothing has hit this
@@ -386,19 +386,52 @@ sizing" above).
    the 2026-07-11 market-research pass's notation findings, but is explicitly marked "proposed...
    pending his sign-off" — it has not been read back to Ian item by item. Needed before the
    abbreviations glossary tab ships copy sourced from that table.
-5. **New (cycle 2): goal-realism handling.** The 2026-07-10 R-A addendum's >10%-goal-improvement
-   gate (decision 3) already only ever governed *race-pace session* targets, never everyday
-   training paces — but `paceDerivation.test.ts` still applies it exactly as R-A specified it
-   (pin to the recent-equivalent pace beyond 10%), which is now the wrong call for a race-specific-
-   phase `RP` session under ruling 3. That test is being resynced this cycle to ruling 3's week-11
-   goal-pace prescription — see the "Pace bands" cycle-2 note above. But the question the old gate
-   was really standing in for is
-   still open: when a declared goal is implausibly faster than the runner's recent-equivalent
-   performance (this runner's 11.1% improvement is exactly the case the old gate fired on), should
-   the app warn at intake, cap the race-pace-rep target, or trust the goal outright? Ruling 3
-   answers *when* a session converges to goal pace across a plan; it does not answer what to do
-   when the goal itself looks unrealistic. No threshold or behavior is assumed here — needs Ian's
-   call.
+5. **RESOLVED 2026-07-12 (goal-realism ruling —
+   `docs/superpowers/specs/2026-07-12-goal-realism-design.md`).** Left here for history: the
+   2026-07-10 R-A addendum's >10%-goal-improvement gate (decision 3) already only ever governed
+   *race-pace session* targets, never everyday training paces — but `paceDerivation.test.ts` still
+   applied it exactly as R-A specified it (pin to the recent-equivalent pace beyond 10%), which was
+   the wrong call for a race-specific-phase `RP` session under ruling 3. That test was resynced to
+   ruling 3's week-11 goal-pace prescription in cycle 2 — see the "Pace bands" cycle-2 note above.
+   But the question the old gate was really standing in for stayed open: when a declared goal is
+   implausibly faster than the runner's recent-equivalent performance (this runner's 11.1%
+   improvement is exactly the case the old gate fired on), should the app warn at intake, cap the
+   race-pace-rep target, or trust the goal outright? Ruling 3 answered *when* a session converges
+   to goal pace across a plan; it did not answer what to do when the goal itself looks unrealistic.
+
+   **Answered: two bands, not one.** Riegel-equivalent the recent performance to the goal distance,
+   then measure the implied improvement (`(equivalentSec − goalTimeSec) / equivalentSec × 100`).
+   **≤10%: `realistic`, silent** — the `RP` session anchors at the raw goal pace. **10%–15%:
+   `ambitious`, warn — but `RP` still anchors at the raw goal pace**; ruling 3 holds even under a
+   warning. **>15%: `implausible`, warn AND cap** — the `RP` anchor is pinned at the recent-
+   equivalent improved by exactly 15%, not the declared goal pace. Boundaries are inclusive at the
+   top of each band (10.0% is `realistic`, 15.0% is `ambitious`); the cap engages only strictly
+   above 15%. Thresholds are flat: no scaling by age, experience, or plan length.
+
+   For **this runner** (20:00 goal vs. 22:30 recent, 11.1% implied improvement): `ambitious`,
+   warned, **not capped** — `RP` still anchors at 4:00/km, exactly ruling 3's week-11 prescription
+   above, unchanged. The canonical fantasy that motivated this question — a 25:00 5K runner
+   declaring a sub-3:00 marathon goal, 24.93% implied improvement — is `implausible`: capped to a
+   3:23:49 equivalent (4:50/km), not the 4:16/km the sub-3 goal implies.
+
+   **Both thresholds are Ian's own, not ported from the source.** `COMPLETENESS.md` lists "goal
+   unrealistic for current fitness" under what the coaching library is missing (edge-case rules,
+   item 8); no threshold exists anywhere in the source to check a declared goal against.
+
+   One pure function, `assessGoalRealism()`, is shared by client and engine so the two can never
+   disagree: the client shows the (advisory, non-blocking) warning at both goal-entry points —
+   intake review and the configure modal, since goal time travels per-generation — and the engine
+   calls the same function to cap the `RP` anchor and stamps the verdict onto the immutable plan
+   (`Plan.goalRealism`), so the plan explains its own numbers forever. Training paces
+   (easy/tempo/interval) are untouched by any of this, at any goal size.
+
+   **What actually landed in code today: the shared types
+   (`GoalRealism`, `GoalRealismAssessment`, `Plan.goalRealism`) in `src/lib/planTypes.ts`, plus the
+   contract encoded as real tests in `paceDerivation.test.ts`** — replacing the `it.todo` this item
+   used to point to, and widening the two existing `deriveRacePaceTarget()` tests whose shape
+   changes. `assessGoalRealism()` and its two threshold constants are contracted by those tests but
+   not yet implemented — **`src/lib/paceDerivation.ts` itself still does not exist** (issue #3
+   builds it against this contract).
 6. **New (cycle 2): should the Daniels weekly-volume brake ever override the 5K band's floor for a
    low-volume runner?** `workout-library.md` § "Session sizing by race distance" now re-scopes the
    Daniels 10%-of-weekly-volume rule as advisory context, not an enforced constraint — this app's

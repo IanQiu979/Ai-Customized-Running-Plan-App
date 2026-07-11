@@ -97,6 +97,41 @@ export interface Pace {
 }
 
 // ---------------------------------------------------------------------------
+// Goal realism
+// ---------------------------------------------------------------------------
+
+/**
+ * `realistic` never warns. `ambitious` warns but still anchors race-pace reps at the
+ * declared goal pace — ruling 3 holds. `implausible` warns and caps the anchor instead
+ * of prescribing a pace the runner cannot hold. See the goal-realism ruling
+ * (2026-07-12) for the exact thresholds and worked cases.
+ */
+export type GoalRealism = 'realistic' | 'ambitious' | 'implausible';
+
+/**
+ * The verdict on a declared goal, measured against what the runner's recent-equivalent
+ * performance predicts. A fantasy goal (e.g. a 25-minute 5K runner declaring a sub-3
+ * marathon) must never reach the runner as an uncapped race-pace prescription — this is
+ * the one place that guard lives. Training paces (easy/tempo/interval) are never touched
+ * by this; they derive from the recent performance unconditionally, at any goal size.
+ */
+export interface GoalRealismAssessment {
+  realism: GoalRealism;
+  /**
+   * Positive means the goal is faster than the Riegel equivalent. An unrounded float —
+   * the presentation layer rounds it for copy, tests compare against the computed value.
+   */
+  impliedImprovementPct: number;
+  /** The recent performance, Riegel-equivalented to the goal distance. */
+  equivalentTimeSec: number;
+  /**
+   * Set only when `realism === 'implausible'`. The race-pace anchor pins here — the
+   * equivalent improved by exactly 15% — instead of at the declared goal pace.
+   */
+  cappedTimeSec?: number;
+}
+
+// ---------------------------------------------------------------------------
 // The plan
 // ---------------------------------------------------------------------------
 
@@ -190,6 +225,8 @@ export interface Plan {
   coachIntro?: string;
   /** Rule 10. Legally required; never empty. */
   disclaimers: string[];
+  /** Present only when a goal time and a recent performance both exist. */
+  goalRealism?: GoalRealismAssessment;
 }
 
 // ---------------------------------------------------------------------------

@@ -111,21 +111,50 @@ strict-content — over-tight validation caused more bad fallback plans than it 
 Difference here: plan quality is the entire paid product, so the hybrid approach (template
 skeleton constrains the AI) is the quality guarantee, not the validator.
 
-### Goal-vs-recent pace threshold (decision, 2026-07-10; refined by addendum R-A, same day)
+### Goal-vs-recent handling (decided 2026-07-10; R-A's pace gate retired 2026-07-11; settled 2026-07-12)
 
 **Training paces are unconditionally derived from the recent time — the goal never drives
 everyday paces, at any improvement size.** This is the `planTypes.ts` contract exactly as coded
-(`recentPerformance` drives every training pace; `goalTimeSec` drives race-pace sessions only) and
-does not change under this threshold.
+(`recentPerformance` drives every training pace; `goalTimeSec` drives race-pace sessions only), and
+it is the one part of this section that has never changed. It also bounds the blast radius of a
+fantasy goal to a single number: the race-pace (`RP`) session target.
 
-The 10% threshold gates **only the goal-pace session's own target pace**: if a goal time implies
-**≤10% improvement** over the recent-time equivalent for the goal distance (cross-distance
-equivalency via the Riegel formula, `T2 = T1 × (D2/D1)^1.06`), goal-pace sessions are prescribed at
-the raw goal pace; beyond 10%, goal-pace sessions use the recent-time-equivalent pace instead. This
-is a direct answer to the failure mode behind Runna's reported injuries: an algorithm that "takes
-the runner at their word." Any remaining numeric gap the coaching source's relative pace rules
-don't cover goes back to Ian as a specific question — nothing is invented (see
-`docs/reference/coaching/00-README.md`).
+**Retired — do not implement.** The 2026-07-10 R-A addendum made 10% a **pace gate**: beyond a 10%
+implied improvement, goal-pace sessions would be prescribed at the recent-time-equivalent pace
+instead of the raw goal pace. **Ruling 3 (2026-07-11) superseded that**, adopting the McMillan
+position that race-specific-phase `RP` sessions anchor at goal pace directly. The gate is gone. It
+is described here only so nobody re-derives it from an old commit.
+
+**Live behavior — goal-realism handling (Ian, 2026-07-12).** Ruling 3 settled *when* a session
+converges to goal pace, but not what to do when the goal itself is a fantasy — which left "trust the
+runner's word" as the de facto behavior, i.e. exactly the failure mode behind Runna's reported
+injuries. The answer is **two bands, not one gate.** Riegel-equivalent the recent performance to the
+goal distance (`T2 = T1 × (D2/D1)^1.06`), then take
+`impliedImprovementPct = (equivalentSec − goalTimeSec) / equivalentSec × 100`:
+
+| Implied improvement | Verdict | Warn | `RP` session anchored at |
+|---|---|---|---|
+| ≤ 10% | `realistic` | no | raw goal pace |
+| 10% – 15% | `ambitious` | **yes** | raw goal pace — **ruling 3 holds** |
+| > 15% | `implausible` | **yes** | **capped** at the equivalent improved by exactly 15% |
+
+Boundaries are inclusive at the top of each band; the cap engages only strictly above 15%.
+Thresholds are **flat** — no scaling by age, experience, or plan length.
+
+Note that the 10% here is **not** R-A's 10%. R-A's gated *which pace anchors the session*; this one
+gates *whether the app says anything*. Same number, different job.
+
+The check is one pure function, `assessGoalRealism()` in `paceDerivation.ts`, called by the client
+for a non-blocking advisory at both goal-entry points (intake review **and** the configure modal —
+goal time travels per-generation) and by the engine to apply the cap and stamp the verdict onto the
+immutable plan (`Plan.goalRealism`). Same function on both sides, so the warning and the cap cannot
+disagree; the server-side cap remains the authority.
+
+**Both thresholds are Ian's own.** The coaching source has no goal-realism rule to port —
+`COMPLETENESS.md` lists "goal unrealistic for current fitness" under what the library is *missing*.
+As always, any remaining numeric gap the source's relative pace rules don't cover goes back to Ian
+as a specific question — nothing is invented (see `docs/reference/coaching/00-README.md`). Full
+reasoning and worked cases: `docs/superpowers/specs/2026-07-12-goal-realism-design.md`.
 
 ## API design
 
