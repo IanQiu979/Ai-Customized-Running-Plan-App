@@ -6,9 +6,9 @@
 > Milestone definitions live in [`planning/02-product-requirements.md`](../planning/02-product-requirements.md).
 > Decision history lives in [`change_log.md`](change_log.md).
 
-**Last updated:** 2026-07-11 (doc-audit pass: cycle 1 + cycle 2 confirmed done on **both** docs and
-code — this file and `change_log.md` had wrongly claimed the code side was still open; the theme
-rewrite (`145d7e0`) also gained the `change_log.md` entry it was missing)
+**Last updated:** 2026-07-12 (units ruling closes issue #36; the 2026-07-11 doc-audit pass
+confirmed cycle 1 + cycle 2 done on **both** docs and code, and gave the theme rewrite (`145d7e0`)
+the `change_log.md` entry it was missing)
 
 ---
 
@@ -199,7 +199,7 @@ with **no backend at all**.
        `clampLongRun()` reports which ceiling actually bound.
 3. [ ] **`src/lib/planTemplates.ts`** (+ **`src/lib/paceDerivation.ts`**, its pace-derivation
        counterpart) — the 5K plan first: phases, workout primitives, load curve. Generates for any
-       week count, any days/week, any starting mileage. **Target the cycle-2-corrected
+       week count, any days/week, any starting weekly volume (km). **Target the cycle-2-corrected
        `example-plan-5k-pro.md`** (45 km week 9, 300 m interval jog, count × distance throughout),
        not cycle 1's numbers and not the original pre-review version — the golden test and fixture
        below already assert exactly this, so build to make them pass rather than re-deriving them.
@@ -279,6 +279,12 @@ Full rationale for each is in `docs/change_log.md`'s "2026-07-10 (Phase 0)" entr
 | "Next workout" / "current week" card | **Dropped.** Home shows the plan link + quota state only. No current-week arithmetic exists in v1. |
 | Red-flag injury protocol representation | Rendered as a conservative fixed-length plan whose weeks carry the protocol's phases, plus a pain-gated-progression `extras` `PlanSection`, plus Rule 10 disclaimers. Does not consume quota. |
 | Pace-derivation method | Cross-distance equivalency via the Riegel formula (`T2 = T1 × (D2/D1)^1.06`); training paces anchored to the source's own relative rules. Any remaining numeric gap goes back to Ian — nothing invented. |
+
+## Decided (2026-07-12)
+
+| Item | Decision |
+|---|---|
+| Distance/pace units — km vs miles (issue #36) | **Kilometres, everywhere, permanently. No unit toggle; units are never user-selectable.** Intake asks weekly volume in km; plans render distances in km and paces in sec/km. Imperial is **out of scope**, not deferred — not an open product question blocking intake. Full rationale in `docs/change_log.md`'s 2026-07-12 entry; the code (`src/lib/planTypes.ts`, `src/lib/loadRules.ts`) was already km-canonical, only `docs/design/frontend-design-brief.md`'s stale `/mi` copy needed fixing. |
 
 ---
 

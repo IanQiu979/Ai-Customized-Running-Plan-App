@@ -5,6 +5,26 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-07-12 — Units ruling: km, permanently (closes issue #36)
+
+- **Ian ruled: V2.2 speaks kilometres, everywhere, permanently. No unit toggle; units are never
+  user-selectable.** Intake asks weekly volume in km; plans render distances in km and paces in
+  sec/km. Imperial is **out of scope**, not deferred. Recorded as a standing product rule in
+  `planning/02-product-requirements.md`, next to the intake-fields section.
+- **Why:** the coaching source of truth (`docs/reference/coaching/source/`) is 100% km — 314 km
+  mentions, zero miles. The shipped code was already km-canonical (`Pace`'s
+  `{lowSecPerKm, highSecPerKm}`, plus `volumeKm`, `distanceKm`, `MAX_WEEKLY_KM`,
+  `MAX_SINGLE_RUN_KM`, `RACE_DISTANCE_KM` in `src/lib/planTypes.ts` / `src/lib/loadRules.ts`).
+  A unit toggle could never be display-only: `Workout.structure` and `Workout.effortDescription`
+  are free prose with the unit baked into the string, and plans are immutable once generated, so
+  switching units would require choosing before generation and regenerating on a change of mind —
+  burning quota for a display preference. That cost is what makes km-only correct rather than a
+  deferred nice-to-have.
+- **This corrected the design brief, not the code.** `docs/design/frontend-design-brief.md` had
+  drifted to a stale `/mi` pace format and "weekly mileage" phrasing in three places (the paid pace
+  readout copy, the intake Q4 copy, and the large-text workout-row example); all three now read
+  `/km` and "weekly volume." The code needed no change — it was already correct.
+
 ## 2026-07-12 — docs stale-reference sweep (closes #37)
 
 Doc-only pass reconciling files that still described the Phase 1 plan-engine work and the

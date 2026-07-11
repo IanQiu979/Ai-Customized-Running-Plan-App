@@ -105,7 +105,7 @@ src/lib/
                             #          A parametric generator, not a fixed matrix: any distance,
                             #          any legal week count (per the plan-shape rules in
                             #          `planning/02-product-requirements.md`), any days/week, any
-                            #          starting mileage. Free's 12-week/5K limit is a UI/quota
+                            #          starting weekly volume (km). Free's 12-week/5K limit is a UI/quota
                             #          gate applied on top of this engine, not a limit of the
                             #          engine itself — a Pro/Elite fallback still needs, say, a
                             #          26-week marathon template.

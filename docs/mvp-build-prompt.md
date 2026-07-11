@@ -116,7 +116,7 @@ These were resolved by evidence during the audit. They are not open questions.
    below. Full-plan per-workout authoring of a 24–30-week plan does not fit in a model response;
    V1 already engineered around this and the V2.2 docs silently dropped it.
 8. **`planTemplates.ts` is a parametric generator** ("any week count, any days/week, any starting
-   mileage" — `docs/mvp-progress.md` §Next step 3), NOT the fixed "5K/10K/half/marathon ×
+   weekly volume" — `docs/mvp-progress.md` §Next step 3), NOT the fixed "5K/10K/half/marathon ×
    8/12/16wk" matrix still described in `planning/03` and `docs/architecture.md`. Fix that
    wording. The template engine must be able to produce **every distance at any legal length**,
    because it is also the fallback for paid tiers (an Elite 26-week marathon fallback needs a

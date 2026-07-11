@@ -46,3 +46,6 @@ example
 
 # session handoff notes
 .claude/HANDOFF.md
+
+# Claude Code agent worktrees — local only, never committed
+.claude/worktrees/

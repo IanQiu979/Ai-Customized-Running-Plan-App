@@ -22,7 +22,7 @@ coaching app (the exact feedback that Echo V1 got: too many features).
    required by App Store rules whenever Google sign-in is offered, so it ships in v1.) No guest
    mode in v1 — a guest account is deferred to v2.
 2. **Intake**: onboarding questionnaire (based on Echo V1's onboarding, extended). **Eight fields
-   always asked**: goal, **age**, experience level, days/week available, current mileage, a
+   always asked**: goal, **age**, experience level, days/week available, current weekly volume, a
    target-race distance choice, **a recent time at any distance** (optional to answer, always
    asked), and injuries/constraints. **Two more appear only once a target race is chosen**: race
    date and **goal time**. **Ten fields, or 8 questions without a race.**
@@ -34,6 +34,16 @@ coaching app (the exact feedback that Echo V1 got: too many features).
    - *Recent time* → drives **every other training pace**. Deriving easy or tempo pace from a goal
      the runner hasn't achieved would prescribe paces they cannot sustain. Without a recent time the
      plan emits **no numeric paces at any tier** — only effort language.
+
+   > **Units — RESOLVED (Ian, 2026-07-12, issue #36): kilometres, everywhere, permanently. No
+   > toggle, ever.** Weekly volume is asked in km; every rendered distance is km and every pace is
+   > sec/km. Imperial is **out of scope**, not deferred. Reasoning: the coaching source of truth
+   > (`docs/reference/coaching/source/`) is 100% km, and `Workout.structure` /
+   > `Workout.effortDescription` are free prose with the unit baked into the string (e.g. "1 km
+   > easy, 3 km steady, 1 km easy"). Since plans are immutable once generated, a unit toggle could
+   > never be display-only — it would have to be chosen before generation, and a runner changing
+   > their mind would need a full regeneration, burning quota for a display preference. That cost is
+   > what makes km-only correct rather than a deferred nice-to-have.
 
    > **Safety clamp (decision, 2026-07-10; refined by addendum R-A, same day).** Training paces are
    > **unconditionally** computed from the recent time, never the goal — this doesn't change at any
