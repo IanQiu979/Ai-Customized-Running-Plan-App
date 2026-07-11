@@ -3,14 +3,20 @@
 **Ian's ruling, 2026-07-11**, issued alongside the session-sizing correction in
 [`workout-library.md`](workout-library.md) after he scored the rendered 5K plan 3/10. His words:
 run-type labels use abbreviations, never full names — *"easy run = ER, tempo run = TR"* — **except
-strides, which are always spelled out.** The abbreviation *set* below is proposed, built to be
-consistent with his two given examples and the notation findings in the 2026-07-11 market-research
-pass on published 5K plans (`market-research-5k-plans.md` § 3, "Notation & abbreviations" —
-session-scoped research report, not checked into the repo — informal coach-community shorthand
-converges on `WU`/`CD`/`@pace`/`count × distance`, which is what the grammar below formalizes).
-**Mark the full abbreviation set "proposed under Ian's 2026-07-11 notation ruling; final set
-pending his sign-off."** It governs [`example-plan-5k-pro.md`](example-plan-5k-pro.md) starting
-today; nothing here overrides an explicit label choice Ian makes later.
+strides, which are always spelled out.** The abbreviation set below was built to be consistent with
+his two given examples and the notation findings in the 2026-07-11 market-research pass on
+published 5K plans (`market-research-5k-plans.md` § 3, "Notation & abbreviations" — session-scoped
+research report, not checked into the repo — informal coach-community shorthand converges on
+`WU`/`CD`/`@pace`/`count × distance`, which is what the grammar below formalizes).
+
+**Signed off exactly as written (Ian's ruling, 2026-07-12 — issue #34, rendered-plan review round
+2).** The full set below — `ER`, `RR`, `TR`, `INT`, `RP`, `LR`, `SR`, with Strides always spelled
+out and Race Day never abbreviated — is approved, not proposed. Ian was shown, and accepted, one
+known wrinkle: `RP` (a run-type label) and `GP` (the structure-string goal-pace symbol) are two
+codes for closely related ideas on two different layers, e.g. week 11's "RP · 3 × 1600 m @ GP." He
+saw it and approved the set anyway — it is not to be re-litigated. It governs
+[`example-plan-5k-pro.md`](example-plan-5k-pro.md); nothing here overrides an explicit label choice
+Ian makes later.
 
 This file is also the source for the app's planned **abbreviations glossary tab** — every row in
 the table below is written as a full name + one-line plain-English meaning specifically so it can
@@ -73,6 +79,11 @@ exported set stay identical.
   effort, then a 2 km cool-down.
 - Strides, appended to an easy run: **`4 × 30 s Strides`** — always `count × seconds`, always the
   full word "Strides," never an abbreviation.
+- Race day (Ian's ruling, 2026-07-12 — issue #34, rendered-plan review round 2; closes issue #29):
+  **`WU 3 km · 5 km race · CD 2 km`** — a 3 km warm-up, the 5 km race itself, then a 2 km cool-down,
+  summing to the 10 km headline. Replaces `5 km warm-up/cool-down + 5 km race`, which broke the
+  grammar (a spelled-out "warm-up/cool-down" and a `+` the glossary above cannot explain) and
+  introduces no new token — see `example-plan-5k-pro.md` week 12.
 
 Reps are prescribed as **count × distance**, never a bare distance or a bare time (Ian's ruling —
 `"8 × 600 m"` style). The source library (`workout-library.md`) only had time-based interval

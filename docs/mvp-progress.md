@@ -6,9 +6,8 @@
 > Milestone definitions live in [`planning/02-product-requirements.md`](../planning/02-product-requirements.md).
 > Decision history lives in [`change_log.md`](change_log.md).
 
-**Last updated:** 2026-07-11 (doc-audit pass: cycle 1 + cycle 2 confirmed done on **both** docs and
-code — this file and `change_log.md` had wrongly claimed the code side was still open; the theme
-rewrite (`145d7e0`) also gained the `change_log.md` entry it was missing)
+**Last updated:** 2026-07-12 (Ian's round-2 coaching sign-off — GitHub issue #34's eight-item queue
+ruled on in full, closing issues #19 and #29 alongside it. Issues #22 and #33 remain open)
 
 ---
 
@@ -27,13 +26,21 @@ rewrite (`145d7e0`) also gained the `change_log.md` entry it was missing)
 Phase 0's paper-reconciliation pass is now done too. **The plan-generation engine itself does not
 exist yet.** `src/lib/supabase.ts`, `planTypes.ts`, `loadRules.ts`, and (as of the 2026-07-11
 review-and-refine cycle) `notation.ts` are the app's `lib/` layer — shared vocabulary, safety
-arithmetic, and run-type/structure-string notation, all pure and tested (64 passing tests). A
-golden fixture (`src/lib/fixtures/examplePlan.ts`), a rendered plan screen (`src/app/plan/[id].tsx`
-and `src/components/plan/`), and an abbreviations glossary tab (`src/app/(tabs)/glossary.tsx`)
-exist and render that fixture — but nothing generates a plan from an intake yet.
-`src/lib/planTemplates.ts` and `src/lib/paceDerivation.ts`, the actual generation logic, are still
-unwritten; two TDD test suites for them exist and intentionally fail on the missing modules. The
-gap between "designed" and "working" is smaller than it was, but the engine itself is still ahead.
+arithmetic, and run-type/structure-string notation, all pure and tested (75 passing tests, up from
+64, after Ian's 2026-07-12 round-2 rulings on issue #34 added the long-run deload-week measurement
+fix (ruling R1c) and the race-day/strides test coverage). A golden fixture (`src/lib/fixtures/examplePlan.ts`), a rendered
+plan screen (`src/app/plan/[id].tsx` and `src/components/plan/`), and an abbreviations glossary tab
+(`src/app/(tabs)/glossary.tsx`) exist and render that fixture — but nothing generates a plan from an
+intake yet. `src/lib/planTemplates.ts` and `src/lib/paceDerivation.ts`, the actual generation logic,
+are still unwritten; two TDD test suites for them exist and intentionally fail to compile on the
+missing modules (`npm run typecheck` and `npm run lint` are red for the same reason — expected, not
+a regression). **What changed 2026-07-12: every coaching question blocking that engine's build is
+now answered.** Issue #19's HIGH-severity long-run-cap conflict — the golden plan's own numbers
+breached the coded cap — is closed; the abbreviation set, race-day notation (issue #29), strides
+placement, the Daniels brake, and peak volume are all signed off. The gap between "designed" and
+"working" is smaller than it was, but the engine itself is still ahead. Two coaching/code questions
+remain genuinely open and unrelated to this pass: issue #22 (`clampWeeklyVolume` comparing against
+the literal previous week) and issue #33 (goal-realism handling).
 
 ---
 
@@ -70,16 +77,24 @@ gap between "designed" and "working" is smaller than it was, but the engine itse
       (`WeekAccordion`, `WorkoutRow`, `EffortChip`, `ReadoutBracket`, `PlanNameplate`,
       `DisclaimerFooter`, `FallbackNotice`, `format.ts`) — render the golden fixture on a real
       screen, ugly-beyond-tokens caveats aside.
-- [x] 64 passing tests (`jest-expo`): `supabase.test.ts`, `loadRules.test.ts`, `notation.test.ts`,
-      `examplePlan.fixture.test.ts`. Two more suites exist and **intentionally fail** — they're
-      TDD specs for code that doesn't exist yet: `planTemplates.golden.test.ts` and
-      `paceDerivation.test.ts`. Both already assert cycle-2's corrected numbers (45 km week 9,
-      300 m jog, week-11 goal-pace convergence) — they fail only because `planTemplates.ts` and
-      `paceDerivation.ts` don't exist to import, not because their expectations are stale.
-      `test` is 4 suites passing / 2 intentionally red. **`typecheck` and `lint` are currently
-      red too**, both on the same two files (`Cannot find module '../planTemplates'` /
-      `'../paceDerivation'`) — expected, not a regression, but `npm run typecheck && npm run
-      lint && npm test` will not run clean until step 3 below lands both modules.
+- [x] 75 passing tests (`jest-expo`), up from 64 after Ian's 2026-07-12 issue #34 rulings:
+      `supabase.test.ts`, `loadRules.test.ts` (extended for ruling R1c — a deload week's long run
+      is measured against the last loading week's volume, not exempted from the cap), plus
+      `notation.test.ts` (+1 for R6's race-day structure string), and
+      `examplePlan.fixture.test.ts` (extended for R6 and R7). Two more suites exist and
+      **intentionally fail to compile** — they're TDD specs for code that doesn't exist yet:
+      `planTemplates.golden.test.ts` (also extended for R6/R7) and `paceDerivation.test.ts`. Both
+      already assert every current coaching ruling (45 km week 9, 300 m jog, week-11 goal-pace
+      convergence, the R6 race-day string, R7's two-strides-day weeks) — they fail only because
+      `planTemplates.ts` and `paceDerivation.ts` don't exist to import, not because their
+      expectations are stale. `test` is 4 suites passing / 2 intentionally red — this was true on
+      clean `origin/main` before the 2026-07-12 pass too; nothing here is a new failure.
+      **`typecheck` and `lint` are currently red too**, both on the same two files (`Cannot find
+      module '../planTemplates'` / `'../paceDerivation'`) — expected, not a regression, but `npm
+      run typecheck && npm run lint && npm test` will not run clean until step 3 below lands both
+      modules. Recorded plainly here and in "Known debt and risks" below: the repo cannot
+      currently satisfy `CLAUDE.md`'s own "clean typecheck && lint && test before every commit"
+      rule.
 
 ### Repo hygiene
 - [x] `AGENTS.md` rewritten as the agent-routing doc, committed (`60382cd`)
@@ -153,6 +168,25 @@ what remain.
       question (Open item 5). **Corrected in this doc-audit pass** — this file previously said
       that code-side resync was still open; it wasn't. Full account: `docs/change_log.md`'s second
       2026-07-11 entry and its doc-audit correction bullet.
+- [x] **Ian's round-2 coaching sign-off done (2026-07-12) — GitHub issue #34's eight-item queue
+      ruled on in full, closing issues #19 and #29 alongside it.** R1: the long-run share cap's
+      per-level ladder rises to a monotonic beginner 25% / intermediate 32% / advanced 35% — an
+      Ian-authorised override of the source library, closing issue #19's HIGH finding that 9 of 11
+      long runs breached the old 30% cap. **A code review then found a HIGH-severity hole in R1's
+      deload-week wording ("deload weeks are exempt" would have let the AI-emittable `isDeload`
+      field switch off the cap entirely) — Ian issued follow-up ruling R1c the same day: the cap
+      is never removed for a deload week, it's measured against the last loading week's volume
+      instead of the deload week's own reduced total.** R2: peak volume 48 km approved outright. R3: the Daniels 10%-of-volume brake is
+      permanently advisory, never overriding the 5K quality-volume band's floor. R4: Rule 5's
+      Monitoring tier is dropped from intake (kept as documented, unused, source content) — closes
+      the last row of "Blocked / awaiting a decision" below. R5: the run-type abbreviation set is
+      signed off exactly as written, including the known `RP`/`GP` layering wrinkle. R6: race-day's
+      structure string becomes `WU 3 km · 5 km race · CD 2 km`, closing issue #29. R7: strides
+      extend to both easy days of loading weeks 1, 2, 3, 5, 6, 7. R8: week 9's 300 m recovery jog
+      is confirmed as correct. Applied to `src/lib/loadRules.ts`, `src/lib/fixtures/examplePlan.ts`,
+      four test files, and five files under `docs/reference/coaching/`. Full account:
+      `docs/change_log.md`'s 2026-07-12 entry. **Issues #22 and #33 remain open** — neither was
+      part of this queue.
 
 ---
 
@@ -164,6 +198,11 @@ cycle 2's code-side resync was still open; **corrected in this doc-audit pass** 
 the time the actual files were read (see `docs/change_log.md`'s new correction bullet). The real
 remaining critical-path item is `src/lib/planTemplates.ts` / `paceDerivation.ts` themselves, a
 genuine gap tracked as step 3 in "Next," not a doc/fixture/test sync problem.
+
+**2026-07-12, since:** the Open items these cycles left pending (4, 6, 7) were batched into
+GitHub issue #34 along with two standalone bugs (#19, #29) and put to Ian in one sitting; see
+"Decided (2026-07-12)" and `docs/change_log.md`'s 2026-07-12 entry for the rulings. That queue is
+now also closed — only Open item 5, tracked as issue #33, is still open.
 
 - **Cycle 1** (2026-07-11): Ian scored the rendered plan 3/10, five rulings applied. Docs rebuilt
   (`notation.md` added; `workout-library.md` and `example-plan-5k-pro.md` rewritten;
@@ -199,13 +238,17 @@ with **no backend at all**.
        `clampLongRun()` reports which ceiling actually bound.
 3. [ ] **`src/lib/planTemplates.ts`** (+ **`src/lib/paceDerivation.ts`**, its pace-derivation
        counterpart) — the 5K plan first: phases, workout primitives, load curve. Generates for any
-       week count, any days/week, any starting mileage. **Target the cycle-2-corrected
-       `example-plan-5k-pro.md`** (45 km week 9, 300 m interval jog, count × distance throughout),
-       not cycle 1's numbers and not the original pre-review version — the golden test and fixture
-       below already assert exactly this, so build to make them pass rather than re-deriving them.
-       Also fixes `clampWeeklyVolume()`'s last-loading-week bug (Open item 2) and needs a ruling
-       from Ian on goal-realism handling (Open item 5) before `deriveRacePaceTarget()` can be
-       written for real.
+       week count, any days/week, any starting mileage. **Target `example-plan-5k-pro.md` as it
+       stands after Ian's 2026-07-12 issue #34 rulings** (45 km week 9 with a 300 m interval jog,
+       count × distance throughout, R1/R1c's long-run cap — a deload week's long run measured
+       against the last loading week's volume, never exempted — R6's race-day structure string,
+       R7's two-strides-day weeks) — the golden test and fixture below already assert
+       exactly this, so build to make them pass rather than re-deriving them. Issue #19, the one
+       coaching conflict that would have made this impossible to build correctly (the golden
+       plan's own long runs breached the coded 30% cap), is now closed. **Two things still block
+       full correctness, both open GitHub issues, neither part of #34's queue:** issue #22
+       (`clampWeeklyVolume()`'s last-loading-week bug, Open item 2) and issue #33 (goal-realism
+       handling, Open item 5 — needed before `deriveRacePaceTarget()` can be written for real).
    - [x] **Fixture/test resync — already done, not still open (corrected in this doc-audit
          pass).** `src/lib/__tests__/paceDerivation.test.ts`, `src/lib/__tests__/planTemplates.golden.test.ts`,
          and `src/lib/fixtures/examplePlan.ts` all already assert cycle-2's corrected numbers:
@@ -237,15 +280,19 @@ with **no backend at all**.
 12. [x] **Abbreviations glossary tab.** **Done.** `src/app/(tabs)/glossary.tsx`, sourced from
         `src/lib/notation.ts`'s `RUN_TYPE_ABBREVIATIONS`/`UNABBREVIATED_RUN_TYPES`/
         `STRUCTURE_SHORTHAND` exports, which are themselves copied verbatim from `notation.md`.
-        Abbreviation-set sign-off (Open item 4) is still pending Ian, so the copy it ships is
-        still "proposed," not confirmed.
-13. [ ] **Ian's rendered-plan review, round 2** (renumbered from "cycle 2" — that label now belongs
-        to today's review-and-refine pass, docs and code both done, see "In flight"). Once
-        `planTemplates.ts` renders the cycle-2-corrected 5K plan, take it back to Ian for a
-        coach's sign-off on the actual rendered numbers, plus his rulings on the cycle-2 open
-        items (Open items 5–7: the goal-realism question, the Daniels-brake low-volume question,
-        and the strides extension). A rendered plan still needs a coach's yes, not just a passing
-        test suite.
+        **Abbreviation-set sign-off (Open item 4, R5) landed 2026-07-12** — the set is confirmed
+        exactly as written, so the copy this tab ships is no longer "proposed," it's final.
+13. [ ] **Ian's rendered-plan review, round 2** (renumbered from "cycle 2" — that label belongs to
+        the 2026-07-11 review-and-refine pass, docs and code both done, see "In flight"). **Partially
+        done 2026-07-12 — GitHub issue #34 batched this queue and Ian ruled on it.** Resolved: the
+        Daniels-brake question (Open item 6, R3 — permanently advisory), the strides extension
+        (Open item 7, R7 — both easy days of two-easy-day loading weeks), peak volume (R2 —
+        48 km approved), and two items outside the original Open-item list that surfaced in the
+        same sitting (the long-run share-cap conflict, R1, closing issue #19; race-day notation,
+        R6, closing issue #29). **Still open, left unchecked:** the goal-realism question (Open
+        item 5, tracked as issue #33) and the actual coach's sign-off on `planTemplates.ts`'s
+        *rendered* numbers — that still can't happen until step 3 above produces a real plan; a
+        rendered plan needs a coach's yes, not just a passing test suite.
 
 ---
 
@@ -258,7 +305,27 @@ to "Decided" below.
 |---|---|---|
 | App name | app icon, wordmark, store listing; needed by M6, not before | Ian |
 | Password minimum length | sign-up copy | Verify against what the live Supabase project actually enforces — Phase 2 |
-| Whether Rule 5's "Monitoring" tier applies to a one-time pre-run intake at all | Rule 5's Monitoring-tier triggers ("new muscular soreness," "joint stiffness > 10 min") are worded for something noticed during/after a run, not a signup-time self-report; wiring `injury-rules.md` to intake | Ian |
+
+**Resolved 2026-07-12, removed from this table:** whether Rule 5's "Monitoring" tier applies to a
+one-time pre-run intake — Ian ruled it does not (R4, issue #34). Only the Immediate Stop and
+Reduce Volume tiers are surfaced or actioned; Monitoring's triggers stay in `load-rules.md`/
+`injury-rules.md` as documented, unused source content. See "Decided (2026-07-12)" below.
+
+## Decided (2026-07-12) — GitHub issue #34, coaching sign-off queue closed
+
+Full rationale for each ruling is in `docs/change_log.md`'s "2026-07-12" entry. Closes issues #19
+and #29 alongside #34; issues #22 and #33 remain open and were not part of this queue.
+
+| Item | Decision |
+|---|---|
+| Long-run share cap vs. the golden plan (issue #19) | **R1 — per-level ladder raised and made monotonic**: beginner 25% (unchanged), intermediate 32% (was 30%), advanced 35% (was 30%). Ian-authorised override of the source library's figures, not a port. **Follow-up ruling R1c (same day, from a code-review finding):** the cap is never removed for a deload week — it's measured against the last loading week's volume instead of the deload week's own reduced total (still bound by the spike, absolute, and time caps; an unsubstantiated deload claim is capped as an ordinary loading week). |
+| Peak weekly volume, 48 km | **R2 — approved on its own merits.** `weeklyLoad` stays `[34, 35, 38, 23, 41, 45, 48, 30, 45, 48, 40, 28]`. |
+| Daniels' 10%-of-weekly-volume brake, low-volume override | **R3 — permanently advisory, never enforced, never overrides the 5K quality-volume band's floor**, not even for a low-volume runner. |
+| Rule 5's "Monitoring" tier at intake | **R4 — dropped from intake entirely.** Only Immediate Stop and Reduce Volume are surfaced/actioned; Monitoring's triggers stay documented as unused source content. |
+| Run-type abbreviation set | **R5 — signed off exactly as written**: `ER`, `RR`, `TR`, `INT`, `RP`, `LR`, `SR`, Strides always spelled out, Race Day never abbreviated — including the known `RP`-vs-`GP` layering wrinkle. |
+| Race-day structure string (issue #29) | **R6 — `WU 3 km · 5 km race · CD 2 km`.** Replaces the ungrammatical `5 km warm-up/cool-down + 5 km race`; no new notation token. |
+| Strides placement | **R7 — both easy days of loading weeks 1, 2, 3, 5, 6, 7** (up from one day/week). Weeks 9/10 keep one day; week 11's taper is left alone; deloads 4 and 8 stay strides-free. Volume-neutral. |
+| Week 9's interval recovery jog | **R8 — 300 m jog confirmed**, the library's 300–400 m menu for 600 m reps stands. Week 9 stays 45 km. |
 
 ## Decided (2026-07-10) — decision gate closed
 
@@ -293,27 +360,29 @@ Full rationale for each is in `docs/change_log.md`'s "2026-07-10 (Phase 0)" entr
 - 🟠 **Deep-link scheme `v22workoutplangenerator://` not confirmed on Supabase's redirect allowlist**
   (Authentication → URL Configuration). Google OAuth will dead-end without it. UNVERIFIED — this
   setting could not be read.
-- 🟡 **Abbreviation set pending Ian's sign-off (2026-07-11).** `notation.md`'s run-type table
-  (`ER`, `RR`, `TR`, `INT`, `RP`, `LR`, `SR`) is built to fit Ian's two given examples (`ER`, `TR`)
-  and the market-research pass's notation findings, but only two of the seven were confirmed
-  directly by him. Marked "proposed" in the doc; confirm the full set — the abbreviations glossary
-  tab already ships copy from it (`src/app/(tabs)/glossary.tsx`) ahead of that confirmation.
-- 🟡 **Three more cycle-2 items await Ian's sign-off (2026-07-11), same status as the
-  abbreviation set above.** (1) Goal-realism handling — when a declared goal is implausibly faster
-  than the runner's recent-equivalent time, should the app warn, cap, or trust the goal?
-  (Open item 5.) (2) Whether the Daniels 10%-of-weekly-volume brake, now re-scoped to advisory
-  context, should ever override the 5K band's floor for a low-volume runner. (Open item 6.)
-  (3) The strides extension to one easy day per loading week is research-sourced, not ruled on by
-  Ian. (Open item 7.) A fourth, smaller item isn't a numbered Open entry but is also his call if he
-  disagrees: the week-9 recovery-jog fix (200 m → 300 m, to match the menu) has a noted
-  alternative — widen the menu to ~33–67% instead and keep 200 m. Full detail:
-  `example-plan-5k-pro.md`'s Open section, `docs/change_log.md`'s second 2026-07-11 entry.
-- 🟡 **Peak weekly volume dropped 54 km → 48 km (2026-07-11) as a consequence of ruling 1, not a
-  separate decision — surface it to Ian anyway.** Right-sizing the tempo/interval sessions to a
-  fixed band removed the only way the old plan reached 52–54 km peak weeks (inflating those
-  sessions); the new peak is wherever correctly-sized sessions plus the long-run cap put it. Ian
-  praised the plan's volume adherence, so a materially different peak number is worth his eyes
-  even though nothing here contradicts what he praised.
+- 🟡 **Goal-realism handling remains open — GitHub issue #33.** When a declared goal is implausibly
+  faster than the runner's recent-equivalent time, should the app warn, cap, or trust the goal?
+  (Open item 5.) The R-A 10% threshold already governs which pace anchors goal-pace *sessions*;
+  this is the separate question of what the product says and does beyond that clamp. Blocks
+  `deriveRacePaceTarget()`; `paceDerivation.test.ts` carries an `it.todo` for it rather than
+  inventing an answer. **Not part of issue #34's 2026-07-12 sign-off queue** — every other Open
+  item from the 2026-07-11 review-and-refine cycles (4, 6, 7) and both standalone bugs filed
+  against the rendered plan (issues #19, #29) were resolved that day; this is the one that wasn't.
+- 🟡 **`clampWeeklyVolume()`'s last-loading-week bug remains open — GitHub issue #22.**
+  `src/lib/loadRules.ts` compares a proposed week against the literal previous week; the ruling
+  encoded in the fixture (a deload week should be skipped, comparing against the last *loading*
+  week instead) isn't enforced in the typed API yet. Slated to be fixed alongside
+  `planTemplates.ts` (step 3 in "Next"). **Conceptually the same fix as ruling R1c** (the long-run
+  share cap now measures a deload week against the last loading week's volume too) — the two
+  rules agree "the last loading week" is the correct reference point, but they govern different
+  functions and #22 is not resolved by R1c.
+- 🟡 **Two TDD suites intentionally fail to compile, and `typecheck`/`lint` are red, because
+  `src/lib/planTemplates.ts` and `src/lib/paceDerivation.ts` don't exist yet.** `npm test` is 75
+  passed / 0 failed (4 suites green, 2 red-by-design); `npm run typecheck` and `npm run lint` both
+  report `Cannot find module '../planTemplates'` / `'../paceDerivation'`. This was true on clean
+  `origin/main` before the 2026-07-12 issue #34 pass too — not a new regression — but it means the
+  repo cannot currently satisfy `CLAUDE.md`'s own "clean typecheck && lint && test before every
+  commit" rule. Resolves the moment step 3 in "Next" lands both modules.
 - 🟡 `220 − age` is retained for max HR by Ian's informed decision, against Tanaka 2001 (±10–12 bpm).
   Recorded so a future session does not "fix" it.
 - 🟡 **EAS project not initialized** (`eas init` not run). No TestFlight pipeline exists yet — needed

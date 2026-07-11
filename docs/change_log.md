@@ -5,6 +5,110 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-07-12 — Ian's round-2 sign-off: the coaching queue for GitHub issue #34 is closed
+
+Ian ruled on all eight items batched into issue #34 ("Decision (Ian): coaching sign-off queue for
+rendered-plan review round 2") — every remaining open question from the 2026-07-11 review-and-refine
+cycles, plus the two standalone bugs (#19, #29) filed against the same rendered plan. **Closes
+issues #19, #29, and #34.** Applied to `src/lib/loadRules.ts`, `src/lib/fixtures/examplePlan.ts`,
+`src/lib/__tests__/{loadRules,examplePlan.fixture,notation,planTemplates.golden}.test.ts`, and
+`docs/reference/coaching/{load-rules,notation,workout-library,example-plan-5k-pro,00-README}.md`.
+
+- **R1 — long-run share cap ladder raised and made monotonic. Closes issue #19. Corrected the same
+  day by follow-up ruling R1c after a HIGH-severity code-review finding.** Per-level cap: beginner
+  25% (unchanged), intermediate 32% (was 30%), advanced 35% (was 30%) — raised deliberately so
+  intermediate's new 32% could never exceed advanced's. **This is an Ian-authorised override of
+  the source library's 20–25% / 25–30% / 30% figures, not a port; do not "correct" it back toward
+  the source.** Ian's initial wording for the deload side of this ruling said "deload weeks are
+  exempt" from the cap. **A code review of this same change flagged that as a HIGH-severity hole:
+  exempting the week removes the ceiling outright, and `Week.isDeload` is a field the AI model
+  itself emits on paid tiers, so an exemption keyed to it would hand the model a switch that turns
+  off its own safety cap — exactly what `CLAUDE.md` forbids ("a model must not be able to
+  prescribe an unsafe week").** Ian issued a same-day follow-up ruling, R1c: **the cap is never
+  removed for a deload week. It is measured against the last *loading* week's volume instead of
+  the deload week's own (reduced) total** — a deload cuts the week's total while largely
+  preserving the long run, so measuring the long run's share against that shrunken total measures
+  the wrong thing; measure it against the right thing, not against nothing. A deload long run
+  stays bound by every other ceiling exactly as before (spike cap, absolute single-run cap,
+  3-hour time cap). **A week that claims to be a deload but is not actually 35–45% down off the
+  last loading week is not treated as one — it's capped as an ordinary loading week**, which makes
+  an unsubstantiated deload claim worthless to a model. `LONG_RUN_SHARE_CAP` and `clampLongRun()`
+  in `src/lib/loadRules.ts` are updated so a deload week's long run is measured against the last
+  loading week's volume rather than skipped outright, with tests covering that measurement and
+  the still-enforced spike/absolute/time ceilings on deload weeks. With the new ladder and R1c's
+  corrected measurement, the golden 5K plan now passes comfortably — issue #19's finding (9 of 11
+  long runs over the old 30% cap) no longer applies: loading weeks top out at 31.7% (week 5,
+  13/41 km); week 4's 8 km deload long run is 21.1% of week 3's 38 km (the last loading week), and
+  week 8's 10 km deload long run is 20.8% of week 7's 48 km — both far under 32%. `load-rules.md`
+  § "Long-run cap, by level" and `example-plan-5k-pro.md`'s "Three things to flag for Ian" item 2
+  (the whole-kilometre rounding overage against the old cap) both rewritten accordingly — that
+  overage no longer exists against the new 32% ceiling. **Cross-reference: R1c is conceptually the
+  same correction as open issue #22** (`clampWeeklyVolume()` should compare a proposed week's
+  total against the last loading week, not literally the previous week) — the two rules now agree
+  "the last loading week" is the correct reference point across a deload boundary. Issue #22
+  governs a different function (the weekly-volume increase cap) and remains open; it is not
+  resolved by this ruling.
+- **R2 — peak weekly volume 48 km APPROVED on its own merits, no longer awaiting Ian's eyes.**
+  `weeklyLoad` stays `[34, 35, 38, 23, 41, 45, 48, 30, 45, 48, 40, 28]` — no code or fixture change,
+  just the doc's flagged-item status moving to resolved (`example-plan-5k-pro.md`).
+- **R3 — Daniels' 10%-of-weekly-volume brake is PERMANENTLY advisory: never enforced, and never
+  overrides the 5K quality-volume band's floor, not even for a low-volume runner. Resolves Open
+  item 6.** Ian's reasoning: the physiological demand of a 5K doesn't shrink because the runner
+  trains less. `workout-library.md` § "Session sizing by race distance" re-worded from "the
+  original wording here was wrong, still an open question" to "settled, permanently advisory."
+- **R4 — Rule 5's "Monitoring" tier is DROPPED from intake.** Only Immediate Stop and Reduce
+  Volume are surfaced or actioned; Monitoring's triggers describe something noticed during or
+  after a run, and V2.2 never observes a run, so a flag it can never monitor does nothing. The
+  triggers stay in `injury-rules.md`/`load-rules.md` as documented source content, explicitly
+  marked not-used-by-V2.2 — not deleted. **Closes the last row of `mvp-progress.md`'s "Blocked /
+  awaiting a decision" table**, removed below.
+- **R5 — the run-type abbreviation set is SIGNED OFF exactly as written.** `ER`, `RR`, `TR`, `INT`,
+  `RP`, `LR`, `SR`, Strides always spelled out, Race Day never abbreviated — no longer "proposed."
+  Ian was shown the `RP`-vs-`GP` layering wrinkle (a run-type label and a structure-string symbol
+  for closely related ideas, e.g. week 11's `RP · 3 × 1600 m @ GP`) and approved the set anyway; it
+  is not to be re-litigated. `notation.md` updated. Resolves Open item 4.
+- **R6 — race-day structure string is now `WU 3 km · 5 km race · CD 2 km`. Closes issue #29.**
+  Replaces `5 km warm-up/cool-down + 5 km race`, which broke the notation grammar (a spelled-out
+  "warm-up/cool-down" and a `+` the glossary can't explain) and introduces no new
+  `STRUCTURE_SHORTHAND` token — `WU`/`CD`/`·` already cover it. Same 10 km headline total.
+  `raceDayWorkout()` in `src/lib/fixtures/examplePlan.ts` updated; new tests in
+  `examplePlan.fixture.test.ts`, `notation.test.ts` (`speakStructure` screen-reader text), and
+  `planTemplates.golden.test.ts` assert the exact string and the unchanged 10 km sum.
+- **R7 — strides now fall on BOTH easy days of loading weeks 1, 2, 3, 5, 6, 7 (up from one day),
+  moving further toward `workout-library.md`'s own 2–3×/week guidance. Resolves Open item 7.**
+  Weeks 9 and 10 (one easy day each) keep their single strides day; week 11's taper is deliberately
+  left alone (Day 1 stays strides-free, only Day 5 keeps its goal-pace strides); deloads 4 and 8
+  stay strides-free. Volume-neutral — strides add no headline distance. `easyRun()` calls for Day 1
+  of weeks 1, 2, 3, 5, 6, 7 in `src/lib/fixtures/examplePlan.ts` now also carry
+  `'4 × 30 s Strides'`; `examplePlan.fixture.test.ts` and `planTemplates.golden.test.ts` rewritten
+  from "every loading week gets exactly one stride day" to "weeks with two easy days get two,
+  weeks with one easy day keep one." `workout-library.md` and `example-plan-5k-pro.md` updated.
+- **R8 — week 9's 300 m recovery jog CONFIRMED**, not merely corrected. The library's 300–400 m
+  menu for 600 m reps stands as written; the version of the plan Ian first scored used a 200 m jog,
+  outside the menu, and the cycle-2 fix to 300 m was correct. Week 9 stays 45 km. No code or
+  fixture change — the doc's "flagged, needs Ian" framing in `example-plan-5k-pro.md` moves to
+  "confirmed."
+- **Test suite: 75 passed / 0 failed, up from 64 at baseline** (`loadRules.test.ts` extended for
+  R1c's last-loading-week deload measurement; `examplePlan.fixture.test.ts`, `notation.test.ts`,
+  and `planTemplates.golden.test.ts` extended/rewritten for R6 and R7). **`npm run typecheck` and
+  `npm run lint` still report errors, and two suites (`planTemplates.golden.test.ts`,
+  `paceDerivation.test.ts`) still fail to *compile*** — both entirely because
+  `src/lib/planTemplates.ts` and `src/lib/paceDerivation.ts` don't exist yet. These are red-by-design
+  TDD suites; they failed identically on clean `origin/main` before this change, and this change
+  introduces no new failure. The repo cannot currently satisfy `CLAUDE.md`'s own "clean typecheck
+  && lint && test before every commit" rule — tracked honestly as debt in `mvp-progress.md`, not
+  hidden.
+- **What this unblocks, not just what it closes:** `src/lib/planTemplates.ts` is still unbuilt and
+  still the critical path (step 3 in `mvp-progress.md`'s "Next" list). Issue #19's cap conflict was
+  the HIGH-severity blocker in its way — the engine could not have reproduced the golden fixture's
+  own long-run numbers under the old 30% cap. Every coaching question the engine needed answered
+  before it could be built for real is now answered. **Issues #22** (`clampWeeklyVolume` comparing
+  against the literal previous week instead of the last loading week) **and #33** (goal-realism
+  handling — Open item 5) **remain open** — neither was part of issue #34's queue and neither is
+  touched by this pass.
+- Constraints respected: HR-zone tables, the Day 1…Day 7 model, and running-only scope are all
+  untouched. Only the eight items above changed.
+
 ## 2026-07-11 (cycle 3) — AGENTS.md rewritten as a 3-tier Subagent Usage Policy
 
 Process/tooling decision, not a coaching or code change — logged because it changes how every

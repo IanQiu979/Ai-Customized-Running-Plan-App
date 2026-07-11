@@ -1,4 +1,5 @@
 import { examplePlan } from '../fixtures/examplePlan';
+import { clampLongRun } from '../loadRules';
 import { RUN_TYPE_ABBREVIATIONS } from '../notation';
 import type { Day, Pace, Week, Workout } from '../planTypes';
 
@@ -9,6 +10,10 @@ import type { Day, Pace, Week, Workout } from '../planTypes';
  * caught by eye. Every expected number below is copied from the doc, cited inline, and is NOT
  * read back out of the fixture itself — the point of this suite is to catch the fixture
  * disagreeing with the doc, so deriving "expected" from the fixture would defeat it.
+ *
+ * Extended 2026-07-12 for GitHub issue #34 (Ian's rulings on this cycle's open coaching
+ * questions): R6 (the race-day structure string) and R7 (strides now on both easy days of every
+ * loading week with two easy days) — see `examplePlan.ts`'s own header for the full ruling text.
  *
  * This is a fixture test, not the golden-fixture TDD suite for the not-yet-built
  * `planTemplates.ts` engine (that's `planTemplates.golden.test.ts`); this file only asserts
@@ -136,6 +141,30 @@ describe('examplePlan fixture — notation ruling (notation.md, Ian 2026-07-11)'
   });
 });
 
+describe('examplePlan fixture — race-day structure string (issue #34 ruling R6)', () => {
+  it("gives the race-day workout the exact structure 'WU 3 km · 5 km race · CD 2 km'", () => {
+    const week12 = examplePlan.weeks[11];
+    const raceDay = week12.days[6] as Workout;
+    expect(raceDay.label).toBe('Race Day');
+    expect(raceDay.structure).toBe('WU 3 km · 5 km race · CD 2 km');
+  });
+
+  it("sums the race-day structure's segments to the existing 10 km headline distanceKm", () => {
+    const week12 = examplePlan.weeks[11];
+    const raceDay = week12.days[6] as Workout;
+    expect(raceDay.distanceKm).toBe(10); // 3 (WU) + 5 (race) + 2 (CD)
+  });
+
+  it('uses only vocabulary already in STRUCTURE_SHORTHAND (WU, CD, ·) — no new glossary token', () => {
+    const week12 = examplePlan.weeks[11];
+    const raceDay = week12.days[6] as Workout;
+    const structure = raceDay.structure ?? '';
+    expect(structure).toContain('WU');
+    expect(structure).toContain('CD');
+    expect(structure).toContain('·');
+  });
+});
+
 describe('examplePlan fixture — session-sizing ruling (5K, example-plan-5k-pro.md § "Session sizing")', () => {
   it('caps every TR (tempo) workout at 10 km total, keyed to race distance not weekly volume', () => {
     const tempoWorkouts = allWorkouts().filter((w) => w.label === 'TR');
@@ -260,22 +289,45 @@ describe('examplePlan fixture — pace-anchoring ruling (Ian, 2026-07-11, ruling
   });
 });
 
-describe('examplePlan fixture — strides extension (cycle-2, 2026-07-11, research-sourced, pending Ian\'s sign-off — Open item 7)', () => {
-  // Doc § "Session sizing": "This revision extends the existing `4 × 30 s Strides`
-  // prescription to one easy day in every other loading week (weeks 3, 5, 6, 7, 9, 10, 11
-  // — placement below)" — combined with weeks 1-2, which already carried strides before
-  // cycle 2, that's every loading week: 1, 2, 3, 5, 6, 7, 9, 10, 11.
-  const LOADING_WEEKS_WITH_STRIDES = [1, 2, 3, 5, 6, 7, 9, 10, 11];
+describe('examplePlan fixture — strides extension (issue #34 ruling R7, confirmed and extended)', () => {
+  // R7: strides go on BOTH easy days of every loading week that has two easy days — weeks
+  // 1, 2, 3, 5, 6, 7 (Day 1 and Day 3 each carry them now, not just Day 3 as in cycle-2).
+  // Weeks 9 and 10 have only one easy day each, so they still carry exactly one. Week 11 (the
+  // taper) is different: it HAS two easy days (Day 1's easyRun(9) and Day 5's easyRun(9,
+  // strides @ GP)) but keeps only its one pre-existing stride day (Day 5) by Ian's explicit
+  // ruling that the taper is left alone — NOT because it lacks a second easy day. It's grouped
+  // below with 9 and 10 only because the resulting stride-day COUNT happens to match (one each),
+  // for two unrelated reasons.
+  const TWO_STRIDE_DAY_WEEKS = [1, 2, 3, 5, 6, 7];
+  const SINGLE_STRIDE_DAY_WEEKS = [9, 10, 11];
   // "Deload weeks 4 and 8 stay strides-free."
   const DELOAD_WEEKS = [4, 8];
 
-  it('gives every loading week exactly one ER + Strides day', () => {
-    for (const weekNumber of LOADING_WEEKS_WITH_STRIDES) {
+  it('gives weeks with two easy days (1, 2, 3, 5, 6, 7) exactly two ER + Strides days', () => {
+    for (const weekNumber of TWO_STRIDE_DAY_WEEKS) {
+      const week = examplePlan.weeks[weekNumber - 1];
+      expect(week.weekNumber).toBe(weekNumber);
+      const stridesDays = week.days.filter(isWorkout).filter((d) => d.label === 'ER + Strides');
+      expect(stridesDays).toHaveLength(2);
+    }
+  });
+
+  it('gives weeks 9 and 10 (only one easy day each) and week 11 (two easy days, but the taper ' +
+    'is left alone by explicit ruling) exactly one ER + Strides day each', () => {
+    for (const weekNumber of SINGLE_STRIDE_DAY_WEEKS) {
       const week = examplePlan.weeks[weekNumber - 1];
       expect(week.weekNumber).toBe(weekNumber);
       const stridesDays = week.days.filter(isWorkout).filter((d) => d.label === 'ER + Strides');
       expect(stridesDays).toHaveLength(1);
     }
+  });
+
+  it("leaves week 11's taper structure alone — Day 1 stays strides-free, only Day 5 carries strides", () => {
+    const week11 = examplePlan.weeks[10];
+    expect(week11.weekNumber).toBe(11);
+    const [day1, , , , day5] = week11.days;
+    expect((day1 as Workout).label).toBe('ER');
+    expect((day5 as Workout).label).toBe('ER + Strides');
   });
 
   it('keeps deload weeks (4, 8) strides-free', () => {
@@ -286,11 +338,10 @@ describe('examplePlan fixture — strides extension (cycle-2, 2026-07-11, resear
     }
   });
 
-  it("keeps week 12's own pre-existing stride day, untouched by the cycle-2 extension", () => {
+  it("keeps week 12's own pre-existing stride day, untouched by R7", () => {
     // Week 12 already carried strides before cycle 2 (Day 3, "ER + Strides · 6 km + 4 × 20 s
-    // Strides @ GP") — it's race week, not a "loading" week, so it's outside the
-    // LOADING_WEEKS_WITH_STRIDES list above, but the doc is explicit its own existing stride
-    // day is unchanged by this revision.
+    // Strides @ GP") — it's race week, not a "loading" week, so it's outside both stride-day
+    // lists above, and R7 is explicit its own existing stride day is unchanged.
     const week12 = examplePlan.weeks[11];
     const stridesDays = week12.days.filter(isWorkout).filter((d) => d.label === 'ER + Strides');
     expect(stridesDays).toHaveLength(1);
@@ -311,7 +362,7 @@ describe('examplePlan fixture — strides extension (cycle-2, 2026-07-11, resear
     // arithmetic-integrity invariant, scoped to stride days specifically, so a regression that
     // slips extra distance onto a stride day is caught even if the week-level sum happened to
     // still balance some other way.
-    for (const weekNumber of LOADING_WEEKS_WITH_STRIDES) {
+    for (const weekNumber of [...TWO_STRIDE_DAY_WEEKS, ...SINGLE_STRIDE_DAY_WEEKS]) {
       const week = examplePlan.weeks[weekNumber - 1];
       const total = week.days
         .filter(isWorkout)
@@ -387,6 +438,36 @@ describe('examplePlan fixture — structural safety (unchanged rules)', () => {
       const runCount = week.days.filter((d) => d.kind === 'run').length;
       expect(restCount + runCount).toBe(7);
       expect(restCount).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('examplePlan fixture — survives its own safety layer (issue #34 ruling R1c)', () => {
+  it("runs every week's long run back through clampLongRun and gets it back unclamped, " +
+    "proving the cap ladder and the deload weekly-share rule both actually fit this plan " +
+    "rather than merely being asserted against in isolation. This is the test whose absence " +
+    "let issue #19 exist: it must fail if either the ladder (R1a) or the deload rule (R1c) is " +
+    "ever silently reverted.", () => {
+    let previousLongestKm = 0;
+    let lastLoadingWeekKm = 0;
+
+    for (const week of examplePlan.weeks) {
+      const longRun = findLongRun(week);
+      if (longRun) {
+        const { km } = clampLongRun({
+          proposedKm: longRun.distanceKm ?? 0,
+          weeklyKm: week.volumeKm,
+          level: 'intermediate',
+          previousLongestKm,
+          isDeload: week.isDeload,
+          lastLoadingWeekKm,
+        });
+        expect(km).toBe(longRun.distanceKm);
+        previousLongestKm = Math.max(previousLongestKm, longRun.distanceKm ?? 0);
+      }
+      if (!week.isDeload) {
+        lastLoadingWeekKm = week.volumeKm;
+      }
     }
   });
 });

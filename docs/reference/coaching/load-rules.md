@@ -27,15 +27,58 @@ exceeds last week's total by more than 15%, reject it and recalculate at a 10% i
 
 ### Long-run cap, by level
 
-*(load_rules.md § Rule 1 › Long Run Cap (Corrected Data))*
+*(load_rules.md § Rule 1 › Long Run Cap (Corrected Data), overridden — see below)*
+
+**Ian's ruling, 2026-07-12 (issue #34, rendered-plan review round 2).** Resolves the conflict
+logged as issue #19, where 9 of the golden 5K plan's 11 long runs breached the 30% cap.
+
+**Follow-up ruling R1c, 2026-07-12 (issue #34 code review — corrects the wording that stood here
+briefly the same day).** Ian's initial pass at this ruling said deload weeks were "exempt" from
+the cap. A code review of that same change flagged it as a HIGH-severity hole: exempting the week
+removes the ceiling outright, and `Week.isDeload` is a field the AI model itself emits on paid
+tiers, so an exemption keyed to it would hand the model a switch that turns off its own safety
+cap — exactly what `CLAUDE.md` forbids ("a model must not be able to prescribe an unsafe week").
+Corrected the same day:
+
+**The cap is never removed for a deload week. It is measured against the last *loading* week's
+volume instead of the deload week's own (reduced) total.** Ian's reasoning: a deload cuts the
+week's total while largely preserving the long run, so measuring the long run's share against
+that shrunken total measures the wrong thing — measure it against the right thing, not against
+nothing. A deload long run remains bound by every other ceiling exactly as before: the 1.10x
+long-run spike cap above, the absolute single-run cap (Rule 4), and the Daniels 3-hour long-run
+time cap above.
+
+**A week that claims to be a deload but is not actually 35–45% down off the last loading week is
+not treated as one — it is capped as an ordinary loading week**, against its own volume. This
+makes an unsubstantiated deload claim worthless as a way to loosen the cap.
+
+**The per-level cap ladder is raised and made monotonic — unchanged by R1c:**
 
 | Level | Long-run cap |
 |---|---|
-| Beginner | 20–25% of weekly km |
-| Intermediate | 25–30% of weekly km |
-| Advanced | 30% of weekly km |
+| Beginner | 25% of weekly km |
+| Intermediate | 32% of weekly km |
+| Advanced | 35% of weekly km |
 
-Example: intermediate runner, 50 km week → long-run max = 50 × 0.30 = **15 km**.
+**This is a deliberate, Ian-authorised departure from the source library's 20–25% / 25–30% / 30%
+figures — an override, not a port.** Ian chose 35% for advanced explicitly so that intermediate's
+32% could never exceed it. Do not "correct" this back toward the source in a future session.
+
+Example: intermediate runner, 50 km loading week → long-run max = 50 × 0.32 = **16 km**. A deload
+week that follows that 50 km loading week caps its own long run the same way — against that
+50 km, not against the deload week's own reduced total.
+
+With this ladder and R1c's corrected measurement, the golden 5K plan (`example-plan-5k-pro.md`)
+now passes comfortably: week 4's 8 km long run is 21.1% of week 3's 38 km (the last loading
+week), and week 8's 10 km long run is 20.8% of week 7's 48 km — both far under the 32%
+intermediate cap.
+
+**Cross-reference:** R1c is conceptually the same correction as open issue #22
+(`clampWeeklyVolume()` should compare a proposed week's total against the last loading week, not
+literally the previous week) — the two rules now agree that "the last loading week" is the
+correct reference point for anything measured across a deload boundary. Issue #22 itself governs
+a different function (the weekly-volume increase cap, not the long-run share cap) and remains
+open; it is not resolved by this ruling.
 
 ### Deload trigger
 
@@ -150,6 +193,10 @@ generate a normal training plan at all — see the design rule in `plan-structur
 return-to-running protocol in `injury-rules.md`. (The exact intake field format needed to do this
 matching is `NOT SPECIFIED IN SOURCE — needs Ian`; see `00-README.md`.)
 
+**Only the Immediate Stop and Reduce Volume tiers below are surfaced or actioned at intake (Ian's
+ruling, 2026-07-12 — issue #34, rendered-plan review round 2).** The Monitoring tier is dropped
+from intake entirely — see the "Monitoring triggers" heading below for why.
+
 ### Immediate stop triggers (do not run)
 
 - Sharp, stabbing pain during a run
@@ -165,7 +212,14 @@ matching is `NOT SPECIFIED IN SOURCE — needs Ian`; see `00-README.md`.)
 - Swelling that appears and does not resolve overnight
 - Pain that increases progressively during a run
 
-### Monitoring triggers
+### Monitoring triggers — documented, NOT used by V2.2 (Ian's ruling, 2026-07-12)
+
+Kept here as source content, for the record — not deleted — but **not surfaced or actioned at
+intake.** Ian's reasoning: all three triggers describe something a runner notices *during or after
+a run*. V2.2 never observes a run — it meets the runner exactly once, at signup — so a monitoring
+flag it can never monitor is a flag that does nothing, and surfacing it at intake would invite a
+self-report the runner has no basis to make before running a single session on the plan. Resolves
+`00-README.md`'s "Open gaps" question of the same name.
 
 - New muscular soreness in an unfamiliar area
 - Joint stiffness that takes more than 10 minutes to resolve

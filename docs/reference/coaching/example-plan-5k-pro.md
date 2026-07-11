@@ -26,6 +26,26 @@
 > anchors an `INT` session to goal pace; and strides are extended to one easy day per loading week
 > (research-sourced, flagged for Ian's sign-off). Full account: `docs/change_log.md`, second
 > 2026-07-11 entry.
+>
+> **Round-2 sign-off, 2026-07-12 (issue #34, rendered-plan review round 2).** Ian ruled on every
+> item this doc had flagged for him. Applied here: peak volume 48 km approved on its own merits,
+> no longer awaiting his eyes (ruling 2); the long-run share cap is raised to 32% for this
+> intermediate runner, so this plan's long-run percentages are no longer a rounding overage worth
+> flagging (ruling 1, `load-rules.md`); the run-type abbreviation set is signed off exactly as
+> written, including the known `RP`/`GP` wrinkle (ruling 5, `notation.md`); race day's structure
+> string is corrected to `WU 3 km · 5 km race · CD 2 km` (ruling 6, closes issue #29); strides
+> extend from one easy day to **both** easy days of every loading week with two easy days — weeks
+> 1, 2, 3, 5, 6, 7 (ruling 7); week 9's 300 m recovery jog is confirmed, not just corrected (ruling
+> 8); and the Daniels 10%-of-volume brake is ruled permanently advisory, never overriding the 5K
+> quality-volume band's floor (ruling 3). Full account: `docs/change_log.md`, 2026-07-12 entry.
+>
+> **Follow-up, same day: ruling R1c (issue #34 code review).** Ian's ruling 1 above was first
+> worded as "deload weeks are exempt" from the long-run share cap; a code review found that a
+> HIGH-severity hole (an AI-emittable field, `Week.isDeload`, would have switched off the app's
+> only volume-relative safety ceiling), so Ian corrected it the same day: the cap is never removed
+> for a deload week, it is measured against the last **loading** week's volume instead of the
+> deload week's own reduced total. See "Volume plan" below and `load-rules.md` for the corrected
+> rule and the worked numbers.
 
 ## The runner (assumed — replace with real intake)
 
@@ -134,19 +154,18 @@ week's volume; the `structure` string itemizes warm-up / work / cool-down so the
 size is never hidden inside the total — see `notation.md`'s headline-number convention for why this
 is a deliberate divergence from how published plans usually headline these numbers.
 
-**Strides extend to one easy day per loading week (cycle-2 addition, 2026-07-11 — research-sourced,
-not a ruling; flagged for Ian's sign-off like the other cycle-2 items).** The original build only
-carried strides in weeks 1–2 and 12. The 2026-07-11 market-research report records strides as
-standard weekly maintenance in the McMillan/Runna/RunnersConnect convention
-(`market-research-5k-plans.md` § 4, "Strides") — 4–8 × 20–30 s at ~85–90% effort, end of an easy
-day — and the ported library already permits "optional 4–6 × 20 sec strides at the end" of an easy
-run (`workout-library.md` § Session 1). This revision extends the existing `4 × 30 s Strides`
-prescription to one easy day in every other loading week (weeks 3, 5, 6, 7, 9, 10, 11 — placement
-below), labelling that day `ER + Strides`. Deload weeks 4 and 8 stay strides-free: the library
-permits strides during a deload for "speedster" types (`workout-library.md` § Session 9, "When to
-use"), but keeping deload weeks pure is the simpler default adopted here — the alternative is
-noted, not applied. Strides add no headline distance, matching how weeks 1–2 already prescribe
-them, so no volume-table arithmetic changes anywhere in this revision.
+**Strides sit on both easy days of every loading week that has two easy days (Ian's ruling,
+2026-07-12 — issue #34, rendered-plan review round 2; resolves Open item 7).** The original build
+only carried strides in weeks 1–2 and 12. A cycle-2 pass (2026-07-11, research-sourced) extended
+that to one easy day in every other loading week. This ruling extends it further, to **both** easy
+days of weeks 1, 2, 3, 5, 6, 7 — moving the plan the rest of the way toward the ported library's own
+2–3×/week guidance (`workout-library.md` § Session 9) rather than partway to it. Weeks 9 and 10
+have only one easy day each and keep their single strides day, unchanged. Week 11 is taper and Ian
+ruled the taper is left alone: Day 1 stays strides-free, only Day 5 keeps its goal-pace strides.
+Week 12 (race week) is unchanged. Deload weeks 4 and 8 stay strides-free: the library permits
+strides during a deload for "speedster" types (`workout-library.md` § Session 9, "When to use"),
+but keeping deload weeks pure remains the simpler default. Strides add no headline distance, so no
+volume-table arithmetic changes anywhere in this revision.
 
 ---
 
@@ -154,10 +173,12 @@ them, so no volume-table arithmetic changes anywhere in this revision.
 
 Baseline 35 km. Weekly increase capped at 10–15% *(load-rules.md Rule 1)*. Deload every **4
 weeks** (intermediate), reducing **35–45%** — ~40% used, measured off the last **loading** week.
-Long run ≤ **30%** of weekly volume (intermediate); **no easy run may exceed ~80% of that week's
-long run** (new rule, a direct consequence of ruling 1 — see below); long run grows by no more
-than **min(10%, 2 km)** per week and never more than **10%** over the plan's own previous longest
-long run (`load-rules.md`, long-run spike cap).
+Long run ≤ **32%** of weekly volume (intermediate); the cap is never removed for a deload week —
+in a deload week it is measured against the last **loading** week's volume instead of the deload
+week's own reduced total (`load-rules.md`, Ian's ruling R1c, 2026-07-12); **no easy run may
+exceed ~80% of that week's long run** (new rule, a direct consequence of ruling 1 — see below);
+long run grows by no more than **min(10%, 2 km)** per week and never more than **10%** over the
+plan's own previous longest long run (`load-rules.md`, long-run spike cap).
 
 **New rule, stated explicitly (consequence of ruling 1): weekly volume is the *sum* of
 correctly-sized sessions, not a target the sessions are stretched to fill.** The old plan reached
@@ -187,6 +208,19 @@ Peak **48 km** ≤ intermediate ceiling of 70 km. Longest run **15 km** ≤ 25 k
 (10 → 11 → 12 → 13 → 14 → 15, each step ≤ 10%; the deload weeks and week 9's step *down* are
 decreases, which the spike cap never restricts).
 
+**Peak volume approved (Ian's ruling, 2026-07-12 — issue #34, rendered-plan review round 2).** The
+drop from the old plan's 54 km peak was a direct consequence of ruling 1 (quality sessions no
+longer scale with weekly volume); Ian has now approved the resulting shape on its own merits.
+`weeklyLoad` stays `[34, 35, 38, 23, 41, 45, 48, 30, 45, 48, 40, 28]` — recorded as approved, no
+longer awaiting his eyes.
+
+**Deload long runs checked against the last loading week (ruling R1c, Ian's follow-up, same day).**
+Week 4's 8 km long run is **21.1%** of week 3's 38 km (the last loading week), and week 8's 10 km
+long run is **20.8%** of week 7's 48 km — both far under the 32% intermediate cap. The cap is
+never removed for a deload week; it is measured against the last loading week's volume instead of
+the deload week's own reduced total. See `load-rules.md` § "Long-run cap, by level" for the full
+rule and why it changed.
+
 **Three things to flag for Ian, all a direct, arithmetic consequence of ruling 1 — not separate
 new rules:**
 
@@ -201,7 +235,13 @@ new rules:**
    This is mechanical, not a case of the cap being ignored: maximizing each easy run at 80% of the
    long run and holding the long run at (approximately) 30% of the total pull the same two numbers
    toward each other from opposite sides, and whole-kilometre rounding rarely lands on an exact
-   solution. Every overage below is under 1 km.
+   solution. Every overage below is under 1 km. **Resolved by ruling 1 (Ian's ruling, 2026-07-12 —
+   issue #34/#19): the long-run share cap for intermediate runners is now 32%, not 25–30%.** Every
+   loading-week figure above (29.4–31.7%) sits inside 32% with room to spare — this is no longer
+   an overage worth flagging. The plan's two deload long runs (week 4, week 8) are checked
+   differently — against their own last loading week's volume, not their own reduced total, per
+   the R1c follow-up ruling — see "Deload long runs checked against the last loading week" above
+   and `load-rules.md` § "Long-run cap, by level."
 3. **Week 9's total volume (45 km) sits *below* week 7's (48 km)**, even though week 9 opens the
    plan's most intense phase. Two right-sized quality sessions (tempo + intervals) plus the
    long-run share cap leave less room for easy-day filler than the single-tempo phase did — with
@@ -228,7 +268,7 @@ All easy running is Zone 1. Hard sessions sit 48+ hours apart *(Rule 4)*. Labels
 ### Phase 1 — Health & Early Aerobic Foundation (weeks 1–4)
 
 **Week 1 — 34 km**
-- Day 1 — ER · 8 km · Z1 117–137 · RPE 3
+- Day 1 — ER + Strides · 8 km + 4 × 30 s Strides · Z1 117–137, strides Z5 · RPE 3
 - Day 2 — Rest
 - Day 3 — ER + Strides · 8 km + 4 × 30 s Strides · Z1, strides Z5
 - Day 4 — Rest
@@ -243,10 +283,12 @@ sustained — 4 km of work either side of a 2 km warm-up and 2 km cool-down (ari
 4:41–4:54/km tempo range — ≈4.17 km, rounded to 4) — and stays exactly this size for as long as
 this phase calls for 20 minutes of tempo work, regardless of how much the week's total volume
 grows. It also sits deliberately at the *bottom* of Zone 3 — tempo runs are run at or slightly
-**below** threshold, not on it *(workout-library.md § Tempo)*.
+**below** threshold, not on it *(workout-library.md § Tempo)*. Both easy days (Day 1, Day 3) carry
+strides this week — every loading week with two easy days does, per Ian's ruling (see "Session
+sizing" above).
 
-**Week 2 — 35 km** · ER 8 / ER + Strides 8 / TR 8 / LR 11 · +2.9%
-**Week 3 — 38 km** · ER 9 / ER + Strides 9 / TR 8 / LR 12 · +8.6%
+**Week 2 — 35 km** · ER + Strides 8 / ER + Strides 8 / TR 8 / LR 11 · +2.9%
+**Week 3 — 38 km** · ER + Strides 9 / ER + Strides 9 / TR 8 / LR 12 · +8.6%
 
 **Week 4 — 23 km · DELOAD**
 - Day 1 — ER · 6 km · Z1
@@ -265,13 +307,13 @@ choice, not a rule, and the alternative is available if Ian prefers it.
 
 ### Phase 2 — Early Aerobic Training (weeks 5–8)
 
-**Week 5 — 41 km** · ER 10 / ER + Strides 10 / TR 8 / LR 13 · +7.9% *(vs week 3, not week 4 — see
-the clamp bug note above)*
-**Week 6 — 45 km** · ER 11 / ER + Strides 11 / TR 9 / LR 14 · +9.8% — tempo steps up to 22 minutes
-sustained (≈5 km of work; 22 min at ~4:48/km ≈ 4.58 km, rounded to 5), still well inside the
+**Week 5 — 41 km** · ER + Strides 10 / ER + Strides 10 / TR 8 / LR 13 · +7.9% *(vs week 3, not week
+4 — see the clamp bug note above)*
+**Week 6 — 45 km** · ER + Strides 11 / ER + Strides 11 / TR 9 / LR 14 · +9.8% — tempo steps up to 22
+minutes sustained (≈5 km of work; 22 min at ~4:48/km ≈ 4.58 km, rounded to 5), still well inside the
 15–30 minute tempo band, not driven by the week's own volume growth.
-**Week 7 — 48 km** · ER 12 / ER + Strides 12 / TR 9 / LR 15 · +6.7% — tempo holds at ~24 minutes
-sustained (≈5 km of work), long run reaches this phase's peak at 15 km.
+**Week 7 — 48 km** · ER + Strides 12 / ER + Strides 12 / TR 9 / LR 15 · +6.7% — tempo holds at ~24
+minutes sustained (≈5 km of work), long run reaches this phase's peak at 15 km.
 **Week 8 — 30 km · DELOAD** · ER 8 / ER 7 / ER 5 / LR 10 — no quality work, −37.5% off week 7,
 strides-free like week 4.
 
@@ -291,13 +333,14 @@ strides-free like week 4.
 *Why this week:* two quality sessions, 48 hours apart (Day 3 to Day 5). The interval structure is
 the McMillan rep-menu "Buildup B" (8 × 600 m, 4.8 km quality volume) — see `workout-library.md` §
 "Rep-distance menu and pace convergence." Recovery is a 300 m jog, inside `workout-library.md`'s
-40–67% menu for 600 m reps (200–300 m would be a 400 m-rep recovery, not a 600 m one) —
-**cycle-2 correction: the version of this plan Ian first scored used a 200 m jog here, outside the
-menu; brought into line with it in this revision. Alternative, needs Ian if he prefers the shorter
-recovery: widen the menu itself to ~33–67% instead of moving this session.** Reps run at this
-runner's current-fitness interval pace, not goal pace yet — ruling 3's early-plan moderation.
-First and last interval should sit within 5–8 s/km of each other; a >10 s/km drop means the pace
-was too aggressive. Day 1's strides are this week's cycle-2 addition — see "Session sizing" above.
+300–400 m recovery menu for 600 m reps (200–300 m would be a 400 m-rep recovery, not a 600 m one) —
+**confirmed, not pending (Ian's ruling, 2026-07-12 — issue #34, rendered-plan review round 2): the
+version of this plan Ian first scored used a 200 m jog here, outside the menu; the 300 m jog this
+revision uses is correct and the menu itself is unchanged. Signed off.** Reps run at this runner's
+current-fitness interval pace, not goal pace yet — ruling 3's early-plan moderation. First and last
+interval should sit within 5–8 s/km of each other; a >10 s/km drop means the pace was too
+aggressive. Day 1's single strides day is unchanged by ruling 7 — weeks 9 and 10 have only one easy
+day each and keep it — see "Session sizing" above.
 
 **Week 10 — 48 km**
 - Day 1 — ER + Strides · 12 km + 4 × 30 s Strides · Z1, strides Z5
@@ -314,7 +357,7 @@ was too aggressive. Day 1's strides are this week's cycle-2 addition — see "Se
 inside the 25–30 minute maximum for this plan's final tempo session) and the interval session
 moves to McMillan's flagship "Best 5K Workout" design (5 × 1000 m, 5.0 km quality volume).
 Everything after this week converts fitness into race readiness, not adds more of it. Day 1's
-strides continue this plan's cycle-2 easy-day maintenance dose (see "Session sizing" above).
+single strides day is unchanged by ruling 7, same as week 9 — see "Session sizing" above.
 
 ### Phase 4 — Race-Specific Preparation (weeks 11–12)
 
@@ -334,8 +377,8 @@ session earlier in the plan would have used the current-fitness interval band in
 above). Recovery is generous (a ~400 m jog between reps, not a tight interval-style recovery) —
 this session rehearses goal pace, it doesn't chase VO2 max. Volume drops 16.7% off week 10 while
 intensity stays specific. Day 5's strides carry a `@ GP` pace reference, like week 12's, since this
-is already the race-specific phase — this plan's cycle-2 easy-day maintenance dose (see "Session
-sizing" above).
+is already the race-specific phase; the taper is left alone by ruling 7 — Day 1 stays strides-free
+(see "Session sizing" above).
 
 **Week 12 — Race week, 28 km**
 - Day 1 — ER · 8 km · Z1
@@ -344,7 +387,7 @@ sizing" above).
 - Day 4 — Rest
 - Day 5 — SR · 4 km · Z1 + 2 × 30 s Strides @ GP
 - Day 6 — Rest
-- Day 7 — **Race Day** · 5 km warm-up/cool-down + 5 km race
+- Day 7 — **Race Day** · WU 3 km · 5 km race · CD 2 km
 
 *Why this week:* nothing here builds fitness. Everything preserves it.
 
@@ -381,11 +424,15 @@ sizing" above).
    answer to that concern. **This supersedes the 2026-07-10 correction that had pinned the week-11
    session flat at current-fitness pace (270 s/km) — not deleted, superseded: see "Session sizing"
    above for the full reasoning.**
-4. **New: final abbreviation-set sign-off.** `notation.md`'s run-type abbreviation table (`ER`,
-   `RR`, `TR`, `INT`, `RP`, `LR`, `SR`) is built to match Ian's two given examples (`ER`, `TR`) and
-   the 2026-07-11 market-research pass's notation findings, but is explicitly marked "proposed...
-   pending his sign-off" — it has not been read back to Ian item by item. Needed before the
-   abbreviations glossary tab ships copy sourced from that table.
+4. **RESOLVED 2026-07-12 (Ian's ruling, issue #34, rendered-plan review round 2).** Left here for
+   history: `notation.md`'s run-type abbreviation table (`ER`, `RR`, `TR`, `INT`, `RP`, `LR`, `SR`)
+   was built to match Ian's two given examples (`ER`, `TR`) and the 2026-07-11 market-research
+   pass's notation findings, but was marked "proposed... pending his sign-off" — it had not been
+   read back to Ian item by item. Answered: the full set is approved exactly as written, with
+   Strides always spelled out and Race Day never abbreviated. Ian was shown, and accepted, the one
+   known wrinkle — `RP` (a run-type label) and `GP` (the structure-string goal-pace symbol) are two
+   codes for closely related ideas on two different layers, e.g. week 11's "RP · 3 × 1600 m @ GP" —
+   and approved the set anyway. See `notation.md`.
 5. **New (cycle 2): goal-realism handling.** The 2026-07-10 R-A addendum's >10%-goal-improvement
    gate (decision 3) already only ever governed *race-pace session* targets, never everyday
    training paces — but `paceDerivation.test.ts` still applies it exactly as R-A specified it
@@ -399,15 +446,23 @@ sizing" above).
    answers *when* a session converges to goal pace across a plan; it does not answer what to do
    when the goal itself looks unrealistic. No threshold or behavior is assumed here — needs Ian's
    call.
-6. **New (cycle 2): should the Daniels weekly-volume brake ever override the 5K band's floor for a
-   low-volume runner?** `workout-library.md` § "Session sizing by race distance" now re-scopes the
-   Daniels 10%-of-weekly-volume rule as advisory context, not an enforced constraint — this app's
-   own golden plan violates it in every quality week (10% of this plan's 34–48 km weeks is
-   3.4–4.8 km, under the 4.0–5.0 km band this app enforces). The brake would only bind meaningfully
-   for a runner training on genuinely low weekly volume, where 10% of the week could fall under the
-   band's own floor. Whether it should win in that case, and how, is Ian's call — nothing invented.
-7. **New (cycle 2): strides extension sign-off.** Strides now appear on one easy day per loading
-   week (weeks 1, 2, 3, 5, 6, 7, 9, 10, 11 — see "Session sizing" above), extended from the
-   original weeks 1–2 and 12 only, sourced from the 2026-07-11 market-research report and the
-   ported library's own optional-strides clause. Same status as item 4: built from research and
-   the source library, not read back to Ian item by item yet.
+6. **RESOLVED 2026-07-12 (Ian's ruling, issue #34, rendered-plan review round 2).** Left here for
+   history: `workout-library.md` § "Session sizing by race distance" re-scopes the Daniels
+   10%-of-weekly-volume rule as advisory context, not an enforced constraint — this app's own
+   golden plan violates it in every quality week (10% of this plan's 34–48 km weeks is 3.4–4.8 km,
+   under the 4.0–5.0 km band this app enforces). Open question was whether the brake should
+   override the band's floor for a genuinely low-volume runner. Answered: never — the brake is
+   **permanently advisory**. The physiological demand of a 5K does not shrink because the runner
+   trains less; a 5K runner gets 4.0–5.0 km of interval quality volume regardless of weekly volume,
+   and the app knowingly accepts that this is a large share of a low-volume runner's week. See
+   `workout-library.md` § "Session sizing by race distance."
+7. **RESOLVED 2026-07-12 (Ian's ruling, issue #34, rendered-plan review round 2).** Left here for
+   history: strides had been extended to one easy day per loading week (weeks 1, 2, 3, 5, 6, 7, 9,
+   10, 11), sourced from the 2026-07-11 market-research report and the ported library's own
+   optional-strides clause, but not read back to Ian item by item. Answered: strides go on **both**
+   easy days of every loading week that has two easy days — weeks 1, 2, 3, 5, 6, 7 — moving further
+   toward the source library's own 2–3×/week guidance. Weeks 9 and 10 have only one easy day each
+   and keep their single strides day, unchanged. Week 11 is taper and stays as ruled: Day 1
+   strides-free, only Day 5 keeps its goal-pace strides. Week 12 (race week) is unchanged. Deload
+   weeks 4 and 8 stay strides-free. Strides add no headline distance, so no volume arithmetic
+   changes anywhere in the plan. See "Session sizing" above.

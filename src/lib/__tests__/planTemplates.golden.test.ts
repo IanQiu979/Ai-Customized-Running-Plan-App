@@ -44,6 +44,19 @@ import { hrZoneBpm, MAX_SINGLE_RUN_KM } from '../loadRules';
  *    phase) all now carry `ER + Strides`. Deload weeks 4 and 8 stay strides-free by the doc's
  *    own explicit choice. Strides add no headline distance, so no other volume-table arithmetic
  *    changes from this dimension.
+ *
+ * RULED 2026-07-12, GitHub issue #34 (Ian's rulings on this cycle's open coaching questions):
+ *  - R6: the race-day workout's structure string becomes `'WU 3 km · 5 km race · CD 2 km'`,
+ *    replacing the cycle-1 `'5 km warm-up/cool-down + 5 km race'`. Same 10 km headline total,
+ *    no new `STRUCTURE_SHORTHAND` token.
+ *  - R7: the cycle-2 strides addition above is now confirmed, and extended — strides go on BOTH
+ *    easy days of every loading week that has two easy days (weeks 1, 2, 3, 5, 6, 7), not just
+ *    the second. Weeks 9 and 10 (one easy day each) and week 11 (taper, left alone by explicit
+ *    ruling) are unchanged.
+ *  - R1 (the long-run share-cap ladder and its new deload exemption, `src/lib/loadRules.ts`)
+ *    does not change this golden fixture's asserted numbers: this file asserts the doc's
+ *    long-run values directly, not values derived by calling `clampLongRun`, so a wider cap has
+ *    nothing here to loosen. `loadRules.test.ts` covers R1 directly.
  */
 const FIXTURE_INTAKE: IntakeResponses = {
   goal: 'Run a fast 5K',
@@ -178,12 +191,14 @@ describe('buildTemplatePlan — 5K golden fixture', () => {
     expect(findLongRun(plan.weeks[11])).toBeUndefined();
   });
 
-  it('reproduces the week-1 day layout: ER, rest, ER + Strides, rest, TR, LR, rest', () => {
+  it('reproduces the week-1 day layout: ER + Strides, rest, ER + Strides, rest, TR, LR, rest (issue #34 ruling R7 — both easy days)', () => {
     const [d1, d2, d3, d4, d5, d6, d7] = plan.weeks[0].days;
 
     expect(d1.kind).toBe('run');
     expect((d1 as Workout).effort).toBe('easy');
-    expect((d1 as Workout).label).toBe('ER');
+    expect((d1 as Workout).label).toBe('ER + Strides');
+    expect((d1 as Workout).structure ?? '').toMatch(/stride/i);
+    expect((d1 as Workout).structure ?? '').not.toMatch(/\bST\b/);
 
     expect(d2).toEqual({ kind: 'rest' });
 
@@ -307,6 +322,12 @@ describe('buildTemplatePlan — 5K golden fixture', () => {
     expect(raceDay.effort).toBe('interval');
     // notation.md: "Race Day stays unabbreviated ... it is the event itself, not a run type."
     expect(raceDay.label).toBe('Race Day');
+  });
+
+  it("gives the race-day workout the exact structure 'WU 3 km · 5 km race · CD 2 km' (issue #34 ruling R6)", () => {
+    const raceDay = plan.weeks[11].days[6] as Workout;
+    expect(raceDay.structure).toBe('WU 3 km · 5 km race · CD 2 km');
+    expect(raceDay.distanceKm).toBe(10); // 3 (WU) + 5 (race) + 2 (CD)
   });
 
   it('never emits `why` on any week or workout, and never emits `coachIntro` (a template has none)', () => {
@@ -444,37 +465,46 @@ describe('buildTemplatePlan — 5K golden fixture', () => {
   });
 
   // ---------------------------------------------------------------------------------------
-  // Cycle-2 addition (2026-07-11) — strides extend to one easy day per loading week.
-  // Research-sourced, flagged in the doc for Ian's sign-off (Open item 7), but already load-
-  // bearing in the golden plan the engine must reproduce. Mirrors the invariants asserted
-  // directly against the hand-built fixture in `examplePlan.fixture.test.ts`.
+  // Issue #34 ruling R7 (2026-07-12) — strides go on BOTH easy days of every loading week that
+  // has two easy days (weeks 1, 2, 3, 5, 6, 7), confirming and extending the cycle-2 addition
+  // that had put them on only the second easy day. Weeks 9, 10 (one easy day each) and week 11
+  // (taper, left alone by explicit ruling) keep exactly one stride day. Mirrors the invariants
+  // asserted directly against the hand-built fixture in `examplePlan.fixture.test.ts`.
   // ---------------------------------------------------------------------------------------
 
-  it('places the loading-week strides day exactly where the doc specifies', () => {
-    // Doc § "Session sizing": weeks 1, 2, 3, 5, 6, 7 carry strides on "the second ER day"
-    // (Day 3, index 2, e.g. "Week 2 ... ER 8 / ER + Strides 8 / TR 8 / LR 11"); weeks 9 and 10
-    // carry them on Day 1 (index 0), that week's only easy day ("Week 9 ... Day 1 — ER +
-    // Strides"); week 11 carries them on Day 5 (index 4, "Day 5 — ER + Strides · 9 km + 4 × 30
-    // s Strides @ GP"), since it's already the race-specific phase.
+  it('places the loading-week strides day(s) exactly where R7 specifies', () => {
+    // R7: weeks 1, 2, 3, 5, 6, 7 carry strides on BOTH easy days (Day 1, index 0, and Day 3,
+    // index 2); weeks 9 and 10 carry them on Day 1 (index 0), that week's only easy day; week 11
+    // (taper) is left alone — Day 1 stays strides-free, Day 5 (index 4) keeps its pre-existing
+    // `@ GP` strides, since it's already the race-specific phase.
     for (const weekIndex of [0, 1, 2, 4, 5, 6]) {
+      const day1 = plan.weeks[weekIndex].days[0] as Workout;
       const day3 = plan.weeks[weekIndex].days[2] as Workout;
+      expect(day1.label).toBe('ER + Strides');
       expect(day3.label).toBe('ER + Strides');
     }
     for (const weekIndex of [8, 9]) {
       const day1 = plan.weeks[weekIndex].days[0] as Workout;
       expect(day1.label).toBe('ER + Strides');
     }
+    const week11Day1 = plan.weeks[10].days[0] as Workout;
     const week11Day5 = plan.weeks[10].days[4] as Workout;
+    expect(week11Day1.label).toBe('ER');
     expect(week11Day5.label).toBe('ER + Strides');
   });
 
-  it('gives every loading week exactly one ER + Strides day, and keeps deload weeks (4, 8) strides-free', () => {
-    // "This revision extends the existing `4 × 30 s Strides` prescription to one easy day in
-    // every other loading week (weeks 3, 5, 6, 7, 9, 10, 11)" plus weeks 1-2, which already
-    // carried it — every loading week: 1, 2, 3, 5, 6, 7, 9, 10, 11. "Deload weeks 4 and 8 stay
-    // strides-free."
-    const loadingWeeks = [1, 2, 3, 5, 6, 7, 9, 10, 11];
-    for (const weekNumber of loadingWeeks) {
+  it('gives weeks with two easy days (1, 2, 3, 5, 6, 7) exactly two ER + Strides days, gives ' +
+    'weeks 9 and 10 (only one easy day each) and week 11 (two easy days, but the taper is left ' +
+    'alone by explicit ruling) exactly one each, and keeps deload weeks (4, 8) strides-free', () => {
+    const twoStrideDayWeeks = [1, 2, 3, 5, 6, 7];
+    const singleStrideDayWeeks = [9, 10, 11];
+    for (const weekNumber of twoStrideDayWeeks) {
+      const stridesDays = plan.weeks[weekNumber - 1].days
+        .filter(isWorkout)
+        .filter((d) => d.label === 'ER + Strides');
+      expect(stridesDays).toHaveLength(2);
+    }
+    for (const weekNumber of singleStrideDayWeeks) {
       const stridesDays = plan.weeks[weekNumber - 1].days
         .filter(isWorkout)
         .filter((d) => d.label === 'ER + Strides');
