@@ -262,8 +262,9 @@ with **no backend at all**.
          and `src/lib/fixtures/examplePlan.ts` all already assert cycle-2's corrected numbers:
          week 9 at 45 km with a 300 m interval jog, and `paceDerivation.test.ts`'s
          >10%-goal-improvement gate already replaced by a test asserting ruling 3's goal-pace
-         convergence (240 s/km), plus an `it.todo` naming the still-open goal-realism question
-         (Open item 5) instead of inventing an answer to it. This step, "In flight," and "Known
+         convergence (240 s/km), plus an `it.todo` naming the then-open goal-realism question
+         (Open item 5) instead of inventing an answer to it. **That `it.todo` is now gone** —
+         2026-07-12's ruling replaced it with real tests. This step, "In flight," and "Known
          debt" previously said this resync was still pending — it wasn't, by the time this pass
          read the actual files; see `docs/change_log.md`'s new correction bullet. What remains is
          writing `planTemplates.ts`/`paceDerivation.ts` themselves against these already-correct
@@ -291,16 +292,18 @@ with **no backend at all**.
         **Abbreviation-set sign-off (Open item 4, R5) landed 2026-07-12** — the set is confirmed
         exactly as written, so the copy this tab ships is no longer "proposed," it's final.
 13. [ ] **Ian's rendered-plan review, round 2** (renumbered from "cycle 2" — that label belongs to
-        the 2026-07-11 review-and-refine pass, docs and code both done, see "In flight"). **Partially
-        done 2026-07-12 — GitHub issue #34 batched this queue and Ian ruled on it.** Resolved: the
+        the 2026-07-11 review-and-refine pass, docs and code both done, see "In flight"). **The
+        paper half is done as of 2026-07-12 — every open coaching question is now ruled on.**
+        Resolved via issue #34's batched queue: the abbreviation set (Open item 4, R5), the
         Daniels-brake question (Open item 6, R3 — permanently advisory), the strides extension
-        (Open item 7, R7 — both easy days of two-easy-day loading weeks), peak volume (R2 —
-        48 km approved), and two items outside the original Open-item list that surfaced in the
-        same sitting (the long-run share-cap conflict, R1, closing issue #19; race-day notation,
-        R6, closing issue #29). **Still open, left unchecked:** the goal-realism question (Open
-        item 5, tracked as issue #33) and the actual coach's sign-off on `planTemplates.ts`'s
-        *rendered* numbers — that still can't happen until step 3 above produces a real plan; a
-        rendered plan needs a coach's yes, not just a passing test suite.
+        (Open item 7, R7 — both easy days of two-easy-day loading weeks), peak volume (R2 — 48 km
+        approved), and two items outside the original Open-item list that surfaced in the same
+        sitting (the long-run share-cap conflict, R1, closing issue #19; race-day notation, R6,
+        closing issue #29). Goal-realism (Open item 5) was ruled on the same day in its own pass —
+        warn at 10%, cap the race-pace anchor at 15% — closing issue #33. **Still open, left
+        unchecked:** the actual coach's sign-off on `planTemplates.ts`'s *rendered* numbers. That
+        can't happen until step 3 above produces a real plan; a rendered plan needs a coach's yes,
+        not just a passing test suite.
 
 ---
 
@@ -340,7 +343,7 @@ Full rationale for each is in `docs/change_log.md`'s "2026-07-10 (Phase 0)" entr
 
 | Item | Decision |
 |---|---|
-| Goal-vs-recent improvement threshold | **10%, gating race-pace session targets only (R-A addendum).** ≤10% implied improvement over the recent-time equivalent → goal-pace sessions use the raw goal pace; beyond 10% → goal-pace sessions use the recent-time-equivalent pace instead. Training paces are **unconditionally** recent-time-derived — the goal never drives everyday paces at any threshold. |
+| Goal-vs-recent improvement threshold | ⚠️ **Superseded twice — see "Goal-realism handling" in the 2026-07-12 row below for the behavior that is actually live.** As originally decided (R-A addendum): 10%, gating race-pace session targets only — beyond 10%, goal-pace sessions would use the recent-time-equivalent pace instead. Ruling 3 (2026-07-11) retired that pace gate; the 2026-07-12 goal-realism ruling reuses the 10% number for a *warning* line, not a pace gate. The one part that never changed: training paces are **unconditionally** recent-time-derived — the goal never drives everyday paces, at any threshold. |
 | "Experienced" maps to intermediate or advanced? | **Intermediate** (kept as coded) — safer, tighter caps. |
 | Intermediate deload cadence | **4 weeks** (kept as coded); 50+ still always forces 3. |
 | Shape of the intake `injuries` field | Closed-set `InjuryFlag` flags + optional free-text notes (length-limited/sanitized). Flags alone drive Rule 5's triage; notes inform paid prompts only. |
@@ -354,6 +357,7 @@ Full rationale for each is in `docs/change_log.md`'s "2026-07-10 (Phase 0)" entr
 | Red-flag injury protocol representation | Rendered as a conservative fixed-length plan whose weeks carry the protocol's phases, plus a pain-gated-progression `extras` `PlanSection`, plus Rule 10 disclaimers. Does not consume quota. |
 | Pace-derivation method | Cross-distance equivalency via the Riegel formula (`T2 = T1 × (D2/D1)^1.06`); training paces anchored to the source's own relative rules. Any remaining numeric gap goes back to Ian — nothing invented. |
 
+<<<<<<< HEAD
 ## Decided (2026-07-12)
 
 Full rationale for each row in `docs/change_log.md`'s 2026-07-12 entries.
@@ -365,6 +369,25 @@ Full rationale for each row in `docs/change_log.md`'s 2026-07-12 entries.
 | Why the name landed now, not M6 (revises issue #35's own premise) | The issue said the name was "needed by M6, not before" — true of the *art*, not the *identifiers*. `scheme` and the bundle ID are load-bearing for Supabase OAuth redirects and Apple/Google sign-in callbacks. Auth doesn't exist yet, EAS isn't linked (no `eas.json`, no `projectId`), and the scheme had zero references in code — so renaming today cost one edit, versus reconfiguring the Supabase redirect allowlist and the Google/Apple OAuth configs after auth ships. **Consequence:** the deep-link scheme is now `paceblueprint://`, not `v22workoutplangenerator://` — issue #5's redirect-allowlist item must use the new scheme. |
 | Rule 10 disclaimer wording | Stays as-is — keeps the word "PACE" (the family brand is the entity providing coaching guidance; Pace Blueprint is one surface of it). `docs/reference/coaching/**` was NOT edited. Issue #32's claim that the fixture disclaimer was "fossilizing a placeholder" was mistaken — it's correct as written. |
 | Distance/pace units — km vs miles (issue #36) | **Kilometres, everywhere, permanently. No unit toggle; units are never user-selectable.** Intake asks weekly volume in km; plans render distances in km and paces in sec/km. Imperial is **out of scope**, not deferred — not an open product question blocking intake. The code (`src/lib/planTypes.ts`, `src/lib/loadRules.ts`) was already km-canonical; only `docs/design/frontend-design-brief.md`'s stale `/mi` copy needed fixing. |
+
+### Goal-realism handling (issue #33)
+
+Closes Open item 5 and GitHub issue #33. Full reasoning, worked cases, and the type contract:
+[`docs/superpowers/specs/2026-07-12-goal-realism-design.md`](superpowers/specs/2026-07-12-goal-realism-design.md).
+
+| Item | Decision |
+|---|---|
+| Goal-realism handling — warn, cap, or trust an implausible goal? | **Two bands: warn, then cap.** Riegel-equivalent the recent performance to the goal distance and measure the implied improvement. **≤10% → `realistic`**, silent, race-pace (`RP`) sessions anchor at the raw goal pace. **10–15% → `ambitious`**, warn, but `RP` *still* anchors at the raw goal pace — ruling 3 holds even under a warning. **>15% → `implausible`**, warn **and cap** the `RP` anchor at the recent-equivalent improved by exactly 15%. Boundaries are inclusive at the top of each band; the cap engages only strictly above 15%. |
+| Do the thresholds scale? | **No — flat for every runner.** No scaling by age, experience, or plan length. The source gives no per-week or per-age improvement rate to port, and inventing one would be exactly the fabricated coaching number this project forbids. Scaling stays available as an additive change if round-2 review shows flat is too crude. |
+| Where the warning appears | **Both goal-entry points *and* the plan**, from one shared pure `assessGoalRealism()`. The client warns at the intake review screen *and* the configure modal (goal time travels per-generation), so the runner learns their goal is a stretch **before** spending a generation — on Free, that is 1 of 3. The engine calls the same function to cap the anchor and stamps the verdict onto the immutable plan (`Plan.goalRealism`), so the plan explains its own numbers. Same function both sides ⇒ warning and cap cannot disagree. The warning is advisory and **non-blocking**. |
+| Provenance | **Both thresholds are Ian's own.** The coaching source has no goal-realism rule — `COMPLETENESS.md` lists "goal unrealistic for current fitness" under what the library is *missing*. Nothing here is portable from McMillan, and nothing here may be changed without him. |
+| Blast radius | Training paces (easy/tempo/interval) stay **unconditionally** recent-derived at any goal size. A fantasy goal cannot corrupt everyday paces — the entire exposure is the `RP` session target, which is why capping one number is a sufficient fix. |
+
+**Landed in code 2026-07-12:** the shared types (`GoalRealism`, `GoalRealismAssessment`,
+`Plan.goalRealism`) in `src/lib/planTypes.ts`, and the ruling encoded as real tests in
+`paceDerivation.test.ts` (the `it.todo` is gone). **`src/lib/paceDerivation.ts` itself is still
+unbuilt** — issue #3 implements `assessGoalRealism()` and the widened `deriveRacePaceTarget()`
+against that contract, so the suite stays quarantined until it lands.
 
 ---
 
@@ -380,6 +403,14 @@ Full rationale for each row in `docs/change_log.md`'s 2026-07-12 entries.
   (Authentication → URL Configuration). Renamed from `v22workoutplangenerator://` in the
   2026-07-12 identifier rename — the allowlist (if it had an entry at all) needs updating to
   match. Google OAuth will dead-end without it. UNVERIFIED — this setting could not be read.
+- 🟠 **`GeneratePlanRequest` has no `goalTimeSec` field, so the per-generation goal cannot reach the
+  engine at all (found 2026-07-12).** `docs/mvp-build-prompt.md:332` promises that race
+  distance/date/goal-time *travel per-generation* — "intake's stored race is a default, not the
+  authority" — but `src/lib/planTypes.ts`'s `GeneratePlanRequest` carries only `raceDistance`,
+  `raceDate`, `durationWeeks`, `notes`, and `idempotencyKey`. The goal-realism check is defined
+  against the goal time, so it cannot run server-side until this is fixed. Belongs to the
+  `generate-plan` contract (issue #9, `api-designer`) — flagged, deliberately not fixed under the
+  goal-realism ruling.
 - 🟡 **`clampWeeklyVolume()`'s last-loading-week bug remains open — GitHub issue #22.**
   `src/lib/loadRules.ts` compares a proposed week against the literal previous week; the ruling
   encoded in the fixture (a deload week should be skipped, comparing against the last *loading*
@@ -388,6 +419,11 @@ Full rationale for each row in `docs/change_log.md`'s 2026-07-12 entries.
   share cap now measures a deload week against the last loading week's volume too) — the two
   rules agree "the last loading week" is the correct reference point, but they govern different
   functions and #22 is not resolved by R1c.
+- 🟡 **The configure-modal design spec never mentions goal time (found 2026-07-12).**
+  `docs/design/frontend-design-brief.md:564` describes the modal as distance chips + a date picker
+  only, which contradicts `mvp-build-prompt.md:332` and leaves the goal-realism warning's second
+  home unspecified. The warning must appear at *both* goal-entry points, so the modal needs a
+  goal-time control and its advisory copy. Resolve when M4's configure modal is built (issue #13).
 - 🟡 `220 − age` is retained for max HR by Ian's informed decision, against Tanaka 2001 (±10–12 bpm).
   Recorded so a future session does not "fix" it.
 - 🟡 **EAS project not initialized** (`eas init` not run). No TestFlight pipeline exists yet — needed
