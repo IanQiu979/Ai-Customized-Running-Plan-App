@@ -26,7 +26,7 @@ ruled on in full, closing issues #19 and #29 alongside it. Issues #22 and #33 re
 Phase 0's paper-reconciliation pass is now done too. **The plan-generation engine itself does not
 exist yet.** `src/lib/supabase.ts`, `planTypes.ts`, `loadRules.ts`, and (as of the 2026-07-11
 review-and-refine cycle) `notation.ts` are the app's `lib/` layer — shared vocabulary, safety
-arithmetic, and run-type/structure-string notation, all pure and tested (75 passing tests, up from
+arithmetic, and run-type/structure-string notation, all pure and tested (82 passing tests, up from
 64, after Ian's 2026-07-12 round-2 rulings on issue #34 added the long-run deload-week measurement
 fix (ruling R1c) and the race-day/strides test coverage). A golden fixture (`src/lib/fixtures/examplePlan.ts`), a rendered
 plan screen (`src/app/plan/[id].tsx` and `src/components/plan/`), and an abbreviations glossary tab
@@ -77,7 +77,7 @@ the literal previous week) and issue #33 (goal-realism handling).
       (`WeekAccordion`, `WorkoutRow`, `EffortChip`, `ReadoutBracket`, `PlanNameplate`,
       `DisclaimerFooter`, `FallbackNotice`, `format.ts`) — render the golden fixture on a real
       screen, ugly-beyond-tokens caveats aside.
-- [x] 75 passing tests (`jest-expo`), up from 64 after Ian's 2026-07-12 issue #34 rulings:
+- [x] 82 passing tests (`jest-expo`), up from 64 after Ian's 2026-07-12 issue #34 rulings:
       `supabase.test.ts`, `loadRules.test.ts` (extended for ruling R1c — a deload week's long run
       is measured against the last loading week's volume, not exempted from the cap), plus
       `notation.test.ts` (+1 for R6's race-day structure string), and

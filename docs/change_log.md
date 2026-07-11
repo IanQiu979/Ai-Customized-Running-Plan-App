@@ -88,7 +88,7 @@ issues #19, #29, and #34.** Applied to `src/lib/loadRules.ts`, `src/lib/fixtures
   outside the menu, and the cycle-2 fix to 300 m was correct. Week 9 stays 45 km. No code or
   fixture change — the doc's "flagged, needs Ian" framing in `example-plan-5k-pro.md` moves to
   "confirmed."
-- **Test suite: 75 passed / 0 failed, up from 64 at baseline** (`loadRules.test.ts` extended for
+- **Test suite: 82 passed / 0 failed, up from 64 at baseline** (`loadRules.test.ts` extended for
   R1c's last-loading-week deload measurement; `examplePlan.fixture.test.ts`, `notation.test.ts`,
   and `planTemplates.golden.test.ts` extended/rewritten for R6 and R7). **`npm run typecheck` and
   `npm run lint` still report errors, and two suites (`planTemplates.golden.test.ts`,
