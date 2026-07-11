@@ -152,7 +152,9 @@ These were resolved by evidence during the audit. They are not open questions.
     treatment): Free unlabelled beyond start/end, week markers Pro, taper annotation Elite.
 17. **Sparkline bitmaps: lazy first-render rasterization, in-memory per-session cache.** No
     expo-file-system in v1.
-18. **Remove `expo-glass-effect`** (installed; contradicts the no-blur depth rules).
+18. **Remove `expo-glass-effect`** (installed; contradicts the no-blur depth rules) — done in
+    `145d7e0`, "Replace the stock theme with the Instrument & Matter token system"; no longer in
+    `package.json`.
 19. **Verify the model ID live** (`claude-sonnet-5`) with a cheap API call before wiring it in.
     V1 runs `claude-sonnet-4-6`; nobody has confirmed the new string.
 20. **Design the routine states the docs skipped:** plan view opened cold from My Plans
@@ -279,12 +281,13 @@ The demoable core: a real template plan rendered on a real screen, zero network.
      `loadRules.ts` + the coaching docs. Include the pace-derivation module (recent-time →
      training paces via `training-zones.md`; goal-time → race-pace sessions only; the Phase-0
      threshold clamp).
-   - `design-system`: rewrite `src/constants/theme.ts` — this is a **structural rewrite, not a
+   - `design-system`: **done in `145d7e0`**, "Replace the stock theme with the Instrument &
+     Matter token system" — `src/constants/theme.ts` rewritten as a **structural rewrite, not a
      value swap** (surfaces, hairline, the five effort hues with verified contrast, hivis,
      `grid.*` tokens, motion durations/curves, radius, spacing ramp with the 48 step,
-     `six`→`seven` rename); bundle Barlow Condensed / Inter / IBM Plex Mono via
-     `npx expo install`; remove `expo-glass-effect`; delete the stock template screens
-     (including "Aanya's baby" at `src/app/index.tsx:38`).
+     `six`→`seven` rename); Barlow Condensed / Inter / IBM Plex Mono bundled via
+     `npx expo install`; `expo-glass-effect` removed; the stock template screens deleted
+     (including "Aanya's baby", formerly at `src/app/index.tsx:38`).
 2. `implementer` executes the planTemplates plan (with `scope-guard` wrapping the handoff);
    `test-writer` in parallel: golden tests per distance × duration × days/week × experience;
    property test — every generated week passes every `loadRules.ts` clamp; deload weeks reduce

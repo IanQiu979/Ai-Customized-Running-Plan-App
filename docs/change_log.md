@@ -5,6 +5,34 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-07-12 — doc sweep: reconcile stale references to the `145d7e0` theme rewrite
+
+`145d7e0` ("Replace the stock theme with the Instrument & Matter token system," 2026-07-10) shipped
+code that several docs still described as pending. No code changed in this pass — docs only,
+brought back in line with the working tree.
+
+- **`docs/mvp-progress.md`**: marked the "Theme + fonts" critical-path step done; added a "Design
+  tokens" entry under `## Done` → `### Code`; removed the three now-resolved risks (`expo-glass-effect`
+  installed, stock template/`"Aanya's baby"` not deleted, spacing ramp missing the 48 step) from
+  "Known debt and risks"; corrected the stale "3 passing tests" count to 22; updated the "Last
+  updated" header and honest-summary paragraph.
+- **`docs/architecture.md`**: `## Current — what exists in src/` no longer lists `explore.tsx` or
+  `components/` (both deleted) and no longer calls `_layout.tsx`/`index.tsx`/`theme.ts` "the
+  create-expo-app template"; `## Proposed visual direction (not yet in theme.ts)` retitled and
+  rewritten as current — the Instrument & Matter tokens described there are now what `theme.ts`
+  actually implements.
+- **`README.md`**: the `src/` file tree under "Project structure" updated to match the real tree
+  (no `explore.tsx`, no `components/`, `lib/` added).
+- **`docs/design/frontend-design-brief.md`**: Part 1 item 5 (`expo-glass-effect`) marked RESOLVED,
+  matching the file's own convention for resolved items; the `Spacing.six` migration blockquote
+  removed as moot (its only two call sites died with `explore.tsx`); Part 9's prerequisites table,
+  "already present" line, and "also required before build" checklist updated — fonts are bundled,
+  `expo-glass-effect` is gone, and the theme/template/`"Aanya's baby"` checklist is done.
+- **`docs/design/mvp-blueprint.md`**: Part 11's font rows, "already present" line, and "also
+  required" sentence updated the same way.
+- **`docs/mvp-build-prompt.md`**: Ruling 18 (remove `expo-glass-effect`) and the Phase 1
+  `design-system` task bullet annotated as done, landed in `145d7e0`.
+
 ## 2026-07-10 (Phase 0) — audit rulings applied, decision gate closed
 
 Doc-sync pass following `docs/mvp-build-prompt.md`'s Phase 0 (§0-B rulings, §0-C decision gate).

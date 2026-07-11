@@ -11,11 +11,9 @@ kept in clearly separate sections below; nothing in a "planned" section is built
 ```
 src/
   app/
-    _layout.tsx        # root layout — still the create-expo-app template
-    index.tsx          # still the create-expo-app template
-    explore.tsx         # still the create-expo-app template
-  components/           # template UI (themed-text, themed-view, app-tabs, collapsible, ...)
-  constants/theme.ts     # stock Expo template palette — see "Proposed visual direction" below
+    _layout.tsx        # root layout — loads the bundled fonts, renders the root stack
+    index.tsx          # placeholder Home — proves the token/font pipeline boots, not the real screen
+  constants/theme.ts     # "Instrument & Matter" token system — current, see "Visual direction" below
   hooks/                 # use-theme, use-color-scheme
   lib/
     supabase.ts          # env-guarded Supabase client
@@ -23,6 +21,11 @@ src/
     loadRules.ts           # canonical — deterministic safety arithmetic, 19 unit tests
     __tests__/supabase.test.ts, loadRules.test.ts
 ```
+
+There is no `src/components/`: the stock create-expo-app template surface (`explore.tsx`,
+`animated-icon.*`, `app-tabs.*`, `themed-text`, `themed-view`, `external-link`, `hint-row`,
+`ui/collapsible`, `web-badge`) was deleted in `145d7e0`, "Replace the stock theme with the
+Instrument & Matter token system."
 
 `src/lib/supabase.ts` exports `supabase`, built with
 `createClient(url, publishableKey, { auth: {...} })`:
@@ -201,14 +204,14 @@ on this: a delete policy would let a user reset their own count. Tier and quota 
 ever written by edge functions running as the service role — the client can never write its own
 tier or quota.
 
-## Proposed visual direction (not yet in `theme.ts`)
+## Visual direction — "Instrument & Matter" (current in `theme.ts`; screens still to come)
 
-`src/constants/theme.ts` today is still the stock Expo template palette — light `#000000` /
-`#ffffff` / `#F0F0F3` / `#E0E1E6` / `#60646C`, dark `#ffffff` / `#000000` / `#212225` /
-`#2E3135` / `#B0B4BA` — plus `Fonts` (system-ui/serif/rounded/mono), `Spacing` (half=2, one=4,
-two=8, three=16, four=24, five=32, six=64), `BottomTabInset`, and `MaxContentWidth = 800`. The
-PACE palette below is a proposal from the frontend-design skill; it does not exist in code and
-is recorded here so it isn't lost before implementation.
+`src/constants/theme.ts` now implements the PACE palette below in full — landed in `145d7e0`,
+"Replace the stock theme with the Instrument & Matter token system" (surfaces, hairline, effort
+hues, the `hivis` accent, typography, the spacing/radius/motion ramps). It replaced the stock
+Expo template palette outright, not incrementally. `theme.ts`'s own header comment and
+[`docs/design/frontend-design-brief.md`](design/frontend-design-brief.md) Part 2 are the source
+of truth for exact values; the bullets below summarize intent, not canonical hex codes.
 
 - **Bases**: `asphalt #14171C` (dark), `chalk #F7F7F4` (light), `graphite #5A6069` (secondary
   text) — deliberately not pure black/white, and deliberately not a cream-and-terracotta look.
@@ -220,10 +223,13 @@ is recorded here so it isn't lost before implementation.
   card in v1 — decision 5, 2026-07-10 — so hivis does not move to one; it stays on the primary
   CTA.)
 - Type: a condensed grotesque for display and numerals (running is numbers — distance, pace,
-  splits), a neutral body face, a mono face for split tables. Scale 32/24/20/17/15/13.
+  splits), a neutral body face, a mono face for split tables. Scale 32/24/20/17/15/13. The three
+  Google Fonts families (Barlow Condensed, Inter, IBM Plex Mono) are bundled and loaded by
+  `src/app/_layout.tsx`.
 - **Signature element — the "week ribbon"**: each training week renders as seven cells colored
   by effort, rest days as gaps. A 16-week plan reads as a barcode of periodization at a glance.
-  The plan view is meant to lead with the ribbon rather than a list.
+  The plan view is meant to lead with the ribbon rather than a list. **Not yet built** — no plan
+  view exists yet; this is tokens only so far (see "Current — what exists in `src/`" above).
 - Accessibility rule, non-negotiable: an effort color is never the only signal — always pair it
   with a text label, so the plan stays legible to color-blind users.
 - Standing rule (already in the engineering spec): theme tokens only, no hardcoded colors or

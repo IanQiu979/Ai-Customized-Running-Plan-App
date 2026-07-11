@@ -612,12 +612,13 @@ was tested against. Getting this wrong is exactly the trap `AGENTS.md` warns abo
 
 | Package | Expo SDK 54 pin | Needed for | v1? |
 |---|---|---|---|
-| `@expo-google-fonts/barlow-condensed` | — | Display + **all** numerals | **Yes** |
-| `@expo-google-fonts/inter` | — | Body, chrome | **Yes** |
-| `@expo-google-fonts/ibm-plex-mono` | — | Pace, HR zones, week numbers | **Yes** |
 | `@shopify/react-native-skia` | **2.2.12** | The wave, and (v2) the sand-man | Only if the wave ships |
 | `expo-haptics` | **~15.0.8** | Every tick and the success beat | Fast-follow |
 | `expo-linear-gradient` | **~15.0.8** | CTA gradient | Optional — see below |
+
+`@expo-google-fonts/barlow-condensed`, `@expo-google-fonts/inter`, and
+`@expo-google-fonts/ibm-plex-mono` were the **Yes** row here and are now installed — see
+"Already present" below.
 
 > **With the sand-man deferred, Skia's only remaining consumer is the periodization wave.** If the
 > wave is also deferred, Skia leaves the v1 dependency set entirely — and with it the heaviest native
@@ -629,19 +630,24 @@ was tested against. Getting this wrong is exactly the trap `AGENTS.md` warns abo
 > `expo-linear-gradient` too.
 
 Already present: `react-native-reanimated ~4.1.1`, `react-native-gesture-handler ~2.28.0`,
-`expo-font ~14.0.12` (**zero font files bundled**), `react-native-safe-area-context ~5.6.0`.
+`expo-font ~14.0.12`, `react-native-safe-area-context ~5.6.0`, and — bundled via
+`npx expo install` in `145d7e0` — `@expo-google-fonts/barlow-condensed`,
+`@expo-google-fonts/inter`, `@expo-google-fonts/ibm-plex-mono`.
 Peer requirements verified: `react 19.1.0` and `react-native 0.81.5` satisfy Skia's `>=19` / `>=0.78`.
 
 **Both Skia and haptics are native modules — they need a dev-client rebuild, not an OTA update.** If that
 rebuild hasn't happened, ship the identical visual choreography with haptic calls absent (they must
 no-op, never crash), and treat haptics as a fast-follow rather than a blocker.
 
-**Do not install `expo-blur`.** This system has no sanctioned blur. **Remove `expo-glass-effect`
-(`~0.1.10`)**, which is installed and contradicts the depth rules.
+**Do not install `expo-blur`.** This system has no sanctioned blur. **`expo-glass-effect` was
+removed in `145d7e0`** (Ruling 18) and is no longer in `package.json`.
 
-Also required: replace every value in `src/constants/theme.ts`; add `48` to the spacing ramp (renaming
-old `six`→`seven`, migrating two call sites in `explore.tsx`); delete the stock template screens; fix the
-placeholder title `"Aanya's baby"` at `src/app/index.tsx:38`.
+**Done in `145d7e0`, "Replace the stock theme with the Instrument & Matter token system":**
+replaced every value in `src/constants/theme.ts`; added `48` to the spacing ramp (renamed old
+`six`→`seven` — its two call sites lived only in `explore.tsx`, deleted in the same change, so no
+migration was needed); deleted the stock template screens (`src/components/` no longer exists);
+fixed the placeholder title `"Aanya's baby"` — `src/app/index.tsx` is now a token-only placeholder
+Home screen.
 
 ---
 

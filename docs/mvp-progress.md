@@ -6,7 +6,7 @@
 > Milestone definitions live in [`planning/02-product-requirements.md`](../planning/02-product-requirements.md).
 > Decision history lives in [`change_log.md`](change_log.md).
 
-**Last updated:** 2026-07-10 (Phase 0 of `docs/mvp-build-prompt.md` complete)
+**Last updated:** 2026-07-12 (doc sync: `145d7e0`'s Instrument & Matter token rewrite reconciled)
 
 ---
 
@@ -23,8 +23,10 @@
 
 **The honest summary:** planning, design, and domain research are done to an unusual depth, and
 Phase 0's paper-reconciliation pass is now done too. **Almost no product code exists.**
-`src/lib/supabase.ts`, `planTypes.ts`, and `loadRules.ts` are the only non-template files in the
-app — the shared vocabulary and the safety arithmetic, not yet a template engine, a screen, or a
+`src/lib/supabase.ts`, `planTypes.ts`, and `loadRules.ts` are the shared vocabulary and the safety
+arithmetic; `src/constants/theme.ts` now carries the full Instrument & Matter token system in
+place of the create-expo-app template (`145d7e0`), and `src/app/` is down to a placeholder Home
+screen and root layout — but there is still not yet a template engine, a real screen, or a
 backend. Nothing generates a plan. The gap between "designed" and "working" is still nearly the
 entire remaining project.
 
@@ -48,7 +50,15 @@ entire remaining project.
 - [x] Expo SDK 54 scaffold — TypeScript strict, expo-router, `@/*` path alias
 - [x] `src/lib/supabase.ts` — env-guarded at import, AsyncStorage on native, `AppState` auto-refresh,
       `detectSessionInUrl: false`
-- [x] 3 passing tests (`jest-expo`); `typecheck && lint && test` all clean
+- [x] 22 passing tests (`jest-expo`); `typecheck && lint && test` all clean
+- [x] **Design tokens — done `145d7e0`, 2026-07-10** ("Replace the stock theme with the
+      Instrument & Matter token system"): `src/constants/theme.ts` rewritten structurally
+      (surfaces, hairline, effort hues, hivis, `grid.*`, motion, radius, spacing ramp with the 48
+      step and `six`→`seven` rename); Barlow Condensed / Inter / IBM Plex Mono bundled via
+      `npx expo install`; `expo-glass-effect` removed; the stock create-expo-app template deleted
+      (`explore.tsx`, `src/components/` in full); the placeholder hero title "Aanya's baby" fixed
+      in `src/app/index.tsx`. Resolves the three risks this previously left open (see the removed
+      🟠/🟡 rows, formerly under "Known debt and risks").
 
 ### Repo hygiene
 - [x] `AGENTS.md` rewritten as the agent-routing doc, committed (`60382cd`)
@@ -118,8 +128,8 @@ with **no backend at all**.
 3. [ ] **`src/lib/planTemplates.ts`** — the 5K plan first: phases, workout primitives, load curve.
        Generates for any week count, any days/week, any starting mileage.
 4. [ ] **Plan view rendering a real template plan.** Ugly beyond tokens, but true.
-5. [ ] **Theme + fonts** — replace `theme.ts` wholesale; bundle Barlow Condensed, Inter, IBM Plex Mono;
-       delete the stock template screens.
+5. [x] **Theme + fonts** — **Done `145d7e0`, 2026-07-10.** `theme.ts` replaced wholesale; Barlow
+       Condensed, Inter, IBM Plex Mono bundled; the stock template screens deleted.
 6. [ ] **The spine** — `supabase init`, migrations, RLS on all four tables, required sign-up.
 7. [ ] **Intake** (8 questions, or 10 with a target race, + review) persisting to `intake_responses`.
 8. [ ] **`generate-plan` edge function** — tier branch, quota check, validate, clamp, retry once, fall back.
@@ -173,13 +183,6 @@ Full rationale for each is in `docs/change_log.md`'s "2026-07-10 (Phase 0)" entr
 - 🟠 **Deep-link scheme `v22workoutplangenerator://` not confirmed on Supabase's redirect allowlist**
   (Authentication → URL Configuration). Google OAuth will dead-end without it. UNVERIFIED — this
   setting could not be read.
-- 🟠 `expo-glass-effect ~0.1.10` is installed and contradicts the design's no-blur depth rule.
-  **Remove it** (Ruling 18 — no fence-off alternative; this system has no sanctioned blur use).
-- 🟡 Stock Expo template not yet deleted — `src/app/explore.tsx` and the other create-expo-app
-  screens are still boilerplate, not yet replaced with real screens, and the hero title still reads
-  **"Aanya's baby"** (`src/app/index.tsx:38`).
-- 🟡 Spacing ramp needs a `48` step inserted, renaming old `six`→`seven` (2 call sites in `explore.tsx`,
-  which is slated for deletion anyway).
 - 🟡 `220 − age` is retained for max HR by Ian's informed decision, against Tanaka 2001 (±10–12 bpm).
   Recorded so a future session does not "fix" it.
 - 🟡 **EAS project not initialized** (`eas init` not run). No TestFlight pipeline exists yet — needed

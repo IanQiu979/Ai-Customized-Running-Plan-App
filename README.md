@@ -85,14 +85,22 @@ What exists today:
 
 ```
 src/
-  app/            # expo-router screens — currently the create-expo-app template
+  app/                  # expo-router screens
     _layout.tsx
     index.tsx
-    explore.tsx
-  components/     # template UI components (themed-text, themed-view, app-tabs, ...)
   constants/
-    theme.ts
+    theme.ts            # "Instrument & Matter" design tokens — see docs/architecture.md
   hooks/
+    use-color-scheme.ts
+    use-color-scheme.web.ts
+    use-theme.ts
+  lib/
+    supabase.ts         # env-guarded Supabase client
+    planTypes.ts        # shared Plan/Week/Workout/Tier types
+    loadRules.ts        # deterministic safety arithmetic, 19 unit tests
+    __tests__/
+      supabase.test.ts
+      loadRules.test.ts
 ```
 
 Planned layout (not yet built — see `planning/03-engineering-requirements.md`):
