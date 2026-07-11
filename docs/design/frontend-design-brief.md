@@ -44,7 +44,7 @@ Getting *"1 total"* vs *"per month"* wrong is a factual error, not a copy nuance
 **Quota and tier are server-authoritative.** The client displays them and is never the authority.
 Home reads a `quota-status` endpoint; it never counts anything itself.
 
-**Intake is ten fields.** Goal, **age**, experience level, days per week, current weekly mileage,
+**Intake is ten fields.** Goal, **age**, experience level, days per week, current weekly volume,
 target race distance, target race date *(only if a race is chosen)*, **goal time** *(only if a race
 is chosen)*, **a recent time at any distance** *(optional)*, injuries/constraints. Do not add an
 eleventh.
@@ -499,7 +499,7 @@ the top — **no visible numeric counter**. The question sits in the top third a
 hivis "Continue" dims to ~30% opacity (never recolored) when a required step is unanswered.
 
 Controls, by field: **goal** as large tappable cards · **age** as a condensed-numeral stepper ·
-**experience** as a segmented row · **days per week** and **weekly mileage** as big condensed-numeral
+**experience** as a segmented row · **days per week** and **weekly volume** as big condensed-numeral
 steppers with a mono unit label (reusing the numeral-forward identity rather than a generic slider) ·
 **race distance** as a chip row · **race date** as a native picker · **goal time** and **recent time**
 as mono time entries (hh:mm:ss), the recent one paired with its own distance chip row · **injuries** as
@@ -521,7 +521,7 @@ device, earned without inventing an extra field.
 
 > Copy — Q1 **"What's your main goal right now?"** · Q2 **"How would you describe your running
 > experience?"** · Q3 **"How many days a week can you run?"** *("Count the days you can realistically
-> train, not your ideal week.")* · Q4 **"What's your current weekly mileage?"** *("A rough average over
+> train, not your ideal week.")* · Q4 **"How many kilometres do you run in a typical week?"** *("A rough average over
 > the last month is fine — this sets a safe starting point, not a judgment on your training.")* ·
 > Q5 **"Do you have a target race?"** · Q6 **"When's race day?"** · Q7 **"Any injuries or physical
 > limits we should plan around?"** *("This keeps your plan honest — we won't schedule speed work through
@@ -644,7 +644,7 @@ never nagged mid-scroll.
 > Copy — race plan: **"{raceDistance} plan"**, sub **"{numberOfWeeks} weeks to race day, {raceDate}"**.
 > Duration plan: **"{durationWeeks}-week plan"**. Week heading **"Week {n} of {total}"**. Rest day
 > **"Rest day — recovery is training too."** Paid explanation section label: **"Why this week"**.
-> Free pace reads **"Effort: easy, conversational pace"**; paid reads **"Pace: {low}–{high} /mi · HR zone {n}"**.
+> Free pace reads **"Effort: easy, conversational pace"**; paid reads **"Pace: {low}–{high} /km · HR zone {n}"**.
 
 ### How the three tiers differ *visually*
 
@@ -884,7 +884,7 @@ read the full quota, not "8 of 1…".
 
 **The workout row is where large text breaks.** Past the accessibility threshold it restructures — the one place
 in the app where text size changes structure. Row 1: chip + wrapping label. Row 2: the numerals as explicit
-"label: value" pairs ("Distance 10km", "Pace 7:45/mi", "Zone 3"), wrapping rather than clipping. Row 3: the "why"
+"label: value" pairs ("Distance 10km", "Pace 4:49/km", "Zone 3"), wrapping rather than clipping. Row 3: the "why"
 line, full width, **never clamped or truncated** — it is paid explanatory copy, and truncating it is the failure a
 paying user notices fastest.
 

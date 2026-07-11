@@ -359,7 +359,7 @@ distance travelled along the rule.
 No frame grid, no topo, no ghost ribbon. Nothing competes with the single decision on screen, which
 sits in the top third at Barlow Condensed 24.
 
-The **numeral steppers** (age, days/week, weekly mileage) get the only instrument flourish this screen
+The **numeral steppers** (age, days/week, weekly volume in km) get the only instrument flourish this screen
 allows: a large condensed numeral centre-stage, a mono unit label directly beneath, both anchored to
 their own short baseline — a digital scale readout, not a slider. The 48×48 `−`/`+` targets flank it.
 Several of the questions are steppers, which is what makes the numeral-forward identity read as

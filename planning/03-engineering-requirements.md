@@ -33,7 +33,7 @@ lib/
   loadRules.ts         ← deterministic safety arithmetic — exists, canonical, 19 unit tests
   planTemplates.ts     ← a parametric generator, NOT a fixed 5K/10K/half/marathon × 8/12/16wk
                           matrix: any distance, any legal week count, any days/week, any starting
-                          mileage. It is also the fallback engine for Pro/Elite, so it must be able
+                          weekly volume (km). It is also the fallback engine for Pro/Elite, so it must be able
                           to produce every distance at any legal length even though Free *users*
                           are capped at 12 weeks/5K by a UI/quota gate, not by the engine.
   subscription.ts      ← tier read + dummy purchase (adapted from Echo)

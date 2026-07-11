@@ -6,7 +6,8 @@
 > Milestone definitions live in [`planning/02-product-requirements.md`](../planning/02-product-requirements.md).
 > Decision history lives in [`change_log.md`](change_log.md).
 
-**Last updated:** 2026-07-10 (Phase 0 of `docs/mvp-build-prompt.md` complete)
+**Last updated:** 2026-07-12 (units ruling closes issue #36; Phase 0 of
+`docs/mvp-build-prompt.md` complete 2026-07-10)
 
 ---
 
@@ -116,7 +117,7 @@ with **no backend at all**.
        35–45% band, long-run share cap, long-run spike cap, Daniels time cap, HR zones. 19 unit tests.
        `clampLongRun()` reports which ceiling actually bound.
 3. [ ] **`src/lib/planTemplates.ts`** — the 5K plan first: phases, workout primitives, load curve.
-       Generates for any week count, any days/week, any starting mileage.
+       Generates for any week count, any days/week, any starting weekly volume (km).
 4. [ ] **Plan view rendering a real template plan.** Ugly beyond tokens, but true.
 5. [ ] **Theme + fonts** — replace `theme.ts` wholesale; bundle Barlow Condensed, Inter, IBM Plex Mono;
        delete the stock template screens.
@@ -159,6 +160,12 @@ Full rationale for each is in `docs/change_log.md`'s "2026-07-10 (Phase 0)" entr
 | "Next workout" / "current week" card | **Dropped.** Home shows the plan link + quota state only. No current-week arithmetic exists in v1. |
 | Red-flag injury protocol representation | Rendered as a conservative fixed-length plan whose weeks carry the protocol's phases, plus a pain-gated-progression `extras` `PlanSection`, plus Rule 10 disclaimers. Does not consume quota. |
 | Pace-derivation method | Cross-distance equivalency via the Riegel formula (`T2 = T1 × (D2/D1)^1.06`); training paces anchored to the source's own relative rules. Any remaining numeric gap goes back to Ian — nothing invented. |
+
+## Decided (2026-07-12)
+
+| Item | Decision |
+|---|---|
+| Distance/pace units — km vs miles (issue #36) | **Kilometres, everywhere, permanently. No unit toggle; units are never user-selectable.** Intake asks weekly volume in km; plans render distances in km and paces in sec/km. Imperial is **out of scope**, not deferred — not an open product question blocking intake. Full rationale in `docs/change_log.md`'s 2026-07-12 entry; the code (`src/lib/planTypes.ts`, `src/lib/loadRules.ts`) was already km-canonical, only `docs/design/frontend-design-brief.md`'s stale `/mi` copy needed fixing. |
 
 ---
 
