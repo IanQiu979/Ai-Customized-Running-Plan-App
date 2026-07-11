@@ -152,7 +152,8 @@ These were resolved by evidence during the audit. They are not open questions.
     treatment): Free unlabelled beyond start/end, week markers Pro, taper annotation Elite.
 17. **Sparkline bitmaps: lazy first-render rasterization, in-memory per-session cache.** No
     expo-file-system in v1.
-18. **Remove `expo-glass-effect`** (installed; contradicts the no-blur depth rules).
+18. **Remove `expo-glass-effect`** (installed; contradicts the no-blur depth rules). **Done —
+    `145d7e0` (2026-07-10); see `docs/change_log.md`.**
 19. **Verify the model ID live** (`claude-sonnet-5`) with a cheap API call before wiring it in.
     V1 runs `claude-sonnet-4-6`; nobody has confirmed the new string.
 20. **Design the routine states the docs skipped:** plan view opened cold from My Plans
@@ -284,7 +285,8 @@ The demoable core: a real template plan rendered on a real screen, zero network.
      `grid.*` tokens, motion durations/curves, radius, spacing ramp with the 48 step,
      `six`→`seven` rename); bundle Barlow Condensed / Inter / IBM Plex Mono via
      `npx expo install`; remove `expo-glass-effect`; delete the stock template screens
-     (including "Aanya's baby" at `src/app/index.tsx:38`).
+     (including "Aanya's baby" at `src/app/index.tsx:38`). **Landed — `145d7e0` (2026-07-10);
+     see `docs/change_log.md`'s "theme rewrite" entry.**
 2. `implementer` executes the planTemplates plan (with `scope-guard` wrapping the handoff);
    `test-writer` in parallel: golden tests per distance × duration × days/week × experience;
    property test — every generated week passes every `loadRules.ts` clamp; deload weeks reduce

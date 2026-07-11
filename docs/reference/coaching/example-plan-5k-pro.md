@@ -84,14 +84,16 @@ For this runner (recent 5K 22:30 → 270 s/km):
 pace, interval pace, and — for the first time, per Ian's 2026-07-11 ruling 3 below — race-pace
 reps at goal pace directly. It still cannot state a numeric steady/Zone 2 pace.
 
-**Cycle-2 note (2026-07-11): `paceDerivation.test.ts` is mid-resync, not yet the valid spec for
-this runner's race-pace target.** That test's `deriveRacePaceTarget` section still encodes the
-2026-07-10 R-A addendum's >10%-goal-improvement gate: for this runner (20:00 goal vs. a 22:30
-recent-equivalent, an 11.1% implied improvement) the gate fires and pins the race-pace target flat
-at this runner's current pace (270 s/km), which contradicts ruling 3's week-11 prescription below
-(goal pace, 4:00/km = 240 s/km, directly). A test agent is resyncing that test to ruling 3 in this
-same cycle; until it lands, `deriveRacePaceTarget`'s current gate behavior is stale, not
-authoritative. The gate itself raises a question ruling 3 doesn't answer — see Open item 5.
+**Cycle-2 note (2026-07-11): `paceDerivation.test.ts` was mid-resync when this note was first
+written; the resync has since landed.** That test's `deriveRacePaceTarget` section originally
+encoded the 2026-07-10 R-A addendum's >10%-goal-improvement gate: for this runner (20:00 goal vs. a
+22:30 recent-equivalent, an 11.1% implied improvement) the gate fired and pinned the race-pace
+target flat at this runner's current pace (270 s/km), which contradicted ruling 3's week-11
+prescription below (goal pace, 4:00/km = 240 s/km, directly). The resync landed the same cycle:
+`deriveRacePaceTarget` now anchors to goal pace for this fixture
+(`pace: { lowSecPerKm: 240, highSecPerKm: 240 }, source: 'goal'`), exactly per ruling 3, and the
+old >10%-goal-improvement gate is gone from the test. The gate itself raised a question ruling 3
+doesn't answer — see Open item 5, which is still open.
 
 ---
 
@@ -388,9 +390,9 @@ sizing" above).
    abbreviations glossary tab ships copy sourced from that table.
 5. **New (cycle 2): goal-realism handling.** The 2026-07-10 R-A addendum's >10%-goal-improvement
    gate (decision 3) already only ever governed *race-pace session* targets, never everyday
-   training paces — but `paceDerivation.test.ts` still applies it exactly as R-A specified it
-   (pin to the recent-equivalent pace beyond 10%), which is now the wrong call for a race-specific-
-   phase `RP` session under ruling 3. That test is being resynced this cycle to ruling 3's week-11
+   training paces — `paceDerivation.test.ts` originally applied it exactly as R-A specified it
+   (pin to the recent-equivalent pace beyond 10%), which was the wrong call for a race-specific-
+   phase `RP` session under ruling 3. That test has since been resynced to ruling 3's week-11
    goal-pace prescription — see the "Pace bands" cycle-2 note above. But the question the old gate
    was really standing in for is
    still open: when a declared goal is implausibly faster than the runner's recent-equivalent

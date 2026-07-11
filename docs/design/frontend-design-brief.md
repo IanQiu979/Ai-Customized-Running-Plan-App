@@ -130,9 +130,9 @@ These surfaced during design. Each needs a human answer. Four of them change cod
 4. **Password minimum length.** Copy assumes 8 characters. Confirm against what Supabase Auth is
    actually configured to enforce and match the string to it.
 
-5. **`expo-glass-effect` is installed (`~0.1.10`)** and directly contradicts this design's "no blur,
-   no glass — depth comes from surfaces and hairlines" rule. Remove it, or explicitly fence it off in
-   review. Left in place, it is a standing temptation to build the wrong thing.
+5. **`expo-glass-effect` — RESOLVED 2026-07-10 (Ruling 18, `145d7e0`): removed.** It directly
+   contradicted this design's "no blur, no glass — depth comes from surfaces and hairlines" rule
+   and is no longer in `package.json`; see `docs/change_log.md`'s "theme rewrite" entry.
 
 6. **Elite extras — RESOLVED 2026-07-10 (decision 7): cut.** They appear in no copy and no screen
    in v1; see Part 0.
@@ -262,11 +262,6 @@ Existing ramp: `half 2 · one 4 · two 8 · three 16 · four 24 · five 32 · si
 There is no "large section gap," which this design needs under the bottom-anchored CTA on tall
 devices. Insert **48**. Since names are ordinal, `six` becomes 48 and the old 64 is renamed
 `seven`.
-
-> **Migration:** exactly two call sites use `Spacing.six` today, both in `src/app/explore.tsx`
-> (lines 30 and 144). Both must move to `Spacing.seven` in the same commit or they silently render
-> at 48 instead of 64. (`explore.tsx` is stock template slated for deletion anyway, which makes this
-> migration free if the rename lands after the delete.)
 
 `radius.control` = **12** (buttons, chips, inputs, segmented tracks). `radius.card` = **20** (cards,
 sheets, modals). An 8px gap between them — deliberately distinct, not the "two values 2px apart" trap.
@@ -912,30 +907,36 @@ viewport. Tablets are a different matter, but this is now moot for v1 — see re
 
 ## Part 9 — Implementation prerequisites
 
-**Nothing below is installed. All of it is needed.**
+**Still needed, none of it installed:** the Skia/gradient/haptics row below. The three font
+packages were bundled in `145d7e0` (2026-07-10) and are already installed.
 
 | Package | Needed for | Note |
 |---|---|---|
 | `@shopify/react-native-skia` | The periodization wave | Config plugin, no bare workflow |
 | `expo-linear-gradient` | CTA gradient, wave fill | Trivial add |
 | `expo-haptics` | Every haptic beat in the reveal | **Native module — needs a dev-client rebuild, not an OTA update** |
-| `@expo-google-fonts/barlow-condensed` | Display + all numerals | — |
-| `@expo-google-fonts/inter` | Body, UI chrome | — |
-| `@expo-google-fonts/ibm-plex-mono` | Pace splits, HR zones, week numbers | — |
+| `@expo-google-fonts/barlow-condensed` | Display + all numerals | **Installed** (`145d7e0`) |
+| `@expo-google-fonts/inter` | Body, UI chrome | **Installed** (`145d7e0`) |
+| `@expo-google-fonts/ibm-plex-mono` | Pace splits, HR zones, week numbers | **Installed** (`145d7e0`) |
 
 **Already present:** `react-native-reanimated ~4.1.1`, `react-native-gesture-handler ~2.28.0`,
-`expo-font ~14.0.12` (with **zero font files bundled**), `react-native-safe-area-context ~5.6.0`.
+`expo-font ~14.0.12` (loading the three bundled font families via `useFonts` in
+`src/app/_layout.tsx`), `react-native-safe-area-context ~5.6.0`.
 
 **Do not install `expo-blur`.** This system has no sanctioned blur use.
-**Consider removing `expo-glass-effect ~0.1.10`**, which is installed and contradicts the depth rules.
+**`expo-glass-effect ~0.1.10` — removed** (Ruling 18, `145d7e0`); it contradicted the depth rules
+and is no longer installed.
 **Do not install `lottie-react-native`.** Build the celebration with Reanimated.
 
-**Also required before build:**
-- Replace every value in `src/constants/theme.ts` (the shape stays; the stock Expo values go).
-- Add `48` to the spacing ramp; rename the old `six`→`seven`; migrate two call sites in `explore.tsx`.
-- Delete the stock template: `explore.tsx`, `animated-icon.*`, `hint-row.tsx`, `web-badge.tsx`, and the
-  current `app-tabs.*` two-tab structure.
-- Fix the placeholder hero title "Aanya's baby" at `src/app/index.tsx:38`.
+**Done, `145d7e0` (2026-07-10)** — see `docs/change_log.md`'s "theme rewrite" entry:
+- Every value in `src/constants/theme.ts` replaced (the shape stayed; the stock Expo values are gone).
+- `48` added to the spacing ramp; the old `six` renamed `seven`. The two `Spacing.six` call sites
+  lived in `explore.tsx` and were deleted along with it, so no migration was needed.
+- Stock template deleted: `explore.tsx`, `animated-icon.*`, `hint-row.tsx`, `web-badge.tsx`,
+  `app-tabs.*`, `themed-text.tsx`, `themed-view.tsx`, `external-link.tsx`, `ui/collapsible.tsx`,
+  `global.css`.
+- The placeholder hero title "Aanya's baby" is gone — `src/app/index.tsx` was renamed to
+  `src/app/(tabs)/index.tsx` and rewritten as a token-only placeholder Home screen.
 
 ---
 
