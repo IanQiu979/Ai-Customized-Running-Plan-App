@@ -19,6 +19,11 @@
 Configure (modal) · Generating (terminal state of that modal) · Plan view · My Plans · Paywall ·
 Settings-lite.
 
+**Plus one added after this document was written: a Glossary tab** (Ian's 2026-07-11 notation
+ruling, `docs/reference/coaching/notation.md`), explaining the run-type/structure-string
+abbreviations the plan view now uses. Not designed here — it shipped as an unstyled, tokens-only
+screen (`src/app/(tabs)/glossary.tsx`) alongside the abbreviation system itself. See Part 8.
+
 **Restored to the MVP (decision 1, 2026-07-10):** a minimal dummy paywall and a settings-lite
 screen (sign out, tier display, restore purchases). Both were cut in the blueprint's first pass;
 M4's done-definition, the `402` path, and the user flow all require a paywall, and cutting
@@ -551,6 +556,13 @@ none stretches to fill more. Settings-lite carries a paywall entry point (Subscr
 account actions (sign out, restore purchases) — see "Paywall · Settings-lite" in Part 7. **Nothing
 about Home or My Plans moves** now that the third column is populated instead of reserved.
 
+**Phase 1 reality check:** the tab bar shipped with two tabs, not three — Home and a **Glossary**
+tab that isn't in this design at all (added for Ian's 2026-07-11 notation ruling, before My Plans
+or Settings-lite exist to occupy the other columns; `src/app/(tabs)/_layout.tsx`). Treat this as a
+temporary Phase 1 stand-in, not a revision of the three-column design above: My Plans and
+Settings-lite still land in their designed columns once the backend gives them something to show,
+and Glossary's permanent home (a fourth tab, a Settings-lite row, or elsewhere) is still undecided.
+
 ---
 
 ## Part 9 — Free vs Pro vs Elite, as row anatomy
@@ -636,12 +648,14 @@ Peer requirements verified: `react 19.1.0` and `react-native 0.81.5` satisfy Ski
 rebuild hasn't happened, ship the identical visual choreography with haptic calls absent (they must
 no-op, never crash), and treat haptics as a fast-follow rather than a blocker.
 
-**Do not install `expo-blur`.** This system has no sanctioned blur. **Remove `expo-glass-effect`
-(`~0.1.10`)**, which is installed and contradicts the depth rules.
+**Do not install `expo-blur`.** This system has no sanctioned blur. **`expo-glass-effect`
+(`~0.1.10`) is removed** (commit `145d7e0`) — it contradicted the depth rules and had no sanctioned use.
 
-Also required: replace every value in `src/constants/theme.ts`; add `48` to the spacing ramp (renaming
-old `six`→`seven`, migrating two call sites in `explore.tsx`); delete the stock template screens; fix the
-placeholder title `"Aanya's baby"` at `src/app/index.tsx:38`.
+**Done (commit `145d7e0`):** every value in `src/constants/theme.ts` replaced; `48` added to the
+spacing ramp (old `six`→`seven`, migrating the two `explore.tsx` call sites); the stock template
+screens deleted; the placeholder title `"Aanya's baby"` at the old `src/app/index.tsx:38` is gone
+(that file is now `src/app/(tabs)/index.tsx`, rewritten). See `docs/architecture.md`'s "Current —
+visual direction" section and `docs/mvp-progress.md`.
 
 ---
 

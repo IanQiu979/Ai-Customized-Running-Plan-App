@@ -27,6 +27,7 @@ are kept as-is even though they no longer spell the product name.
 | [`injury-rules.md`](injury-rules.md) | Return-to-running protocol for a declared injury |
 | [`plan-structure.md`](plan-structure.md) | Phases, the Day 1…Day 7 model, deload cadence, how a plan is composed |
 | [`example-plan-5k-pro.md`](example-plan-5k-pro.md) | Worked 12-week 5K Pro-tier plan, hand-derived from the library — the golden fixture `planTemplates.ts` must reproduce |
+| [`notation.md`](notation.md) | Run-type abbreviations (`ER`, `TR`, `INT`, `RP`, `LR`, `SR`, `ER + Strides`), the structure-string grammar (`WU`/`CD`/`GP`/`w/`/`@`), and the headline-number convention — Ian's 2026-07-11 notation ruling |
 
 ## The applicability filter — why most of the source didn't make the cut
 

@@ -113,7 +113,13 @@ export interface RestDay {
 export interface Workout {
   kind: 'run';
   effort: EffortLevel;
-  /** "Easy run", "Intervals", "Long run". Always paired with `effort` — colour is never the only signal. */
+  /**
+   * Abbreviated run-type code — "ER", "INT", "LR", "ER + Strides" — never a spelled-out name
+   * except the entries `notation.md` marks as always-spelled-out ("Strides", "Race Day").
+   * Canonical abbreviation set and grammar: `docs/reference/coaching/notation.md`; code
+   * counterpart (glossary data, `expandLabel` for accessibility): `src/lib/notation.ts`. Always
+   * paired with `effort` — colour is never the only signal.
+   */
   label: string;
   /** Exactly one of these is set. */
   distanceKm?: number;
