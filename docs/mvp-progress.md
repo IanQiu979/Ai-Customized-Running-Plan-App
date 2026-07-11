@@ -6,7 +6,7 @@
 > Milestone definitions live in [`planning/02-product-requirements.md`](../planning/02-product-requirements.md).
 > Decision history lives in [`change_log.md`](change_log.md).
 
-**Last updated:** 2026-07-10 (Phase 0 of `docs/mvp-build-prompt.md` complete)
+**Last updated:** 2026-07-12 (app name decided: **Pace Blueprint**)
 
 ---
 
@@ -136,7 +136,6 @@ to "Decided" below.
 
 | Item | Blocks | Who decides |
 |---|---|---|
-| App name | app icon, wordmark, store listing; needed by M6, not before | Ian |
 | Password minimum length | sign-up copy | Verify against what the live Supabase project actually enforces — Phase 2 |
 | Whether Rule 5's "Monitoring" tier applies to a one-time pre-run intake at all | Rule 5's Monitoring-tier triggers ("new muscular soreness," "joint stiffness > 10 min") are worded for something noticed during/after a run, not a signup-time self-report; wiring `injury-rules.md` to intake | Ian |
 
@@ -160,6 +159,17 @@ Full rationale for each is in `docs/change_log.md`'s "2026-07-10 (Phase 0)" entr
 | Red-flag injury protocol representation | Rendered as a conservative fixed-length plan whose weeks carry the protocol's phases, plus a pain-gated-progression `extras` `PlanSection`, plus Rule 10 disclaimers. Does not consume quota. |
 | Pace-derivation method | Cross-distance equivalency via the Riegel formula (`T2 = T1 × (D2/D1)^1.06`); training paces anchored to the source's own relative rules. Any remaining numeric gap goes back to Ian — nothing invented. |
 
+## Decided (2026-07-12) — app name
+
+Full rationale in `docs/change_log.md`'s "2026-07-12" entry.
+
+| Item | Decision |
+|---|---|
+| App name | **Pace Blueprint** — a PACE-family sibling to V2.3 "Pace AnalysisAI" (`com.ian.paceanalysisai`). Chosen over "Pace Blocks," "Pace Plans," and "Pace Builder." A blueprint is a precise document you build from and don't edit — matching this app's immutable plans (2026-07-10 decision) — and carries no AI hype, matching the Instrument & Matter aesthetic (data is the decoration; glow is banned). |
+| Identifiers (shipped, not just the art) | `app.json` `expo.name` → `Pace Blueprint`, `expo.slug` → `pace-blueprint`, `expo.scheme` → `paceblueprint`, `expo.ios.bundleIdentifier` → `com.ian.paceblueprint`, `expo.android.package` → `com.ian.paceblueprint` (newly added); `package.json` name → `pace-blueprint`; Home title in `src/app/index.tsx` → "Pace Blueprint." `package-lock.json` regenerated. `typecheck && lint && test` all clean (22 tests). |
+| Why now, not M6 (revises the issue's own premise) | The issue said the name was "needed by M6, not before" — true of the *art*, not the *identifiers*. `scheme` and the bundle ID are load-bearing for Supabase OAuth redirects and Apple/Google sign-in callbacks. Auth doesn't exist yet, EAS isn't linked (no `eas.json`, no `projectId`), and the scheme had zero references in code — so renaming today cost one edit, versus reconfiguring the Supabase redirect allowlist and the Google/Apple OAuth configs after auth ships. |
+| Rule 10 disclaimer wording | Stays as-is — keeps the word "PACE" (the family brand is the entity providing coaching guidance; Pace Blueprint is one surface of it). `docs/reference/coaching/**` was NOT edited. The issue's claim that the fixture disclaimer was "fossilizing a placeholder" was mistaken — it's correct as written. |
+
 ---
 
 ## Known debt and risks
@@ -170,9 +180,10 @@ Full rationale for each is in `docs/change_log.md`'s "2026-07-10 (Phase 0)" entr
   so `supabase start` and `functions serve` both fail today. The comment inside
   `supabase/functions/.env` claiming otherwise is currently false.
 - 🟠 **Apple Sign-In is not configured.** App Store rules require it once Google sign-in is offered.
-- 🟠 **Deep-link scheme `v22workoutplangenerator://` not confirmed on Supabase's redirect allowlist**
-  (Authentication → URL Configuration). Google OAuth will dead-end without it. UNVERIFIED — this
-  setting could not be read.
+- 🟠 **Deep-link scheme `paceblueprint://` not confirmed on Supabase's redirect allowlist**
+  (Authentication → URL Configuration). Renamed from `v22workoutplangenerator://` in the
+  2026-07-12 identifier rename — the allowlist (if it had an entry at all) needs updating to
+  match. Google OAuth will dead-end without it. UNVERIFIED — this setting could not be read.
 - 🟠 `expo-glass-effect ~0.1.10` is installed and contradicts the design's no-blur depth rule.
   **Remove it** (Ruling 18 — no fence-off alternative; this system has no sanctioned blur use).
 - 🟡 Stock Expo template not yet deleted — `src/app/explore.tsx` and the other create-expo-app
@@ -184,5 +195,11 @@ Full rationale for each is in `docs/change_log.md`'s "2026-07-10 (Phase 0)" entr
   Recorded so a future session does not "fix" it.
 - 🟡 **EAS project not initialized** (`eas init` not run). No TestFlight pipeline exists yet — needed
   at M6, not before.
+- 🟡 **App art is still stock Expo — unblocked by the name decision, not yet done.** The icon,
+  wordmark, splash artwork, and store listing copy are all still placeholders; needed at M6, not
+  before. `app.json` also still carries stock Expo blue — `#208AEF` (splash `backgroundColor`) and
+  `#E6F4FE` (Android `adaptiveIcon.backgroundColor`) — which clashes with the Instrument & Matter
+  token system (commit `145d7e0`). Pull both colors from `src/constants/theme.ts` when the art
+  lands.
 - 🟡 **Payments are dummy-only.** Real IAP (RevenueCat/StoreKit) is required before public App Store
   release; deferred to v2 per `planning/02-product-requirements.md`.

@@ -14,7 +14,7 @@ export default function HomeScreen() {
   return (
     <View style={[styles.container, { backgroundColor: theme.surface.base }]}>
       <SafeAreaView style={styles.safeArea}>
-        <Text style={[styles.title, { color: theme.text.primary }]}>Running Plan Builder</Text>
+        <Text style={[styles.title, { color: theme.text.primary }]}>Pace Blueprint</Text>
         <Text style={[styles.body, { color: theme.text.secondary }]}>
           Intake, generation, and plan view land in later build phases.
         </Text>

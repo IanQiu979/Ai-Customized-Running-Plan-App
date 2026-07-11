@@ -1,17 +1,18 @@
 {
   "expo": {
-    "name": "v2.2-workout-plan-generator",
-    "slug": "v2.2-workout-plan-generator",
+    "name": "Pace Blueprint",
+    "slug": "pace-blueprint",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "v22workoutplangenerator",
+    "scheme": "paceblueprint",
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon",
-      "bundleIdentifier": "com.ian.v22workoutplangenerator"
+      "bundleIdentifier": "com.ian.paceblueprint"
     },
     "android": {
+      "package": "com.ian.paceblueprint",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

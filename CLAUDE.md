@@ -2,8 +2,8 @@
 
 ## What this is
 
-V2.2 — Running Training Plan Builder (working title; final name is OPEN, see
-`docs/mvp-progress.md`). An Expo/React Native app, part of the PACE family: it turns a runner's
+V2.2 — **Pace Blueprint** (name decided 2026-07-12, see `docs/change_log.md`). An Expo/React
+Native app, part of the PACE family (sibling to V2.3 "Pace AnalysisAI"): it turns a runner's
 intake answers into a tiered, week-by-week training plan and does nothing else — no logging,
 no chat, no coach messaging. Full spec: [`planning/README.md`](planning/README.md) and the
 linked brainstorm / product / engineering docs it indexes.

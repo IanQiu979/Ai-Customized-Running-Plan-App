@@ -5,6 +5,39 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-07-12 — app name decided: Pace Blueprint (closes GitHub issue 35)
+
+- **Ian closed the last open naming decision.** The app is named **Pace Blueprint** — a
+  PACE-family sibling to V2.3 "Pace AnalysisAI" (`com.ian.paceanalysisai`). Chosen over "Pace
+  Blocks," "Pace Plans," and "Pace Builder." Rationale: a blueprint is a precise document you
+  build from and don't edit, matching this app's immutable plans (2026-07-10 decision); the name
+  carries no AI hype, matching the "Instrument & Matter" aesthetic ruling (data is the decoration,
+  glow is banned).
+- **Identifiers renamed in the same pass, not deferred to M6.** `app.json` `expo.name` →
+  `Pace Blueprint`, `expo.slug` → `pace-blueprint`, `expo.scheme` → `paceblueprint`,
+  `expo.ios.bundleIdentifier` → `com.ian.paceblueprint`, `expo.android.package` →
+  `com.ian.paceblueprint` (newly added); `package.json` name → `pace-blueprint`; Home title in
+  `src/app/index.tsx` → "Pace Blueprint." `package-lock.json` regenerated to match.
+  `typecheck && lint && test` all pass (22 tests).
+- **Why the identifiers landed now, not at M6 — revises the issue's own premise.** The issue said
+  the name was "needed by M6, not before." True of the *art* (icon, wordmark, splash, store
+  listing), not of the *identifiers*. `scheme` and the bundle ID are load-bearing for Supabase
+  OAuth redirects and Apple/Google sign-in callbacks. Auth doesn't exist yet, EAS isn't linked (no
+  `eas.json`, no `projectId`), and the scheme had zero references anywhere in code — so the rename
+  cost one edit today, versus reconfiguring the Supabase redirect allowlist and the Google/Apple
+  OAuth consoles if done after auth ships.
+- **Rule 10 disclaimer wording stays exactly as written.** Ian ruled the legally-required
+  disclaimer keeps the word "PACE" — the family brand is the entity providing coaching guidance,
+  and Pace Blueprint is one surface of it. `docs/reference/coaching/**` was **not** touched. The
+  issue's claim that the fixture disclaimer was "fossilizing a placeholder" was mistaken.
+- **Docs synced**: `docs/mvp-progress.md` (App name moved out of "Blocked" into a new
+  "Decided (2026-07-12)" section; a new 🟡 debt item records that the app art and `app.json`'s
+  stock Expo colors — `#208AEF` splash background, `#E6F4FE` Android adaptive-icon background —
+  are now unblocked but still stock, and clash with the Instrument & Matter tokens from commit
+  `145d7e0`), `CLAUDE.md` ("What this is" now names the app), `planning/02-product-requirements.md`
+  (status line no longer says "Working name TBD"), and `planning/README.md` ("Pick the app name"
+  removed from "Still open before coding").
+
 ## 2026-07-10 (Phase 0) — audit rulings applied, decision gate closed
 
 Doc-sync pass following `docs/mvp-build-prompt.md`'s Phase 0 (§0-B rulings, §0-C decision gate).
