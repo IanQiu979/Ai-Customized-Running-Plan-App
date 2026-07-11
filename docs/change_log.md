@@ -5,6 +5,48 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-07-11 (cycle 3) — AGENTS.md rewritten as a 3-tier Subagent Usage Policy
+
+Process/tooling decision, not a coaching or code change — logged because it changes how every
+future session routes work in this repo.
+
+- **`AGENTS.md`'s old size-based "Routing rules" (small/big) replaced with Ian's 3-tier severity
+  policy**: LOW (single file, no schema/API change, easily reversible — proceed directly or with
+  at most one subagent), MEDIUM (multi-file, new features, refactors touching shared code —
+  minimum planning → implementation → testing → `doc-writer` if user-facing), HIGH/CRITICAL
+  (schema/migrations, auth/security, production config, cross-service, or anything the user flags
+  risky — full chain ending in branch + PR via `github-ops`, never a direct commit). The old
+  "always big" list (auth, RLS, schema, payments, secrets/env, edge functions, plan generation,
+  adding a dependency) folds into the HIGH tier definition unchanged. Skipping a required step for
+  a tier is disallowed unless the user overrides it in the same message; the old "unsure → treat
+  as big" rule becomes "unsure → default to the higher tier," with `task-router` kept as an
+  optional escalation path.
+- **New § "Subagent selection — category lookup" table** maps severity → category (planning,
+  implementation by domain, testing, review/security, docs, QA/verification) → specific subagent,
+  so routing is a lookup rather than a guess. Grounded directly against the 70 real subagent
+  definitions at `~/.claude/agents/*.md` (name + description read for every file first) — no
+  subagent name in the new policy is invented; the pre-existing "Full roster (70)" section
+  cross-checks cleanly against it.
+- **"Task → chain" table kept, given a `Tier` column**, and every row's chain brought in line with
+  its tier's minimum requirements (e.g. the DB-schema, auth, edge-function, `generate-plan`,
+  env/secrets, Expo-SDK-bump, and TestFlight-ship rows all gained the `doc-writer` → `github-ops`
+  (branch + PR) tail HIGH now requires; a new "Add any new npm dependency" row was added since the
+  old table never gave dependency additions their own line despite always being in the "always
+  big" list).
+- **Carried forward unchanged, under a new § "Standing rules"**: parallel dispatch only when tasks
+  share no files; read-only agents report/never fix (with all seven existing pairings); all
+  git/GitHub actions via `github-ops`; `verifier` = `npm run typecheck && npm run lint && npm
+  test`, required before every commit at every tier.
+- **`CLAUDE.md` checked, left untouched.** Its Git etiquette section ("branch when a change is
+  multi-file, touches auth/payments/RLS/edge functions, or is worth a review pass") is coarser than
+  the new HIGH tier but not contradicted by it — HIGH is a subset of that existing rule, and this
+  predates the rewrite rather than being introduced by it. Flagged, not fixed, since fixing it
+  wasn't this pass's scope: CLAUDE.md's "multi-file" branching trigger and the new policy's
+  MEDIUM tier (which doesn't itself mandate branch + PR) can disagree on an ordinary multi-file
+  feature — worth Ian's eye in a future pass.
+- **`Full roster (70)`, `V2.2 guardrails agents must respect`, and the file's intro/`Expo HAS
+  CHANGED` sections are untouched** — none referenced the old small/big language.
+
 ## 2026-07-11 (cycle 2) — review-and-refine: doc-side corrections to the 3/10-review rebuild
 
 A code-review pass over cycle 1's rebuild (same day, entry below) found five internal
