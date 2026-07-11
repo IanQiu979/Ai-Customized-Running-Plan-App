@@ -180,6 +180,38 @@ into the repo at the end of the session since the coaching docs cite it as a sou
   passed, 6 total`). `docs/mvp-progress.md`'s occurrences of the same figure are corrected to 64
   in this pass.
 
+## 2026-07-10 (evening) — theme rewrite: "Instrument & Matter" tokens land in code
+
+**Missing from this log until now — added in this doc-audit pass.** Commit `145d7e0` shipped
+between Phase 0's decision gate (below) and Ian's 3/10 review above (the review's rendered plan
+and the golden fixture's components already consume these tokens), but was never given its own
+entry.
+
+- **`src/constants/theme.ts` and `src/hooks/use-theme.ts` rewritten** from the stock Expo template
+  palette to the full "Instrument & Matter" token system specified in
+  `docs/design/frontend-design-brief.md` Part 2: `Colors` (light/dark bases, effort scale,
+  `grid.*`), `Accent`, `FontFamily`/`FontSize`, `Spacing`, `Radius`, and `Motion`. Two contrast
+  values the brief left unresolved were computed to the documented 4.5:1 floor rather than
+  guessed: `text.secondary` dark `#7E8590` (4.83:1 on `#14171C`) and `progress.informative` light
+  `#676D7B` (4.83:1 on `#F7F7F4`) / dark `#788696` (4.83:1 on `#14171C`).
+- **Spacing ramp gains a step.** `48` inserted between the old `five` (32) and `six` (64); the old
+  `six` is renamed `seven`. The only two call sites using the old name were in the now-deleted
+  `explore.tsx`.
+- **Bundled the three font families** (`@expo-google-fonts/barlow-condensed`, `-inter`,
+  `-ibm-plex-mono`) via `npx expo install`; `src/app/_layout.tsx` now loads them with `useFonts`
+  and keeps the native splash screen up until they resolve.
+- **Removed `expo-glass-effect`** — banned by the no-blur depth rule (Phase 0 Ruling 18); this
+  system has no sanctioned blur use. Resolves the corresponding 🟠 risk in
+  `docs/mvp-progress.md`'s "Known debt," removed in this pass.
+- **Deleted the stock Expo template surface**: `src/app/explore.tsx`, `animated-icon*`,
+  `hint-row.tsx`, `web-badge.tsx`, `app-tabs*`, `themed-text.tsx`, `themed-view.tsx`,
+  `external-link.tsx`, `ui/collapsible.tsx`, and `src/global.css`.
+- **`src/app/index.tsx` → `src/app/(tabs)/index.tsx`, rewritten** as a token-only placeholder Home
+  screen proving the font/token pipeline boots. The stock template's placeholder title `"Aanya's
+  baby"` is gone.
+- Verification before commit: `typecheck`, `lint`, 22/22 tests, and `npx expo export --platform
+  web` all ran clean.
+
 ## 2026-07-10 (Phase 0) — audit rulings applied, decision gate closed
 
 Doc-sync pass following `docs/mvp-build-prompt.md`'s Phase 0 (§0-B rulings, §0-C decision gate).

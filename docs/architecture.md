@@ -11,17 +11,29 @@ kept in clearly separate sections below; nothing in a "planned" section is built
 ```
 src/
   app/
-    _layout.tsx        # root layout — still the create-expo-app template
-    index.tsx          # still the create-expo-app template
-    explore.tsx         # still the create-expo-app template
-  components/           # template UI (themed-text, themed-view, app-tabs, collapsible, ...)
-  constants/theme.ts     # stock Expo template palette — see "Proposed visual direction" below
-  hooks/                 # use-theme, use-color-scheme
+    _layout.tsx          # root layout — loads the three font families, ThemeProvider, Stack
+    (tabs)/
+      _layout.tsx          # tab bar — Home + Glossary today (My Plans/Settings-lite land with
+                            #           the backend that gives them something to show)
+      index.tsx             # Home placeholder shell + a temporary demo link to the fixture plan
+      glossary.tsx           # abbreviations glossary — sourced from notation.ts, nothing hardcoded
+    plan/[id].tsx            # plan view — renders the golden fixture; `[id]` isn't read yet
+  components/
+    plan/                   # WeekAccordion, WorkoutRow, EffortChip, ReadoutBracket,
+                             # PlanNameplate, DisclaimerFooter, FallbackNotice, format.ts
+  constants/theme.ts        # "Instrument & Matter" token system — current, see below
+  hooks/                    # use-theme, use-color-scheme
   lib/
-    supabase.ts          # env-guarded Supabase client
-    planTypes.ts          # canonical — shared Plan/Week/Workout/Tier vocabulary
-    loadRules.ts           # canonical — deterministic safety arithmetic, 19 unit tests
-    __tests__/supabase.test.ts, loadRules.test.ts
+    supabase.ts             # env-guarded Supabase client
+    planTypes.ts              # canonical — shared Plan/Week/Workout/Tier vocabulary
+    loadRules.ts               # canonical — deterministic safety arithmetic, 19 unit tests
+    notation.ts                 # canonical — run-type/structure-string notation, the code
+                                 #             counterpart of `notation.md`, 13 unit tests
+    fixtures/examplePlan.ts       # the 5K golden fixture as real `Plan` data — what `plan/[id].tsx`
+                                   # renders today; not yet `planTemplates.ts` output
+    __tests__/                    # supabase, loadRules, notation, examplePlan.fixture (64 passing);
+                                   # planTemplates.golden and paceDerivation intentionally fail —
+                                   # TDD specs for modules that don't exist yet
 ```
 
 `src/lib/supabase.ts` exports `supabase`, built with
@@ -39,25 +51,34 @@ src/
   / `stopAutoRefresh()` as the app foregrounds/backgrounds, so a backgrounded app stops issuing
   token refreshes.
 
-`src/lib/planTypes.ts` and `src/lib/loadRules.ts` **exist and are canonical** — pure TypeScript,
-no runtime deps, imported by both the Expo app and (once written) the Deno edge functions.
-`loadRules.ts` carries 19 passing unit tests. **When this document and the types disagree, the
-types win** — `planTypes.ts` is the source of truth, this file is a description of it.
+`src/lib/planTypes.ts`, `src/lib/loadRules.ts`, and `src/lib/notation.ts` **exist and are
+canonical** — pure TypeScript, no runtime deps, imported by both the Expo app and (once written)
+the Deno edge functions. `loadRules.ts` carries 19 passing unit tests, `notation.ts` 13.
+**When this document and the types disagree, the types win** — `planTypes.ts` is the source of
+truth, this file is a description of it.
 
-There is no `src/lib/planTemplates.ts` or `subscription.ts` yet; no auth screens; no intake
-screen; no plan view; no `supabase/functions/`; no `supabase/migrations/`. `tsconfig.json` maps
-`@/*` → `./src/*` and `@/assets/*` → `./assets/*`.
+`src/lib/fixtures/examplePlan.ts` is the 5K golden fixture rendered as real `Plan` data —
+`src/app/plan/[id].tsx` and `src/components/plan/` render it end to end on a real screen
+(ugly-beyond-tokens caveats aside), and `src/app/(tabs)/glossary.tsx` explains its abbreviations,
+reading its copy from `notation.ts`. None of this is wired to a real intake or a real generator
+yet: every plan id renders the same fixture.
 
-## Planned — route tree
+There is no `src/lib/planTemplates.ts`, `src/lib/paceDerivation.ts`, or `subscription.ts` yet; no
+auth screens; no intake screen; no `supabase/functions/`; no `supabase/migrations/`.
+`tsconfig.json` maps `@/*` → `./src/*` and `@/assets/*` → `./assets/*`.
+
+## Route tree — current + planned
 
 ```
 src/app/
   (auth)/sign-in, sign-up
-  (tabs)/index          # Home / Create plan
-  (tabs)/plans          # My Plans (history)
-  (tabs)/settings       # third tab — dummy paywall + settings-lite (decision 1, 2026-07-10)
-  intake/                # onboarding questionnaire (stack)
-  plan/[id]              # plan view
+  (tabs)/index          # Home / Create plan — exists today (placeholder shell + demo link)
+  (tabs)/glossary       # exists today — abbreviations glossary, not in the original blueprint's
+                         # tab list; added for Ian's 2026-07-11 notation ruling (see change_log.md)
+  (tabs)/plans          # My Plans (history) — planned, needs the backend first
+  (tabs)/settings       # third tab — dummy paywall + settings-lite (decision 1, 2026-07-10) — planned
+  intake/                # onboarding questionnaire (stack) — planned
+  plan/[id]              # plan view — exists today, renders the golden fixture only
 ```
 
 **Decision 1 (2026-07-10):** the paywall and a settings-lite screen (sign out, tier display,
@@ -77,6 +98,9 @@ src/lib/
   planTypes.ts             # exists today — shared Plan/Week/Workout/Tier types, one source of
                             #                truth for the app and the edge functions
   loadRules.ts              # exists today — deterministic safety arithmetic, 19 unit tests
+  notation.ts                # exists today — run-type/structure-string notation, the code
+                              #                counterpart of `notation.md`, 13 unit tests
+  fixtures/examplePlan.ts    # exists today — the 5K golden fixture as real `Plan` data
   planTemplates.ts        # planned — the free-tier engine AND the fallback engine for Pro/Elite.
                             #          A parametric generator, not a fixed matrix: any distance,
                             #          any legal week count (per the plan-shape rules in
@@ -85,6 +109,10 @@ src/lib/
                             #          gate applied on top of this engine, not a limit of the
                             #          engine itself — a Pro/Elite fallback still needs, say, a
                             #          26-week marathon template.
+  paceDerivation.ts        # planned — planTemplates.ts's pace-derivation counterpart (decision
+                            #          13, 2026-07-10: Riegel cross-distance equivalency + the
+                            #          source's relative pace rules). TDD test suite exists
+                            #          (`paceDerivation.test.ts`) and intentionally fails today.
   subscription.ts          # planned — tier read + dummy purchase
 ```
 
@@ -201,14 +229,17 @@ on this: a delete policy would let a user reset their own count. Tier and quota 
 ever written by edge functions running as the service role — the client can never write its own
 tier or quota.
 
-## Proposed visual direction (not yet in `theme.ts`)
+## Current — visual direction (`theme.ts`, commit `145d7e0`)
 
-`src/constants/theme.ts` today is still the stock Expo template palette — light `#000000` /
-`#ffffff` / `#F0F0F3` / `#E0E1E6` / `#60646C`, dark `#ffffff` / `#000000` / `#212225` /
-`#2E3135` / `#B0B4BA` — plus `Fonts` (system-ui/serif/rounded/mono), `Spacing` (half=2, one=4,
-two=8, three=16, four=24, five=32, six=64), `BottomTabInset`, and `MaxContentWidth = 800`. The
-PACE palette below is a proposal from the frontend-design skill; it does not exist in code and
-is recorded here so it isn't lost before implementation.
+`src/constants/theme.ts` is the "Instrument & Matter" token system below — the stock Expo
+template palette it replaced (light `#000000`/`#ffffff`/`#F0F0F3`/`#E0E1E6`/`#60646C`, dark
+`#ffffff`/`#000000`/`#212225`/`#2E3135`/`#B0B4BA`) is gone, along with the template screens that
+used it (`explore.tsx` and friends). `Spacing` now runs half=2, one=4, two=8, three=16, four=24,
+five=32, **six=48** (new step), seven=64 (the old `six`); `BottomTabInset` and
+`MaxContentWidth = 800` are unchanged from the scaffold. Full rationale for every value —
+contrast math, the two computed dark-mode fixes, the `grid.*` tokens — lives in the token file's
+own header comment and `docs/design/frontend-design-brief.md` Part 2; this section is a summary,
+not the source of truth.
 
 - **Bases**: `asphalt #14171C` (dark), `chalk #F7F7F4` (light), `graphite #5A6069` (secondary
   text) — deliberately not pure black/white, and deliberately not a cream-and-terracotta look.
@@ -223,7 +254,9 @@ is recorded here so it isn't lost before implementation.
   splits), a neutral body face, a mono face for split tables. Scale 32/24/20/17/15/13.
 - **Signature element — the "week ribbon"**: each training week renders as seven cells colored
   by effort, rest days as gaps. A 16-week plan reads as a barcode of periodization at a glance.
-  The plan view is meant to lead with the ribbon rather than a list.
+  The plan view is meant to lead with the ribbon rather than a list. **This per-week micro ribbon
+  is implemented** (`src/components/plan/WeekAccordion.tsx`); the macro periodization wave
+  (`mvp-blueprint.md` Part 3) is not built yet.
 - Accessibility rule, non-negotiable: an effort color is never the only signal — always pair it
   with a text label, so the plan stays legible to color-blind users.
 - Standing rule (already in the engineering spec): theme tokens only, no hardcoded colors or
