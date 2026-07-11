@@ -105,4 +105,15 @@ describe('speakStructure', () => {
       'warm-up 2 km, 8 times 600 m @ 4:22–4:30/km with 300 m jog, cool-down 2 km',
     );
   });
+
+  it('speaks the race-day structure string from the fixture (issue #34 ruling R6)', () => {
+    // src/lib/fixtures/examplePlan.ts, week 12 (index 11), Day 7 (index 6):
+    // 'WU 3 km · 5 km race · CD 2 km'.
+    const raceDay = examplePlan.weeks[11].days[6] as Workout;
+    expect(raceDay.label).toBe('Race Day');
+    expect(raceDay.structure).toBe('WU 3 km · 5 km race · CD 2 km');
+    expect(speakStructure(raceDay.structure ?? '')).toBe(
+      'warm-up 3 km, 5 km race, cool-down 2 km',
+    );
+  });
 });

@@ -6,6 +6,7 @@ import {
   estimateMaxHr,
   hrZoneBpm,
   isValidDeload,
+  LONG_RUN_SHARE_CAP,
   toExperienceLevel,
 } from '../loadRules';
 
@@ -86,13 +87,39 @@ describe('deload weeks', () => {
 describe('long run', () => {
   const intermediate = { level: 'intermediate' as const, previousLongestKm: 0 };
 
-  it('caps at the level share of weekly volume (doc example: 50 km week -> 15 km)', () => {
+  it('pins the cap ladder exactly (guards against a silent ladder mutation slipping past every other assertion)', () => {
+    expect(LONG_RUN_SHARE_CAP).toEqual({ beginner: 0.25, intermediate: 0.32, advanced: 0.35 });
+  });
+
+  it('caps at the level share of weekly volume (doc example: 50 km week -> 16 km, issue #34 ruling R1a\'s 0.32 intermediate cap)', () => {
     const { km, limitedBy } = clampLongRun({
       ...intermediate,
       proposedKm: 20,
       weeklyKm: 50,
     });
-    expect(km).toBeCloseTo(15);
+    expect(km).toBeCloseTo(16);
+    expect(limitedBy).toBe('weekly-share');
+  });
+
+  it('caps at the beginner share of weekly volume (0.25) when the beginner ceiling is the actually-binding one', () => {
+    const { km, limitedBy } = clampLongRun({
+      level: 'beginner',
+      proposedKm: 13,
+      weeklyKm: 40, // 0.25 * 40 = 10 km, tighter than the 13 km proposal and the 14 km absolute cap
+      previousLongestKm: 0,
+    });
+    expect(km).toBeCloseTo(10);
+    expect(limitedBy).toBe('weekly-share');
+  });
+
+  it('caps at the advanced share of weekly volume (0.35) when the advanced ceiling is the actually-binding one', () => {
+    const { km, limitedBy } = clampLongRun({
+      level: 'advanced',
+      proposedKm: 34,
+      weeklyKm: 90, // 0.35 * 90 = 31.5 km, tighter than the 34 km proposal and the 35 km absolute cap
+      previousLongestKm: 0,
+    });
+    expect(km).toBeCloseTo(31.5);
     expect(limitedBy).toBe('weekly-share');
   });
 
@@ -100,7 +127,7 @@ describe('long run', () => {
     const { km, limitedBy } = clampLongRun({
       level: 'intermediate',
       proposedKm: 14,
-      weeklyKm: 60, // share cap 18 km, so the spike cap must bind first
+      weeklyKm: 60, // share cap 19.2 km (0.32), so the spike cap must bind first
       previousLongestKm: 12,
     });
     expect(km).toBeCloseTo(13.2);
@@ -149,5 +176,117 @@ describe('long run', () => {
     });
     expect(km).toBe(10);
     expect(limitedBy).toBe('none');
+  });
+});
+
+describe('long run — deload weekly-share ceiling measured against the last loading week (issue #34 ruling R1c, closes the R1b HIGH-severity hole)', () => {
+  it('would be clamped by the weekly-share cap in a loading week', () => {
+    const { km, limitedBy } = clampLongRun({
+      level: 'intermediate',
+      proposedKm: 8,
+      weeklyKm: 23, // 8/23 = 34.8%, above the 32% intermediate cap
+      previousLongestKm: 0,
+    });
+    expect(km).toBeCloseTo(7.36);
+    expect(limitedBy).toBe('weekly-share');
+  });
+
+  it('isDeload alone no longer exempts anything — with no lastLoadingWeekKm, the ceiling falls ' +
+    'back to weeklyKm and still binds. This is the R1b hole: a model emitting isDeload: true ' +
+    'must not be able to disable its own safety ceiling', () => {
+    const { km, limitedBy } = clampLongRun({
+      level: 'intermediate',
+      proposedKm: 8,
+      weeklyKm: 23,
+      previousLongestKm: 0,
+      isDeload: true,
+    });
+    expect(km).toBeCloseTo(7.36);
+    expect(limitedBy).toBe('weekly-share');
+  });
+
+  it('falls back to weeklyKm when lastLoadingWeekKm fails isValidDeload against it — an ' +
+    'unsubstantiated isDeload claim gains the caller nothing', () => {
+    const { km, limitedBy } = clampLongRun({
+      level: 'intermediate',
+      proposedKm: 8,
+      weeklyKm: 23,
+      previousLongestKm: 0,
+      isDeload: true,
+      lastLoadingWeekKm: 23, // 0% reduction off itself — fails isValidDeload
+    });
+    expect(km).toBeCloseTo(7.36);
+    expect(limitedBy).toBe('weekly-share');
+  });
+
+  it("measures the ceiling against lastLoadingWeekKm for a genuine deload — the golden week-4 " +
+    'shape: 23 km deload week, 38 km last loading week, a 39.5% reduction inside the 35-45% ' +
+    "band, so the 8 km long run (21.1% of 38) sits well under the 32% cap (12.16 km)", () => {
+    const { km, limitedBy } = clampLongRun({
+      level: 'intermediate',
+      proposedKm: 8,
+      weeklyKm: 23,
+      previousLongestKm: 0,
+      isDeload: true,
+      lastLoadingWeekKm: 38,
+    });
+    expect(km).toBe(8);
+    expect(limitedBy).toBe('none');
+  });
+
+  it('still registers the weekly-share ceiling for a genuine deload — the denominator changes, ' +
+    'the ceiling itself never disappears', () => {
+    const { km, limitedBy } = clampLongRun({
+      level: 'intermediate',
+      proposedKm: 13,
+      weeklyKm: 23,
+      previousLongestKm: 0,
+      isDeload: true,
+      lastLoadingWeekKm: 38, // valid deload; share cap = 0.32 * 38 = 12.16, tighter than 13
+    });
+    expect(km).toBeCloseTo(12.16);
+    expect(limitedBy).toBe('weekly-share');
+  });
+
+  it('still enforces the spike cap on a deload long run, even when the share cap is measured ' +
+    'against the last loading week', () => {
+    const { km, limitedBy } = clampLongRun({
+      level: 'intermediate',
+      proposedKm: 8,
+      weeklyKm: 23,
+      previousLongestKm: 6, // spike cap: 6 * 1.10 = 6.6, tighter than the proposed 8
+      isDeload: true,
+      lastLoadingWeekKm: 38,
+    });
+    expect(km).toBeCloseTo(6.6);
+    expect(limitedBy).toBe('spike');
+  });
+
+  it('still enforces the absolute single-run cap on a deload long run', () => {
+    const { km, limitedBy } = clampLongRun({
+      level: 'beginner',
+      proposedKm: 20,
+      weeklyKm: 36,
+      previousLongestKm: 0,
+      isDeload: true,
+      lastLoadingWeekKm: 60, // valid deload: (60-36)/60 = 40%; share cap = 0.25 * 60 = 15,
+      // looser than the beginner absolute cap (14), so absolute binds instead
+    });
+    expect(km).toBe(14); // beginner absolute cap
+    expect(limitedBy).toBe('absolute');
+  });
+
+  it('still enforces the 3-hour time cap on a deload long run when a pace is known', () => {
+    const { km, limitedBy } = clampLongRun({
+      level: 'advanced',
+      proposedKm: 30,
+      weeklyKm: 50,
+      previousLongestKm: 0,
+      isDeload: true,
+      lastLoadingWeekKm: 90, // valid deload: (90-50)/90 = 44.4%; share cap = 0.35 * 90 = 31.5
+      easyPaceSecPerKm: 400, // 3 h at 6:40/km = 27 km
+    });
+    expect(km).toBeCloseTo(27);
+    expect(limitedBy).toBe('time');
   });
 });

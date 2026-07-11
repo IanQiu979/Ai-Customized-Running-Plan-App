@@ -214,6 +214,16 @@ speed (never a flying start), full recovery jog (90 sec minimum) between each.
 **When to use:** end of easy runs (2–3×/week); the day before a hard session (1×/week); during
 deload weeks, to maintain the feel for speed without adding fatigue. Never after hard sessions.
 
+**Application in the golden 5K plan (Ian's ruling, 2026-07-12 — issue #34, rendered-plan review
+round 2; resolves `example-plan-5k-pro.md` Open item 7).** Strides go on **both** easy days of
+every loading week that has two easy days — weeks 1, 2, 3, 5, 6, 7 of `example-plan-5k-pro.md` —
+moving the plan further toward this session's own 2–3×/week guidance above, up from the single
+easy day per week the prior revision prescribed. Weeks 9 and 10 have only one easy day each and
+keep their single strides day, unchanged. Week 11 is taper and Ian ruled the taper is left alone:
+Day 1 stays strides-free, only Day 5 keeps its goal-pace strides. Week 12 (race week) is unchanged.
+Deload weeks 4 and 8 stay strides-free. Strides add no headline distance, so this changes no volume
+arithmetic anywhere in the plan.
+
 ## Session sizing by race distance (Ian's ruling, 2026-07-11 — research-sourced, not a port)
 
 Not in the source, and it corrects a real defect the source's own port allowed through: nothing
@@ -257,17 +267,18 @@ not one of them — see the enforcement note below the table):
 | Tempo, full session incl. WU/CD | **≤ 10 km for a sub-5:00/km-tempo runner** — see the worked arithmetic in `example-plan-5k-pro.md` | Research pass §1; never the old defect's 14 km |
 | Interval, quality volume (reps only, excl. WU/CD/jog) | **4.0–5.0 km**, using the McMillan rep menu below | McMillan's four interchangeable "Best 5K Workout" designs, research pass §2 |
 | Interval, rep menu | 5×1000 m, 8×600 m, 6×800 m, or 10–12×400 m — **all converge on 4.0–5.0 km** regardless of rep length chosen | McMillan flagship workout, research pass §2 |
-| *Reference only, not enforced* — Daniels' weekly-volume brake | Daniels: a single session should ideally not exceed **~10% of that week's total volume** | Research pass §1–2; a different methodology's rule, not adopted as an app constraint — see the enforcement note below |
+| *Permanently advisory, never enforced* — Daniels' weekly-volume brake | Daniels: a single session should ideally not exceed **~10% of that week's total volume** | Research pass §1–2; a different methodology's rule, never adopted as an app constraint — see the enforcement note below |
 
-**Enforcement note (re-scoped 2026-07-11, cycle 2 — the original wording here was wrong): the
-5K physiological band above is this app's enforced constraint. The Daniels 10%-of-weekly-volume
-brake is advisory context from a different methodology, not an enforced rule, and "the smaller
-number wins" — this doc's earlier claim — does not hold up against the app's own golden plan:**
-`example-plan-5k-pro.md`'s quality weeks run 34–48 km, and 10% of that range is 3.4–4.8 km —
-under this table's own 4.0–5.0 km interval-quality-volume band for every one of those weeks
-(the plan's actual sessions land at 4.8–5.0 km, at the high end of the band, which only makes the
-mismatch starker). Enforcing "smaller number wins" as written would have silently undersized the
-app's own reference plan. The brake would only bind meaningfully for a genuinely low-volume
-runner, where 10% of the week could fall under the band's floor on its own — whether it should
-override the band minimum in that case is a real, still-open coaching question, not a resolved
-rule. Flagged for Ian; see `example-plan-5k-pro.md`'s Open section.
+**Enforcement note (settled by Ian's ruling, 2026-07-12 — issue #34, rendered-plan review round 2;
+resolves Open item 6). The 5K physiological band above is this app's only enforced constraint. The
+Daniels 10%-of-weekly-volume brake is permanently advisory context from a different methodology —
+it is never enforced, and it never overrides the 5K quality-volume band's floor, not even for a
+genuinely low-volume runner, which was the open question.** Ian's reasoning: the physiological
+demand of a 5K does not shrink because the runner trains less. A 5K runner gets 4.0–5.0 km of
+interval quality volume regardless of weekly volume — the app accepts, knowingly, that this is a
+large share of a low-volume runner's week. This is no longer an open question: `example-plan-5k-pro.md`'s
+quality weeks run 34–48 km, and 10% of that range is 3.4–4.8 km — under this table's own 4.0–5.0 km
+interval-quality-volume band for every one of those weeks (the plan's actual sessions land at
+4.8–5.0 km, at the high end of the band, which only makes the gap starker). Enforcing "smaller
+number wins," as an earlier draft of this note claimed, would have silently undersized the app's
+own reference plan; the brake was never adopted as an app constraint and now never will be.

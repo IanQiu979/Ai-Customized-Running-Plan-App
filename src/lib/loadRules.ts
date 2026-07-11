@@ -55,11 +55,16 @@ export const MAX_HARD_SESSIONS_PER_WEEK: Record<ExperienceLevel, number> = {
   advanced: 3,
 };
 
-/** Upper bound of the source's per-level long-run band, since this is a cap. */
+/**
+ * Upper bound of the source's per-level long-run band, since this is a cap. Ian's issue #34
+ * ruling (R1a): intermediate rises to 0.32 and advanced to 0.35 (both were 0.30) — chosen
+ * explicitly to keep the ladder monotonic, since an intermediate cap of 0.32 would otherwise
+ * exceed the advanced level's old 0.30 cap. Beginner is unchanged.
+ */
 export const LONG_RUN_SHARE_CAP: Record<ExperienceLevel, number> = {
   beginner: 0.25,
-  intermediate: 0.30,
-  advanced: 0.30,
+  intermediate: 0.32,
+  advanced: 0.35,
 };
 
 // ---------------------------------------------------------------------------
@@ -180,6 +185,29 @@ export interface LongRunClamp {
  *
  * `easyPaceSecPerKm` is optional because the time cap cannot be enforced without a
  * pace, and a pace requires a recent performance the runner may not have given.
+ *
+ * The weekly-share ceiling is NEVER omitted — there is no code path that drops it from the
+ * ceiling list. A prior version (R1b) exempted deload weeks from it entirely; a code review
+ * flagged that as a HIGH-severity hole, since `Week.isDeload` is a field the AI model emits on
+ * paid tiers, handing the model a switch that disabled its own safety ceiling (CLAUDE.md: "A
+ * model must not be able to prescribe an unsafe week"), and it was also the plan's only
+ * volume-relative ceiling — the spike cap needs `previousLongestKm > 0` and the time cap needs a
+ * pace the intake makes optional, so stripping the share cap left some deload weeks bounded only
+ * by the non-volume-relative absolute cap.
+ *
+ * Ian's follow-up ruling (R1c, 2026-07-12, issue #34) closes the hole by changing the
+ * denominator instead of dropping the ceiling: a deload cuts the week's total while largely
+ * preserving the long run, so measuring the long run's share against that shrunken total
+ * measures the wrong thing — so it's measured against the right thing (the last loading week's
+ * volume), not against nothing. The denominator is `lastLoadingWeekKm` only if all three hold:
+ * `isDeload === true`, `lastLoadingWeekKm > 0`, and `isValidDeload(lastLoadingWeekKm, weeklyKm)`
+ * (a week that claims to be a deload but isn't 35-45% down off the last loading week is not
+ * one). Otherwise the denominator is the ordinary `weeklyKm` — the conservative fallback, so an
+ * unsubstantiated `isDeload: true` claim gains the caller nothing. `limitedBy` still reports
+ * `'weekly-share'` in both cases; there is no separate ceiling name for the deload case.
+ *
+ * Trust boundary: `lastLoadingWeekKm` must be derived by the caller from the plan's own
+ * preceding weeks (deterministic engine state) — never taken from model output.
  */
 export function clampLongRun(args: {
   proposedKm: number;
@@ -187,11 +215,29 @@ export function clampLongRun(args: {
   level: ExperienceLevel;
   previousLongestKm: number;
   easyPaceSecPerKm?: number;
+  isDeload?: boolean;
+  lastLoadingWeekKm?: number;
 }): LongRunClamp {
-  const { proposedKm, weeklyKm, level, previousLongestKm, easyPaceSecPerKm } = args;
+  const {
+    proposedKm,
+    weeklyKm,
+    level,
+    previousLongestKm,
+    easyPaceSecPerKm,
+    isDeload,
+    lastLoadingWeekKm,
+  } = args;
+
+  const shareDenominatorKm =
+    isDeload === true &&
+    lastLoadingWeekKm !== undefined &&
+    lastLoadingWeekKm > 0 &&
+    isValidDeload(lastLoadingWeekKm, weeklyKm)
+      ? lastLoadingWeekKm
+      : weeklyKm;
 
   const ceilings: readonly (readonly [number, LongRunLimit])[] = [
-    [weeklyKm * LONG_RUN_SHARE_CAP[level], 'weekly-share'],
+    [shareDenominatorKm * LONG_RUN_SHARE_CAP[level], 'weekly-share'],
     [MAX_SINGLE_RUN_KM[level], 'absolute'],
     ...(previousLongestKm > 0
       ? ([[previousLongestKm * LONG_RUN_SPIKE_MULTIPLE, 'spike']] as const)

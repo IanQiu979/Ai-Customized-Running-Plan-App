@@ -74,6 +74,31 @@
  *     during a deload for "speedster" types, but this revision keeps deloads pure as the
  *     simpler default). Strides add no headline distance, so no volume-table arithmetic changes
  *     from this dimension.
+ *
+ * RULED 2026-07-12, GitHub issue #34 (Ian's rulings on this cycle's open coaching questions).
+ * Two confirmed rulings change this file; the rest of the ruling set is either confirmation of
+ * numbers already here or has no code impact on this file:
+ *
+ *   - R6: `raceDayWorkout()`'s structure string becomes `'WU 3 km · 5 km race · CD 2 km'`,
+ *     replacing the cycle-1 `'5 km warm-up/cool-down + 5 km race'`. Same 10 km headline total,
+ *     the same `·` separator the other eleven structure strings already use, and no new
+ *     `STRUCTURE_SHORTHAND` token — `WU` and `CD` already cover it.
+ *   - R7: the cycle-2 strides addition above is now a confirmed ruling, and it goes further —
+ *     strides go on BOTH easy days of every loading week that has two easy days, not just the
+ *     second. Day 1's `easyRun()` call in weeks 1, 2, 3, 5, 6, 7 now also carries
+ *     `'4 × 30 s Strides'` (previously only Day 3 did), making its label `ER + Strides` there
+ *     too. Weeks 9 and 10 are unchanged — each has only one easy day (Day 1), already covered.
+ *     Week 11 (taper) is unchanged by explicit ruling: Day 1 stays strides-free and only Day 5
+ *     keeps `'4 × 30 s Strides @ GP'` — Ian ruled the taper is left alone. Week 12 (race week)
+ *     and the deload weeks 4 and 8 are unchanged. Strides still add no headline distance, so no
+ *     volume/weeklyLoad arithmetic changes anywhere.
+ *   - R8 confirms week 9's 300 m recovery jog as-is (11 km INT session, `volumeKm` 45, see the
+ *     cycle-2 paragraph above); R2 confirms this file's peak volume, 48 km (week 7), as-is.
+ *     Neither changes anything here.
+ *
+ * R1 (the long-run share-cap ladder and its new deload exemption) lives in `src/lib/loadRules.ts`,
+ * not this file — this fixture's long-run numbers are hand-transcribed from the coaching doc, not
+ * run through `clampLongRun`, so R1 requires no data change here. R3–R5 have no code impact.
  */
 
 import type { Day, Pace, Phase, Plan, RestDay, Week, Week7, Workout } from '@/lib/planTypes';
@@ -189,7 +214,7 @@ function raceDayWorkout(): Workout {
     label: 'Race Day',
     distanceKm: 10,
     effortDescription: RACE_DESCRIPTION,
-    structure: '5 km warm-up/cool-down + 5 km race',
+    structure: 'WU 3 km · 5 km race · CD 2 km',
   };
 }
 
@@ -226,7 +251,7 @@ export const examplePlan: Plan = {
       false,
       34,
       [
-        easyRun(8),
+        easyRun(8, '4 × 30 s Strides'),
         REST,
         easyRun(8, '4 × 30 s Strides'),
         REST,
@@ -246,7 +271,7 @@ export const examplePlan: Plan = {
       false,
       35,
       [
-        easyRun(8),
+        easyRun(8, '4 × 30 s Strides'),
         REST,
         easyRun(8, '4 × 30 s Strides'),
         REST,
@@ -263,7 +288,7 @@ export const examplePlan: Plan = {
       false,
       38,
       [
-        easyRun(9),
+        easyRun(9, '4 × 30 s Strides'),
         REST,
         easyRun(9, '4 × 30 s Strides'),
         REST,
@@ -292,7 +317,7 @@ export const examplePlan: Plan = {
       false,
       41,
       [
-        easyRun(10),
+        easyRun(10, '4 × 30 s Strides'),
         REST,
         easyRun(10, '4 × 30 s Strides'),
         REST,
@@ -311,7 +336,7 @@ export const examplePlan: Plan = {
       false,
       45,
       [
-        easyRun(11),
+        easyRun(11, '4 × 30 s Strides'),
         REST,
         easyRun(11, '4 × 30 s Strides'),
         REST,
@@ -329,7 +354,7 @@ export const examplePlan: Plan = {
       false,
       48,
       [
-        easyRun(12),
+        easyRun(12, '4 × 30 s Strides'),
         REST,
         easyRun(12, '4 × 30 s Strides'),
         REST,

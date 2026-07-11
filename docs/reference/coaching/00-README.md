@@ -166,11 +166,17 @@ Each is evidence-driven and cited inline at its source location. Summary:
   `planning/03-engineering-requirements.md`'s `intake_responses.injuries` column specified free
   text vs. a structured symptom picker at the time this gap was logged. Answered: closed-set
   `InjuryFlag` flags plus optional free-text notes; the flags alone drive the safety triage.
-- **Whether "Monitoring" tier flags should surface at intake at all.** Still open. Rule 5's
-  triggers in that tier ("new muscular soreness in unfamiliar area," "joint stiffness > 10 min")
-  are worded as things noticed *during or after a run* — not something a runner would confidently
-  self-report once at signup, before taking a single run on the plan. The source doesn't say
-  whether a one-time intake should act on this tier or only on the two more severe ones.
+- **Whether "Monitoring" tier flags should surface at intake at all. RESOLVED 2026-07-12 (Ian's
+  ruling, issue #34, rendered-plan review round 2).** Left here for history: Rule 5's triggers in
+  that tier ("new muscular soreness in unfamiliar area," "joint stiffness > 10 min," "unusual leg
+  fatigue 3+ days") are worded as things noticed *during or after a run* — not something a runner
+  would confidently self-report once at signup, before taking a single run on the plan. The source
+  doesn't say whether a one-time intake should act on this tier or only on the two more severe
+  ones. Answered: no. A monitoring flag V2.2 can never monitor is a flag that does nothing, and it
+  invites a self-report the runner has no basis to make before running a single session. Only the
+  Immediate Stop and Reduce Volume tiers are surfaced or actioned at intake; the Monitoring tier
+  stays documented in `load-rules.md` § Rule 5 as source content, not deleted, but is not used by
+  V2.2.
 - **Where/how often the Rule 10 disclaimers render in the UI. RESOLVED 2026-07-10 (decision gate
   #11) — see "Ian's decisions, applied exactly" item 7 above.** Left here for history: Rule 10
   mandates *that* the disclaimers appear on every injury-related and health-guidance output; it
