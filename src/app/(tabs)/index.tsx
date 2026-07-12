@@ -27,6 +27,7 @@ export default function HomeScreen() {
         <Text style={[styles.mono, { color: theme.text.secondary }]}>PHASE 1 — TOKEN SHELL</Text>
         <Link href={{ pathname: '/plan/[id]', params: { id: EXAMPLE_PLAN_ID } }} asChild>
           <Pressable
+            accessibilityRole="link"
             style={({ pressed }) => [
               styles.demoLink,
               { borderColor: theme.text.primary },

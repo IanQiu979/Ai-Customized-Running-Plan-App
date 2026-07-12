@@ -35,8 +35,9 @@ export default function PlanScreen() {
           headerShown: true,
           headerTitle: '',
           headerShadowVisible: false,
+          // Deliberate deviation from the nav theme's `card` (surface.raised): this screen wants
+          // a header flush with the page canvas, not a wrong theme needing compensation.
           headerStyle: { backgroundColor: theme.surface.base },
-          headerTintColor: theme.text.primary,
         }}
       />
       <Animated.ScrollView
@@ -47,7 +48,13 @@ export default function PlanScreen() {
         ]}
       >
         <PlanNameplate plan={plan} />
-        {plan.isFallback ? <FallbackNotice /> : null}
+        {/*
+          `variant` is hardcoded because `Plan` carries no signal for it: `isFallback` is a bare
+          boolean, and only the server knows whether this fallback landed inside the 3-per-period
+          exemption or past it. `exempt` is correct for the fixture and for the common case;
+          rendering the true variant needs `generate-plan` to return it (issue #45).
+        */}
+        {plan.isFallback ? <FallbackNotice variant="exempt" /> : null}
         <View style={styles.ribbon}>
           {plan.weeks.map((week) => (
             <WeekAccordion key={week.weekNumber} week={week} />

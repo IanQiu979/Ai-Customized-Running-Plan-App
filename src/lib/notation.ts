@@ -14,6 +14,8 @@
  * see that file's header and `example-plan-5k-pro.md`'s Open item 4.
  */
 
+import type { Pace } from './planTypes';
+
 /** A glossary row: the expanded name and its one-line plain-English meaning. */
 export interface GlossaryEntry {
   fullName: string;
@@ -58,6 +60,14 @@ export const RUN_TYPE_ABBREVIATIONS: Record<string, GlossaryEntry> = {
 };
 
 /**
+ * The canonical race-day `Workout.label` — the single source of truth for that string. Compare
+ * against this constant, never an inlined `'Race Day'`: an inlined copy does not fail to compile
+ * if the label is ever renamed, it just silently stops matching, and `describeDays` would fall
+ * back to announcing the effort ("Day 7 interval") with the race invisible again.
+ */
+export const RACE_DAY_LABEL = 'Race Day';
+
+/**
  * Run-type words that are always spelled out in full — never abbreviated. Strides' description
  * is notation.md's "Meaning" column for its own table row; Race Day's is notation.md's own prose
  * ("It is the event itself, not a run type — abbreviating it would imply it's just another
@@ -73,7 +83,7 @@ export const UNABBREVIATED_RUN_TYPES: Record<string, GlossaryEntry> = {
     description:
       'Short, controlled accelerations to near-top speed with full recovery — neuromuscular sharpening, not a workout in itself.',
   },
-  'Race Day': {
+  [RACE_DAY_LABEL]: {
     fullName: 'Race Day',
     description:
       "The event itself, not just another training session — abbreviating it would imply otherwise.",
@@ -134,9 +144,12 @@ function expandSingleLabel(label: string): string {
  * `"WU 2 km · 8 × 600 m @ GP w/ 300 m jog · CD 2 km"` reads as "warm-up 2 km, 8 times 600 m @
  * goal pace with 300 m jog, cool-down 2 km" instead of the runner having to parse letter-code
  * shorthand by ear. `·` becomes the pause between segments (a comma); `@` is left as-is —
- * screen readers already read the at-sign as "at" on its own. Total: any input, recognized
- * shorthand or not, produces a string; text this function doesn't recognize passes through
- * unchanged.
+ * screen readers already read the at-sign as "at" on its own. A pace band written into the
+ * structure string itself ("4:22–4:30/km") is spoken in the same words `speakPace` gives a
+ * `Workout.pace` value — every interval and race-pace session carries one, and the row's label
+ * is flattened, so leaving it raw would speak the same band correctly once and as en-dash/slash
+ * notation once, in a single utterance. Total: any input, recognized shorthand or not, produces
+ * a string; text this function doesn't recognize passes through unchanged.
  */
 export function speakStructure(structure: string): string {
   return structure
@@ -153,5 +166,33 @@ function expandStructureTokens(segment: string): string {
     .replace(/\bCD\b/g, 'cool-down')
     .replace(/\bGP\b/g, 'goal pace')
     .replace(/w\//g, 'with')
-    .replace(/×/g, 'times');
+    .replace(/×/g, 'times')
+    .replace(/(\d{1,2}:\d{2})\s*[–-]\s*(\d{1,2}:\d{2})\/km/g, '$1 to $2 per kilometer')
+    .replace(/(\d{1,2}:\d{2})\/km/g, '$1 per kilometer');
+}
+
+/**
+ * m:ss formatter shared by the visible readout (`formatPace`, `src/components/plan/format.ts`)
+ * and the spoken one (`speakPace` below), so the two can't drift. Rounds to the nearest second
+ * FIRST, then decomposes: flooring the minutes while independently rounding the seconds carries
+ * a fraction into a nonexistent ":60" — 299.63 sec/km floors to 4 min but rounds to 60 sec,
+ * giving "4:60" instead of "5:00". Components import this from `src/lib/`, never the reverse
+ * (this module stays pure — see the file header).
+ */
+export function formatSecPerKm(totalSec: number): string {
+  const rounded = Math.round(totalSec);
+  return `${Math.floor(rounded / 60)}:${(rounded % 60).toString().padStart(2, '0')}`;
+}
+
+/**
+ * Speaks a `Workout.pace` band for screen readers — GitHub issue #31 finding 1: the visible
+ * "4:41–4:54/km" (en dash, "/km") reads unreliably through VoiceOver, so this says the words
+ * instead. A fixed target (`lowSecPerKm === highSecPerKm`) speaks as "4:30 per kilometer"; a
+ * genuine range speaks as "4:41 to 4:54 per kilometer" — always the word "to", never an en dash,
+ * always "per kilometer", never "/km". Total: any pace band produces an output, nothing throws.
+ */
+export function speakPace(pace: Pace): string {
+  const low = formatSecPerKm(pace.lowSecPerKm);
+  if (pace.lowSecPerKm === pace.highSecPerKm) return `${low} per kilometer`;
+  return `${low} to ${formatSecPerKm(pace.highSecPerKm)} per kilometer`;
 }

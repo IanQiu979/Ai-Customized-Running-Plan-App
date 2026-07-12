@@ -11,7 +11,8 @@ kept in clearly separate sections below; nothing in a "planned" section is built
 ```
 src/
   app/
-    _layout.tsx          # root layout — loads the three font families, ThemeProvider, Stack
+    _layout.tsx          # root layout — loads the three font families; ThemeProvider is fed
+                          #                constants/navigation-theme.ts's tokened Theme, Stack
     (tabs)/
       _layout.tsx          # tab bar — Home + Glossary today (My Plans/Settings-lite land with
                             #           the backend that gives them something to show)
@@ -21,7 +22,12 @@ src/
   components/
     plan/                   # WeekAccordion, WorkoutRow, EffortChip, ReadoutBracket,
                              # PlanNameplate, DisclaimerFooter, FallbackNotice, format.ts
-  constants/theme.ts        # "Instrument & Matter" token system — current, see below
+  constants/
+    theme.ts                # "Instrument & Matter" token system — current, see below
+    navigation-theme.ts      # bridges theme.ts's tokens into @react-navigation/native's `Theme`
+                             #  shape, so ThemeProvider never leaks the library's own stock
+                             #  DefaultTheme/DarkTheme colors (fixes issue #27)
+    __tests__/                # navigation-theme (10 tests) — first suite under constants/
   hooks/                    # use-theme, use-color-scheme
   lib/
     supabase.ts             # env-guarded Supabase client
@@ -270,6 +276,14 @@ summary, not the source of truth.
   The plan view is meant to lead with the ribbon rather than a list. **This per-week micro ribbon
   is implemented** (`src/components/plan/WeekAccordion.tsx`); the macro periodization wave
   (`mvp-blueprint.md` Part 3) is not built yet.
+- **React Navigation's own chrome is tokened too, not just the screens built on top of it.**
+  `src/constants/navigation-theme.ts` bridges the same `Colors` tokens into the `Theme` shape
+  `@react-navigation/native` expects (`background`→`surface.base`, `card`→`surface.raised`,
+  `text`→`text.primary`, `border`→`hairline`, `primary`→`text.primary`, `notification`→
+  `status.error`), so `_layout.tsx`'s `ThemeProvider` never falls back to the library's own stock
+  `DefaultTheme`/`DarkTheme` palette for transition underlays, header defaults, or the back-swipe
+  reveal (closes issue #27, a 2026-07-11 frontend-audit finding). `primary` deliberately maps to
+  `text.primary`, not `Accent.hivis` — hivis stays reserved for the single per-screen forward-action.
 - Accessibility rule, non-negotiable: an effort color is never the only signal — always pair it
   with a text label, so the plan stays legible to color-blind users.
 - Standing rule (already in the engineering spec): theme tokens only, no hardcoded colors or

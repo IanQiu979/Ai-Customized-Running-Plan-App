@@ -4,14 +4,25 @@ import { FontFamily, FontSize, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 /**
+ * Whether this fallback consumed a quota slot. The first 3 fallbacks in a period are
+ * quota-exempt; a 4th+ keeps its already-reserved slot and counts like any other plan
+ * (`docs/reference/plan-generation.md`, addendum R-B). The two cases make opposite factual
+ * claims to the user, so the caller must say which one it is — there is deliberately no
+ * default.
+ */
+export type FallbackVariant = 'exempt' | 'counted';
+
+interface FallbackNoticeProps {
+  variant: FallbackVariant;
+}
+
+/**
  * The calm, neutral card explaining an `isFallback` plan — raised surface, hairline border,
  * never `status.error`, never hivis. `frontend-design-brief.md` Part 5, "The isFallback
- * treatment". This is the within-exemption copy variant; the 4th+/quota-consuming variant
- * needs live server quota state that doesn't exist yet in Phase 1, and there is no working
- * "Regenerate" action to attach a button to until `generate-plan` exists (Phase 4) — so this
- * renders the explanation only, no CTA.
+ * treatment". There is no working "Regenerate" action to attach a button to until
+ * `generate-plan` exists (Phase 4), so this renders the explanation only, no CTA.
  */
-export function FallbackNotice() {
+export function FallbackNotice({ variant }: FallbackNoticeProps) {
   const theme = useTheme();
   return (
     <View style={[styles.card, { backgroundColor: theme.surface.raised, borderColor: theme.hairline }]}>
@@ -19,7 +30,10 @@ export function FallbackNotice() {
       <Text style={[styles.body, { color: theme.text.secondary }]}>
         We tried twice to build your personalized plan and couldn&apos;t validate the result, so
         this is a template plan for your distance and schedule instead — no pace targets, HR
-        zones, or coach notes. This attempt didn&apos;t use one of your plans.
+        zones, or coach notes.{' '}
+        {variant === 'exempt'
+          ? "This attempt didn't use one of your plans."
+          : 'This attempt used one of your plans, the same as any other.'}
       </Text>
     </View>
   );
