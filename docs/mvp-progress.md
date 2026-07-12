@@ -6,10 +6,12 @@
 > Milestone definitions live in [`planning/02-product-requirements.md`](../planning/02-product-requirements.md).
 > Decision history lives in [`change_log.md`](change_log.md).
 
-**Last updated:** 2026-07-12 (integration pass: Ian's round-2 coaching sign-off closes issues #34,
-#19 and #29; goal-realism ruled, closing #33; app named **Pace Blueprint** (#35); units ruled
-km-only (#36); doc stale-reference sweep (#37). `main` returned to green by quarantining the two
-orphaned TDD suites (#41). Issue #22 remains open.)
+**Last updated:** 2026-07-12 (`formatSecPerKm` pace-rounding carry bug fixed, closing #28, with the
+first test suite under `src/components/` — 93 tests passing, up from 82. Also this date:
+integration pass: Ian's round-2 coaching sign-off closes issues #34, #19 and #29; goal-realism
+ruled, closing #33; app named **Pace Blueprint** (#35); units ruled km-only (#36); doc
+stale-reference sweep (#37). `main` returned to green by quarantining the two orphaned TDD suites
+(#41). Issue #22 remains open.)
 
 ---
 
@@ -28,9 +30,11 @@ orphaned TDD suites (#41). Issue #22 remains open.)
 Phase 0's paper-reconciliation pass is now done too. **The plan-generation engine itself does not
 exist yet.** `src/lib/supabase.ts`, `planTypes.ts`, `loadRules.ts`, and (as of the 2026-07-11
 review-and-refine cycle) `notation.ts` are the app's `lib/` layer — shared vocabulary, safety
-arithmetic, and run-type/structure-string notation, all pure and tested (82 passing tests, up from
-64, after Ian's 2026-07-12 round-2 rulings on issue #34 added the long-run deload-week measurement
-fix (ruling R1c) and the race-day/strides test coverage). A golden fixture (`src/lib/fixtures/examplePlan.ts`), a rendered
+arithmetic, and run-type/structure-string notation, all pure and tested (82 lib-layer tests, up
+from 64, after Ian's 2026-07-12 round-2 rulings on issue #34 added the long-run deload-week
+measurement fix (ruling R1c) and the race-day/strides test coverage; the project total is **93
+across 5 suites** as of the same day's `formatSecPerKm` carry-boundary fix, issue #28, which added
+the first test suite under `src/components/`). A golden fixture (`src/lib/fixtures/examplePlan.ts`), a rendered
 plan screen (`src/app/plan/[id].tsx` and `src/components/plan/`), and an abbreviations glossary tab
 (`src/app/(tabs)/glossary.tsx`) exist and render that fixture — but nothing generates a plan from an
 intake yet. `src/lib/planTemplates.ts` and `src/lib/paceDerivation.ts`, the actual generation logic,
@@ -97,6 +101,16 @@ the literal previous week) and issue #33 (goal-realism handling).
       modules. Recorded plainly here and in "Known debt and risks" below: the repo cannot
       currently satisfy `CLAUDE.md`'s own "clean typecheck && lint && test before every commit"
       rule.
+- [x] **Issue #28 fixed (2026-07-12): `formatSecPerKm`'s minute/second carry.**
+      `src/components/plan/format.ts` rounded minutes and seconds independently, so a fractional
+      pace could round seconds up to 60 without carrying into the next minute (359.6 s/km →
+      `"5:60/km"` instead of `"6:00/km"`) — latent today since every pace in `examplePlan.ts` is an
+      integer, but armed to fire the moment `paceDerivation.ts` or the AI path emits an unrounded
+      pace band. Fixed by rounding the total seconds once, then splitting into minutes and seconds.
+      New `src/components/plan/__tests__/format.test.ts` (11 tests) is the first test suite under
+      `src/components/` — covers `formatPace` (both carry-boundary cases), `formatPlanDate`, and
+      `describeDays`. **Test count: 93 passing, up from 82, across 5 suites** (still 2 suites
+      excluded — see "Known debt and risks").
 
 ### Repo hygiene
 - [x] `AGENTS.md` rewritten as the agent-routing doc, committed (`60382cd`)
@@ -409,9 +423,10 @@ against that contract, so the suite stays quarantined until it lands.
   import `planTemplates.ts` / `paceDerivation.ts`, which don't exist. PR #2 merged them ahead of
   their modules, so every branch cut from `main` inherited a red build (issue #41) and the repo
   could not satisfy `CLAUDE.md`'s own pre-commit gate. **Nothing in the specs is stale** — they
-  assert every current coaching ruling. `typecheck`, `lint`, and `test` (82/82, 4 suites) are now
-  all clean. **Removing the three exclusions and getting both suites green is part of step 3's
-  done-when** (issue #3) — do not land the engine without doing it.
+  assert every current coaching ruling. `typecheck`, `lint`, and `test` (93/93, 5 suites, as of the
+  2026-07-12 issue #28 fix) are now all clean. **Removing the three exclusions and getting both
+  suites green is part of step 3's done-when** (issue #3) — do not land the engine without doing
+  it.
 - 🟠 **Deep-link scheme `paceblueprint://` not confirmed on Supabase's redirect allowlist**
   (Authentication → URL Configuration). Renamed from `v22workoutplangenerator://` in the
   2026-07-12 identifier rename — the allowlist (if it had an entry at all) needs updating to
