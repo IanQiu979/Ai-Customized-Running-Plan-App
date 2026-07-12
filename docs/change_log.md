@@ -5,6 +5,39 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-07-12 — `FallbackNotice`'s quota-copy variant made explicit, not hardcoded (closes issue #30)
+
+Bug fix, plus a same-session engineering ruling from Ian on how to close it. Frontend audit
+finding: `FallbackNotice` always rendered the quota-exempt copy ("This attempt didn't use one of
+your plans"), which is true only for the first 3 fallbacks in a period (R-B addendum,
+`docs/reference/plan-generation.md:112-118`) — a 4th+ fallback keeps its already-reserved quota
+slot and counts like any other plan, and the old copy would tell that user something false.
+
+- **`src/components/plan/FallbackNotice.tsx` gains a required prop, `variant: 'exempt' |
+  'counted'` (exported type `FallbackVariant`).** Both copy strings now live in the component,
+  taken verbatim from the already-ruled copy block in `docs/design/frontend-design-brief.md`
+  (lines 684-689) rather than newly written: `exempt` → "This attempt didn't use one of your
+  plans."; `counted` → "This attempt used one of your plans, the same as any other." The shared
+  lead sentence ("We tried twice to build your personalized plan…") and the card's visual
+  treatment (raised surface, hairline border, never `status.error`/hivis, no CTA —
+  `frontend-design-brief.md`'s "The `isFallback` treatment") are unchanged.
+- **The prop is required, with no default — Ian's ruling, overriding the issue's own suggested
+  fix.** The issue text proposed defaulting to `exempt`; Ian rejected that: a default is exactly
+  what would let a bare `<FallbackNotice />` keep compiling while still making a false quota claim
+  to a runner past the cap. Required means the Phase 4 integrator physically cannot wire the
+  screen up without choosing which claim is true.
+- **`src/app/plan/[id].tsx`, the one existing caller, now passes `variant="exempt"` explicitly**,
+  with an inline comment explaining why it's hardcoded (see the next bullet).
+- **Known limitation, filed as its own issue rather than half-fixed here: GitHub issue #45.** The
+  client cannot currently derive the correct variant — `Plan.isFallback`
+  (`src/lib/planTypes.ts:218`) is a bare boolean, and only the server knows which side of the
+  3-per-period cap a given fallback landed on. `exempt` is correct for the Phase 1 fixture and the
+  common case, wrong for anyone past the cap. Issue #45 asks `generate-plan` to return whether the
+  fallback consumed quota (e.g. `quotaConsumed: boolean` alongside `isFallback`) so the plan
+  screen can derive `variant` from it, rather than the client guessing. Deliberately not built now
+  — it's an API/edge-function contract change (HIGH tier per `AGENTS.md`), and `generate-plan`
+  itself doesn't exist yet (Phase 4).
+
 ## 2026-07-12 — integration pass: five PRs merged to `main`, `main` returned to green
 
 Repo-state change, not a coaching or product decision. Merged every open PR into `main` in one

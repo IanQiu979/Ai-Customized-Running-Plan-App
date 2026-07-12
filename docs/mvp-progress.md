@@ -9,7 +9,8 @@
 **Last updated:** 2026-07-12 (integration pass: Ian's round-2 coaching sign-off closes issues #34,
 #19 and #29; goal-realism ruled, closing #33; app named **Pace Blueprint** (#35); units ruled
 km-only (#36); doc stale-reference sweep (#37). `main` returned to green by quarantining the two
-orphaned TDD suites (#41). Issue #22 remains open.)
+orphaned TDD suites (#41). `FallbackNotice` gains a required quota-copy `variant` prop, closing
+issue #30 (issue #45 filed for the still-open follow-up). Issue #22 remains open.)
 
 ---
 
@@ -79,6 +80,13 @@ the literal previous week) and issue #33 (goal-realism handling).
       (`WeekAccordion`, `WorkoutRow`, `EffortChip`, `ReadoutBracket`, `PlanNameplate`,
       `DisclaimerFooter`, `FallbackNotice`, `format.ts`) — render the golden fixture on a real
       screen, ugly-beyond-tokens caveats aside.
+- [x] **`FallbackNotice` gains a required `variant: 'exempt' | 'counted'` prop, closing issue
+      #30.** It previously hardcoded the quota-exempt copy; both strings now live in the
+      component, and the one caller (`src/app/plan/[id].tsx`) passes `variant="exempt"`
+      explicitly, with a comment explaining why. The prop is required, with no default, by Ian's
+      ruling — see `docs/change_log.md`'s 2026-07-12 entry. **Known gap, filed as issue #45:** the
+      client can't yet derive the true variant from `Plan.isFallback` alone; blocked on
+      `generate-plan` returning whether a fallback consumed quota (Phase 4).
 - [x] 82 passing tests (`jest-expo`), up from 64 after Ian's 2026-07-12 issue #34 rulings:
       `supabase.test.ts`, `loadRules.test.ts` (extended for ruling R1c — a deload week's long run
       is measured against the last loading week's volume, not exempted from the cap), plus
@@ -368,6 +376,7 @@ Full rationale for each row in `docs/change_log.md`'s 2026-07-12 entries.
 | Why the name landed now, not M6 (revises issue #35's own premise) | The issue said the name was "needed by M6, not before" — true of the *art*, not the *identifiers*. `scheme` and the bundle ID are load-bearing for Supabase OAuth redirects and Apple/Google sign-in callbacks. Auth doesn't exist yet, EAS isn't linked (no `eas.json`, no `projectId`), and the scheme had zero references in code — so renaming today cost one edit, versus reconfiguring the Supabase redirect allowlist and the Google/Apple OAuth configs after auth ships. **Consequence:** the deep-link scheme is now `paceblueprint://`, not `v22workoutplangenerator://` — issue #5's redirect-allowlist item must use the new scheme. |
 | Rule 10 disclaimer wording | Stays as-is — keeps the word "PACE" (the family brand is the entity providing coaching guidance; Pace Blueprint is one surface of it). `docs/reference/coaching/**` was NOT edited. Issue #32's claim that the fixture disclaimer was "fossilizing a placeholder" was mistaken — it's correct as written. |
 | Distance/pace units — km vs miles (issue #36) | **Kilometres, everywhere, permanently. No unit toggle; units are never user-selectable.** Intake asks weekly volume in km; plans render distances in km and paces in sec/km. Imperial is **out of scope**, not deferred — not an open product question blocking intake. The code (`src/lib/planTypes.ts`, `src/lib/loadRules.ts`) was already km-canonical; only `docs/design/frontend-design-brief.md`'s stale `/mi` copy needed fixing. |
+| `FallbackNotice` quota-copy variant, default or required? (issue #30) | **Required, no default** — Ian rejected the issue's own suggested fix (default to `exempt`), since a default is exactly what would let a bare `<FallbackNotice />` keep compiling while still stating a false quota claim to a runner past the 3-per-period cap. `variant: 'exempt' \| 'counted'` (`FallbackVariant`) now carries both copy strings; the one caller, `src/app/plan/[id].tsx`, passes `variant="exempt"` explicitly. The client can't yet derive the true variant server-side — filed as issue #45, blocked on `generate-plan` (Phase 4). |
 
 ### Goal-realism handling (issue #33)
 
@@ -437,6 +446,14 @@ against that contract, so the suite stays quarantined until it lands.
   only, which contradicts `mvp-build-prompt.md:332` and leaves the goal-realism warning's second
   home unspecified. The warning must appear at *both* goal-entry points, so the modal needs a
   goal-time control and its advisory copy. Resolve when M4's configure modal is built (issue #13).
+- 🟡 **Plan screen can't yet derive the correct `FallbackNotice` variant — GitHub issue #45.**
+  `Plan.isFallback` (`src/lib/planTypes.ts:218`) is a bare boolean; only the server knows whether
+  a given fallback landed inside the 3-per-period quota-exempt cap or past it (R-B addendum,
+  `docs/reference/plan-generation.md:112-118`). `src/app/plan/[id].tsx` hardcodes
+  `variant="exempt"` — correct for the Phase 1 fixture and the common case, wrong for a runner
+  past the cap. Needs `generate-plan` to return whether the fallback consumed quota (e.g.
+  `quotaConsumed: boolean` alongside `isFallback`) so the plan screen can derive `variant` from it;
+  blocked on `generate-plan` existing (Phase 4, issue #9's API contract).
 - 🟡 `220 − age` is retained for max HR by Ian's informed decision, against Tanaka 2001 (±10–12 bpm).
   Recorded so a future session does not "fix" it.
 - 🟡 **EAS project not initialized** (`eas init` not run). No TestFlight pipeline exists yet — needed
