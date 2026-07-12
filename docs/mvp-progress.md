@@ -9,8 +9,14 @@
 **Last updated:** 2026-07-12 (integration pass: Ian's round-2 coaching sign-off closes issues #34,
 #19 and #29; goal-realism ruled, closing #33; app named **Pace Blueprint** (#35); units ruled
 km-only (#36); doc stale-reference sweep (#37). `main` returned to green by quarantining the two
-orphaned TDD suites (#41). React Navigation's chrome now derives from `theme.ts`'s tokens instead
-of leaking the library's own stock palette, closing #27. Issue #22 remains open.)
+orphaned TDD suites (#41). `formatSecPerKm` pace-rounding carry bug fixed, closing #28, adding the
+first test suite under `src/components/`. Screen-reader gaps fixed, closing #31 — pace bands spoken
+as words, race day announced, plus three code-review-caught defects, including collapsing the m:ss
+formatter #28 fixed into one shared `formatSecPerKm()` so the two readouts can't drift apart.
+`FallbackNotice` gains a required quota-copy `variant` prop, closing issue #30 (issue #45 filed for
+the still-open follow-up). React Navigation's chrome now derives from `theme.ts`'s tokens instead
+of leaking the library's own stock palette, closing #27. 117 tests passing, up from 82. Issue #22 remains
+open.)
 
 ---
 
@@ -29,9 +35,13 @@ of leaking the library's own stock palette, closing #27. Issue #22 remains open.
 Phase 0's paper-reconciliation pass is now done too. **The plan-generation engine itself does not
 exist yet.** `src/lib/supabase.ts`, `planTypes.ts`, `loadRules.ts`, and (as of the 2026-07-11
 review-and-refine cycle) `notation.ts` are the app's `lib/` layer — shared vocabulary, safety
-arithmetic, and run-type/structure-string notation, all pure and tested (82 passing tests, up from
-64, after Ian's 2026-07-12 round-2 rulings on issue #34 added the long-run deload-week measurement
-fix (ruling R1c) and the race-day/strides test coverage). A golden fixture (`src/lib/fixtures/examplePlan.ts`), a rendered
+arithmetic, and run-type/structure-string notation, all pure and tested (82 lib-layer tests, up
+from 64, after Ian's 2026-07-12 round-2 rulings on issue #34 added the long-run deload-week
+measurement fix (ruling R1c) and the race-day/strides test coverage; the project total is **117
+across 6 suites** as of the same day's `formatSecPerKm` carry-boundary fix (issue #28, which added
+the first test suite under `src/components/`), issue #31's screen-reader accessibility fixes, and
+issue #27's navigation-theme suite under `src/constants/`, which together took the project total
+82 → 93 → 107 → 117). A golden fixture (`src/lib/fixtures/examplePlan.ts`), a rendered
 plan screen (`src/app/plan/[id].tsx` and `src/components/plan/`), and an abbreviations glossary tab
 (`src/app/(tabs)/glossary.tsx`) exist and render that fixture — but nothing generates a plan from an
 intake yet. `src/lib/planTemplates.ts` and `src/lib/paceDerivation.ts`, the actual generation logic,
@@ -97,6 +107,13 @@ the literal previous week) and issue #33 (goal-realism handling).
       its deliberate `headerStyle` deviation from the nav theme's `card`, commented in place. New
       suite `src/constants/__tests__/navigation-theme.test.ts` (10 tests, first under
       `src/constants/`) guards against regressing to the stock literals.
+- [x] **`FallbackNotice` gains a required `variant: 'exempt' | 'counted'` prop, closing issue
+      #30.** It previously hardcoded the quota-exempt copy; both strings now live in the
+      component, and the one caller (`src/app/plan/[id].tsx`) passes `variant="exempt"`
+      explicitly, with a comment explaining why. The prop is required, with no default, by Ian's
+      ruling — see `docs/change_log.md`'s 2026-07-12 entry. **Known gap, filed as issue #45:** the
+      client can't yet derive the true variant from `Plan.isFallback` alone; blocked on
+      `generate-plan` returning whether a fallback consumed quota (Phase 4).
 - [x] 82 passing tests (`jest-expo`), up from 64 after Ian's 2026-07-12 issue #34 rulings:
       `supabase.test.ts`, `loadRules.test.ts` (extended for ruling R1c — a deload week's long run
       is measured against the last loading week's volume, not exempted from the cap), plus
@@ -114,7 +131,41 @@ the literal previous week) and issue #33 (goal-realism handling).
       run typecheck && npm run lint && npm test` will not run clean until step 3 below lands both
       modules. Recorded plainly here and in "Known debt and risks" below: the repo cannot
       currently satisfy `CLAUDE.md`'s own "clean typecheck && lint && test before every commit"
-      rule.
+      rule. **Superseded the same day by the 2026-07-12 quarantine below (issue #41)** — both
+      files are now excluded from `jest`/`tsc`/`eslint` outright, so `typecheck`, `lint`, and
+      `test` are all clean again; see "Known debt and risks."
+- [x] **Issue #28 fixed (2026-07-12): `formatSecPerKm`'s minute/second carry.**
+      `src/components/plan/format.ts` rounded minutes and seconds independently, so a fractional
+      pace could round seconds up to 60 without carrying into the next minute (359.6 s/km →
+      `"5:60/km"` instead of `"6:00/km"`) — latent today since every pace in `examplePlan.ts` is an
+      integer, but armed to fire the moment `paceDerivation.ts` or the AI path emits an unrounded
+      pace band. Fixed by rounding the total seconds once, then splitting into minutes and seconds.
+      New `src/components/plan/__tests__/format.test.ts` (11 tests) was the first test suite under
+      `src/components/` — covering `formatPace` (both carry-boundary cases), `formatPlanDate`, and
+      `describeDays`. **93 passing, up from 82, across 5 suites** at this point (still 2 suites
+      excluded — see "Known debt and risks").
+- [x] **GitHub issue #31 fixed (2026-07-12): three screen-reader gaps from the 2026-07-11 a11y
+      audits, plus three further defects a code review caught while fixing them.** Pace bands now
+      reach VoiceOver as words (new `speakPace()` in `src/lib/notation.ts` — "4:41 to 4:54 per
+      kilometer" instead of the visible en-dash/"/km" notation); race day is no longer announced as
+      a generic interval (`describeDays` in `src/components/plan/format.ts` special-cases the new
+      exported `RACE_DAY_LABEL` constant); `accessibilityRole="link"` was added to Home's demo
+      link, though the fix turned out to be redundant — expo-router's `Link asChild` already
+      supplies `role: 'link'`, so the audit's finding 3 was mistaken. Code review then caught two
+      live defects the fix hadn't yet covered: `speakStructure` was leaving a pace band embedded
+      inside the structure string raw, so a single flattened VoiceOver label spoke the same band
+      correctly once and as broken notation once — fixed via the same transform in
+      `expandStructureTokens`; and issue #28/PR #46's already-fixed `:60` rollover bug in the m:ss
+      formatter would otherwise have been re-introduced by `speakPace`'s own copy of the same
+      arithmetic — instead of duplicating it, `formatSecPerKm()` was collapsed into one shared
+      function in `src/lib/notation.ts`, consumed by both `formatPace` (visible) and `speakPace`
+      (spoken), so the two readouts cannot drift apart again. `composeWorkoutLabel` moved out of
+      `WorkoutRow.tsx` into the React-free `format.ts` so the composed label is unit-tested at its
+      real call site (`src/components/plan/__tests__/format.test.ts`, extended with these cases on
+      top of #28's) instead of only indirectly. **107 passing tests, up from 93 (still 5 suites)**;
+      `typecheck`, `lint`, and `test` all clean. No coaching rule touched. Full account:
+      `docs/change_log.md`'s 2026-07-12 entries. **A suspected pre-existing bug was found while
+      tracing the Link and filed separately, not fixed here** — see "Known debt and risks" below.
 
 ### Repo hygiene
 - [x] `AGENTS.md` rewritten as the agent-routing doc, committed (`60382cd`)
@@ -386,6 +437,7 @@ Full rationale for each row in `docs/change_log.md`'s 2026-07-12 entries.
 | Why the name landed now, not M6 (revises issue #35's own premise) | The issue said the name was "needed by M6, not before" — true of the *art*, not the *identifiers*. `scheme` and the bundle ID are load-bearing for Supabase OAuth redirects and Apple/Google sign-in callbacks. Auth doesn't exist yet, EAS isn't linked (no `eas.json`, no `projectId`), and the scheme had zero references in code — so renaming today cost one edit, versus reconfiguring the Supabase redirect allowlist and the Google/Apple OAuth configs after auth ships. **Consequence:** the deep-link scheme is now `paceblueprint://`, not `v22workoutplangenerator://` — issue #5's redirect-allowlist item must use the new scheme. |
 | Rule 10 disclaimer wording | Stays as-is — keeps the word "PACE" (the family brand is the entity providing coaching guidance; Pace Blueprint is one surface of it). `docs/reference/coaching/**` was NOT edited. Issue #32's claim that the fixture disclaimer was "fossilizing a placeholder" was mistaken — it's correct as written. |
 | Distance/pace units — km vs miles (issue #36) | **Kilometres, everywhere, permanently. No unit toggle; units are never user-selectable.** Intake asks weekly volume in km; plans render distances in km and paces in sec/km. Imperial is **out of scope**, not deferred — not an open product question blocking intake. The code (`src/lib/planTypes.ts`, `src/lib/loadRules.ts`) was already km-canonical; only `docs/design/frontend-design-brief.md`'s stale `/mi` copy needed fixing. |
+| `FallbackNotice` quota-copy variant, default or required? (issue #30) | **Required, no default** — Ian rejected the issue's own suggested fix (default to `exempt`), since a default is exactly what would let a bare `<FallbackNotice />` keep compiling while still stating a false quota claim to a runner past the 3-per-period cap. `variant: 'exempt' \| 'counted'` (`FallbackVariant`) now carries both copy strings; the one caller, `src/app/plan/[id].tsx`, passes `variant="exempt"` explicitly. The client can't yet derive the true variant server-side — filed as issue #45, blocked on `generate-plan` (Phase 4). |
 
 ### Goal-realism handling (issue #33)
 
@@ -427,11 +479,18 @@ against that contract, so the suite stays quarantined until it lands.
   import `planTemplates.ts` / `paceDerivation.ts`, which don't exist. PR #2 merged them ahead of
   their modules, so every branch cut from `main` inherited a red build (issue #41) and the repo
   could not satisfy `CLAUDE.md`'s own pre-commit gate. **Nothing in the specs is stale** — they
-  assert every current coaching ruling. `typecheck`, `lint`, and `test` (92/92, 5 suites — 82/4 as
-  of the 2026-07-12 integration pass, plus `src/constants/__tests__/navigation-theme.test.ts`'s 10
-  tests from the issue #27 fix) are now all clean. **Removing the three exclusions and getting
-  both suites green is part of step 3's done-when** (issue #3) — do not land the engine without
-  doing it.
+  assert every current coaching ruling. `typecheck`, `lint`, and `test` (117/117, 6 suites —
+  up from 82/82, 4 suites, after the 2026-07-12 issue #28 fix (`formatSecPerKm` carry-boundary,
+  93/93, first suite under `src/components/`), issue #31's accessibility fixes on top of it, and
+  issue #27's `src/constants/__tests__/navigation-theme.test.ts`) are now all clean. **Removing the
+  three exclusions and getting both suites green is part of step 3's done-when** (issue #3) — do
+  not land the engine without doing it.
+- 🟡 **Suspected pre-existing bug: Home's demo link may render with no border, no 48pt tap target,
+  and no pressed state (found while tracing the Link for issue #31, filed as issue #51).**
+  expo-router's `Link asChild` (`src/app/(tabs)/index.tsx`) uses a Radix Slot whose `mergeProps`
+  spreads `style` as an *object*, but the wrapped `Pressable`'s `style` prop is a *function*
+  (`({ pressed }) => [...]`) — spreading a function yields `{}`, silently dropping every rule the
+  function would have returned. Derived from reading the source, not device-verified.
 - 🟠 **Deep-link scheme `paceblueprint://` not confirmed on Supabase's redirect allowlist**
   (Authentication → URL Configuration). Renamed from `v22workoutplangenerator://` in the
   2026-07-12 identifier rename — the allowlist (if it had an entry at all) needs updating to
@@ -457,6 +516,14 @@ against that contract, so the suite stays quarantined until it lands.
   only, which contradicts `mvp-build-prompt.md:332` and leaves the goal-realism warning's second
   home unspecified. The warning must appear at *both* goal-entry points, so the modal needs a
   goal-time control and its advisory copy. Resolve when M4's configure modal is built (issue #13).
+- 🟡 **Plan screen can't yet derive the correct `FallbackNotice` variant — GitHub issue #45.**
+  `Plan.isFallback` (`src/lib/planTypes.ts:218`) is a bare boolean; only the server knows whether
+  a given fallback landed inside the 3-per-period quota-exempt cap or past it (R-B addendum,
+  `docs/reference/plan-generation.md:112-118`). `src/app/plan/[id].tsx` hardcodes
+  `variant="exempt"` — correct for the Phase 1 fixture and the common case, wrong for a runner
+  past the cap. Needs `generate-plan` to return whether the fallback consumed quota (e.g.
+  `quotaConsumed: boolean` alongside `isFallback`) so the plan screen can derive `variant` from it;
+  blocked on `generate-plan` existing (Phase 4, issue #9's API contract).
 - 🟡 `220 − age` is retained for max HR by Ian's informed decision, against Tanaka 2001 (±10–12 bpm).
   Recorded so a future session does not "fix" it.
 - 🟡 **EAS project not initialized** (`eas init` not run). No TestFlight pipeline exists yet — needed
