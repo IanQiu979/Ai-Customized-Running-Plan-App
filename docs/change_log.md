@@ -5,6 +5,29 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-07-12 — `formatSecPerKm` carry-boundary fix, first test suite under `src/components/` (closes #28)
+
+Bug fix from the 2026-07-11 codebase audit's bug list.
+
+- **The bug.** `src/components/plan/format.ts`'s `formatSecPerKm()` computed minutes and seconds
+  independently — `Math.floor(totalSec / 60)` for minutes, `Math.round(totalSec % 60)` for
+  seconds — so a fractional pace could round seconds up to 60 without carrying into the next
+  minute: 359.6 s/km rendered as `"5:60/km"` instead of `"6:00/km"`.
+- **The fix.** Round the total seconds once, then derive minutes and seconds from that
+  already-rounded value, so the carry is structural rather than two independent roundings that
+  can disagree.
+- **Latent today, not yet triggered.** Every pace in the current fixture (`examplePlan.ts`) is an
+  integer, so the bug never fired in a rendered plan. It was armed to fire the moment
+  `paceDerivation.ts` or the AI generation path emits an unrounded pace band — i.e. it would have
+  surfaced the instant the plan engine (step 3, `mvp-progress.md`) landed.
+- **New `src/components/plan/__tests__/format.test.ts` (11 tests)** — the first test suite under
+  `src/components/`. Covers `formatPace`, including both carry-boundary regression cases (359.4
+  s/km → `"5:59/km"`, 359.6 s/km → `"6:00/km"`, and a range that crosses the boundary on only one
+  end), plus `formatPlanDate` and `describeDays`.
+- Verified clean: `typecheck`, `lint`, and **93 tests passing across 5 suites** (up from 82 across
+  4).
+- Closes GitHub issue #28.
+
 ## 2026-07-12 — integration pass: five PRs merged to `main`, `main` returned to green
 
 Repo-state change, not a coaching or product decision. Merged every open PR into `main` in one

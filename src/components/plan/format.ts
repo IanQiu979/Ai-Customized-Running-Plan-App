@@ -13,8 +13,9 @@ export function formatPace(pace: Pace): string {
 }
 
 function formatSecPerKm(totalSec: number): string {
-  const minutes = Math.floor(totalSec / 60);
-  const seconds = Math.round(totalSec % 60);
+  const roundedTotalSec = Math.round(totalSec);
+  const minutes = Math.floor(roundedTotalSec / 60);
+  const seconds = roundedTotalSec % 60;
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
