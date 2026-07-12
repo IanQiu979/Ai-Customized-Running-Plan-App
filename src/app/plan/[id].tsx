@@ -35,8 +35,9 @@ export default function PlanScreen() {
           headerShown: true,
           headerTitle: '',
           headerShadowVisible: false,
+          // Deliberate deviation from the nav theme's `card` (surface.raised): this screen wants
+          // a header flush with the page canvas, not a wrong theme needing compensation.
           headerStyle: { backgroundColor: theme.surface.base },
-          headerTintColor: theme.text.primary,
         }}
       />
       <Animated.ScrollView

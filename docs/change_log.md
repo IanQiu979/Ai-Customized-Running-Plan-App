@@ -5,6 +5,41 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-07-12 — navigation chrome now uses design tokens, not React Navigation's stock palette (closes #27)
+
+Frontend-audit finding from 2026-07-11. `src/app/_layout.tsx` handed React Navigation's stock
+`DefaultTheme`/`DarkTheme` straight to `ThemeProvider`. Those ship colors nobody in this codebase
+chose (`rgb(242, 242, 242)` light background, `rgb(1, 1, 1)` dark, plus stock `card`/`text`/
+`border`/`primary`) that the library uses to paint chrome the app never styles directly —
+transition underlays, header defaults, and the reveal behind an in-progress back-swipe. Against
+the chalk `#F7F7F4` canvas, a light-mode push could flash a visibly wrong gray: an untokened seam
+in an otherwise token-only system.
+
+- **New `src/constants/navigation-theme.ts`** — exports `NavigationLightTheme`,
+  `NavigationDarkTheme`, and a `NavigationThemes: Record<ColorScheme, Theme>` lookup. Each spreads
+  the stock theme (preserving React Navigation v7's `dark` flag and `fonts`) and overrides only
+  `colors`, with every slot derived from `Colors` in `theme.ts` — never a re-typed hex: `background`
+  → `surface.base`, `card` → `surface.raised`, `text` → `text.primary`, `border` → `hairline`,
+  `primary` → `text.primary`, `notification` → `status.error`. `primary` is deliberately
+  `text.primary`, **not** `Accent.hivis` — the design brief reserves hivis for the single
+  forward-action per screen and explicitly bars it from nav/tab active states.
+- **`src/app/_layout.tsx`** now feeds `NavigationThemes[theme.scheme]` to `ThemeProvider`, replacing
+  the old branch between the stock `DarkTheme`/`DefaultTheme`.
+- **`src/app/plan/[id].tsx`** drops the now-redundant `headerTintColor` (the nav theme's `text` slot
+  already supplies it) and keeps its `headerStyle: { backgroundColor: theme.surface.base }`
+  override — a deliberate seamless-header deviation from the nav theme's `card`
+  (`surface.raised`), now with a comment explaining why so it doesn't get "cleaned up" as a
+  leftover.
+- **New test suite, `src/constants/__tests__/navigation-theme.test.ts`** (10 tests) — the first
+  suite under `src/constants/`. Asserts every overridden slot derives from its `Colors` token, and
+  separately, that the stock React Navigation literals (`rgb(242, 242, 242)`, `rgb(1, 1, 1)`) are
+  absent — a regression guard against the module ever being "simplified" back to
+  `export const NavigationLightTheme = DefaultTheme`.
+- **Verified:** `npm run typecheck && npm run lint && npm test` all clean — 5 suites, 92 tests (up
+  from 4 suites / 82 tests). The two quarantined plan-engine TDD suites
+  (`planTemplates.golden.test.ts`, `paceDerivation.test.ts`) remain excluded per `jest.config.js` /
+  issue #41 — unrelated to this change.
+- Closes GitHub issue #27.
 ## 2026-07-12 — `FallbackNotice`'s quota-copy variant made explicit, not hardcoded (closes issue #30)
 
 Bug fix, plus a same-session engineering ruling from Ian on how to close it. Frontend audit

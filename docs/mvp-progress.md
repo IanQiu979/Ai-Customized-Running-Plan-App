@@ -14,7 +14,9 @@ first test suite under `src/components/`. Screen-reader gaps fixed, closing #31 
 as words, race day announced, plus three code-review-caught defects, including collapsing the m:ss
 formatter #28 fixed into one shared `formatSecPerKm()` so the two readouts can't drift apart.
 `FallbackNotice` gains a required quota-copy `variant` prop, closing issue #30 (issue #45 filed for
-the still-open follow-up). 107 tests passing, up from 82. Issue #22 remains open.)
+the still-open follow-up). React Navigation's chrome now derives from `theme.ts`'s tokens instead
+of leaking the library's own stock palette, closing #27. 117 tests passing, up from 82. Issue #22 remains
+open.)
 
 ---
 
@@ -35,10 +37,11 @@ exist yet.** `src/lib/supabase.ts`, `planTypes.ts`, `loadRules.ts`, and (as of t
 review-and-refine cycle) `notation.ts` are the app's `lib/` layer — shared vocabulary, safety
 arithmetic, and run-type/structure-string notation, all pure and tested (82 lib-layer tests, up
 from 64, after Ian's 2026-07-12 round-2 rulings on issue #34 added the long-run deload-week
-measurement fix (ruling R1c) and the race-day/strides test coverage; the project total is **107
-across 5 suites** as of the same day's `formatSecPerKm` carry-boundary fix (issue #28, which added
-the first test suite under `src/components/`) and issue #31's screen-reader accessibility fixes,
-which together took the project total 82 → 93 → 107). A golden fixture (`src/lib/fixtures/examplePlan.ts`), a rendered
+measurement fix (ruling R1c) and the race-day/strides test coverage; the project total is **117
+across 6 suites** as of the same day's `formatSecPerKm` carry-boundary fix (issue #28, which added
+the first test suite under `src/components/`), issue #31's screen-reader accessibility fixes, and
+issue #27's navigation-theme suite under `src/constants/`, which together took the project total
+82 → 93 → 107 → 117). A golden fixture (`src/lib/fixtures/examplePlan.ts`), a rendered
 plan screen (`src/app/plan/[id].tsx` and `src/components/plan/`), and an abbreviations glossary tab
 (`src/app/(tabs)/glossary.tsx`) exist and render that fixture — but nothing generates a plan from an
 intake yet. `src/lib/planTemplates.ts` and `src/lib/paceDerivation.ts`, the actual generation logic,
@@ -87,6 +90,23 @@ the literal previous week) and issue #33 (goal-realism handling).
       (`WeekAccordion`, `WorkoutRow`, `EffortChip`, `ReadoutBracket`, `PlanNameplate`,
       `DisclaimerFooter`, `FallbackNotice`, `format.ts`) — render the golden fixture on a real
       screen, ugly-beyond-tokens caveats aside.
+- [x] **`src/constants/navigation-theme.ts` — fixes GitHub issue #27 (2026-07-11 frontend-audit
+      finding), done 2026-07-12.** `src/app/_layout.tsx` was feeding React Navigation's stock
+      `DefaultTheme`/`DarkTheme` to `ThemeProvider`, which meant the library painted its own
+      untokened colors (`rgb(242, 242, 242)` light background, `rgb(1, 1, 1)` dark, plus stock
+      `card`/`text`/`border`/`primary`) onto chrome the app never styles directly — transition
+      underlays, header defaults, the reveal behind an in-progress back-swipe — a visible seam
+      against the chalk `#F7F7F4` canvas. `navigation-theme.ts` exports `NavigationLightTheme`,
+      `NavigationDarkTheme`, and a `NavigationThemes: Record<ColorScheme, Theme>` lookup, each
+      spreading the stock theme (keeping `dark`/`fonts`) but overriding every `colors` slot from
+      `Colors` in `theme.ts`: `background`→`surface.base`, `card`→`surface.raised`,
+      `text`→`text.primary`, `border`→`hairline`, `primary`→`text.primary` (deliberately not
+      `Accent.hivis`, which the brief reserves for the single per-screen forward-action),
+      `notification`→`status.error`. `_layout.tsx` now feeds `NavigationThemes[theme.scheme]` to
+      `ThemeProvider`; `src/app/plan/[id].tsx` drops the now-redundant `headerTintColor` and keeps
+      its deliberate `headerStyle` deviation from the nav theme's `card`, commented in place. New
+      suite `src/constants/__tests__/navigation-theme.test.ts` (10 tests, first under
+      `src/constants/`) guards against regressing to the stock literals.
 - [x] **`FallbackNotice` gains a required `variant: 'exempt' | 'counted'` prop, closing issue
       #30.** It previously hardcoded the quota-exempt copy; both strings now live in the
       component, and the one caller (`src/app/plan/[id].tsx`) passes `variant="exempt"`
@@ -459,11 +479,12 @@ against that contract, so the suite stays quarantined until it lands.
   import `planTemplates.ts` / `paceDerivation.ts`, which don't exist. PR #2 merged them ahead of
   their modules, so every branch cut from `main` inherited a red build (issue #41) and the repo
   could not satisfy `CLAUDE.md`'s own pre-commit gate. **Nothing in the specs is stale** — they
-  assert every current coaching ruling. `typecheck`, `lint`, and `test` (107/107, 5 suites — up
-  from 82/82, 4 suites, after the 2026-07-12 issue #28 fix (`formatSecPerKm` carry-boundary,
-  93/93, first suite under `src/components/`) and issue #31's accessibility fixes on top of it)
-  are now all clean. **Removing the three exclusions and getting both suites green is part of
-  step 3's done-when** (issue #3) — do not land the engine without doing it.
+  assert every current coaching ruling. `typecheck`, `lint`, and `test` (117/117, 6 suites —
+  up from 82/82, 4 suites, after the 2026-07-12 issue #28 fix (`formatSecPerKm` carry-boundary,
+  93/93, first suite under `src/components/`), issue #31's accessibility fixes on top of it, and
+  issue #27's `src/constants/__tests__/navigation-theme.test.ts`) are now all clean. **Removing the
+  three exclusions and getting both suites green is part of step 3's done-when** (issue #3) — do
+  not land the engine without doing it.
 - 🟡 **Suspected pre-existing bug: Home's demo link may render with no border, no 48pt tap target,
   and no pressed state (found while tracing the Link for issue #31, filed as issue #51).**
   expo-router's `Link asChild` (`src/app/(tabs)/index.tsx`) uses a Radix Slot whose `mergeProps`
