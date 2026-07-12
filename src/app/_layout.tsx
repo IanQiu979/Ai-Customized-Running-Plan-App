@@ -9,13 +9,14 @@ import {
   IBMPlexMono_600SemiBold,
 } from '@expo-google-fonts/ibm-plex-mono';
 import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { NavigationThemes } from '@/constants/navigation-theme';
 import { useTheme } from '@/hooks/use-theme';
 
 SplashScreen.preventAutoHideAsync();
@@ -50,7 +51,7 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <ThemeProvider value={theme.scheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <ThemeProvider value={NavigationThemes[theme.scheme]}>
         <Stack
           screenOptions={{
             headerShown: false,

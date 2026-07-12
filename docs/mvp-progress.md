@@ -9,7 +9,8 @@
 **Last updated:** 2026-07-12 (integration pass: Ian's round-2 coaching sign-off closes issues #34,
 #19 and #29; goal-realism ruled, closing #33; app named **Pace Blueprint** (#35); units ruled
 km-only (#36); doc stale-reference sweep (#37). `main` returned to green by quarantining the two
-orphaned TDD suites (#41). Issue #22 remains open.)
+orphaned TDD suites (#41). React Navigation's chrome now derives from `theme.ts`'s tokens instead
+of leaking the library's own stock palette, closing #27. Issue #22 remains open.)
 
 ---
 
@@ -79,6 +80,23 @@ the literal previous week) and issue #33 (goal-realism handling).
       (`WeekAccordion`, `WorkoutRow`, `EffortChip`, `ReadoutBracket`, `PlanNameplate`,
       `DisclaimerFooter`, `FallbackNotice`, `format.ts`) — render the golden fixture on a real
       screen, ugly-beyond-tokens caveats aside.
+- [x] **`src/constants/navigation-theme.ts` — fixes GitHub issue #27 (2026-07-11 frontend-audit
+      finding), done 2026-07-12.** `src/app/_layout.tsx` was feeding React Navigation's stock
+      `DefaultTheme`/`DarkTheme` to `ThemeProvider`, which meant the library painted its own
+      untokened colors (`rgb(242, 242, 242)` light background, `rgb(1, 1, 1)` dark, plus stock
+      `card`/`text`/`border`/`primary`) onto chrome the app never styles directly — transition
+      underlays, header defaults, the reveal behind an in-progress back-swipe — a visible seam
+      against the chalk `#F7F7F4` canvas. `navigation-theme.ts` exports `NavigationLightTheme`,
+      `NavigationDarkTheme`, and a `NavigationThemes: Record<ColorScheme, Theme>` lookup, each
+      spreading the stock theme (keeping `dark`/`fonts`) but overriding every `colors` slot from
+      `Colors` in `theme.ts`: `background`→`surface.base`, `card`→`surface.raised`,
+      `text`→`text.primary`, `border`→`hairline`, `primary`→`text.primary` (deliberately not
+      `Accent.hivis`, which the brief reserves for the single per-screen forward-action),
+      `notification`→`status.error`. `_layout.tsx` now feeds `NavigationThemes[theme.scheme]` to
+      `ThemeProvider`; `src/app/plan/[id].tsx` drops the now-redundant `headerTintColor` and keeps
+      its deliberate `headerStyle` deviation from the nav theme's `card`, commented in place. New
+      suite `src/constants/__tests__/navigation-theme.test.ts` (10 tests, first under
+      `src/constants/`) guards against regressing to the stock literals.
 - [x] 82 passing tests (`jest-expo`), up from 64 after Ian's 2026-07-12 issue #34 rulings:
       `supabase.test.ts`, `loadRules.test.ts` (extended for ruling R1c — a deload week's long run
       is measured against the last loading week's volume, not exempted from the cap), plus
@@ -409,9 +427,11 @@ against that contract, so the suite stays quarantined until it lands.
   import `planTemplates.ts` / `paceDerivation.ts`, which don't exist. PR #2 merged them ahead of
   their modules, so every branch cut from `main` inherited a red build (issue #41) and the repo
   could not satisfy `CLAUDE.md`'s own pre-commit gate. **Nothing in the specs is stale** — they
-  assert every current coaching ruling. `typecheck`, `lint`, and `test` (82/82, 4 suites) are now
-  all clean. **Removing the three exclusions and getting both suites green is part of step 3's
-  done-when** (issue #3) — do not land the engine without doing it.
+  assert every current coaching ruling. `typecheck`, `lint`, and `test` (92/92, 5 suites — 82/4 as
+  of the 2026-07-12 integration pass, plus `src/constants/__tests__/navigation-theme.test.ts`'s 10
+  tests from the issue #27 fix) are now all clean. **Removing the three exclusions and getting
+  both suites green is part of step 3's done-when** (issue #3) — do not land the engine without
+  doing it.
 - 🟠 **Deep-link scheme `paceblueprint://` not confirmed on Supabase's redirect allowlist**
   (Authentication → URL Configuration). Renamed from `v22workoutplangenerator://` in the
   2026-07-12 identifier rename — the allowlist (if it had an entry at all) needs updating to
