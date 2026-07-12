@@ -628,12 +628,13 @@ was tested against. Getting this wrong is exactly the trap `AGENTS.md` warns abo
 
 | Package | Expo SDK 54 pin | Needed for | v1? |
 |---|---|---|---|
-| `@expo-google-fonts/barlow-condensed` | — | Display + **all** numerals | **Yes** |
-| `@expo-google-fonts/inter` | — | Body, chrome | **Yes** |
-| `@expo-google-fonts/ibm-plex-mono` | — | Pace, HR zones, week numbers | **Yes** |
 | `@shopify/react-native-skia` | **2.2.12** | The wave, and (v2) the sand-man | Only if the wave ships |
 | `expo-haptics` | **~15.0.8** | Every tick and the success beat | Fast-follow |
 | `expo-linear-gradient` | **~15.0.8** | CTA gradient | Optional — see below |
+
+The three Google Fonts packages (`@expo-google-fonts/barlow-condensed`, `inter`, `ibm-plex-mono`)
+were the **Yes** rows of this table and are **now installed** (commit `145d7e0`) — see "Already
+present" below. They are no longer something to install.
 
 > **With the sand-man deferred, Skia's only remaining consumer is the periodization wave.** If the
 > wave is also deferred, Skia leaves the v1 dependency set entirely — and with it the heaviest native
@@ -645,7 +646,10 @@ was tested against. Getting this wrong is exactly the trap `AGENTS.md` warns abo
 > `expo-linear-gradient` too.
 
 Already present: `react-native-reanimated ~4.1.1`, `react-native-gesture-handler ~2.28.0`,
-`expo-font ~14.0.12` (**zero font files bundled**), `react-native-safe-area-context ~5.6.0`.
+`expo-font ~14.0.12`, `react-native-safe-area-context ~5.6.0`, and — bundled via `npx expo install`
+in commit `145d7e0` — `@expo-google-fonts/barlow-condensed`, `@expo-google-fonts/inter`, and
+`@expo-google-fonts/ibm-plex-mono`. (This line previously read "`expo-font ~14.0.12` (**zero font
+files bundled**)", which stopped being true at `145d7e0`.)
 Peer requirements verified: `react 19.1.0` and `react-native 0.81.5` satisfy Skia's `>=19` / `>=0.78`.
 
 **Both Skia and haptics are native modules — they need a dev-client rebuild, not an OTA update.** If that
