@@ -5,6 +5,37 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-07-12 — the last stale doc reference from issue #37, actually fixed this time
+
+Found while cleaning up branches after the four-PR merge pass. **Issue #37's sweep was recorded as
+complete, and one of its corrections had never landed.**
+
+This file's own 2026-07-12 issue #37 entry claims *"Part 9's prerequisite table and checklist
+updated: the three Google Fonts packages marked installed, `expo-font`'s stale 'zero font files
+bundled' note corrected."* That correction was applied to **Part 9** — but the prerequisite table
+and the "Already present" line actually live in **Part 11** of
+`docs/design/mvp-blueprint.md`, and Part 11 was never touched. So the change log asserted a fix
+that the document did not contain, which is the worst kind of doc rot: it defends itself against
+being found.
+
+Verified against reality (`package.json`), not against the claim:
+
+- **`@expo-google-fonts/barlow-condensed`, `inter`, and `ibm-plex-mono` are installed** — three
+  packages, present. Part 11's table still listed all three as things to install, marked `v1?
+  **Yes**`. Removed from the table; a line now records that they landed in `145d7e0`.
+- **`expo-font ~14.0.12` (**zero font files bundled**)** — false since `145d7e0`. The "Already
+  present" line now names the three font packages, and says out loud what it used to claim, so the
+  next person greping for the old string finds the correction rather than the error.
+
+Re-checked and found genuinely **already correct**, so left alone: `expo-glass-effect` (absent from
+`package.json`, and every doc reference already reads "removed"/"Done — `145d7e0`"), `expo-blur`
+(never installed), and every `explore.tsx` reference (all past-tense records of its deletion —
+`src/app/(tabs)/` holds only `_layout.tsx`, `glossary.tsx`, `index.tsx`).
+
+The stale `worktree-issue37` branch that carried this fix on a pre-PR-#1 base was deleted rather
+than merged: its base was old enough that merging it would have regressed newer doc content. The
+one correction it still had that `main` lacked is the one applied above.
+
 ## 2026-07-12 — issue #32 polish batch: nine of eleven LOW findings fixed, two dispositioned not fixed (closes #32)
 
 Frontend/code polish batch from the 2026-07-11 audits, triaged and closed in one pass. No coaching
