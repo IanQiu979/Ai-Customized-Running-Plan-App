@@ -33,34 +33,61 @@ them. Code only — no coaching rule touched.
   race-pace session in the plan carries such a band. `expandStructureTokens` now applies the same
   en-dash/slash → "to"/"per kilometer" transform. Two existing tests in `notation.test.ts` that
   were pinning the broken output are corrected.
-- **Code review also found a latent `:60` rollover bug in the m:ss formatter** — pre-existing in
-  `formatPace` (`src/components/plan/format.ts`) and duplicated by finding 1's new `speakPace`: it
-  floored the minutes but independently rounded the seconds, so a non-integer pace could render a
-  nonexistent `":60"` — e.g. 299.63 sec/km (a 3:30:43 marathon goal) produced `"4:60/km"` instead
-  of `"5:00/km"`. Not reachable from today's integer-only fixture, but it would land live the day
-  the pace-derivation engine (issue #3) starts producing non-integer paces. Now rounds once, then
-  decomposes. The m:ss arithmetic is one shared `formatSecPerKm()` in `src/lib/notation.ts`,
-  consumed by both `formatPace` (visible) and `speakPace` (spoken) so the two formatters cannot
-  drift apart again.
+- **Issue #28 / PR #46 fixed a latent `:60` rollover bug in the m:ss formatter first, independently
+  of this issue** — pre-existing in `formatPace` (`src/components/plan/format.ts`): it floored the
+  minutes but independently rounded the seconds, so a non-integer pace could render a nonexistent
+  `":60"` — e.g. 299.63 sec/km (a 3:30:43 marathon goal) produced `"4:60/km"` instead of
+  `"5:00/km"`. Not reachable from today's integer-only fixture, but it would land live the day the
+  pace-derivation engine (issue #3) starts producing non-integer paces. **This issue's contribution
+  is de-duplication, not the fix itself.** Finding 1's new `speakPace` needed the same m:ss
+  arithmetic, and giving it its own copy would have re-created a second, independently-drifting
+  version of the bug #46 already fixed. Instead, the m:ss logic was collapsed into one shared
+  `formatSecPerKm()` in `src/lib/notation.ts`, consumed by both `formatPace` (visible) and
+  `speakPace` (spoken), so the two formatters cannot drift apart again.
 - **`composeWorkoutLabel` moved from `WorkoutRow.tsx` into the React-free
   `src/components/plan/format.ts`** so the composed accessibility label is unit-testable without a
-  renderer — the regression is now pinned at its real call site (new
-  `src/components/plan/__tests__/format.test.ts`), which it previously wasn't: swapping
-  `speakPace`/`speakStructure`'s pace expansion back out would have left every existing test green.
+  renderer — the regression is now pinned at its real call site
+  (`src/components/plan/__tests__/format.test.ts`, added by #46 and extended here with these
+  cases), which it previously wasn't: swapping `speakPace`/`speakStructure`'s pace expansion back
+  out would have left every existing test green.
 - **Two small hardening changes alongside the above.** `RACE_DAY_LABEL` is now an exported constant
   in `src/lib/notation.ts` — an inlined `'Race Day'` literal would not fail to compile on a rename,
   it would just silently stop matching and re-hide the race. `notation.ts` now imports `planTypes`
   with a relative path, matching `loadRules.ts`'s existing convention and staying resolvable under
   Deno for the future edge function.
-- **Test suite: 100 passed / 0 failed, up from 82** (5 suites, up from 4 — new
-  `src/components/plan/__tests__/format.test.ts`; `notation.test.ts` extended). The two TDD suites
-  for the still-unbuilt `planTemplates.ts`/`paceDerivation.ts` stay quarantined, unaffected.
-  `typecheck`, `lint`, and `test` all clean.
+- **Test suite: 107 passed / 0 failed, up from 93** (still 5 suites — `format.test.ts` is now the
+  union of both PRs' cases: #46's `formatPace` carry-boundary and `formatPlanDate` regressions,
+  plus this issue's race-day `describeDays` and `composeWorkoutLabel` cases; `notation.test.ts`
+  also extended). The two TDD suites for the still-unbuilt `planTemplates.ts`/`paceDerivation.ts`
+  stay quarantined, unaffected. `typecheck`, `lint`, and `test` all clean.
 - **Found while tracing the Link, not fixed here — filed as its own issue.** expo-router's `Link
   asChild` uses a Radix Slot whose `mergeProps` spreads `style` as an *object*, but Home's
   demo-link `Pressable` passes `style` as a *function* (`({ pressed }) => [...]`); spreading a
   function yields `{}`, so the demo link may be rendering with no border, no 48pt minimum tap
   target, and no pressed state. Derived from reading the source, not device-verified.
+
+## 2026-07-12 — `formatSecPerKm` carry-boundary fix, first test suite under `src/components/` (closes #28)
+
+Bug fix from the 2026-07-11 codebase audit's bug list.
+
+- **The bug.** `src/components/plan/format.ts`'s `formatSecPerKm()` computed minutes and seconds
+  independently — `Math.floor(totalSec / 60)` for minutes, `Math.round(totalSec % 60)` for
+  seconds — so a fractional pace could round seconds up to 60 without carrying into the next
+  minute: 359.6 s/km rendered as `"5:60/km"` instead of `"6:00/km"`.
+- **The fix.** Round the total seconds once, then derive minutes and seconds from that
+  already-rounded value, so the carry is structural rather than two independent roundings that
+  can disagree.
+- **Latent today, not yet triggered.** Every pace in the current fixture (`examplePlan.ts`) is an
+  integer, so the bug never fired in a rendered plan. It was armed to fire the moment
+  `paceDerivation.ts` or the AI generation path emits an unrounded pace band — i.e. it would have
+  surfaced the instant the plan engine (step 3, `mvp-progress.md`) landed.
+- **New `src/components/plan/__tests__/format.test.ts` (11 tests)** — the first test suite under
+  `src/components/`. Covers `formatPace`, including both carry-boundary regression cases (359.4
+  s/km → `"5:59/km"`, 359.6 s/km → `"6:00/km"`, and a range that crosses the boundary on only one
+  end), plus `formatPlanDate` and `describeDays`.
+- Verified clean: `typecheck`, `lint`, and **93 tests passing across 5 suites** (up from 82 across
+  4).
+- Closes GitHub issue #28.
 
 ## 2026-07-12 — integration pass: five PRs merged to `main`, `main` returned to green
 
