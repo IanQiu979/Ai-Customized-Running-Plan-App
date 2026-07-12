@@ -465,8 +465,12 @@ not a firework.
 ### Plan view · *system theme, the hero screen, tab bar hidden*
 
 The header reads as an **equipment nameplate**, not a caption: title at 24–32, and beneath it a small
-mono metadata line, uppercase tokens separated by middots — `TIER · PRO   GENERATED · 07.10.26` — the
-way a serial plate reads, not a casual sentence.
+mono metadata line, uppercase tokens — a colon binds each key to its value, a middot separates one
+field from the next — `TIER: PRO   ·   12 WEEKS TO RACE DAY: OCT 4, 2026` — the way a serial plate
+reads, not a casual sentence. **(Corrected 2026-07-12, issue #32): the original wording
+here — "separated by middots," with the worked example `TIER · PRO   GENERATED · 07.10.26` using `·`
+for both the key-value bind and the field separator — was itself the ambiguity `PlanNameplate.tsx`
+shipped with. One glyph, one job, as above.**
 
 Below it, the wave gets the fullest grid treatment in the app **at Elite density** — faint
 horizontal load-interval gridlines behind the bronze fill, a solid zero-axis baseline, week-number

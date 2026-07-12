@@ -356,6 +356,23 @@ describe('examplePlan fixture — strides extension (issue #34 ruling R7, confir
     }
   });
 
+  it('never labels an easy run plain "ER" while its structure prescribes strides', () => {
+    // The converse of the assertion above, and the one that earns its keep since issue #32
+    // finding 11: `easyRun` used to *infer* the "+ Strides" suffix from the presence of any
+    // structure string, so label and structure could not disagree. Now that strides is an
+    // explicit argument, they can — pass a strides structure and forget the flag and the day
+    // silently prescribes strides under a plain "ER" heading. Scoped to the easy-run family on
+    // purpose: `shakeoutRun` carries a strides structure under an "SR" label deliberately (week
+    // 12), and that is correct, not a desync.
+    const easyRuns = allWorkouts().filter((w) => w.label.startsWith('ER'));
+    expect(easyRuns.length).toBeGreaterThan(0);
+    for (const w of easyRuns) {
+      if (/Strides/.test(w.structure ?? '')) {
+        expect(w.label).toBe('ER + Strides');
+      }
+    }
+  });
+
   it("adds no headline distance for strides — a loading week's ER + Strides day still sums into volumeKm like a plain ER day", () => {
     // "Strides add no headline distance, matching how weeks 1-2 already prescribe them, so no
     // volume-table arithmetic changes anywhere in this revision." Re-derives the same

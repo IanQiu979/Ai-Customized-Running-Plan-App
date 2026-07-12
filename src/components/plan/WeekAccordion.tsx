@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Effort, FontFamily, FontSize, Spacing } from '@/constants/theme';
+import { Effort, FontFamily, FontSize, PressedOpacity, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Week } from '@/lib/planTypes';
 
@@ -64,7 +64,7 @@ export function WeekAccordion({ week }: { week: Week }) {
             </View>
           ))}
         </View>
-        <Text style={[styles.chevron, { color: theme.text.secondary }]}>{expanded ? '▴' : '▾'}</Text>
+        <Chevron expanded={expanded} color={theme.text.secondary} />
       </Pressable>
 
       {expanded ? (
@@ -84,6 +84,26 @@ export function WeekAccordion({ week }: { week: Week }) {
   );
 }
 
+/** Drawn, not typeset: a square with two borders, rotated to sit on a point. It replaces the ▴/▾
+ * Unicode triangles, whose weight was at the mercy of the body font's Android fallback (issue #32
+ * finding 2). No icon library — adding a dependency is HIGH-tier (`AGENTS.md`) and this is a
+ * polish fix. The stroke is a fixed 1.5, not `hairlineWidth`: this is a glyph, and it should carry
+ * the same weight on every device. `hairlineWidth` is for rules and baselines — the ribbon's and
+ * the card's — where being one physical pixel is the whole point. */
+function Chevron({ expanded, color }: { expanded: boolean; color: string }) {
+  return (
+    <View style={styles.chevron}>
+      <View
+        style={[
+          styles.chevronMark,
+          { borderColor: color },
+          expanded ? styles.chevronMarkUp : styles.chevronMarkDown,
+        ]}
+      />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   card: {
     borderBottomWidth: StyleSheet.hairlineWidth,
@@ -96,7 +116,7 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.two,
   },
   headerPressed: {
-    opacity: 0.7,
+    opacity: PressedOpacity,
   },
   weekNumber: {
     width: WEEK_GUTTER_WIDTH,
@@ -117,12 +137,30 @@ const styles = StyleSheet.create({
     alignItems: 'stretch',
   },
   bar: {
-    borderRadius: Spacing.half,
+    // Top-only — the bars rise from the unbroken baseline below, they don't float above it.
+    borderTopLeftRadius: Spacing.half,
+    borderTopRightRadius: Spacing.half,
   },
   chevron: {
-    fontFamily: FontFamily.body.regular,
-    fontSize: FontSize.md,
-    paddingBottom: Spacing.one,
+    width: Spacing.three, // room for the rotated mark's diagonal footprint
+    height: Spacing.three,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.one, // matches weekNumber's paddingBottom — same visual baseline
+  },
+  chevronMark: {
+    width: Spacing.two,
+    height: Spacing.two,
+    // Fixed weight, not `hairlineWidth` — see `Chevron`. An 8pt square's rotated diagonal is
+    // 11.3pt, comfortably inside the 16pt box above.
+    borderRightWidth: 1.5,
+    borderBottomWidth: 1.5,
+  },
+  chevronMarkDown: {
+    transform: [{ rotate: '45deg' }], // vertex down — the old ▾, collapsed
+  },
+  chevronMarkUp: {
+    transform: [{ rotate: '225deg' }], // vertex up — the old ▴, expanded
   },
   body: {
     paddingBottom: Spacing.three,

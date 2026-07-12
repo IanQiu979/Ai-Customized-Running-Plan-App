@@ -5,8 +5,9 @@
  * https://docs.expo.dev/guides/color-schemes/
  */
 
-import { Accent, Colors, ColorScheme, Effort, EffortLevel, EffortOrder } from '@/constants/theme';
+import { Accent, Colors, ColorScheme, Effort, EffortOrder } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import type { EffortLevel } from '@/lib/planTypes';
 
 export function useTheme() {
   // useColorScheme returns null when the device reports no preference on SDK 54.

@@ -13,10 +13,16 @@ import { formatPlanDate } from './format';
 export function PlanNameplate({ plan }: { plan: Plan }) {
   const theme = useTheme();
 
+  // One glyph, one job: `·` separates peer fields, a colon binds a key to its value. Before, `·`
+  // did both, told apart only by how much whitespace surrounded it. `·` takes the separator role
+  // rather than the binder role because that's the sense the app already teaches the runner —
+  // `notation.ts` glosses it as the segment separator inside a structure string, and the Glossary
+  // prints that definition. The wide gutters stay: they are what makes this line read as a serial
+  // plate rather than a caption.
   const metadata = [
-    `TIER · ${plan.tierAtGeneration.toUpperCase()}`,
+    `TIER: ${plan.tierAtGeneration.toUpperCase()}`,
     plan.goalType === 'race' && plan.raceDistance && plan.raceDate
-      ? `${plan.durationWeeks} WEEKS TO RACE DAY · ${formatPlanDate(plan.raceDate)}`
+      ? `${plan.durationWeeks} WEEKS TO RACE DAY: ${formatPlanDate(plan.raceDate)}`
       : `${plan.durationWeeks}-WEEK PLAN`,
   ].join('   ·   ');
 

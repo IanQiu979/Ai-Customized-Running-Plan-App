@@ -62,8 +62,10 @@ export const RUN_TYPE_ABBREVIATIONS: Record<string, GlossaryEntry> = {
  * is notation.md's "Meaning" column for its own table row; Race Day's is notation.md's own prose
  * ("It is the event itself, not a run type — abbreviating it would imply it's just another
  * training session, which it isn't"); Rest has no notation.md entry (that file only covers run
- * types and structure shorthand) — its description is the app's own established rest-day copy,
- * already shipped in `WorkoutRow.tsx`, reused here rather than newly invented.
+ * types and structure shorthand) — its description elaborates the shipped rest-day row copy in
+ * `WorkoutRow.tsx` for a glossary entry rather than reproducing it verbatim, echoing that row's
+ * "recovery is training too" clause while stating the "real slot, not an absence" rule
+ * `planTypes.ts`'s `RestDay` encodes.
  */
 export const UNABBREVIATED_RUN_TYPES: Record<string, GlossaryEntry> = {
   Strides: {
