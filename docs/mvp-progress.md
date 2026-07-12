@@ -9,7 +9,8 @@
 **Last updated:** 2026-07-12 (integration pass: Ian's round-2 coaching sign-off closes issues #34,
 #19 and #29; goal-realism ruled, closing #33; app named **Pace Blueprint** (#35); units ruled
 km-only (#36); doc stale-reference sweep (#37). `main` returned to green by quarantining the two
-orphaned TDD suites (#41). Issue #22 remains open.)
+orphaned TDD suites (#41). Screen-reader gaps fixed, closing #31 — pace bands spoken as words, race
+day announced, plus three code-review-caught defects. Issue #22 remains open.)
 
 ---
 
@@ -28,9 +29,10 @@ orphaned TDD suites (#41). Issue #22 remains open.)
 Phase 0's paper-reconciliation pass is now done too. **The plan-generation engine itself does not
 exist yet.** `src/lib/supabase.ts`, `planTypes.ts`, `loadRules.ts`, and (as of the 2026-07-11
 review-and-refine cycle) `notation.ts` are the app's `lib/` layer — shared vocabulary, safety
-arithmetic, and run-type/structure-string notation, all pure and tested (82 passing tests, up from
-64, after Ian's 2026-07-12 round-2 rulings on issue #34 added the long-run deload-week measurement
-fix (ruling R1c) and the race-day/strides test coverage). A golden fixture (`src/lib/fixtures/examplePlan.ts`), a rendered
+arithmetic, and run-type/structure-string notation, all pure and tested (100 passing tests, up from
+82, after Ian's 2026-07-12 round-2 rulings on issue #34 added the long-run deload-week measurement
+fix (ruling R1c) and the race-day/strides test coverage, then up again the same day after issue
+#31's accessibility fixes — 82 was itself up from 64). A golden fixture (`src/lib/fixtures/examplePlan.ts`), a rendered
 plan screen (`src/app/plan/[id].tsx` and `src/components/plan/`), and an abbreviations glossary tab
 (`src/app/(tabs)/glossary.tsx`) exist and render that fixture — but nothing generates a plan from an
 intake yet. `src/lib/planTemplates.ts` and `src/lib/paceDerivation.ts`, the actual generation logic,
@@ -96,7 +98,31 @@ the literal previous week) and issue #33 (goal-realism handling).
       run typecheck && npm run lint && npm test` will not run clean until step 3 below lands both
       modules. Recorded plainly here and in "Known debt and risks" below: the repo cannot
       currently satisfy `CLAUDE.md`'s own "clean typecheck && lint && test before every commit"
-      rule.
+      rule. **Superseded the same day by the 2026-07-12 quarantine below (issue #41)** — both
+      files are now excluded from `jest`/`tsc`/`eslint` outright, so `typecheck`, `lint`, and
+      `test` are all clean again; see "Known debt and risks."
+- [x] **GitHub issue #31 fixed (2026-07-12): three screen-reader gaps from the 2026-07-11 a11y
+      audits, plus three further defects a code review caught while fixing them.** Pace bands now
+      reach VoiceOver as words (new `speakPace()`/`formatSecPerKm()` in `src/lib/notation.ts` —
+      "4:41 to 4:54 per kilometer" instead of the visible en-dash/"/km" notation); race day is no
+      longer announced as a generic interval (`describeDays` in `src/components/plan/format.ts`
+      special-cases the new exported `RACE_DAY_LABEL` constant); `accessibilityRole="link"` was
+      added to Home's demo link, though the fix turned out to be redundant — expo-router's `Link
+      asChild` already supplies `role: 'link'`, so the audit's finding 3 was mistaken. Code review
+      then caught two live defects the fix hadn't yet covered: `speakStructure` was leaving a pace
+      band embedded inside the structure string raw, so a single flattened VoiceOver label spoke
+      the same band correctly once and as broken notation once — fixed via the same transform in
+      `expandStructureTokens`; and a latent `:60` rollover bug in the shared m:ss formatter (a
+      non-integer pace like 299.63 sec/km could render "4:60/km" instead of "5:00/km" — not
+      reachable from today's integer-only fixture, but live the day `paceDerivation.ts`, issue #3,
+      starts producing non-integer paces) — fixed by rounding once then decomposing, in one shared
+      `formatSecPerKm()` consumed by both the visible and spoken formatters. `composeWorkoutLabel`
+      moved out of `WorkoutRow.tsx` into the React-free `format.ts` so the composed label is
+      unit-tested at its real call site (new `src/components/plan/__tests__/format.test.ts`)
+      instead of only indirectly. **100 passing tests, up from 82 (5 suites, up from 4)**;
+      `typecheck`, `lint`, and `test` all clean. No coaching rule touched. Full account:
+      `docs/change_log.md`'s 2026-07-12 entry. **A suspected pre-existing bug was found while
+      tracing the Link and filed separately, not fixed here** — see "Known debt and risks" below.
 
 ### Repo hygiene
 - [x] `AGENTS.md` rewritten as the agent-routing doc, committed (`60382cd`)
@@ -409,9 +435,16 @@ against that contract, so the suite stays quarantined until it lands.
   import `planTemplates.ts` / `paceDerivation.ts`, which don't exist. PR #2 merged them ahead of
   their modules, so every branch cut from `main` inherited a red build (issue #41) and the repo
   could not satisfy `CLAUDE.md`'s own pre-commit gate. **Nothing in the specs is stale** — they
-  assert every current coaching ruling. `typecheck`, `lint`, and `test` (82/82, 4 suites) are now
-  all clean. **Removing the three exclusions and getting both suites green is part of step 3's
+  assert every current coaching ruling. `typecheck`, `lint`, and `test` (100/100, 5 suites — up
+  from 82/82, 4 suites after issue #31's accessibility fixes added a new suite) are now all clean.
+  **Removing the three exclusions and getting both suites green is part of step 3's
   done-when** (issue #3) — do not land the engine without doing it.
+- 🟡 **Suspected pre-existing bug: Home's demo link may render with no border, no 48pt tap target,
+  and no pressed state (found while tracing the Link for issue #31, filed as its own issue).**
+  expo-router's `Link asChild` (`src/app/(tabs)/index.tsx`) uses a Radix Slot whose `mergeProps`
+  spreads `style` as an *object*, but the wrapped `Pressable`'s `style` prop is a *function*
+  (`({ pressed }) => [...]`) — spreading a function yields `{}`, silently dropping every rule the
+  function would have returned. Derived from reading the source, not device-verified.
 - 🟠 **Deep-link scheme `paceblueprint://` not confirmed on Supabase's redirect allowlist**
   (Authentication → URL Configuration). Renamed from `v22workoutplangenerator://` in the
   2026-07-12 identifier rename — the allowlist (if it had an entry at all) needs updating to

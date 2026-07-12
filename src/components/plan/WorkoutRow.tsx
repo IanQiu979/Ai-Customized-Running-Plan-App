@@ -2,11 +2,10 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { FontFamily, FontSize, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { expandLabel, speakStructure } from '@/lib/notation';
 import type { Day, Workout } from '@/lib/planTypes';
 
 import { EffortChip } from './EffortChip';
-import { formatPace } from './format';
+import { composeWorkoutLabel, formatPace } from './format';
 import { ReadoutBracket } from './ReadoutBracket';
 
 /**
@@ -76,22 +75,6 @@ function DistanceOrDuration({ day }: { day: Workout }) {
     );
   }
   return null;
-}
-
-function composeWorkoutLabel(dayNumber: number, day: Workout): string {
-  // `day.label` is an abbreviated code ("ER", "TR" ...) — read the expanded name aloud, not the
-  // bare letters (`src/lib/notation.ts`, per `docs/reference/coaching/notation.md`).
-  const parts = [`Day ${dayNumber}`, expandLabel(day.label)];
-  if (day.distanceKm !== undefined) parts.push(`${day.distanceKm} kilometers`);
-  if (day.durationMin !== undefined) parts.push(`${day.durationMin} minutes`);
-  if (day.pace) parts.push(formatPace(day.pace));
-  if (day.hrZone) parts.push(`heart rate zone ${day.hrZone}`);
-  parts.push(day.effortDescription);
-  // The row is flattened (`accessible` above collapses its whole subtree into this one label),
-  // so the structure line — the rep prescription the notation ruling exists to carry — would
-  // otherwise never reach a screen reader at all. Speak it expanded, not as raw shorthand.
-  if (day.structure) parts.push(speakStructure(day.structure));
-  return parts.join(', ');
 }
 
 const styles = StyleSheet.create({
