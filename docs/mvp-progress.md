@@ -6,12 +6,14 @@
 > Milestone definitions live in [`planning/02-product-requirements.md`](../planning/02-product-requirements.md).
 > Decision history lives in [`change_log.md`](change_log.md).
 
-**Last updated:** 2026-07-12 (`formatSecPerKm` pace-rounding carry bug fixed, closing #28, with the
-first test suite under `src/components/` — 93 tests passing, up from 82. Also this date:
-integration pass: Ian's round-2 coaching sign-off closes issues #34, #19 and #29; goal-realism
-ruled, closing #33; app named **Pace Blueprint** (#35); units ruled km-only (#36); doc
-stale-reference sweep (#37). `main` returned to green by quarantining the two orphaned TDD suites
-(#41). Issue #22 remains open.)
+**Last updated:** 2026-07-12 (integration pass: Ian's round-2 coaching sign-off closes issues #34,
+#19 and #29; goal-realism ruled, closing #33; app named **Pace Blueprint** (#35); units ruled
+km-only (#36); doc stale-reference sweep (#37). `main` returned to green by quarantining the two
+orphaned TDD suites (#41). `formatSecPerKm` pace-rounding carry bug fixed, closing #28, adding the
+first test suite under `src/components/`. Screen-reader gaps fixed, closing #31 — pace bands spoken
+as words, race day announced, plus three code-review-caught defects, including collapsing the m:ss
+formatter #28 fixed into one shared `formatSecPerKm()` so the two readouts can't drift apart. 107
+tests passing, up from 82. Issue #22 remains open.)
 
 ---
 
@@ -32,9 +34,10 @@ exist yet.** `src/lib/supabase.ts`, `planTypes.ts`, `loadRules.ts`, and (as of t
 review-and-refine cycle) `notation.ts` are the app's `lib/` layer — shared vocabulary, safety
 arithmetic, and run-type/structure-string notation, all pure and tested (82 lib-layer tests, up
 from 64, after Ian's 2026-07-12 round-2 rulings on issue #34 added the long-run deload-week
-measurement fix (ruling R1c) and the race-day/strides test coverage; the project total is **93
-across 5 suites** as of the same day's `formatSecPerKm` carry-boundary fix, issue #28, which added
-the first test suite under `src/components/`). A golden fixture (`src/lib/fixtures/examplePlan.ts`), a rendered
+measurement fix (ruling R1c) and the race-day/strides test coverage; the project total is **107
+across 5 suites** as of the same day's `formatSecPerKm` carry-boundary fix (issue #28, which added
+the first test suite under `src/components/`) and issue #31's screen-reader accessibility fixes,
+which together took the project total 82 → 93 → 107). A golden fixture (`src/lib/fixtures/examplePlan.ts`), a rendered
 plan screen (`src/app/plan/[id].tsx` and `src/components/plan/`), and an abbreviations glossary tab
 (`src/app/(tabs)/glossary.tsx`) exist and render that fixture — but nothing generates a plan from an
 intake yet. `src/lib/planTemplates.ts` and `src/lib/paceDerivation.ts`, the actual generation logic,
@@ -100,17 +103,41 @@ the literal previous week) and issue #33 (goal-realism handling).
       run typecheck && npm run lint && npm test` will not run clean until step 3 below lands both
       modules. Recorded plainly here and in "Known debt and risks" below: the repo cannot
       currently satisfy `CLAUDE.md`'s own "clean typecheck && lint && test before every commit"
-      rule.
+      rule. **Superseded the same day by the 2026-07-12 quarantine below (issue #41)** — both
+      files are now excluded from `jest`/`tsc`/`eslint` outright, so `typecheck`, `lint`, and
+      `test` are all clean again; see "Known debt and risks."
 - [x] **Issue #28 fixed (2026-07-12): `formatSecPerKm`'s minute/second carry.**
       `src/components/plan/format.ts` rounded minutes and seconds independently, so a fractional
       pace could round seconds up to 60 without carrying into the next minute (359.6 s/km →
       `"5:60/km"` instead of `"6:00/km"`) — latent today since every pace in `examplePlan.ts` is an
       integer, but armed to fire the moment `paceDerivation.ts` or the AI path emits an unrounded
       pace band. Fixed by rounding the total seconds once, then splitting into minutes and seconds.
-      New `src/components/plan/__tests__/format.test.ts` (11 tests) is the first test suite under
-      `src/components/` — covers `formatPace` (both carry-boundary cases), `formatPlanDate`, and
-      `describeDays`. **Test count: 93 passing, up from 82, across 5 suites** (still 2 suites
+      New `src/components/plan/__tests__/format.test.ts` (11 tests) was the first test suite under
+      `src/components/` — covering `formatPace` (both carry-boundary cases), `formatPlanDate`, and
+      `describeDays`. **93 passing, up from 82, across 5 suites** at this point (still 2 suites
       excluded — see "Known debt and risks").
+- [x] **GitHub issue #31 fixed (2026-07-12): three screen-reader gaps from the 2026-07-11 a11y
+      audits, plus three further defects a code review caught while fixing them.** Pace bands now
+      reach VoiceOver as words (new `speakPace()` in `src/lib/notation.ts` — "4:41 to 4:54 per
+      kilometer" instead of the visible en-dash/"/km" notation); race day is no longer announced as
+      a generic interval (`describeDays` in `src/components/plan/format.ts` special-cases the new
+      exported `RACE_DAY_LABEL` constant); `accessibilityRole="link"` was added to Home's demo
+      link, though the fix turned out to be redundant — expo-router's `Link asChild` already
+      supplies `role: 'link'`, so the audit's finding 3 was mistaken. Code review then caught two
+      live defects the fix hadn't yet covered: `speakStructure` was leaving a pace band embedded
+      inside the structure string raw, so a single flattened VoiceOver label spoke the same band
+      correctly once and as broken notation once — fixed via the same transform in
+      `expandStructureTokens`; and issue #28/PR #46's already-fixed `:60` rollover bug in the m:ss
+      formatter would otherwise have been re-introduced by `speakPace`'s own copy of the same
+      arithmetic — instead of duplicating it, `formatSecPerKm()` was collapsed into one shared
+      function in `src/lib/notation.ts`, consumed by both `formatPace` (visible) and `speakPace`
+      (spoken), so the two readouts cannot drift apart again. `composeWorkoutLabel` moved out of
+      `WorkoutRow.tsx` into the React-free `format.ts` so the composed label is unit-tested at its
+      real call site (`src/components/plan/__tests__/format.test.ts`, extended with these cases on
+      top of #28's) instead of only indirectly. **107 passing tests, up from 93 (still 5 suites)**;
+      `typecheck`, `lint`, and `test` all clean. No coaching rule touched. Full account:
+      `docs/change_log.md`'s 2026-07-12 entries. **A suspected pre-existing bug was found while
+      tracing the Link and filed separately, not fixed here** — see "Known debt and risks" below.
 
 ### Repo hygiene
 - [x] `AGENTS.md` rewritten as the agent-routing doc, committed (`60382cd`)
@@ -423,10 +450,17 @@ against that contract, so the suite stays quarantined until it lands.
   import `planTemplates.ts` / `paceDerivation.ts`, which don't exist. PR #2 merged them ahead of
   their modules, so every branch cut from `main` inherited a red build (issue #41) and the repo
   could not satisfy `CLAUDE.md`'s own pre-commit gate. **Nothing in the specs is stale** — they
-  assert every current coaching ruling. `typecheck`, `lint`, and `test` (93/93, 5 suites, as of the
-  2026-07-12 issue #28 fix) are now all clean. **Removing the three exclusions and getting both
-  suites green is part of step 3's done-when** (issue #3) — do not land the engine without doing
-  it.
+  assert every current coaching ruling. `typecheck`, `lint`, and `test` (107/107, 5 suites — up
+  from 82/82, 4 suites, after the 2026-07-12 issue #28 fix (`formatSecPerKm` carry-boundary,
+  93/93, first suite under `src/components/`) and issue #31's accessibility fixes on top of it)
+  are now all clean. **Removing the three exclusions and getting both suites green is part of
+  step 3's done-when** (issue #3) — do not land the engine without doing it.
+- 🟡 **Suspected pre-existing bug: Home's demo link may render with no border, no 48pt tap target,
+  and no pressed state (found while tracing the Link for issue #31, filed as issue #51).**
+  expo-router's `Link asChild` (`src/app/(tabs)/index.tsx`) uses a Radix Slot whose `mergeProps`
+  spreads `style` as an *object*, but the wrapped `Pressable`'s `style` prop is a *function*
+  (`({ pressed }) => [...]`) — spreading a function yields `{}`, silently dropping every rule the
+  function would have returned. Derived from reading the source, not device-verified.
 - 🟠 **Deep-link scheme `paceblueprint://` not confirmed on Supabase's redirect allowlist**
   (Authentication → URL Configuration). Renamed from `v22workoutplangenerator://` in the
   2026-07-12 identifier rename — the allowlist (if it had an entry at all) needs updating to

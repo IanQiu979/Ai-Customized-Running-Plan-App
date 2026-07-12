@@ -1,12 +1,20 @@
-import { describeDays, formatPace, formatPlanDate } from '../format';
-import type { Day, Pace, Workout } from '@/lib/planTypes';
+import { examplePlan } from '../../../lib/fixtures/examplePlan';
+import type { Day, Pace, Workout } from '../../../lib/planTypes';
+import { composeWorkoutLabel, describeDays, formatPace, formatPlanDate } from '../format';
 
 /**
  * Unit tests for `src/components/plan/format.ts`.
  *
- * The `formatPace` carry-boundary cases are a regression guard (GitHub issue #28): seconds
- * must be derived from an already-rounded total, never rounded independently of minutes, or
- * a fractional pace like 359.6 s/km renders as "5:60/km" instead of "6:00/km".
+ * Two regression guards live here, both about a pace or a day reaching the runner wrong:
+ *
+ * - `formatPace`'s carry boundary (issue #28): seconds must be derived from an already-rounded
+ *   total, never rounded independently of the minutes, or a fractional pace like 359.6 s/km
+ *   renders as "5:60/km" instead of "6:00/km". The arithmetic now lives in `formatSecPerKm`
+ *   (`src/lib/notation.ts`), shared with the spoken readout so the two cannot drift.
+ * - The screen-reader gaps (issue #31): a race day must announce as "race day" rather than its
+ *   `effort`, or a VoiceOver user never hears the week contains the race; and a pace band must
+ *   be spoken in words — including one embedded in a structure string, which is where every
+ *   interval and race-pace session carries it.
  */
 
 describe('formatPace', () => {
@@ -18,6 +26,11 @@ describe('formatPace', () => {
   it('renders a genuine range with an en dash ("4:00–4:15/km")', () => {
     const pace: Pace = { lowSecPerKm: 240, highSecPerKm: 255 };
     expect(formatPace(pace)).toBe('4:00–4:15/km');
+  });
+
+  it('renders the range the plan view actually shows ("4:41–4:54/km")', () => {
+    const pace: Pace = { lowSecPerKm: 281, highSecPerKm: 294 };
+    expect(formatPace(pace)).toBe('4:41–4:54/km');
   });
 
   it('zero-pads seconds under 10 ("5:05/km")', () => {
@@ -47,7 +60,7 @@ describe('formatPlanDate', () => {
     expect(formatPlanDate('2026-09-26')).toBe('SEP 26, 2026');
   });
 
-  it('does not shift by a day regardless of the runner\'s local timezone (UTC parse)', () => {
+  it("does not shift by a day regardless of the runner's local timezone (UTC parse)", () => {
     const originalTZ = process.env.TZ;
     try {
       process.env.TZ = 'Pacific/Kiritimati'; // UTC+14 — would roll a naive local parse forward
@@ -99,5 +112,50 @@ describe('describeDays', () => {
     for (const weekday of weekdayNames) {
       expect(result).not.toContain(weekday);
     }
+  });
+
+  it('announces a race day as "race day", not its effort (issue #31 finding 2)', () => {
+    // examplePlan week 12 (index 11), Day 7 (index 6): a normal `kind: 'run'` Workout with
+    // `effort: 'interval'` and `label: 'Race Day'` — the label is the only signal that this is
+    // the race and not another interval session.
+    const raceDay = examplePlan.weeks[11].days[6];
+    expect(raceDay.kind).toBe('run');
+    expect((raceDay as { label?: string }).label).toBe('Race Day');
+    expect((raceDay as { effort?: string }).effort).toBe('interval');
+
+    expect(describeDays([raceDay])).toBe('Day 1 race day');
+  });
+
+  it('distinguishes the race day from a plain interval session in the same week', () => {
+    const raceDayWorkout: Workout = {
+      kind: 'run',
+      effort: 'interval',
+      label: 'Race Day',
+      distanceKm: 10,
+      effortDescription: 'The event itself.',
+    };
+    const days: readonly Day[] = [restDay, intervalWorkout, raceDayWorkout];
+    expect(describeDays(days)).toBe('Day 1 rest, Day 2 interval, Day 3 race day');
+  });
+});
+
+describe('composeWorkoutLabel', () => {
+  it("speaks the structure string's embedded pace band in words, not raw en-dash/slash notation", () => {
+    // examplePlan week 9 (index 8), Day 5 (index 4): structure
+    // 'WU 2 km · 8 × 600 m @ 4:22–4:30/km w/ 300 m jog · CD 2 km'. One assertion pins both
+    // halves of the pace fix — `day.pace` spoken in words, and the same band embedded in
+    // `day.structure` spoken in words too. The row is flattened into this single label, so
+    // leaving either raw would speak the same band correctly once and broken once.
+    const week9Int = examplePlan.weeks[8].days[4] as Workout;
+    const label = composeWorkoutLabel(5, week9Int);
+
+    expect(label).toBe(
+      'Day 5, Intervals, 11 kilometers, 4:22 to 4:30 per kilometer, heart rate zone 4, ' +
+        'Hard, controlled effort with full recovery between reps., ' +
+        'warm-up 2 km, 8 times 600 m @ 4:22 to 4:30 per kilometer with 300 m jog, cool-down 2 km',
+    );
+    expect(label).toContain('4:22 to 4:30 per kilometer');
+    expect(label).not.toContain('–');
+    expect(label).not.toContain('/km');
   });
 });
