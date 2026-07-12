@@ -15,6 +15,8 @@
 
 import { Platform } from 'react-native';
 
+import { EFFORT_LEVELS, EFFORT_ORDINAL, EffortLevel } from '@/lib/planTypes';
+
 // ---------------------------------------------------------------------------------------------
 // Color scheme
 // ---------------------------------------------------------------------------------------------
@@ -118,20 +120,34 @@ export type ThemeColors = (typeof Colors)[ColorScheme];
 // The effort scale — brief Part 2 "The effort scale". A color always means an intensity; it
 // never decorates. `barHeight` is the mandatory non-hue accessibility channel (Part 7 #1): the
 // bar-height ramp is monotonic and identical in both color schemes.
+//
+// `EffortLevel`, its render order, and its intensity ordinal are owned by `planTypes.ts` — the
+// module both this app and the `generate-plan` edge function import — so this file only ever
+// derives from it, never redeclares it. Before this (issue #32 finding 4), the level, its order,
+// and its ordinal were each duplicated here, and a reorder in one could silently desync the
+// others.
 // ---------------------------------------------------------------------------------------------
 
-export type EffortLevel = 'recovery' | 'easy' | 'steady' | 'tempo' | 'interval';
+/** Low to high intensity, in ribbon-render order — `planTypes.ts`'s `EFFORT_LEVELS`, not a
+ * second literal array that could drift from it. */
+export const EffortOrder: readonly EffortLevel[] = EFFORT_LEVELS;
 
-/** Low to high intensity, in ribbon-render order. */
-export const EffortOrder: readonly EffortLevel[] = ['recovery', 'easy', 'steady', 'tempo', 'interval'];
+/**
+ * `barHeight` is `0.4 + 0.15 × EFFORT_ORDINAL[level]`: recovery through interval land on exactly
+ * 0.4 / 0.55 / 0.7 / 0.85 / 1, the ramp `frontend-design-brief.md` Part 2 records. Deriving it
+ * from `planTypes.ts`'s ordinal, rather than hand-writing each fraction, means a future reorder
+ * there fails loudly instead of silently skewing these bar heights out of sync with the colours
+ * below.
+ */
+const barHeightFor = (level: EffortLevel): number => 0.4 + 0.15 * EFFORT_ORDINAL[level];
 
 export const Effort: Record<EffortLevel, { light: string; dark: string; barHeight: number }> = {
-  recovery: { dark: '#6FA8C9', light: '#5196BE', barHeight: 0.4 },
-  easy: { dark: '#4FA97E', light: '#4A9F76', barHeight: 0.55 },
-  steady: { dark: '#C9A227', light: '#AB8A21', barHeight: 0.7 },
-  tempo: { dark: '#D9772B', light: '#D87427', barHeight: 0.85 },
-  interval: { dark: '#C6402F', light: '#C6402F', barHeight: 1 },
-} as const;
+  recovery: { dark: '#6FA8C9', light: '#5196BE', barHeight: barHeightFor('recovery') },
+  easy: { dark: '#4FA97E', light: '#4A9F76', barHeight: barHeightFor('easy') },
+  steady: { dark: '#C9A227', light: '#AB8A21', barHeight: barHeightFor('steady') },
+  tempo: { dark: '#D9772B', light: '#D87427', barHeight: barHeightFor('tempo') },
+  interval: { dark: '#C6402F', light: '#C6402F', barHeight: barHeightFor('interval') },
+};
 
 // ---------------------------------------------------------------------------------------------
 // The accent — brief Part 2 "The accent". Theme-invariant: hivis means the same thing whether
@@ -248,9 +264,35 @@ export const Motion = {
 } as const;
 
 // ---------------------------------------------------------------------------------------------
-// Layout constants — unchanged from the template scaffold; still load-bearing (brief Part 8).
+// Interaction — issue #32 finding 3. Every `Pressable` in the app dims to the same opacity on
+// press; before this token, `index.tsx` and `WeekAccordion.tsx` each hardcoded their own `0.7`.
+// `Motion.duration.instant` is reserved for animating this transition once Phase 6 wires real
+// press-in/press-out springs — until then it's a flat, unanimated opacity swap.
 // ---------------------------------------------------------------------------------------------
 
+export const PressedOpacity = 0.7;
+
+// ---------------------------------------------------------------------------------------------
+// Layout constants.
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * PARKED — deliberately uncalled, and not to be given a call site until the condition below is
+ * met (issue #32 finding 8, which asked "use it or fix the comment"; this is the "fix the
+ * comment" half, and the reason).
+ *
+ * This models the height of a tab bar that *floats over* screen content — the case where a
+ * screen must pad its own bottom because nothing else reserves that space. That tab bar was
+ * never built. `src/app/(tabs)/_layout.tsx` sets no `position: 'absolute'` on `tabBarStyle`, so
+ * React Navigation lays the bar out **in normal flow**, as a sibling below the screen container,
+ * and the bar applies the bottom safe-area inset itself. A tab screen's viewport therefore
+ * already ends where the tab bar begins: padding it by this constant adds trailing void, not
+ * clearance — the "floating dead gap" `frontend-design-brief.md` Part 8 warns about.
+ *
+ * It becomes correct — and should be applied to every scrolling tab screen at once — the day
+ * `tabBarStyle` goes `position: 'absolute'`. Until then, a tab screen's bottom padding is an
+ * ordinary `Spacing` value like any other.
+ */
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
 
 /** Binds only on iPad/tablet/resizable web — invisible on every phone (360–430pt). Phone-only

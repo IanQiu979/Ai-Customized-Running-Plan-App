@@ -15,8 +15,9 @@ as words, race day announced, plus three code-review-caught defects, including c
 formatter #28 fixed into one shared `formatSecPerKm()` so the two readouts can't drift apart.
 `FallbackNotice` gains a required quota-copy `variant` prop, closing issue #30 (issue #45 filed for
 the still-open follow-up). React Navigation's chrome now derives from `theme.ts`'s tokens instead
-of leaking the library's own stock palette, closing #27. 117 tests passing, up from 82. Issue #22 remains
-open.)
+of leaking the library's own stock palette, closing #27. Issue #32's frontend polish batch closed —
+nine of eleven findings fixed, two dispositioned (rejected / already stale). 121 tests passing, up
+from 82. Issue #22 remains open.)
 
 ---
 
@@ -35,13 +36,14 @@ open.)
 Phase 0's paper-reconciliation pass is now done too. **The plan-generation engine itself does not
 exist yet.** `src/lib/supabase.ts`, `planTypes.ts`, `loadRules.ts`, and (as of the 2026-07-11
 review-and-refine cycle) `notation.ts` are the app's `lib/` layer — shared vocabulary, safety
-arithmetic, and run-type/structure-string notation, all pure and tested (82 lib-layer tests, up
+arithmetic, and run-type/structure-string notation, all pure and tested (83 lib-layer tests, up
 from 64, after Ian's 2026-07-12 round-2 rulings on issue #34 added the long-run deload-week
-measurement fix (ruling R1c) and the race-day/strides test coverage; the project total is **117
-across 6 suites** as of the same day's `formatSecPerKm` carry-boundary fix (issue #28, which added
-the first test suite under `src/components/`), issue #31's screen-reader accessibility fixes, and
-issue #27's navigation-theme suite under `src/constants/`, which together took the project total
-82 → 93 → 107 → 117). A golden fixture (`src/lib/fixtures/examplePlan.ts`), a rendered
+measurement fix (ruling R1c) and the race-day/strides test coverage, plus issue #32's
+strides-label regression test; the project total is **121 across 7 suites** as of the same day's
+`formatSecPerKm` carry-boundary fix (issue #28, which added the first test suite under
+`src/components/`), issue #31's screen-reader accessibility fixes, issue #27's navigation-theme
+suite under `src/constants/`, and issue #32's `theme.effort.test.ts`, which together took the
+project total 82 → 93 → 107 → 117 → 121). A golden fixture (`src/lib/fixtures/examplePlan.ts`), a rendered
 plan screen (`src/app/plan/[id].tsx` and `src/components/plan/`), and an abbreviations glossary tab
 (`src/app/(tabs)/glossary.tsx`) exist and render that fixture — but nothing generates a plan from an
 intake yet. `src/lib/planTemplates.ts` and `src/lib/paceDerivation.ts`, the actual generation logic,
@@ -90,6 +92,28 @@ the literal previous week) and issue #33 (goal-realism handling).
       (`WeekAccordion`, `WorkoutRow`, `EffortChip`, `ReadoutBracket`, `PlanNameplate`,
       `DisclaimerFooter`, `FallbackNotice`, `format.ts`) — render the golden fixture on a real
       screen, ugly-beyond-tokens caveats aside.
+- [x] **Issue #32 frontend/code polish batch — nine of eleven findings fixed, 2026-07-12.** Applied
+      to `src/components/plan/{WeekAccordion,PlanNameplate}.tsx`, `src/constants/theme.ts`,
+      `src/hooks/use-theme.ts`, `src/app/(tabs)/index.tsx`, `src/lib/notation.ts`, and
+      `src/lib/fixtures/examplePlan.ts`. Ribbon bars round top-only (rise from the baseline instead
+      of floating above it); the ▴/▾ chevron is a drawn, fixed-weight glyph instead of a
+      Unicode character riding on font-fallback weight; `PlanNameplate.tsx`'s metadata line now
+      binds key→value with a colon and separates fields with `·` (was `·` doing both jobs,
+      told apart only by whitespace — `docs/design/mvp-blueprint.md` Part 7 corrected to match, it
+      was the origin of the ambiguity); a new `PressedOpacity` theme token replaces two hardcoded
+      `0.7` press-dim values; `theme.ts`'s effort scale (`EffortLevel`, `EffortOrder`, `barHeight`)
+      now derives from `planTypes.ts`'s `EFFORT_LEVELS`/`EFFORT_ORDINAL` instead of duplicating them
+      (`planTypes.ts` itself untouched — still the source of truth); Home's `SafeAreaView` no longer
+      reserves the bottom edge (matches `glossary.tsx`, the tab bar already owns it); a false
+      provenance comment in `notation.ts` is corrected (comment only, no copy change); and
+      `examplePlan.ts`'s `easyRun()` takes strides as an explicit parameter instead of inferring it
+      from the structure string (fixture output byte-identical). **Two findings dispositioned, not
+      fixed:** the Rule 10 disclaimer's "PACE" wording is rejected per Ian's existing 2026-07-12
+      ruling (naming PR #40), not re-litigated; the "Home title" finding was already stale (Home has
+      read "Pace Blueprint" since PR #40). **`BottomTabInset` stays intentionally uncalled** —
+      documented in `theme.ts`'s docblock as parked until `tabBarStyle` ever goes `position:
+      'absolute'`; see `docs/change_log.md` and "Known debt" below. Full account:
+      `docs/change_log.md`'s 2026-07-12 issue #32 entry.
 - [x] **`src/constants/navigation-theme.ts` — fixes GitHub issue #27 (2026-07-11 frontend-audit
       finding), done 2026-07-12.** `src/app/_layout.tsx` was feeding React Navigation's stock
       `DefaultTheme`/`DarkTheme` to `ThemeProvider`, which meant the library painted its own
@@ -114,17 +138,21 @@ the literal previous week) and issue #33 (goal-realism handling).
       ruling — see `docs/change_log.md`'s 2026-07-12 entry. **Known gap, filed as issue #45:** the
       client can't yet derive the true variant from `Plan.isFallback` alone; blocked on
       `generate-plan` returning whether a fallback consumed quota (Phase 4).
-- [x] 82 passing tests (`jest-expo`), up from 64 after Ian's 2026-07-12 issue #34 rulings:
-      `supabase.test.ts`, `loadRules.test.ts` (extended for ruling R1c — a deload week's long run
-      is measured against the last loading week's volume, not exempted from the cap), plus
-      `notation.test.ts` (+1 for R6's race-day structure string), and
-      `examplePlan.fixture.test.ts` (extended for R6 and R7). Two more suites exist and
-      **intentionally fail to compile** — they're TDD specs for code that doesn't exist yet:
+- [x] 121 passing tests across 7 suites (`jest-expo`), up from 64 after Ian's 2026-07-12 issue #34
+      rulings and the same day's issue #28 / #31 / #27 / #32 fixes: `supabase.test.ts`,
+      `loadRules.test.ts` (extended for ruling R1c — a deload week's long run is measured against
+      the last loading week's volume, not exempted from the cap), `notation.test.ts` (+1 for R6's
+      race-day structure string), `examplePlan.fixture.test.ts` (extended for R6, R7, and issue
+      #32's strides-label regression test), `src/components/`'s first suite (issue #28's
+      `formatSecPerKm` carry boundary, extended by issue #31's screen-reader fixes),
+      `src/constants/__tests__/navigation-theme.test.ts` (issue #27, 10 tests), and
+      `theme.effort.test.ts` (issue #32, 3 tests guarding the effort-scale derivation above).
+      Two more suites exist and **intentionally fail to compile** — they're TDD specs for code that doesn't exist yet:
       `planTemplates.golden.test.ts` (also extended for R6/R7) and `paceDerivation.test.ts`. Both
       already assert every current coaching ruling (45 km week 9, 300 m jog, week-11 goal-pace
       convergence, the R6 race-day string, R7's two-strides-day weeks) — they fail only because
       `planTemplates.ts` and `paceDerivation.ts` don't exist to import, not because their
-      expectations are stale. `test` is 4 suites passing / 2 intentionally red — this was true on
+      expectations are stale. `test` is 5 suites passing / 2 intentionally red — this was true on
       clean `origin/main` before the 2026-07-12 pass too; nothing here is a new failure.
       **`typecheck` and `lint` are currently red too**, both on the same two files (`Cannot find
       module '../planTemplates'` / `'../paceDerivation'`) — expected, not a regression, but `npm
@@ -479,10 +507,11 @@ against that contract, so the suite stays quarantined until it lands.
   import `planTemplates.ts` / `paceDerivation.ts`, which don't exist. PR #2 merged them ahead of
   their modules, so every branch cut from `main` inherited a red build (issue #41) and the repo
   could not satisfy `CLAUDE.md`'s own pre-commit gate. **Nothing in the specs is stale** — they
-  assert every current coaching ruling. `typecheck`, `lint`, and `test` (117/117, 6 suites —
+  assert every current coaching ruling. `typecheck`, `lint`, and `test` (121/121, 7 suites —
   up from 82/82, 4 suites, after the 2026-07-12 issue #28 fix (`formatSecPerKm` carry-boundary,
-  93/93, first suite under `src/components/`), issue #31's accessibility fixes on top of it, and
-  issue #27's `src/constants/__tests__/navigation-theme.test.ts`) are now all clean. **Removing the
+  93/93, first suite under `src/components/`), issue #31's accessibility fixes on top of it,
+  issue #27's `src/constants/__tests__/navigation-theme.test.ts`, and issue #32's
+  `theme.effort.test.ts`) are now all clean. **Removing the
   three exclusions and getting both suites green is part of step 3's done-when** (issue #3) — do
   not land the engine without doing it.
 - 🟡 **Suspected pre-existing bug: Home's demo link may render with no border, no 48pt tap target,
@@ -526,6 +555,16 @@ against that contract, so the suite stays quarantined until it lands.
   blocked on `generate-plan` existing (Phase 4, issue #9's API contract).
 - 🟡 `220 − age` is retained for max HR by Ian's informed decision, against Tanaka 2001 (±10–12 bpm).
   Recorded so a future session does not "fix" it.
+- 🟡 **`BottomTabInset` stays deliberately uncalled (issue #32 finding 8, 2026-07-12).** It models a
+  tab bar that *floats over* content; the real tab bar (`src/app/(tabs)/_layout.tsx`) sets no
+  `position: 'absolute'` on `tabBarStyle`, so React Navigation lays it out in normal flow and a tab
+  screen's viewport already ends where the bar begins — padding by this constant today adds
+  trailing void, not clearance. **A first attempt at this batch wired it into the Glossary's scroll
+  padding and was reverted** (it silently grew Android's bottom gap from 48pt to 80pt for no
+  benefit). It becomes correct — and should be applied to every scrolling tab screen at once — only
+  if `tabBarStyle` ever goes `position: 'absolute'`; whoever builds Home/My Plans' real scrolling
+  content next should read this before reaching for the constant. Full reasoning in `theme.ts`'s
+  docblock at the constant's definition.
 - 🟡 **EAS project not initialized** (`eas init` not run). No TestFlight pipeline exists yet — needed
   at M6, not before.
 - 🟡 **App art is still stock Expo — unblocked by the name decision, not yet done.** The icon,

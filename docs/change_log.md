@@ -5,6 +5,85 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-07-12 — issue #32 polish batch: nine of eleven LOW findings fixed, two dispositioned not fixed (closes #32)
+
+Frontend/code polish batch from the 2026-07-11 audits, triaged and closed in one pass. No coaching
+rule touched. Applied to `src/components/plan/{WeekAccordion,PlanNameplate}.tsx`,
+`src/constants/theme.ts`, `src/hooks/use-theme.ts`, `src/app/(tabs)/index.tsx`, `src/lib/notation.ts`,
+`src/lib/fixtures/examplePlan.ts`, and `src/lib/__tests__/{examplePlan.fixture,theme.effort}.test.ts`
+(the second is new). `docs/design/mvp-blueprint.md` Part 7 also corrected — see below.
+
+- **Ribbon bars round top-only.** `WeekAccordion.tsx`'s `bar` style used a full `borderRadius`,
+  making each bar look like it floats above the week's baseline rule instead of rising from it.
+  Now `borderTopLeftRadius`/`borderTopRightRadius` only.
+- **The ▴/▾ chevron is drawn, not typeset.** The Unicode triangle's weight rode on the body font's
+  Android fallback, so it could render heavier or lighter than the rest of the UI depending on
+  device. Replaced with a small bordered `View` rotated onto a point (fixed 1.5 stroke, not
+  `hairlineWidth` — a glyph should carry the same weight on every device, unlike a hairline rule).
+  The finding said to wait for "the tab icon set"; there is no icon set and none is planned — the
+  tab bar is deliberately label + caliper tick (`mvp-blueprint.md` Part 8) — and adding an icon
+  library would be a HIGH-tier dependency addition (`AGENTS.md`) for a cosmetic fix, so it was
+  drawn instead.
+- **`PlanNameplate.tsx`'s metadata line: one glyph, one job.** `·` was doing double duty as both
+  the key→value binder (`TIER · PRO`) and the field separator, distinguishable only by how much
+  whitespace surrounded it. Now a colon binds key to value and `·` (with its existing wide gutters)
+  separates fields only. `·` keeps the separator role, not the binder role, because that's the
+  sense the app already teaches the runner — `notation.ts` glosses `·` as the structure-string
+  segment separator, and the Glossary tab prints that definition. The line now renders
+  `TIER: PRO   ·   12 WEEKS TO RACE DAY: OCT 4, 2026` (or `TIER: FREE   ·   12-WEEK PLAN` for a
+  duration goal). **`docs/design/mvp-blueprint.md` Part 7 corrected in the same pass — it was the
+  origin of the ambiguity**: its own worked example, `TIER · PRO   GENERATED · 07.10.26`, used `·`
+  for both jobs too. Rewritten to the shipped colon/middot split; the surrounding prose ("uppercase
+  tokens separated by middots") fixed to name both roles explicitly.
+- **`PressedOpacity` token added to `theme.ts`.** `index.tsx` and `WeekAccordion.tsx` each
+  hardcoded the same `0.7` press-dim value independently; both now reference one token.
+- **The effort scale is no longer duplicated between `theme.ts` and `planTypes.ts`.** `EffortLevel`,
+  its render order (`EffortOrder`), and its intensity ordinal were each declared separately in both
+  files — three places a reorder could silently desync. `theme.ts` now imports `EFFORT_LEVELS` and
+  `EFFORT_ORDINAL` from `planTypes.ts` (the module the app and the future `generate-plan` edge
+  function share) and derives `Effort[level].barHeight` as `0.4 + 0.15 × EFFORT_ORDINAL[level]` —
+  reproducing `frontend-design-brief.md` Part 2's documented ramp (0.4 / 0.55 / 0.7 / 0.85 / 1)
+  exactly, but as arithmetic instead of five hand-written numbers. `planTypes.ts` itself was **not**
+  edited — it was already the source of truth, and stays it. New test file
+  `src/lib/__tests__/theme.effort.test.ts` (3 tests) guards the derivation: the exact ramp, that the
+  ordinals it assumes are dense `0…4`, and that `EffortOrder` is `EFFORT_LEVELS` by referential
+  identity, not a re-typed copy.
+- **Home's `SafeAreaView` no longer reserves the bottom edge.** `index.tsx` now passes
+  `edges={['top', 'left', 'right']}`, matching `glossary.tsx` — the tab bar already owns that inset.
+- **A false provenance comment in `notation.ts` corrected — no user-visible copy changed.** The
+  comment claimed the Rest glossary entry's description was reused verbatim from `WorkoutRow.tsx`;
+  it isn't verbatim, it elaborates that row's copy for a glossary context. Comment only.
+- **`examplePlan.ts`'s `easyRun()` no longer infers its "+ Strides" label from the mere presence of
+  a structure string.** Strides is now an explicit third parameter (`hasStrides`), so a structure
+  string and its label can't silently disagree the way an inferred label could. Every call site
+  updated; the fixture's emitted data is byte-identical. New regression test in
+  `examplePlan.fixture.test.ts` asserts the converse of the existing "+ Strides implies a strides
+  structure" test — that an `ER`-labelled day never carries an unlabelled strides structure —
+  scoped to the `ER` family on purpose (`shakeoutRun`'s week-12 `SR + Strides` day is intentional,
+  not a desync).
+- **`BottomTabInset` documented as deliberately parked, not given a manufactured call site.** The
+  finding was "zero call sites — use it or justify it"; the honest answer is the constant models a
+  tab bar that *floats over* content, and no such tab bar exists. `src/app/(tabs)/_layout.tsx` sets
+  no `position: 'absolute'` on `tabBarStyle`, so React Navigation lays the bar out in normal flow as
+  a sibling below the screen container and applies the bottom safe-area inset itself — a tab
+  screen's viewport already ends where the tab bar begins. Padding by `BottomTabInset` today would
+  add trailing void, not clearance: exactly the "floating dead gap" `frontend-design-brief.md` Part
+  8 warns against. **It becomes correct — and should be applied to every scrolling tab screen at
+  once — only if `tabBarStyle` ever goes `position: 'absolute'`.** Caught in review: the first cut
+  of this batch wired it into the Glossary's scroll padding, which silently grew Android's bottom
+  gap from 48pt to 80pt for no benefit; that wiring was reverted before landing. `theme.ts`'s
+  docblock now carries this full reasoning at the constant's definition.
+- **Two findings dispositioned, not fixed — deliberately, not silently dropped:**
+  - **The disclaimer finding is rejected.** It claimed `examplePlan.ts`'s Rule 10 disclaimer
+    "hardcodes PACE as the app name" and should be templated. Ian already ruled the opposite on
+    2026-07-12, in the same pass that named the app (PR #40, recorded above and in
+    `mvp-progress.md`'s "Decided" table): the disclaimer keeps "PACE" because the family brand, not
+    the individual app surface, is the entity providing coaching guidance. Not re-litigated here.
+  - **The "Home title is a de-facto app name" finding was already stale by the time this pass
+    opened it** — Home has read "Pace Blueprint" since PR #40, well before this batch started.
+- **Test suite: 86 passed / 0 failed, up from 82** (`theme.effort.test.ts` new, 3 tests;
+  `examplePlan.fixture.test.ts` +1). `typecheck` and `lint` both clean. No source file outside the
+  list above was touched, and no coaching-reference file under `docs/reference/coaching/` changed.
 ## 2026-07-12 — navigation chrome now uses design tokens, not React Navigation's stock palette (closes #27)
 
 Frontend-audit finding from 2026-07-11. `src/app/_layout.tsx` handed React Navigation's stock

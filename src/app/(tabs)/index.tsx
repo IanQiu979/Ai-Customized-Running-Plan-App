@@ -2,7 +2,7 @@ import { Link } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { FontFamily, FontSize, Radius, Spacing } from '@/constants/theme';
+import { FontFamily, FontSize, PressedOpacity, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { EXAMPLE_PLAN_ID } from '@/lib/fixtures/examplePlan';
 
@@ -19,7 +19,7 @@ export default function HomeScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.surface.base }]}>
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         <Text style={[styles.title, { color: theme.text.primary }]}>Pace Blueprint</Text>
         <Text style={[styles.body, { color: theme.text.secondary }]}>
           Intake, generation, and plan view land in later build phases.
@@ -82,7 +82,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   demoLinkPressed: {
-    opacity: 0.7,
+    opacity: PressedOpacity,
   },
   demoLinkText: {
     fontFamily: FontFamily.body.semiBold,

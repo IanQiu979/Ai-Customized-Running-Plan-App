@@ -130,11 +130,11 @@ const CURRENT_INTERVAL_PACE: Pace = { lowSecPerKm: 262, highSecPerKm: 270 };
  * point, now that the plan sits in the race-specific phase. */
 const GOAL_PACE: Pace = { lowSecPerKm: 240, highSecPerKm: 240 };
 
-function easyRun(distanceKm: number, structure?: string): Workout {
+function easyRun(distanceKm: number, structure?: string, hasStrides = false): Workout {
   return {
     kind: 'run',
     effort: 'easy',
-    label: structure ? 'ER + Strides' : 'ER',
+    label: hasStrides ? 'ER + Strides' : 'ER',
     distanceKm,
     effortDescription: EASY_DESCRIPTION,
     pace: EASY_PACE,
@@ -251,9 +251,9 @@ export const examplePlan: Plan = {
       false,
       34,
       [
-        easyRun(8, '4 × 30 s Strides'),
+        easyRun(8, '4 × 30 s Strides', true),
         REST,
-        easyRun(8, '4 × 30 s Strides'),
+        easyRun(8, '4 × 30 s Strides', true),
         REST,
         tempoRun(8, 'WU 2 km · 20 min @ tempo · CD 2 km'),
         longRun(10),
@@ -271,9 +271,9 @@ export const examplePlan: Plan = {
       false,
       35,
       [
-        easyRun(8, '4 × 30 s Strides'),
+        easyRun(8, '4 × 30 s Strides', true),
         REST,
-        easyRun(8, '4 × 30 s Strides'),
+        easyRun(8, '4 × 30 s Strides', true),
         REST,
         tempoRun(8, 'WU 2 km · 20 min @ tempo · CD 2 km'),
         longRun(11),
@@ -288,9 +288,9 @@ export const examplePlan: Plan = {
       false,
       38,
       [
-        easyRun(9, '4 × 30 s Strides'),
+        easyRun(9, '4 × 30 s Strides', true),
         REST,
-        easyRun(9, '4 × 30 s Strides'),
+        easyRun(9, '4 × 30 s Strides', true),
         REST,
         tempoRun(8, 'WU 2 km · 20 min @ tempo · CD 2 km'),
         longRun(12),
@@ -317,9 +317,9 @@ export const examplePlan: Plan = {
       false,
       41,
       [
-        easyRun(10, '4 × 30 s Strides'),
+        easyRun(10, '4 × 30 s Strides', true),
         REST,
-        easyRun(10, '4 × 30 s Strides'),
+        easyRun(10, '4 × 30 s Strides', true),
         REST,
         tempoRun(8, 'WU 2 km · 20 min @ tempo · CD 2 km'),
         longRun(13),
@@ -336,9 +336,9 @@ export const examplePlan: Plan = {
       false,
       45,
       [
-        easyRun(11, '4 × 30 s Strides'),
+        easyRun(11, '4 × 30 s Strides', true),
         REST,
-        easyRun(11, '4 × 30 s Strides'),
+        easyRun(11, '4 × 30 s Strides', true),
         REST,
         tempoRun(9, 'WU 2 km · 22 min @ tempo · CD 2 km'),
         longRun(14),
@@ -354,9 +354,9 @@ export const examplePlan: Plan = {
       false,
       48,
       [
-        easyRun(12, '4 × 30 s Strides'),
+        easyRun(12, '4 × 30 s Strides', true),
         REST,
-        easyRun(12, '4 × 30 s Strides'),
+        easyRun(12, '4 × 30 s Strides', true),
         REST,
         tempoRun(9, 'WU 2 km · 24 min @ tempo · CD 2 km'),
         longRun(15),
@@ -381,7 +381,7 @@ export const examplePlan: Plan = {
       false,
       45,
       [
-        easyRun(11, '4 × 30 s Strides'),
+        easyRun(11, '4 × 30 s Strides', true),
         REST,
         tempoRun(9, 'WU 2 km · 24 min @ tempo · CD 2 km'),
         REST,
@@ -404,7 +404,7 @@ export const examplePlan: Plan = {
       false,
       48,
       [
-        easyRun(12, '4 × 30 s Strides'),
+        easyRun(12, '4 × 30 s Strides', true),
         REST,
         tempoRun(10, 'WU 2 km · 29 min @ tempo · CD 2 km'),
         REST,
@@ -428,7 +428,7 @@ export const examplePlan: Plan = {
         REST,
         racePaceReps(10, 'WU 2 km · 3 × 1600 m @ GP 4:00/km w/ ~400 m jog · CD 2 km'),
         REST,
-        easyRun(9, '4 × 30 s Strides @ GP'),
+        easyRun(9, '4 × 30 s Strides @ GP', true),
         longRun(12),
         REST,
       ],
@@ -449,7 +449,7 @@ export const examplePlan: Plan = {
       [
         easyRun(8),
         REST,
-        easyRun(6, '4 × 20 s Strides @ GP'),
+        easyRun(6, '4 × 20 s Strides @ GP', true),
         REST,
         shakeoutRun(4, '2 × 30 s Strides @ GP'),
         REST,

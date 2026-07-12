@@ -61,7 +61,11 @@ src/
 canonical** — pure TypeScript, no runtime deps, imported by both the Expo app and (once written)
 the Deno edge functions. `loadRules.ts` carries 19 passing unit tests, `notation.ts` 13.
 **When this document and the types disagree, the types win** — `planTypes.ts` is the source of
-truth, this file is a description of it.
+truth, this file is a description of it. `src/constants/theme.ts` is one such consumer: as of
+2026-07-12 (issue #32 findings 4 and 7) it derives `EffortLevel`'s render order and bar-height ramp
+from `planTypes.ts`'s `EFFORT_LEVELS`/`EFFORT_ORDINAL` rather than redeclaring them, so a
+presentation value can no longer drift from the shared type it's meant to visualize — see "visual
+direction" below.
 
 `src/lib/fixtures/examplePlan.ts` is the 5K golden fixture rendered as real `Plan` data —
 `src/app/plan/[id].tsx` and `src/components/plan/` render it end to end on a real screen
@@ -241,21 +245,30 @@ tier or quota.
 template palette it replaced (light `#000000`/`#ffffff`/`#F0F0F3`/`#E0E1E6`/`#60646C`, dark
 `#ffffff`/`#000000`/`#212225`/`#2E3135`/`#B0B4BA`) is gone, along with the template screens that
 used it (`explore.tsx` and friends). `Spacing` now runs half=2, one=4, two=8, three=16, four=24,
-five=32, **six=48** (new step), seven=64 (the old `six`); `BottomTabInset` and
-`MaxContentWidth = 800` are unchanged from the scaffold. Full rationale for every value —
-contrast math, the two computed dark-mode fixes, the `grid.*` tokens — lives in the token file's
-own header comment and `docs/design/frontend-design-brief.md` Part 2; this section is a summary,
-not the source of truth.
+five=32, **six=48** (new step), seven=64 (the old `six`); `MaxContentWidth = 800` is unchanged from
+the scaffold. `BottomTabInset`'s value is likewise unchanged, but as of 2026-07-12 (issue #32
+finding 8) it carries a docblock explaining why it still has zero call sites: it models a tab bar
+that *floats over* content, and the real tab bar (`(tabs)/_layout.tsx`) lays out in normal flow
+instead, so applying the inset today would add trailing void, not clearance — see
+`docs/mvp-progress.md`'s "Known debt" for the full reasoning. Full rationale for every other
+value — contrast math, the two computed dark-mode fixes, the `grid.*` tokens — lives in the token
+file's own header comment and `docs/design/frontend-design-brief.md` Part 2; this section is a
+summary, not the source of truth.
 
 - **Bases**: `asphalt #14171C` (dark), `chalk #F7F7F4` (light), `graphite #5A6069` (secondary
   text) — deliberately not pure black/white, and deliberately not a cream-and-terracotta look.
 - **Effort scale** — the palette *is* the information, not decoration: `recovery #6FA8C9`,
   `easy #4FA97E`, `steady #C9A227`, `tempo #D9772B`, `interval #C6402F`. A color always means an
-  intensity.
+  intensity. `barHeight` (the ramp's mandatory non-hue accessibility channel) is computed as
+  `0.4 + 0.15 × EFFORT_ORDINAL[level]` against `planTypes.ts`'s ordinal rather than hand-written
+  per level (issue #32 findings 4 and 7, 2026-07-12) — see "Current" above.
 - One accent, `hivis #D8F14A`, reserved exclusively for the single primary forward-action of
   whatever screen you're on — boldness spent in exactly one place. (There is no "next workout"
   card in v1 — decision 5, 2026-07-10 — so hivis does not move to one; it stays on the primary
   CTA.)
+- **Interaction**: one `PressedOpacity` token (`0.7`) for every `Pressable`'s press-dim, added
+  2026-07-12 (issue #32 finding 3) so the value can't fork across components the way it had in
+  `index.tsx` and `WeekAccordion.tsx`.
 - Type: a condensed grotesque for display and numerals (running is numbers — distance, pace,
   splits), a neutral body face, a mono face for split tables. Scale 32/24/20/17/15/13.
 - **Signature element — the "week ribbon"**: each training week renders as seven cells colored
