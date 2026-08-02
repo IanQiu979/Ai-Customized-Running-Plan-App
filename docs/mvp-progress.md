@@ -8,7 +8,7 @@
 
 **Last updated:** 2026-08-03 (issue #3's pure TypeScript plan-generation engine landed:
 `paceDerivation.ts` + `planTemplates.ts`; bundled issues #22/#23 fixed; both red-first suites
-un-quarantined. Typecheck, lint, and all 201 tests across 10 suites pass. Backend wiring remains
+un-quarantined. Typecheck, lint, and all 213 tests across 10 suites pass. Backend wiring remains
 unbuilt.)
 
 ---
@@ -28,7 +28,7 @@ unbuilt.)
 derives Riegel equivalents, training pace bands, and the ruled goal-realism/cap result;
 `src/lib/planTemplates.ts` builds deterministic template plans and reproduces the approved 12-week
 5K fixture exactly. `clampWeeklyVolume()` now names and uses the last loading week, and the golden
-week-8 output is 30 km. The former red-first suites run normally: **201 tests across 10 suites**,
+week-8 output is 30 km. The former red-first suites run normally: **213 tests across 10 suites**,
 with typecheck and lint clean. The plan screen still renders the static fixture, however, and no
 intake, database, edge function, quota flow, or AI personalization exists yet; M3 is therefore only
 partially complete.
@@ -114,7 +114,7 @@ partially complete.
       ruling — see `docs/change_log.md`'s 2026-07-12 entry. **Known gap, filed as issue #45:** the
       client can't yet derive the true variant from `Plan.isFallback` alone; blocked on
       `generate-plan` returning whether a fallback consumed quota (Phase 4).
-- [x] **201 passing tests across 10 suites (`jest-expo`) as of 2026-08-03.** This includes the
+- [x] **213 passing tests across 10 suites (`jest-expo`) as of 2026-08-03.** This includes the
       formerly red-first `planTemplates.golden.test.ts` and `paceDerivation.test.ts` contracts,
       now un-quarantined and green. `npm run typecheck`, `npm run lint`, and `npm test` all pass.
 - [x] **Issue #28 fixed (2026-07-12): `formatSecPerKm`'s minute/second carry.**
@@ -286,7 +286,7 @@ with **no backend at all**.
        race distances. Pace derivation, goal realism, issue #22's last-loading-week clamp, and
        issue #23's 30 km week-8 output landed in the same build.
    - [x] **Un-quarantine the two TDD suites.** The Jest, TypeScript, and ESLint exclusions are
-         removed; both suites run in the normal gate. Typecheck, lint, and 201/201 tests pass.
+         removed; both suites run in the normal gate. Typecheck, lint, and 213/213 tests pass.
    - [x] **Fixture/test resync — already done, not still open (corrected in this doc-audit
          pass).** `src/lib/__tests__/paceDerivation.test.ts`, `src/lib/__tests__/planTemplates.golden.test.ts`,
          and `src/lib/fixtures/examplePlan.ts` all already assert cycle-2's corrected numbers:

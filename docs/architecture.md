@@ -38,7 +38,7 @@ src/
     paceDerivation.ts        # pure Riegel/training-pace/goal-realism arithmetic
     planTemplates.ts         # pure deterministic template + fallback plan engine
     fixtures/examplePlan.ts  # hand-built 5K screen fixture; `plan/[id].tsx` still renders it
-    __tests__/               # 9 passing suites project-wide, including the two engine contracts
+    __tests__/               # 10 passing suites project-wide, including the two engine contracts
 ```
 
 `src/lib/supabase.ts` exports `supabase`, built with
@@ -59,7 +59,7 @@ src/
 `src/lib/planTypes.ts`, `src/lib/loadRules.ts`, `src/lib/notation.ts`,
 `src/lib/paceDerivation.ts`, and `src/lib/planTemplates.ts` **exist and are canonical** — pure
 TypeScript with no runtime dependencies, importable by both the Expo app and future Deno edge
-functions. The project gate is 201 passing tests across 10 suites.
+functions. The project gate is 213 passing tests across 10 suites.
 **When this document and the types disagree, the types win** — `planTypes.ts` is the source of
 truth, this file is a description of it. `src/constants/theme.ts` is one such consumer: as of
 2026-07-12 (issue #32 findings 4 and 7) it derives `EffortLevel`'s render order and bar-height ramp

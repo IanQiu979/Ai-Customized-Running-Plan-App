@@ -21,7 +21,11 @@ make a behavior-changing commit, add a bullet under today's date — create a ne
 - Resolved issue #23 in generated output: week 8 is the approved 30 km and every week's
   `volumeKm` remains the exact sum of its sessions.
 - Removed the Jest, TypeScript, and ESLint quarantine exclusions. The two red-first suites now run
-  in the normal build; all 201 tests across 10 suites pass alongside typecheck and lint.
+  in the normal build; all 213 tests across 10 suites pass alongside typecheck and lint.
+- Review fix: `buildGenericWeek()` now reconciles assembled workouts down to the clamped
+  `targetKm` via `reconcileVolumeToTarget()`, since independently-floored pieces (a quality
+  session's minimum, the long run's floor, `distributeDistance`'s 1 km/session floor) could each
+  be individually reasonable yet stack past the clamp.
 
 ## 2026-07-12 — the last stale doc reference from issue #37, actually fixed this time
 
