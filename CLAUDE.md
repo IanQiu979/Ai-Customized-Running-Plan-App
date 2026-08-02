@@ -10,12 +10,16 @@ linked brainstorm / product / engineering docs it indexes.
 
 ## Architecture at a glance
 
-Client: Expo SDK 54, expo-router, TypeScript strict. Backend: Supabase (Postgres + Auth + Edge
-Functions). AI: Claude (`claude-sonnet-5`), called only from the `generate-plan` edge function,
-never from the client. Today only the client scaffold and `src/lib/supabase.ts` exist — no auth
-screens, no DB tables, no edge functions, no migrations. Route tree, `lib/` layout, the
-`generate-plan` flow, the API table, the draft DB schema, and the proposed visual direction all
-live in [`docs/architecture.md`](docs/architecture.md).
+Client: Expo SDK 54, expo-router, TypeScript strict. **Backend: Cloudflare — D1 + Workers +
+better-auth, in [`workers/`](workers/README.md)** (captain's decision, 2026-08-02; `supabase/` and
+`src/lib/supabase.ts` are dead scaffold, kept but unused). AI: Claude (`claude-sonnet-5`), called
+only from the `generate-plan` route, never from the client. The backend spine works end to end
+against `wrangler dev` locally — auth, the quota ledger, `quota-status`, `purchase-tier`,
+`delete-account`, intake, plan reads — but **nothing is deployed** and `generate-plan` returns
+`503 engine_unavailable` until `src/lib/planTemplates.ts` exists. On the client side there are still
+no auth screens and no module that talks to `workers/`. Route tree, `lib/` layout, the
+`generate-plan` flow, the API table, the D1 schema, and the proposed visual direction all live in
+[`docs/architecture.md`](docs/architecture.md).
 
 ## Commands
 
@@ -26,25 +30,35 @@ live in [`docs/architecture.md`](docs/architecture.md).
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run lint` | `expo lint` |
 | `npm test` | `jest` |
+| `npm --prefix workers run dev` | `wrangler dev` — the backend, locally, no Cloudflare account needed |
+| `npm --prefix workers run db:migrate:local` | apply `workers/migrations/` to the local D1 |
+| `npm --prefix workers run typecheck` / `test` | the backend's own gate (`tsc`, then vitest in real `workerd`) |
 
-Run `npm run typecheck && npm run lint && npm test` clean before every commit.
+Run `npm run typecheck && npm run lint && npm test` clean before every commit. **If the commit
+touches `workers/`, also run `npm --prefix workers run typecheck && npm --prefix workers test`** —
+the root gate deliberately excludes that directory (different runtime, different type system,
+different runner), so it will pass while the backend is broken.
 
 ## Secrets & env — read this before touching any env file
 
 - `.env` (gitignored) holds ONLY `EXPO_PUBLIC_SUPABASE_URL` and
   `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. `.env.example` is the committed template — copy it,
-  never edit it in place.
+  never edit it in place. **Both are legacy since 2026-08-02** and exist only because
+  `src/lib/supabase.ts` still throws at import without them; they go when the client is moved onto
+  `workers/`. Server-side config now lives in `workers/` — see the two bullets below.
 - Anything prefixed `EXPO_PUBLIC_` is inlined in **plain text** into the compiled app bundle by
   Expo. Treat it as public. Always read it with static dot notation
   (`process.env.EXPO_PUBLIC_X`) — the `expo/no-dynamic-env-var` lint rule enforces this;
   destructuring or bracket access silently yields `undefined`.
 - `ANTHROPIC_API_KEY` must NEVER get an `EXPO_PUBLIC_` prefix and must NEVER go in `.env`. It
-  lives in `supabase/functions/.env` (gitignored, local dev) and is pushed to production with
-  `supabase secrets set` — not done yet, see `docs/mvp-progress.md`.
-- Supabase auto-injects `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEYS`, `SUPABASE_SECRET_KEYS` into
-  edge functions at runtime. Never set these by hand.
-- Google OAuth client secret and Apple sign-in credentials live only in the Supabase Dashboard,
-  never in a repo file.
+  lives in `workers/.dev.vars` (gitignored, local dev; `.dev.vars.example` is the template) and is
+  pushed to production with `wrangler secret put ANTHROPIC_API_KEY` — not done yet, see
+  `docs/mvp-progress.md`. It is read in exactly one file, `workers/src/lib/model.ts`.
+- **`workers/wrangler.toml` is committed, so it is the Cloudflare equivalent of the
+  `EXPO_PUBLIC_` trap.** `[vars]` there is public configuration only. Every secret goes to
+  `.dev.vars` locally and `wrangler secret put` in production. `BETTER_AUTH_SECRET` included.
+- Google OAuth client id/secret live in `.dev.vars` / `wrangler secret put`, never in a committed
+  file. Apple sign-in is parked entirely (`docs/apple-dev-blocked.md`).
 
 ## Git etiquette
 
@@ -59,13 +73,16 @@ clean `typecheck && lint && test`. Never force-push without explicit user approv
 - Theme tokens only — no hardcoded colors or spacing in components; use
   `src/constants/theme.ts`. It currently holds the stock Expo template palette; the proposed
   PACE palette is recorded in `docs/architecture.md` but not yet implemented.
-- No business rules in the client. Tier, quota, and plan generation are server-only (edge
-  functions); the client may display tier state but is never the authority for it.
+- No business rules in the client. Tier, quota, and plan generation are server-only (`workers/`);
+  the client may display tier state but is never the authority for it. **D1 has no row-level
+  security**, so every D1 statement must bind a `userId` from the verified session — see
+  `workers/src/lib/store.ts`'s header, which is the whole of the authorization story.
 - AI output validation is structural, not strict-content: validate shape, retry once, then fall
   back to a template. Over-tight content validation is a known Echo V1 mistake — detail in
   [`docs/reference/plan-generation.md`](docs/reference/plan-generation.md).
-- Shared types (`Plan`, `Week`, `Workout`, `Tier`) belong in one place (planned:
-  `src/lib/planTypes.ts`) and are imported by both the app and the edge functions.
+- Shared types (`Plan`, `Week`, `Workout`, `Tier`) live in `src/lib/planTypes.ts`, and shared
+  constants/logic in `src/lib/tierLimits.ts` and `src/lib/quotaPeriod.ts`. All three are imported by
+  both the app and `workers/`, so they must stay pure — no React, no Node, no Cloudflare globals.
 
 ## Coaching domain — read before touching plan generation
 

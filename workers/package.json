@@ -1,0 +1,24 @@
+{
+  "name": "pace-blueprint-workers",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Cloudflare Workers + D1 backend for Pace Blueprint (V2.2). Deliberately a separate npm project from the Expo app so wrangler/better-auth never enter the mobile bundle.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "db:migrate:local": "wrangler d1 migrations apply pace-blueprint --local",
+    "db:migrate:remote": "wrangler d1 migrations apply pace-blueprint --remote"
+  },
+  "dependencies": {
+    "better-auth": "^1.6.25"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.20.1",
+    "@cloudflare/workers-types": "^5.20260801.1",
+    "typescript": "~5.9.2",
+    "vitest": "^4.1.0",
+    "wrangler": "^4.118.0"
+  }
+}

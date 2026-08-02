@@ -2,16 +2,22 @@
 
 > **Status: the pure shared plan layer is built and canonical** — `planTypes.ts`,
 > `loadRules.ts`, `paceDerivation.ts`, and `planTemplates.ts` exist, and when this document and the
-> types disagree, the types win. `supabase/functions/generate-plan` and `src/lib/subscription.ts`
-> are still designed, not built. This document describes the design in
+> types disagree, the types win. The `generate-plan` **endpoint** also exists, on Cloudflare
+> Workers (`workers/`, 2026-08-02 — the backend is Cloudflare, not Supabase; see
+> [`docs/architecture.md`](../architecture.md)): all eleven steps below are implemented and tested,
+> and the quota, idempotency, validation, and fallback rules on this page are live. What the
+> endpoint does **not** have yet is a wire-up to that plan engine — `workers/src/deps.ts` still
+> binds the skeleton builder and Pro/Elite prompt (step 7) to a typed *unavailable*, so it answers a
+> structured `503` and releases its quota reservation rather than inventing a plan. This document
+> describes the design in
 > [`planning/02-product-requirements.md`](../../planning/02-product-requirements.md) and
 > [`planning/03-engineering-requirements.md`](../../planning/03-engineering-requirements.md).
 > See [`docs/architecture.md`](../architecture.md) for how it fits the rest of the system and
 > [`docs/mvp-progress.md`](../mvp-progress.md) for what's actually shipped.
 
 Plan generation is the entire product — this app does one thing: turn intake answers into a
-training plan. It is a single edge function, `generate-plan`, that branches into one of three
-engines by the caller's subscription tier.
+training plan. It is a single server route, `POST /api/generate-plan` on Cloudflare Workers, that
+branches into one of three engines by the caller's subscription tier.
 
 ## Coaching source of truth
 
@@ -57,13 +63,16 @@ it explains — never how much of the coach's judgment is taken away.
 
 ## The generation pipeline
 
-All eleven steps run inside the single `generate-plan` edge function, in order:
+All eleven steps run inside the single `generate-plan` route, in order. The orchestration is
+`workers/src/lib/generate-plan-flow.ts`, written with every dependency injected so each branch below
+is unit-tested with no network and no Anthropic spend:
 
-1. **Auth** — verify the JWT, reject anonymous requests.
+1. **Auth** — verify the session, reject anonymous requests. This happens once, ahead of dispatch,
+   so no route can be reached anonymously.
 2. **Idempotency replay** — `GeneratePlanRequest.idempotencyKey` is minted client-side when the
    configure modal opens. A duplicate `(user_id, idempotency_key)` returns the existing plan
    instead of generating again — this is what makes a network-timeout retry safe.
-3. **Atomic quota gate** — the SECURITY DEFINER RPC described under "Quotas" below.
+3. **Atomic quota gate** — the single conditional insert described under "Quotas" below.
 4. **Reconcile plan length** — a race farther out than the tier's max plan length gets a delayed
    start so the taper lands on race day (ported from Echo V1's `reconcilePlanLength`); a
    compressed race gets an honest, short plan. **Never refuse.** A declared red-flag injury
@@ -77,7 +86,7 @@ All eleven steps run inside the single `generate-plan` edge function, in order:
    goes into the prompt as the fixed structure; Claude personalizes **one representative week per
    phase**, not all 24–30 weeks — a full plan does not fit a single model response. Ported from
    Echo V1's token strategy: a brevity mandate, a `max_tokens` ceiling, a **forced tool call** for
-   guaranteed JSON, **SSE streaming** so the edge function isn't CPU-killed mid-response, and
+   guaranteed JSON, streaming so the server isn't CPU-killed mid-response, and
    truncation detection. Personalization is paces (**only if a recent time exists — otherwise no
    numeric pace is emitted at any tier**), HR zones (from age), warm-ups/drills, a weekly "why"
    (Pro) or per-workout "why" (Elite).
@@ -89,9 +98,11 @@ All eleven steps run inside the single `generate-plan` edge function, in order:
 10. **Validate structurally, loosely; retry once; fall back.** See "Validation" below. A second
     failure falls back to the pure template plan, `is_fallback: true`, rendered at **Free
     density** — a template has no "why"; fabricating one would lie.
-11. **Insert** the `plans` row (immutable JSONB — no update/delete RLS grant — carrying
-    `tier_at_generation`, `engine`, `is_fallback`, `idempotency_key`) and return
-    `{ plan, planId, isFallback }`.
+11. **Settle** the `plans` row reserved at step 3 (immutable once settled — enforced by a database
+    trigger, since SQLite has no per-operation grants — carrying `tier_at_generation`, `engine`,
+    `is_fallback`, `idempotency_key`) and return `{ plan, planId, isFallback }`. A reservation is
+    settled or released on **every** exit path, including an unexpected throw: a quota slot held by
+    a crashed generation is a bug the user can neither see nor work around.
 
 ## Quotas
 
@@ -101,13 +112,19 @@ calendar months: they're computed **arithmetically at read time** from the purch
 function `currentPeriod(anchorDate, now)` used by both `generate-plan` and `quota-status`. No
 cron, no rollover write. A user with no `subscriptions` row is `free`.
 
-The check itself is a **SECURITY DEFINER RPC**, not a bare `count(plans)` read followed by an
+The check itself is **one atomic statement**, not a bare `count(plans)` read followed by an
 insert — a count-then-insert has a TOCTOU race with a window as wide as the generation itself
-(tens of seconds). The RPC checks the tier limit, counts **non-fallback** plans
-(`is_fallback = false`) in the current period, and reserves the slot atomically in one
-transaction — N concurrent requests at 2-of-3 quota must yield exactly one success. There is no
-separate counter table to drift out of sync with the `plans` table itself. Quotas are always
-enforced **server-side**, never a client-side counter, and never trusted from client input.
+(tens of seconds). It checks the tier limit, counts **non-fallback** plans (`is_fallback = false`)
+in the current period, and reserves the slot in a single write — N concurrent requests at 2-of-3
+quota must yield exactly one success, which `workers/test/store.test.ts` asserts directly with
+eight concurrent reservations against a three-slot limit. There is no separate counter table to
+drift out of sync with the `plans` table itself. Quotas are always enforced **server-side**, never
+a client-side counter, and never trusted from client input.
+
+On Postgres this needed a `SECURITY DEFINER` RPC holding `pg_advisory_xact_lock`; on D1 (SQLite) a
+single conditional `INSERT ... SELECT ... WHERE (SELECT count(*) ...) < limit` is sufficient, for
+reasons written out in `docs/architecture.md` and in `workers/migrations/0002_app_schema.sql`'s
+header. The *rule* is unchanged; only its mechanism is.
 
 **Fallback plans are quota-exempt (decision, 2026-07-10).** `is_fallback: true` rows are excluded
 from the count in both `generate-plan` and `quota-status`, capped at **3 quota-exempt fallbacks
@@ -138,15 +155,25 @@ outright malformed responses, not to judge quality.
 
 ## Model and key handling
 
-Model: `claude-sonnet-5`. Called only from the `generate-plan` edge function (Deno, Supabase
-Edge Functions) — never from the client. `ANTHROPIC_API_KEY` lives in edge-function secrets
-(`supabase secrets set`, not yet pushed — see `docs/mvp-progress.md` "Known debt and risks") and in
-`supabase/functions/.env` for local development; it must never carry an `EXPO_PUBLIC_` prefix
-or appear in the app bundle. Full policy: `CLAUDE.md` "Secrets & env".
+Model: `claude-sonnet-5`. Called only from the `generate-plan` route on Cloudflare Workers — never
+from the client. `ANTHROPIC_API_KEY` is read in exactly one file, `workers/src/lib/model.ts`,
+reached from exactly one file, `workers/src/deps.ts`. It lives in `workers/.dev.vars` (gitignored)
+for local development and is pushed to production with `wrangler secret put ANTHROPIC_API_KEY` —
+the direct analogue of `supabase secrets set`, and likewise still unpushed, because it needs the
+captain's own `wrangler login`. It must never carry an `EXPO_PUBLIC_` prefix, appear in the app
+bundle, or land in `wrangler.toml`, which is committed. Full policy: `CLAUDE.md` "Secrets & env"
+and [`workers/README.md`](../../workers/README.md).
+
+**No key is configured anywhere today, and the code is built for that state rather than broken by
+it.** With no key, the model caller returns a typed `not_configured` failure, which the pipeline
+already handles as step 10's fallback: the runner gets the real template plan marked
+`is_fallback: true`, which is quota-exempt. Nobody is charged a plan slot for the backend being
+unfinished, and nothing fabricates a personalized plan it cannot produce.
 
 ## Request/response contract
 
-See `docs/architecture.md`, "Planned — `generate-plan` edge function flow" and "Planned — API",
+See `docs/architecture.md`, "Current — `generate-plan`, and what is still missing from it" and
+"Current — API",
 for the endpoint signatures. The step-by-step flow is "The generation pipeline" above (auth →
 idempotency replay → atomic quota gate → reconcile plan length → build skeleton → Free stops /
 Pro-Elite AI call → expand → clamp → validate → retry once → fall back to template → insert →

@@ -6,24 +6,34 @@ deliberately narrow — it builds plans, it is not a training log.
 
 ## Status
 
-**Scaffold / pre-implementation.** This repo is currently a stock Expo SDK 54 app
-(expo-router template) with no product code written yet — no auth, no database, no plan
-generation, no Supabase dependency, no tests. Everything described below past this section is
-the *design*, not shipped behavior. See `planning/` for the full spec:
+**Backend spine built; client still pre-implementation.** The Cloudflare backend in
+[`workers/`](workers/README.md) works end to end against local emulation — auth, the quota ledger,
+`quota-status`, `purchase-tier`, `delete-account`, intake, plan reads — but nothing is deployed, and
+`generate-plan` returns `503 engine_unavailable` because the plan engine (`src/lib/planTemplates.ts`)
+does not exist yet. The app itself is still close to the stock Expo SDK 54 template: no auth screens,
+no intake screen, no module that talks to the backend. Everything described below that is marked
+*planned* is design, not shipped behavior. Current state: [`docs/mvp-progress.md`](docs/mvp-progress.md).
+Full spec:
 
 - [`planning/01-brainstorm.md`](planning/01-brainstorm.md) — goal, milestones, open questions
 - [`planning/02-product-requirements.md`](planning/02-product-requirements.md) — who it's for, tiers, user flow, milestones
-- [`planning/03-engineering-requirements.md`](planning/03-engineering-requirements.md) — stack, architecture, edge functions, DB schema, security
+- [`planning/03-engineering-requirements.md`](planning/03-engineering-requirements.md) — stack, architecture, server routes, DB schema, security (written against the Supabase design that Cloudflare replaced; the rules survive, the vendor does not)
 
-## Stack (planned)
+## Stack
+
+**The backend is Cloudflare, not Supabase** (decision, 2026-08-02): a Supabase project-slot
+constraint, plus a preference for a stack that stays genuinely free at this stage. Cloudflare also
+clears the bar that ruled Firebase's free tier out — Workers can make outbound `fetch` calls, which
+plan generation needs to reach Anthropic. `supabase/` and `src/lib/supabase.ts` remain in the repo,
+unused, and are marked legacy.
 
 | Layer | Choice | Notes |
 |-------|--------|-------|
 | App | Expo / React Native + TypeScript, expo-router | |
-| Auth | Supabase Auth — Google OAuth + Sign in with Apple + email/password | Required sign-up, no guest mode in v1 |
-| Database | Supabase Postgres | New project, separate from other PACE-family apps |
-| Server logic | Supabase Edge Functions (Deno) | AI calls + quota enforcement live here, never in the client |
-| AI | Claude API (`claude-sonnet-5`) via edge function | API key stays server-side, never in the app bundle |
+| Auth | better-auth on D1 — email/password today, Google OAuth coded but unprovisioned | Required sign-up, no guest mode in v1. Apple Sign-In parked ([`docs/apple-dev-blocked.md`](docs/apple-dev-blocked.md)) |
+| Database | Cloudflare D1 (SQLite) | **No row-level security** — ownership is enforced in Worker code, see [`docs/architecture.md`](docs/architecture.md) |
+| Server logic | Cloudflare Workers (`workers/`) | AI calls + quota enforcement live here, never in the client |
+| AI | Claude API (`claude-sonnet-5`) via a Worker route | API key stays server-side, never in the app bundle |
 | Payments | Dummy (v1) → RevenueCat/StoreKit (v2) | Apple requires real IAP for public release; dummy is TestFlight-only |
 | Hosting/builds | EAS Build, TestFlight | |
 
@@ -42,7 +52,7 @@ it does not trade away the skeleton for an unconstrained AI plan. The determinis
 `docs/reference/plan-generation.md` for the full design.
 
 Quotas reset monthly for Pro/Elite (Free is 1 plan total) and are enforced **server-side** in
-the `generate-plan` edge function — the client never decides or tracks its own quota. The Elite
+the `generate-plan` Worker route — the client never decides or tracks its own quota. The Elite
 extras above are still marked "proposed, to confirm" in the product requirements doc.
 
 ## Getting started
@@ -68,16 +78,18 @@ npm run lint     # expo lint
 copy it, don't edit it in place.
 
 - **Client variables** must be prefixed `EXPO_PUBLIC_`. Expo inlines these in plain text into
-  the compiled app bundle, so treat anything with this prefix as public. The two client vars are:
-  - `EXPO_PUBLIC_SUPABASE_URL`
-  - `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` — safe to ship publicly because Postgres Row Level
-    Security (RLS) is what actually protects the data, not secrecy of this key.
-- **The Anthropic API key never goes in `.env` and never gets an `EXPO_PUBLIC_` prefix.** It is
-  an edge-function secret, set with `supabase secrets set ANTHROPIC_API_KEY=sk-ant-...`. For
-  local edge-function development it lives in `supabase/functions/.env` instead (also
-  gitignored).
-- Supabase automatically injects `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEYS`, and
-  `SUPABASE_SECRET_KEYS` into edge functions at runtime — you don't set those yourself.
+  the compiled app bundle, so treat anything with this prefix as public. The two that exist
+  (`EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`) are **legacy**: nothing reads
+  them except `src/lib/supabase.ts`, which nothing imports. They go when the client is moved onto
+  `workers/`.
+- **Server variables live in `workers/`, not here.** `workers/.dev.vars` (gitignored;
+  `.dev.vars.example` is the template) for local development, `wrangler secret put NAME` for
+  production. That covers `BETTER_AUTH_SECRET`, `ANTHROPIC_API_KEY`, and the Google OAuth pair.
+- **`workers/wrangler.toml` is committed**, which makes its `[vars]` block the Cloudflare
+  equivalent of the `EXPO_PUBLIC_` trap: public configuration only, never a secret.
+- **The Anthropic API key never goes in `.env` and never gets an `EXPO_PUBLIC_` prefix.** It is read
+  in exactly one file, `workers/src/lib/model.ts`. No key is configured anywhere today; with none,
+  plan generation degrades to the template plan rather than failing.
 
 ## Project structure
 
@@ -102,8 +114,16 @@ src/
     loadRules.ts             # deterministic safety clamp
     notation.ts               # run-type abbreviations + structure-string shorthand
     planTypes.ts               # shared Plan/Week/Workout types
-    supabase.ts                 # client init
-    fixtures/examplePlan.ts      # golden fixture plan
+    tierLimits.ts               # the one copy of the tier limits — app AND worker
+    quotaPeriod.ts               # currentPeriod() — app AND worker
+    supabase.ts                   # LEGACY, unused
+    fixtures/examplePlan.ts        # golden fixture plan
+
+workers/                     # the Cloudflare backend — see workers/README.md
+  wrangler.toml
+  migrations/                 # 0001 better-auth's tables, 0002 the app's
+  src/                         # index, auth, routes, deps, lib/{store,generate-plan-flow,model,...}
+  test/                         # 75 tests in real workerd against real D1
 ```
 
 Planned layout (not yet built — see `planning/03-engineering-requirements.md`):
@@ -116,16 +136,14 @@ src/app/
   paywall, settings
 
 lib/
-  planTemplates.ts      # free-tier hard-coded plans (parametric template generator)
-  subscription.ts       # tier read + dummy purchase
-
-supabase/functions/
-  generate-plan/        # core plan-generation edge function
+  planTemplates.ts      # free-tier plans (parametric template generator) — blocks generate-plan
+  paceDerivation.ts     # its pace counterpart
+  api.ts                # the client's calls into workers/ — replaces supabase.ts
 ```
 
 ## Roadmap
 
-- **M1 — Foundation**: Expo app scaffolded, Supabase project, required sign-up working.
+- **M1 — Foundation**: Expo app scaffolded, backend + auth working, required sign-up. *Server half done; client screens not started.*
 - **M2 — Intake**: onboarding questionnaire persists to the database.
 - **M3 — Plan engine**: free template plans + paid AI plans generate reliably; plan view renders.
 - **M4 — Tiers & quotas**: dummy paywall, tier and quota enforcement server-side.

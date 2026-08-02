@@ -8,8 +8,28 @@
 
 **Last updated:** 2026-08-03 (issue #3's pure TypeScript plan-generation engine landed:
 `paceDerivation.ts` + `planTemplates.ts`; bundled issues #22/#23 fixed; both red-first suites
-un-quarantined. Typecheck, lint, and all 213 tests across 10 suites pass. Backend wiring remains
-unbuilt.)
+un-quarantined. Typecheck, lint, and tests pass. This lands on top of the 2026-08-02 backend move:
+**the backend is Cloudflare — D1 + Workers + better-auth, in `workers/`** — a captain's decision
+over a Supabase project-slot constraint and a genuinely-free stack; the relational design was
+ported, not re-decided. Auth, the quota ledger, `quota-status`, `purchase-tier`, `delete-account`,
+intake, and plan reads all work end to end against `wrangler dev`, offline, with no Cloudflare
+account. `generate-plan` is wired end to end but still returns `503 engine_unavailable` and
+consumes no quota, because `workers/src/deps.ts` has not yet been swapped to call the
+now-existing `src/lib/planTemplates.ts` — that wiring is the remaining gap. Two shared pure
+modules, `src/lib/tierLimits.ts` and `src/lib/quotaPeriod.ts`, are imported by both the app and the
+Worker. 75 vitest tests in `workers/`. Nothing deployed, no secret set — see "Blocked" below.
+Previous entry: 2026-07-12 integration pass: Ian's round-2 coaching sign-off closes issues #34,
+#19 and #29; goal-realism ruled, closing #33; app named **Pace Blueprint** (#35); units ruled
+km-only (#36); doc stale-reference sweep (#37). `main` returned to green by quarantining the two
+orphaned TDD suites (#41). `formatSecPerKm` pace-rounding carry bug fixed, closing #28, adding the
+first test suite under `src/components/`. Screen-reader gaps fixed, closing #31 — pace bands spoken
+as words, race day announced, plus three code-review-caught defects, including collapsing the m:ss
+formatter #28 fixed into one shared `formatSecPerKm()` so the two readouts can't drift apart.
+`FallbackNotice` gains a required quota-copy `variant` prop, closing issue #30 (issue #45 filed for
+the still-open follow-up). React Navigation's chrome now derives from `theme.ts`'s tokens instead
+of leaking the library's own stock palette, closing #27. Issue #32's frontend polish batch closed —
+nine of eleven findings fixed, two dispositioned (rejected / already stale). 121 tests passing, up
+from 82. Issue #22 remains open.)
 
 ---
 
@@ -17,21 +37,50 @@ unbuilt.)
 
 | Milestone | State |
 |---|---|
-| M1 — Foundation (account → empty Home) | **Not started.** Infra partially provisioned |
+| M1 — Foundation (account → empty Home) | **Server half done.** Auth + schema + account routes work locally on Cloudflare (`workers/`); no client screens yet, nothing deployed |
 | M2 — Intake (questionnaire persists) | Not started |
-| M3 — Plan engine (3 tiers produce valid plans) | **In progress.** Pure template/pace engine done; backend/hybrid flow not started |
-| M4 — Tiers & quotas (server-side, unbypassable) | Not started |
+| M3 — Plan engine (3 tiers produce valid plans) | **In progress.** Pure template/pace engine done; not yet wired into the Worker's `generate-plan` route |
+| M4 — Tiers & quotas (server-side, unbypassable) | **Server half done.** The quota ledger, atomic gate, fallback exemption, `quota-status` and `purchase-tier` are built and tested; no client UI |
 | M5 — My Plans (history) | Not started |
 | M6 — Polish & TestFlight | Not started |
 
-**The honest summary:** the pure client/shared plan engine now exists. `src/lib/paceDerivation.ts`
-derives Riegel equivalents, training pace bands, and the ruled goal-realism/cap result;
-`src/lib/planTemplates.ts` builds deterministic template plans and reproduces the approved 12-week
-5K fixture exactly. `clampWeeklyVolume()` now names and uses the last loading week, and the golden
-week-8 output is 30 km. The former red-first suites run normally: **213 tests across 10 suites**,
-with typecheck and lint clean. The plan screen still renders the static fixture, however, and no
-intake, database, edge function, quota flow, or AI personalization exists yet; M3 is therefore only
+**The honest summary:** planning, design, and domain research are done to an unusual depth, and
+Phase 0's paper-reconciliation pass is now done too. **As of 2026-08-02 there is also a real
+backend** — `workers/`, on Cloudflare D1 + Workers + better-auth — with auth, the quota ledger, and
+the account routes working end to end against local emulation. **As of 2026-08-03 the pure
+client/shared plan engine also exists.** `src/lib/paceDerivation.ts` derives Riegel equivalents,
+training pace bands, and the ruled goal-realism/cap result; `src/lib/planTemplates.ts` builds
+deterministic template plans and reproduces the approved 12-week 5K fixture exactly.
+`clampWeeklyVolume()` now names and uses the last loading week, and the golden week-8 output is
+30 km. The former red-first suites run normally, with typecheck and lint clean. **What is still
+missing is the wiring between the two**: `workers/src/deps.ts` still binds `generate-plan`'s
+skeleton builder and Pro/Elite prompt to a typed *unavailable* rather than to
+`src/lib/planTemplates.ts`, which is why `generate-plan` still answers `503` and charges nothing.
+The plan screen also still renders the static fixture, not a generated plan; M3 is therefore only
 partially complete.
+
+`planTypes.ts`, `loadRules.ts`, and (as of the 2026-07-11
+review-and-refine cycle) `notation.ts` are the app's `lib/` layer — shared vocabulary, safety
+arithmetic, and run-type/structure-string notation, all pure and tested (83 lib-layer tests, up
+from 64, after Ian's 2026-07-12 round-2 rulings on issue #34 added the long-run deload-week
+measurement fix (ruling R1c) and the race-day/strides test coverage, plus issue #32's
+strides-label regression test; the project total is **121 across 7 suites** as of the same day's
+`formatSecPerKm` carry-boundary fix (issue #28, which added the first test suite under
+`src/components/`), issue #31's screen-reader accessibility fixes, issue #27's navigation-theme
+suite under `src/constants/`, and issue #32's `theme.effort.test.ts`, which together took the
+project total 82 → 93 → 107 → 117 → 121). A golden fixture (`src/lib/fixtures/examplePlan.ts`), a rendered
+plan screen (`src/app/plan/[id].tsx` and `src/components/plan/`), and an abbreviations glossary tab
+(`src/app/(tabs)/glossary.tsx`) exist and render that fixture — but nothing generates a plan from an
+intake yet. `src/lib/planTemplates.ts` and `src/lib/paceDerivation.ts`, the actual generation logic,
+are still unwritten; two TDD test suites for them exist and intentionally fail to compile on the
+missing modules (`npm run typecheck` and `npm run lint` are red for the same reason — expected, not
+a regression). **What changed 2026-07-12: every coaching question blocking that engine's build is
+now answered.** Issue #19's HIGH-severity long-run-cap conflict — the golden plan's own numbers
+breached the coded cap — is closed; the abbreviation set, race-day notation (issue #29), strides
+placement, the Daniels brake, and peak volume are all signed off. The gap between "designed" and
+"working" is smaller than it was, but the engine itself is still ahead. Two coaching/code questions
+remain genuinely open and unrelated to this pass: issue #22 (`clampWeeklyVolume` comparing against
+the literal previous week) and issue #33 (goal-realism handling).
 
 ---
 
@@ -43,16 +92,30 @@ partially complete.
 - [x] `docs/architecture.md` — route tree, DB schema draft, API table, `generate-plan` design
 
 ### Infrastructure
-- [x] Supabase project `v2.2_plan_generation` (`vvvcaulmbwbujeszfvbo`, ap-northeast-1) — `ACTIVE_HEALTHY`
-- [x] Google OAuth + email/password auth enabled
-- [x] Env layout correct and **verified**: `.env` (client) and `supabase/functions/.env` (server) are
-      both gitignored and untracked; no secret is committed; `ANTHROPIC_API_KEY` is server-side only
-- [x] `gh` 2.96.0 and `supabase` 2.109.1 CLIs installed
+- [x] Env layout correct and **verified**: `.env` (client) and `workers/.dev.vars` (server) are both
+      gitignored and untracked; no secret is committed; `ANTHROPIC_API_KEY` is server-side only and
+      read in exactly one file, `workers/src/lib/model.ts`
+- [x] `gh` 2.96.0 installed; `wrangler` 4.118 available via `npx`
+- [ ] **Cloudflare account resources — none created.** `wrangler login`, `wrangler d1 create`,
+      `wrangler secret put`, `wrangler deploy`: all the captain's, all unrun. See "Blocked" below.
+- ~~Supabase project `v2.2_plan_generation`~~ — **superseded 2026-08-02.** The backend is Cloudflare
+  now (`workers/`); the Supabase project is unused, and `supabase/` is dead scaffold kept for
+  reference. Google OAuth and email/password were enabled on it and are not carried over: better-auth
+  does email/password today, and Google needs a fresh client id/secret from the captain.
 
 ### Code
 - [x] Expo SDK 54 scaffold — TypeScript strict, expo-router, `@/*` path alias
-- [x] `src/lib/supabase.ts` — env-guarded at import, AsyncStorage on native, `AppState` auto-refresh,
-      `detectSessionInUrl: false`
+- [x] **`workers/` — the Cloudflare backend spine (2026-08-02).** better-auth on D1 (email/password,
+      Bearer sessions), `migrations/` for both better-auth's tables and the app's, the quota ledger
+      with its atomic gate and reserve→settle/release lifecycle, and the routes `generate-plan`,
+      `quota-status`, `purchase-tier`, `delete-account`, `GET/PUT /api/intake`,
+      `GET /api/plans[/:id]`. 75 tests in real `workerd` against real D1. Verified end to end against
+      `wrangler dev`, offline. `generate-plan` returns `503 engine_unavailable` (and charges nothing)
+      until the plan engine exists. Details: [`workers/README.md`](../workers/README.md)
+- [x] `src/lib/tierLimits.ts` and `src/lib/quotaPeriod.ts` — pure, shared by the app and the Worker,
+      as `planning/03-engineering-requirements.md` requires by name. 18 unit tests
+- [x] ~~`src/lib/supabase.ts`~~ — **legacy since 2026-08-02**, nothing imports it. Kept, not deleted:
+      the client-side replacement (a better-auth client against `workers/`) is not built yet
 - [x] `src/lib/loadRules.ts` — deterministic safety arithmetic (see "Next" step 2)
 - [x] `src/lib/notation.ts` — the code counterpart of `notation.md`: `RUN_TYPE_ABBREVIATIONS`,
       `UNABBREVIATED_RUN_TYPES`, `STRUCTURE_SHORTHAND`, and `expandLabel()` for screen-reader text.
@@ -309,9 +372,20 @@ with **no backend at all**.
        `expo-glass-effect` also removed in the same commit — the "Known debt" risk recording it as
        still-installed is stale and removed below. Not logged in `change_log.md` until this
        doc-audit pass; see its new 2026-07-10 (evening) entry.
-6. [ ] **The spine** — `supabase init`, migrations, RLS on all four tables, required sign-up.
+6. [x] **The spine** — **Server half done 2026-08-02, on Cloudflare rather than Supabase.**
+       `workers/` holds better-auth on D1, both migrations, and the account routes; there is no RLS
+       to write because SQLite has none, so ownership moved into `workers/src/lib/store.ts` (see
+       `docs/architecture.md` "Authorization without RLS"). **Still to do:** the client half — auth
+       screens and an API module against `workers/` — plus the captain's `wrangler login`/`d1
+       create`/`secret put`/`deploy`. Required sign-up is enforced server-side today (every `/api/*`
+       route 403s anonymously); the client cannot yet sign anyone up.
 7. [ ] **Intake** (8 questions, or 10 with a target race, + review) persisting to `intake_responses`.
-8. [ ] **`generate-plan` edge function** — tier branch, quota check, validate, clamp, retry once, fall back.
+       The server side exists: `GET`/`PUT /api/intake`, validated twice (readable message in the
+       route, table CHECKs underneath). Only the screen is missing.
+8. [~] **`generate-plan`** — tier branch, quota check, validate, retry once, fall back: **all built
+       and tested** in `workers/`. Clamp and skeleton are not, because `src/lib/planTemplates.ts`
+       does not exist (step 3), so the route returns `503 engine_unavailable` and charges no quota.
+       Finishing it is two bindings in `workers/src/deps.ts`, not a rewrite.
 9. [ ] **Quota UI + dummy paywall.**
 10. [ ] **My Plans.**
 11. [ ] **Motion + polish**, last, because the reveal choreographs the finalised `Plan` types.
@@ -343,7 +417,20 @@ to "Decided" below.
 
 | Item | Blocks | Who decides |
 |---|---|---|
-| Password minimum length | sign-up copy | Verify against what the live Supabase project actually enforces — Phase 2 |
+| `wrangler login` (interactive) | every remote Cloudflare action below | **Ian.** Opens a browser; nothing else can run first |
+| `wrangler d1 create pace-blueprint` | a real remote database; `wrangler.toml`'s `database_id` is a deliberately fake placeholder until its uuid is pasted in | **Ian**, after login |
+| `wrangler secret put BETTER_AUTH_SECRET` / `ANTHROPIC_API_KEY` | production auth; any real model call | **Ian.** The exact analogue of `supabase secrets set`. Generate the auth secret with `openssl rand -base64 32` |
+| Google OAuth client id + secret | Google sign-in (email/password works without it) | **Ian.** A Google Cloud OAuth 2.0 "Web application" client, redirect URI `${BETTER_AUTH_URL}/api/auth/callback/google`. Exact steps: `workers/src/auth.ts`'s TODO |
+| `APP_SCHEME` = `paceblueprint://` | the OAuth return into the app | **Ian.** Renamed 2026-07-12 and never verified against a built app |
+| `wrangler deploy` | anything reachable from a phone | **Ian**, after all of the above |
+
+None of the above blocks local work: everything in `workers/` runs offline against `wrangler dev`'s
+Miniflare emulation with no account. The list is the exact Cloudflare counterpart of what the audit
+called "the Supabase spine" — the same shape of gate, a different vendor.
+
+**Password minimum length is decided, not blocked:** 8 characters, set in `workers/src/auth.ts`
+(better-auth's `minPasswordLength`) and asserted by a test. It is ours to choose now, not something
+to verify against a hosted provider's default.
 
 **Resolved 2026-07-12, removed from this table:** whether Rule 5's "Monitoring" tier applies to a
 one-time pre-run intake — Ian ruled it does not (R4, issue #34). Only the Immediate Stop and
@@ -421,11 +508,27 @@ reasoning, worked cases, and the type contract:
 
 ## Known debt and risks
 
-- 🔴 **`supabase secrets set` has never been run.** Production has no `ANTHROPIC_API_KEY`. Hard blocker
-  the moment `generate-plan` deploys.
-- 🟠 **Supabase CLI is not logged in, and `supabase init` was never run** — there is no `config.toml`,
-  so `supabase start` and `functions serve` both fail today. The comment inside
-  `supabase/functions/.env` claiming otherwise is currently false.
+- 🔴 **`wrangler secret put ANTHROPIC_API_KEY` has never been run** (nor its Supabase predecessor).
+  Nothing anywhere has an Anthropic key. This is not currently *breaking* anything — with no key the
+  model caller returns a typed `not_configured` and the pipeline serves the template plan as a
+  quota-exempt fallback — but it is a hard blocker on paid tiers ever being paid-tier.
+- 🔴 **No Cloudflare account resources exist.** `wrangler login` is interactive and unrun, so
+  `wrangler d1 create`, `wrangler secret put`, and `wrangler deploy` are all unrun too, and
+  `wrangler.toml`'s `database_id` is a deliberately fake placeholder. Local work is unaffected —
+  `wrangler dev` and the test suite need no account — but nothing is reachable from a phone. Full
+  list in "Blocked" above.
+- 🟠 **`generate-plan` cannot actually generate a plan yet.** The route, quota gate, idempotency,
+  validation, and fallback are built and tested; the deterministic skeleton
+  (`src/lib/planTemplates.ts`) and the Pro/Elite prompt are not, so it returns `503
+  engine_unavailable`. Both are single bindings in `workers/src/deps.ts`, which names them so the
+  swap has an owner. They are bound to typed *unavailable* implementations rather than mocks on
+  purpose — the sibling repo's issue #128 shipped a mock as its production client.
+- 🟠 **The client still has no way to talk to `workers/`.** No auth screens, no API module; the app
+  imports the legacy `src/lib/supabase.ts`, which points at an unused Supabase project. The Worker
+  half of M1/M4 is done; the app half is not started.
+- 🟡 **`supabase/` and `src/lib/supabase.ts` are dead code** kept deliberately (2026-08-02) so the
+  earlier design stays readable. Deleting them is its own decision, and the `@supabase/supabase-js`
+  dependency is still in `package.json` for the same reason.
 - 🟠 **Apple Sign-In is not configured — and is now formally parked.** App Store rules require it
   once Google sign-in is offered, but configuring it needs an Apple Developer Program membership
   (App ID + Services ID + key) that Ian does not hold yet. Carved out of issue #7 on 2026-07-12 and
@@ -438,10 +541,11 @@ reasoning, worked cases, and the type contract:
   spreads `style` as an *object*, but the wrapped `Pressable`'s `style` prop is a *function*
   (`({ pressed }) => [...]`) — spreading a function yields `{}`, silently dropping every rule the
   function would have returned. Derived from reading the source, not device-verified.
-- 🟠 **Deep-link scheme `paceblueprint://` not confirmed on Supabase's redirect allowlist**
-  (Authentication → URL Configuration). Renamed from `v22workoutplangenerator://` in the
-  2026-07-12 identifier rename — the allowlist (if it had an entry at all) needs updating to
-  match. Google OAuth will dead-end without it. UNVERIFIED — this setting could not be read.
+- 🟠 **Deep-link scheme `paceblueprint://` still unverified against a built app.** It is now
+  configured as `APP_SCHEME` in `workers/wrangler.toml` and passed to better-auth's
+  `trustedOrigins`, so there is no third-party allowlist to update any more — but the value itself
+  was renamed from `v22workoutplangenerator://` in the 2026-07-12 identifier rename and has never
+  been checked against what the app actually registers. Google OAuth will dead-end if it is wrong.
 - 🟠 **`GeneratePlanRequest` has no `goalTimeSec` field, so the per-generation goal cannot reach the
   engine at all (found 2026-07-12).** `docs/mvp-build-prompt.md:332` promises that race
   distance/date/goal-time *travel per-generation* — "intake's stored race is a default, not the
