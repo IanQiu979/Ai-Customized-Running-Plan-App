@@ -6,7 +6,7 @@
  * copy or a `coachIntro`.
  */
 
-import { MAX_SINGLE_RUN_KM, toExperienceLevel } from './loadRules';
+import { clampWeeklyVolume, deloadVolume, MAX_SINGLE_RUN_KM, toExperienceLevel } from './loadRules';
 import {
   assessGoalRealism,
   deriveRacePaceTarget,
@@ -15,6 +15,7 @@ import {
 import {
   RACE_DISTANCE_KM,
   type Day,
+  type ExperienceLevel,
   type GoalType,
   type HrZone,
   type IntakeResponses,
@@ -285,6 +286,16 @@ function targetVolumeKm(
   return Math.max(1, Math.round(canonical * (startingWeeklyKm / 35)));
 }
 
+/**
+ * Nominal quality-workout distances (tempo/interval) are written against the 35 km
+ * worked-example baseline, same as `FIVE_K_WEEKLY_LOAD`. Scaling them to the week's own
+ * (already growth-clamped) volume keeps a hard session from single-handedly exceeding the
+ * clamp on a low-volume week or plan.
+ */
+function scaleQualityDistanceKm(nominalKm: number, desiredVolumeKm: number): number {
+  return Math.max(3, Math.round(nominalKm * (desiredVolumeKm / 35)));
+}
+
 function targetLongRunKm(
   startingWeeklyKm: number,
   weekIndex: number,
@@ -553,6 +564,8 @@ function buildGenericWeek(args: {
   racePace?: Pace;
   maxSingleRunKm: number;
   deloadCadence: number;
+  level: ExperienceLevel;
+  lastLoadingWeekKm: number;
 }): Week {
   const {
     weekNumber,
@@ -568,10 +581,22 @@ function buildGenericWeek(args: {
     racePace,
     maxSingleRunKm,
     deloadCadence,
+    level,
+    lastLoadingWeekKm,
   } = args;
   const isRaceWeek = goalType === 'race' && weekNumber === durationWeeks;
   const isDeload = !isRaceWeek && phase !== 'taper' && weekNumber % deloadCadence === 0;
-  const desiredVolumeKm = targetVolumeKm(intake.weeklyKm, weekNumber - 1, durationWeeks);
+  const rawVolumeKm = targetVolumeKm(intake.weeklyKm, weekNumber - 1, durationWeeks);
+  const desiredVolumeKm = isDeload
+    ? lastLoadingWeekKm > 0
+      ? Math.max(1, Math.round(deloadVolume(lastLoadingWeekKm)))
+      : rawVolumeKm
+    : Math.max(
+        1,
+        Math.round(
+          clampWeeklyVolume({ lastLoadingWeekKm, proposedKm: rawVolumeKm, level }),
+        ),
+      );
 
   if (isRaceWeek) {
     const race = raceDayWorkout(raceDistance);
@@ -598,7 +623,7 @@ function buildGenericWeek(args: {
   if (!isDeload && (phase === 'base' || phase === 'build' || phase === 'peak')) {
     quality.push(
       tempoRun({
-        distanceKm: raceDistance === '5k' ? 8 : 10,
+        distanceKm: scaleQualityDistanceKm(raceDistance === '5k' ? 8 : 10, desiredVolumeKm),
         durationMin: phase === 'base' ? 20 : phase === 'build' ? 24 : 29,
         pace: tempoPace,
         density,
@@ -608,7 +633,7 @@ function buildGenericWeek(args: {
   if (!isDeload && phase === 'peak') {
     quality.push(
       intervalRun({
-        distanceKm: 11,
+        distanceKm: scaleQualityDistanceKm(11, desiredVolumeKm),
         structure: 'WU 2 km · 5 × 1000 m @ current-fitness interval effort w/ 400 m jog · CD 2 km',
         pace: intervalPace,
         density,
@@ -618,7 +643,7 @@ function buildGenericWeek(args: {
   if (!isDeload && goalType === 'race' && phase === 'taper') {
     quality.push(
       intervalRun({
-        distanceKm: 10,
+        distanceKm: scaleQualityDistanceKm(10, desiredVolumeKm),
         structure: 'WU 2 km · 3 × 1600 m @ GP w/ ~400 m jog · CD 2 km',
         pace: racePace,
         density,
@@ -627,14 +652,6 @@ function buildGenericWeek(args: {
     );
   }
 
-  const longDistanceKm = Math.min(
-    maxSingleRunKm,
-    Math.max(
-      quality.reduce((max, workout) => Math.max(max, (workout.distanceKm ?? 0) + 1), 1),
-      targetLongRunKm(intake.weeklyKm, weekNumber - 1, durationWeeks, maxSingleRunKm),
-    ),
-  );
-  const long = longRun(longDistanceKm, easyPace, density);
   const requestedRuns = normalizedRunCount(intake.daysPerWeek);
   const retainedQuality = quality.slice(0, Math.max(1, requestedRuns - 2));
   const easyCount = Math.max(1, requestedRuns - retainedQuality.length - 1);
@@ -642,6 +659,17 @@ function buildGenericWeek(args: {
     (sum, workout) => sum + (workout.distanceKm ?? 0),
     0,
   );
+  const longRunFloor = quality.reduce(
+    (max, workout) => Math.max(max, (workout.distanceKm ?? 0) + 1),
+    1,
+  );
+  const longRunFromCurve = Math.max(
+    longRunFloor,
+    targetLongRunKm(intake.weeklyKm, weekNumber - 1, durationWeeks, maxSingleRunKm),
+  );
+  const longRunVolumeBudget = Math.max(longRunFloor, desiredVolumeKm - qualityKm - easyCount);
+  const longDistanceKm = Math.min(maxSingleRunKm, longRunFromCurve, longRunVolumeBudget);
+  const long = longRun(longDistanceKm, easyPace, density);
   const easyDistances = distributeDistance(
     desiredVolumeKm - longDistanceKm - qualityKm,
     easyCount,
@@ -686,8 +714,9 @@ export function buildTemplatePlan(params: TemplatePlanParams): Plan {
     raceDistance === '5k' &&
     durationWeeks === 12 &&
     normalizedRunCount(params.intake.daysPerWeek) === 4;
-  const weeks = phases.map((phase, index) =>
-    useGoldenFiveKShape
+  let lastLoadingWeekKm = 0;
+  const weeks = phases.map((phase, index) => {
+    const week = useGoldenFiveKShape
       ? buildCanonicalFiveKWeek({
           weekNumber: index + 1,
           durationWeeks,
@@ -714,8 +743,12 @@ export function buildTemplatePlan(params: TemplatePlanParams): Plan {
           racePace: racePaceTarget?.pace,
           maxSingleRunKm,
           deloadCadence,
-        }),
-  );
+          level,
+          lastLoadingWeekKm,
+        });
+    if (!week.isDeload) lastLoadingWeekKm = week.volumeKm;
+    return week;
+  });
 
   const goalRealism =
     params.goalType === 'race' && params.intake.goalTimeSec !== undefined

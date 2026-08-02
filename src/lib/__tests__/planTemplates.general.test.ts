@@ -1,4 +1,5 @@
 import { buildTemplatePlan } from '../planTemplates';
+import { WEEKLY_INCREASE_REJECT_ABOVE } from '../loadRules';
 import type { Day, GoalType, IntakeResponses, RaceDistance, Workout } from '../planTypes';
 
 const BASE_INTAKE: IntakeResponses = {
@@ -98,6 +99,57 @@ describe('buildTemplatePlan — parametric inputs', () => {
       }
     }
   });
+
+  it('never grows a non-deload week beyond the reject threshold off the last loading week (issue #22)', () => {
+    const plan = build({ raceDistance: '10k', durationWeeks: 6, daysPerWeek: 4, weeklyKm: 35 });
+    let lastLoadingWeekKm = 0;
+    for (const week of plan.weeks) {
+      const isRaceDayWeek = week.days.filter(isWorkout).some((day) => day.label === 'Race Day');
+      if (!week.isDeload && !isRaceDayWeek) {
+        if (lastLoadingWeekKm > 0) {
+          const growth = (week.volumeKm - lastLoadingWeekKm) / lastLoadingWeekKm;
+          expect(growth).toBeLessThanOrEqual(WEEKLY_INCREASE_REJECT_ABOVE + 1e-9);
+        }
+        lastLoadingWeekKm = week.volumeKm;
+      }
+    }
+  });
+
+  it('materially reduces a deload week off the last loading week', () => {
+    const plan = build({ raceDistance: '10k', durationWeeks: 8, daysPerWeek: 4, weeklyKm: 35 });
+    let lastLoadingWeekKm = 0;
+    for (const week of plan.weeks) {
+      if (week.isDeload && lastLoadingWeekKm > 0) {
+        expect(week.volumeKm).toBeLessThan(lastLoadingWeekKm * 0.75);
+      }
+      if (!week.isDeload) lastLoadingWeekKm = week.volumeKm;
+    }
+  });
+
+  it.each([
+    ['10k', 6, 4, 35],
+    ['10k', 16, 5, 25],
+    ['half', 18, 6, 40],
+    ['marathon', 26, 3, 30],
+  ] as const)(
+    'keeps growth-cap compliance across durations/days/volumes (%s, %i weeks, %i days, %i km)',
+    (raceDistance, durationWeeks, daysPerWeek, weeklyKm) => {
+      const plan = build({ raceDistance, durationWeeks, daysPerWeek, weeklyKm });
+      let lastLoadingWeekKm = 0;
+      for (const week of plan.weeks) {
+        const isRaceDayWeek = week.days
+          .filter(isWorkout)
+          .some((day) => day.label === 'Race Day');
+        if (!week.isDeload && !isRaceDayWeek) {
+          if (lastLoadingWeekKm > 0) {
+            const growth = (week.volumeKm - lastLoadingWeekKm) / lastLoadingWeekKm;
+            expect(growth).toBeLessThanOrEqual(WEEKLY_INCREASE_REJECT_ABOVE + 1e-9);
+          }
+          lastLoadingWeekKm = week.volumeKm;
+        }
+      }
+    },
+  );
 
   it('does not leak race fields or race sessions into a duration plan', () => {
     const plan = build({ goalType: 'duration', durationWeeks: 8 });
