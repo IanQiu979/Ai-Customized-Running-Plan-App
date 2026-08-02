@@ -1,0 +1,114 @@
+import { buildTemplatePlan } from '../planTemplates';
+import type { Day, GoalType, IntakeResponses, RaceDistance, Workout } from '../planTypes';
+
+const BASE_INTAKE: IntakeResponses = {
+  goal: 'Build fitness',
+  age: 35,
+  experience: 'regular',
+  daysPerWeek: 4,
+  weeklyKm: 35,
+  raceDistance: '5k',
+  goalTimeSec: 1200,
+  recentPerformance: { distance: '5k', timeSec: 1350 },
+  injuries: ['none'],
+};
+
+function isWorkout(day: Day): day is Workout {
+  return day.kind === 'run';
+}
+
+function build(args: {
+  goalType?: GoalType;
+  durationWeeks?: number;
+  raceDistance?: RaceDistance;
+  daysPerWeek?: number;
+  weeklyKm?: number;
+}) {
+  const goalType = args.goalType ?? 'race';
+  const raceDistance = args.raceDistance ?? '5k';
+  return buildTemplatePlan({
+    intake: {
+      ...BASE_INTAKE,
+      daysPerWeek: args.daysPerWeek ?? BASE_INTAKE.daysPerWeek,
+      weeklyKm: args.weeklyKm ?? BASE_INTAKE.weeklyKm,
+      raceDistance,
+    },
+    goalType,
+    durationWeeks: args.durationWeeks ?? 12,
+    raceDistance,
+    raceDate: goalType === 'race' ? '2026-10-02' : undefined,
+    tierAtGeneration: 'pro',
+    density: 'paid',
+  });
+}
+
+describe('buildTemplatePlan — parametric inputs', () => {
+  it.each([
+    ['5k', 12],
+    ['10k', 16],
+    ['half', 18],
+    ['marathon', 26],
+  ] as const)('scales to a %s plan with %i weeks', (raceDistance, durationWeeks) => {
+    const plan = build({ raceDistance, durationWeeks });
+    expect(plan.weeks).toHaveLength(durationWeeks);
+    expect(plan.weeks.map((week) => week.weekNumber)).toEqual(
+      Array.from({ length: durationWeeks }, (_, index) => index + 1),
+    );
+    expect(plan.weeks.at(-1)?.days.filter(isWorkout).some((day) => day.label === 'Race Day')).toBe(
+      true,
+    );
+  });
+
+  it.each([2, 3, 4, 5, 6, 7])(
+    'uses the source minimum of three runs and otherwise honors %i available days',
+    (daysPerWeek) => {
+      const plan = build({ raceDistance: '10k', durationWeeks: 16, daysPerWeek });
+      const expectedRuns = Math.max(3, daysPerWeek);
+      for (const week of plan.weeks) {
+        expect(week.days.filter(isWorkout)).toHaveLength(expectedRuns);
+      }
+    },
+  );
+
+  it('scales weekly load from the starting volume', () => {
+    const lower = build({ raceDistance: '10k', durationWeeks: 16, weeklyKm: 25 });
+    const higher = build({ raceDistance: '10k', durationWeeks: 16, weeklyKm: 50 });
+    expect(higher.weeklyLoad[0]).toBeGreaterThan(lower.weeklyLoad[0]);
+    expect(higher.weeklyLoad.at(-1)).toBeGreaterThan(lower.weeklyLoad.at(-1) ?? 0);
+  });
+
+  it('keeps every generated week internally balanced and hard sessions separated', () => {
+    const plan = build({ raceDistance: 'marathon', durationWeeks: 26, daysPerWeek: 6 });
+    for (const week of plan.weeks) {
+      const workouts = week.days.filter(isWorkout);
+      expect(workouts.reduce((sum, workout) => sum + (workout.distanceKm ?? 0), 0)).toBe(
+        week.volumeKm,
+      );
+      const hardIndexes = week.days
+        .map((day, index) => ({ day, index }))
+        .filter(
+          ({ day }) =>
+            isWorkout(day) && (day.effort === 'tempo' || day.effort === 'interval'),
+        )
+        .map(({ index }) => index);
+      for (let left = 0; left < hardIndexes.length; left += 1) {
+        for (let right = left + 1; right < hardIndexes.length; right += 1) {
+          expect(Math.abs(hardIndexes[left] - hardIndexes[right])).toBeGreaterThanOrEqual(2);
+        }
+      }
+    }
+  });
+
+  it('does not leak race fields or race sessions into a duration plan', () => {
+    const plan = build({ goalType: 'duration', durationWeeks: 8 });
+    expect(plan.title).toBe('8-Week Running Plan');
+    expect(plan.raceDistance).toBeUndefined();
+    expect(plan.raceDate).toBeUndefined();
+    expect(plan.goalRealism).toBeUndefined();
+    expect(
+      plan.weeks
+        .flatMap((week) => week.days.filter(isWorkout))
+        .some((workout) => workout.label === 'Race Day' || workout.label === 'RP'),
+    ).toBe(false);
+  });
+});

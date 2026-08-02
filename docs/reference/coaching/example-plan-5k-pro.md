@@ -405,8 +405,8 @@ is already the race-specific phase; the taper is left alone by ruling 7 — Day 
 
 ## Open — needs Ian
 
-1. **Pace derivation. RESOLVED 2026-07-10 (decision gate #13, `00-README.md`) — implemented in
-   the in-flight `paceDerivation.ts` module.** Left here for history: this doc originally said the
+1. **Pace derivation. RESOLVED 2026-07-10 and implemented 2026-08-03
+   (`paceDerivation.ts`).** Left here for history: this doc originally said the
    library could produce no numeric easy or tempo pace at all. Answered: cross-distance Riegel
    equivalency plus the source's own relative pace rules derive tempo, interval, and
    (intermediate-level) easy-pace bands from a recent performance; see "Pace bands" above for this
@@ -414,10 +414,9 @@ is already the race-specific phase; the taper is left alone by ruling 7 — Day 
    source for steady/Zone 2 pace** — `paceDerivation.ts` deliberately never returns one. (See Open
    item 5 — RESOLVED 2026-07-12 — for a related but separate question this cycle surfaced: what to
    do about the goal itself, not the pace derivation, when it looks implausible.)
-2. **`clampWeeklyVolume()` must compare against the last *loading* week**, not literally last
-   week, or every post-deload week gets crushed. Still open — not yet fixed in `loadRules.ts` as
-   of this revision (`src/lib/planTemplates.ts` doesn't exist yet either, so nothing has hit this
-   bug in running code yet). Fix before `planTemplates.ts` is built.
+2. **RESOLVED 2026-08-03.** `clampWeeklyVolume()` now takes an explicitly named
+   `lastLoadingWeekKm` reference, so a deload week cannot be passed accidentally. Regression tests
+   cover the golden week-5 and week-9 post-deload transitions.
 3. **RESOLVED 2026-07-11 (ruling 3).** Ian: *"your goal is to run at your goal pace, might be
    slower in the beginning."* Early-plan interval sessions (weeks 9–10) run at this runner's
    current-fitness interval pace; race-pace-rep sessions in the race-specific phase (week 11) run
@@ -474,13 +473,9 @@ is already the race-specific phase; the taper is left alone by ruling 7 — Day 
    (`Plan.goalRealism`), so the plan explains its own numbers forever. Training paces
    (easy/tempo/interval) are untouched by any of this, at any goal size.
 
-   **What actually landed in code today: the shared types
-   (`GoalRealism`, `GoalRealismAssessment`, `Plan.goalRealism`) in `src/lib/planTypes.ts`, plus the
-   contract encoded as real tests in `paceDerivation.test.ts`** — replacing the `it.todo` this item
-   used to point to, and widening the two existing `deriveRacePaceTarget()` tests whose shape
-   changes. `assessGoalRealism()` and its two threshold constants are contracted by those tests but
-   not yet implemented — **`src/lib/paceDerivation.ts` itself still does not exist** (issue #3
-   builds it against this contract).
+   **Implemented 2026-08-03:** the shared types in `planTypes.ts`, the contract tests, and
+   `src/lib/paceDerivation.ts` now all exist. `assessGoalRealism()` and
+   `deriveRacePaceTarget()` use the exact ruled arithmetic and thresholds.
 6. **RESOLVED 2026-07-12 (Ian's ruling, issue #34, rendered-plan review round 2).** Left here for
    history: `workout-library.md` § "Session sizing by race distance" re-scopes the Daniels
    10%-of-weekly-volume rule as advisory context, not an enforced constraint — this app's own

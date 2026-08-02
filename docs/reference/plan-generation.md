@@ -1,9 +1,9 @@
 # Plan generation
 
-> **Status: `src/lib/planTypes.ts` and `src/lib/loadRules.ts` exist and are canonical** (19
-> passing unit tests on `loadRules.ts`) — when this document and the types disagree, the types
-> win. `supabase/functions/generate-plan`, `src/lib/planTemplates.ts`, and
-> `src/lib/subscription.ts` are still designed, not built. This document describes the design in
+> **Status: the pure shared plan layer is built and canonical** — `planTypes.ts`,
+> `loadRules.ts`, `paceDerivation.ts`, and `planTemplates.ts` exist, and when this document and the
+> types disagree, the types win. `supabase/functions/generate-plan` and `src/lib/subscription.ts`
+> are still designed, not built. This document describes the design in
 > [`planning/02-product-requirements.md`](../../planning/02-product-requirements.md) and
 > [`planning/03-engineering-requirements.md`](../../planning/03-engineering-requirements.md).
 > See [`docs/architecture.md`](../architecture.md) for how it fits the rest of the system and
@@ -42,7 +42,7 @@ a declared red-flag injury still produces a plan — the return-to-running proto
 removed.** What scales across tiers is how much of the runner the plan reasons about and how much
 it explains — never how much of the coach's judgment is taken away.
 
-- **Free**: select and lightly parametrize the skeleton from `src/lib/planTemplates.ts` (planned).
+- **Free**: select and lightly parametrize the skeleton from `src/lib/planTemplates.ts`.
   No AI call at all for this tier; effort *descriptions* only.
 - **Pro**: the skeleton supplies the structural shape for the chosen distance/duration; Claude
   personalizes workouts, paces, HR zones, and a weekly "why" within it.

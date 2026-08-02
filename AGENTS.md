@@ -43,8 +43,8 @@ break existing behavior.**
   `src/components/`.
 - Refactoring a shared type in `planTypes.ts` in a way that ripples into the golden fixture,
   `notation.ts`'s consumers, and multiple test files.
-- Implementing a new pure-logic module shared by the app and the edge functions (e.g. the
-  still-unbuilt `paceDerivation.ts`), with its own test suite.
+- Implementing a new pure-logic module shared by the app and the edge functions (for example,
+  extending `paceDerivation.ts` or `planTemplates.ts`), with its own test suite.
 
 **HIGH/CRITICAL — schema/migration changes, auth/security-sensitive code, anything touching
 production config, cross-service changes, or anything the user explicitly flags as risky.**
@@ -176,3 +176,9 @@ Built-ins also available: `Explore`, `Plan`, `general-purpose`. Plugin agents ar
   `docs/mvp-progress.md`, `docs/change_log.md`, and `docs/architecture.md`.
 - **Coaching content is never invented.** `docs/reference/coaching/` is a port of Ian's
   McMillan-based library. No agent changes a training rule, formula, or clinical claim without him.
+
+## Maintaining this file
+
+Keep this file limited to durable routing and guardrail rules useful to almost every future
+session. Prefer pointers to canonical docs or code over copying implementation detail, and update
+or remove stale guidance when the project changes.

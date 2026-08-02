@@ -1,14 +1,8 @@
 /**
- * QUARANTINED — red-first TDD spec for a module that does not exist yet.
+ * Golden template-plan contract for the plan engine (GitHub issue #3).
  *
- * This suite is excluded from `jest` (jest.config.js `testPathIgnorePatterns`) and from
- * `tsc` (tsconfig.json `exclude`) so that `main` can satisfy CLAUDE.md’s “clean typecheck &&
- * lint && test before every commit” gate. It was merged ahead of its implementation by PR #2,
- * which left every branch cut from `main` inheriting a red build (issue #41).
- *
- * Nothing here is stale — the expectations assert every current coaching ruling. Un-quarantining
- * this file (removing both exclusions) and getting it green is part of the plan engine’s
- * done-when: GitHub issue #3.
+ * This began as a red-first TDD suite and was un-quarantined when
+ * `src/lib/planTemplates.ts` landed. Its expectations pin every current coaching ruling.
  */
 
 import { buildTemplatePlan } from '../planTemplates';

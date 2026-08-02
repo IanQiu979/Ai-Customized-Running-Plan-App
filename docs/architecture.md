@@ -35,11 +35,10 @@ src/
     loadRules.ts               # canonical — deterministic safety arithmetic, 19 unit tests
     notation.ts                 # canonical — run-type/structure-string notation, the code
                                  #             counterpart of `notation.md`, 13 unit tests
-    fixtures/examplePlan.ts       # the 5K golden fixture as real `Plan` data — what `plan/[id].tsx`
-                                   # renders today; not yet `planTemplates.ts` output
-    __tests__/                    # supabase, loadRules, notation, examplePlan.fixture (64 passing);
-                                   # planTemplates.golden and paceDerivation intentionally fail —
-                                   # TDD specs for modules that don't exist yet
+    paceDerivation.ts        # pure Riegel/training-pace/goal-realism arithmetic
+    planTemplates.ts         # pure deterministic template + fallback plan engine
+    fixtures/examplePlan.ts  # hand-built 5K screen fixture; `plan/[id].tsx` still renders it
+    __tests__/               # 9 passing suites project-wide, including the two engine contracts
 ```
 
 `src/lib/supabase.ts` exports `supabase`, built with
@@ -57,9 +56,10 @@ src/
   / `stopAutoRefresh()` as the app foregrounds/backgrounds, so a backgrounded app stops issuing
   token refreshes.
 
-`src/lib/planTypes.ts`, `src/lib/loadRules.ts`, and `src/lib/notation.ts` **exist and are
-canonical** — pure TypeScript, no runtime deps, imported by both the Expo app and (once written)
-the Deno edge functions. `loadRules.ts` carries 19 passing unit tests, `notation.ts` 13.
+`src/lib/planTypes.ts`, `src/lib/loadRules.ts`, `src/lib/notation.ts`,
+`src/lib/paceDerivation.ts`, and `src/lib/planTemplates.ts` **exist and are canonical** — pure
+TypeScript with no runtime dependencies, importable by both the Expo app and future Deno edge
+functions. The project gate is 201 passing tests across 10 suites.
 **When this document and the types disagree, the types win** — `planTypes.ts` is the source of
 truth, this file is a description of it. `src/constants/theme.ts` is one such consumer: as of
 2026-07-12 (issue #32 findings 4 and 7) it derives `EffortLevel`'s render order and bar-height ramp
@@ -70,11 +70,11 @@ direction" below.
 `src/lib/fixtures/examplePlan.ts` is the 5K golden fixture rendered as real `Plan` data —
 `src/app/plan/[id].tsx` and `src/components/plan/` render it end to end on a real screen
 (ugly-beyond-tokens caveats aside), and `src/app/(tabs)/glossary.tsx` explains its abbreviations,
-reading its copy from `notation.ts`. None of this is wired to a real intake or a real generator
-yet: every plan id renders the same fixture.
+reading its copy from `notation.ts`. The pure generator now exists, but the route is not wired to
+it yet: every plan id still renders the same fixture.
 
-There is no `src/lib/planTemplates.ts`, `src/lib/paceDerivation.ts`, or `subscription.ts` yet; no
-auth screens; no intake screen; no `supabase/functions/`; no `supabase/migrations/`.
+There is no `subscription.ts` yet; no auth screens; no intake screen; no `supabase/functions/`;
+no `supabase/migrations/`.
 `tsconfig.json` maps `@/*` → `./src/*` and `@/assets/*` → `./assets/*`.
 
 ## Route tree — current + planned
@@ -100,7 +100,7 @@ no "next workout" or "current week" card. No current-week arithmetic exists in v
 unnamed and there are no check-offs, so "next" has no well-defined meaning without one. This is
 Ian's override of the recommended `floor(days since created_at / 7) + 1` design.
 
-## Planned — `src/lib/` layout
+## Current + planned — `src/lib/` layout
 
 ```
 src/lib/
@@ -111,18 +111,11 @@ src/lib/
   notation.ts                # exists today — run-type/structure-string notation, the code
                               #                counterpart of `notation.md`, 13 unit tests
   fixtures/examplePlan.ts    # exists today — the 5K golden fixture as real `Plan` data
-  planTemplates.ts        # planned — the free-tier engine AND the fallback engine for Pro/Elite.
-                            #          A parametric generator, not a fixed matrix: any distance,
-                            #          any legal week count (per the plan-shape rules in
-                            #          `planning/02-product-requirements.md`), any days/week, any
-                            #          starting weekly volume (km). Free's 12-week/5K limit is a UI/quota
-                            #          gate applied on top of this engine, not a limit of the
-                            #          engine itself — a Pro/Elite fallback still needs, say, a
-                            #          26-week marathon template.
-  paceDerivation.ts        # planned — planTemplates.ts's pace-derivation counterpart (decision
-                            #          13, 2026-07-10: Riegel cross-distance equivalency + the
-                            #          source's relative pace rules). TDD test suite exists
-                            #          (`paceDerivation.test.ts`) and intentionally fails today.
+  planTemplates.ts        # exists — Free-tier engine and paid-tier fallback; parametric across
+                            #          supported distances, week counts, run-day availability, and
+                            #          starting weekly volume; exactly reproduces the golden 5K case
+  paceDerivation.ts        # exists — Riegel equivalency, source-relative training bands, and
+                            #          the ruled goal-realism/race-pace cap
   subscription.ts          # planned — tier read + dummy purchase
 ```
 
