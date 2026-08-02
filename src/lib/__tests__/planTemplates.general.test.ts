@@ -18,6 +18,33 @@ function isWorkout(day: Day): day is Workout {
   return day.kind === 'run';
 }
 
+/**
+ * A race week's own distance is fixed by the event and cannot be clamped down like an ordinary
+ * training week — a marathon race day is 42.195 km regardless of the runner's taper volume. That
+ * week complies with the growth cap either the ordinary way (its actual, user-visible volume is
+ * within the 15% cap off the last loading week) or because it sits exactly at the mathematically
+ * mandatory minimum forced by the fixed race distance plus one required run per remaining day
+ * (i.e. there is no discretionary padding beyond what the race itself forces).
+ */
+function assertWeekGrowthCapCompliance(
+  week: ReturnType<typeof buildTemplatePlan>['weeks'][number],
+  lastLoadingWeekKm: number,
+): void {
+  if (lastLoadingWeekKm <= 0) return;
+  const growth = (week.volumeKm - lastLoadingWeekKm) / lastLoadingWeekKm;
+  if (growth <= WEEKLY_INCREASE_REJECT_ABOVE + 1e-9) return;
+
+  const raceDay = week.days.filter(isWorkout).find((day) => day.label === 'Race Day');
+  if (raceDay === undefined) {
+    throw new Error(
+      `week ${week.weekNumber} grew ${(growth * 100).toFixed(1)}% off ${lastLoadingWeekKm} km, exceeding the reject threshold`,
+    );
+  }
+  const otherRuns = week.days.filter(isWorkout).filter((day) => day !== raceDay).length;
+  const mandatoryFloorKm = (raceDay.distanceKm ?? 0) + otherRuns;
+  expect(week.volumeKm).toBeLessThanOrEqual(mandatoryFloorKm + 1e-9);
+}
+
 function build(args: {
   goalType?: GoalType;
   durationWeeks?: number;
@@ -100,16 +127,12 @@ describe('buildTemplatePlan — parametric inputs', () => {
     }
   });
 
-  it('never grows a non-deload week beyond the reject threshold off the last loading week (issue #22)', () => {
+  it('never grows a non-deload week — including the race week — beyond the reject threshold off the last loading week, unless mathematically forced by the fixed race distance (issue #22)', () => {
     const plan = build({ raceDistance: '10k', durationWeeks: 6, daysPerWeek: 4, weeklyKm: 35 });
     let lastLoadingWeekKm = 0;
     for (const week of plan.weeks) {
-      const isRaceDayWeek = week.days.filter(isWorkout).some((day) => day.label === 'Race Day');
-      if (!week.isDeload && !isRaceDayWeek) {
-        if (lastLoadingWeekKm > 0) {
-          const growth = (week.volumeKm - lastLoadingWeekKm) / lastLoadingWeekKm;
-          expect(growth).toBeLessThanOrEqual(WEEKLY_INCREASE_REJECT_ABOVE + 1e-9);
-        }
+      if (!week.isDeload) {
+        assertWeekGrowthCapCompliance(week, lastLoadingWeekKm);
         lastLoadingWeekKm = week.volumeKm;
       }
     }
@@ -131,20 +154,24 @@ describe('buildTemplatePlan — parametric inputs', () => {
     ['10k', 16, 5, 25],
     ['half', 18, 6, 40],
     ['marathon', 26, 3, 30],
+    ['10k', 8, 7, 35],
+    ['half', 26, 3, 40],
+    ['half', 26, 3, 60],
+    ['marathon', 18, 7, 60],
+    ['5k', 16, 5, 20],
+    ['10k', 12, 6, 15],
   ] as const)(
-    'keeps growth-cap compliance across durations/days/volumes (%s, %i weeks, %i days, %i km)',
+    'keeps every week — including the race week and every deload — growth-cap compliant across durations/days/volumes (%s, %i weeks, %i days, %i km)',
     (raceDistance, durationWeeks, daysPerWeek, weeklyKm) => {
       const plan = build({ raceDistance, durationWeeks, daysPerWeek, weeklyKm });
       let lastLoadingWeekKm = 0;
       for (const week of plan.weeks) {
-        const isRaceDayWeek = week.days
-          .filter(isWorkout)
-          .some((day) => day.label === 'Race Day');
-        if (!week.isDeload && !isRaceDayWeek) {
+        if (week.isDeload) {
           if (lastLoadingWeekKm > 0) {
-            const growth = (week.volumeKm - lastLoadingWeekKm) / lastLoadingWeekKm;
-            expect(growth).toBeLessThanOrEqual(WEEKLY_INCREASE_REJECT_ABOVE + 1e-9);
+            expect(week.volumeKm).toBeLessThan(lastLoadingWeekKm * 0.75);
           }
+        } else {
+          assertWeekGrowthCapCompliance(week, lastLoadingWeekKm);
           lastLoadingWeekKm = week.volumeKm;
         }
       }

@@ -296,6 +296,24 @@ function scaleQualityDistanceKm(nominalKm: number, desiredVolumeKm: number): num
   return Math.max(3, Math.round(nominalKm * (desiredVolumeKm / 35)));
 }
 
+/**
+ * Per-workout structural floors (a quality session's own minimum, the long run's "longest run
+ * of the week" floor, `distributeDistance`'s 1 km/session floor) can each be individually
+ * reasonable yet still stack past `targetKm`. This is the last-mile guarantee that the assembled,
+ * user-visible total never exceeds the clamped target: scale every running workout down together,
+ * never below 1 km each, rather than trusting the sum of independently floored pieces.
+ */
+function reconcileVolumeToTarget(workouts: Workout[], targetKm: number): Workout[] {
+  const total = workouts.reduce((sum, workout) => sum + (workout.distanceKm ?? 0), 0);
+  if (total <= targetKm) return workouts;
+  const scale = targetKm / total;
+  return workouts.map((workout) =>
+    workout.distanceKm === undefined
+      ? workout
+      : { ...workout, distanceKm: Math.max(1, Math.floor(workout.distanceKm * scale)) },
+  );
+}
+
 function targetLongRunKm(
   startingWeeklyKm: number,
   weekIndex: number,
@@ -602,17 +620,15 @@ function buildGenericWeek(args: {
     const race = raceDayWorkout(raceDistance);
     const requestedRuns = normalizedRunCount(intake.daysPerWeek);
     const easyCount = Math.max(0, requestedRuns - 1);
-    const easyDistances = distributeDistance(
-      desiredVolumeKm - (race.distanceKm ?? 0),
-      easyCount,
-      maxSingleRunKm,
-    );
+    const easyBudgetKm = Math.max(0, desiredVolumeKm - (race.distanceKm ?? 0));
+    const easyDistances = distributeDistance(easyBudgetKm, easyCount, maxSingleRunKm);
     const easyWorkouts = easyDistances.map((distanceKm, index) =>
       index === easyDistances.length - 1
         ? shakeoutRun(distanceKm, density, '2 × 30 s Strides @ GP')
         : easyRun({ distanceKm, pace: easyPace, density }),
     );
-    const days = placeWorkouts([...easyWorkouts, race], requestedRuns);
+    const reconciledEasyWorkouts = reconcileVolumeToTarget(easyWorkouts, easyBudgetKm);
+    const days = placeWorkouts([...reconciledEasyWorkouts, race], requestedRuns);
     const volumeKm = days
       .filter((day): day is Workout => day.kind === 'run')
       .reduce((sum, workout) => sum + (workout.distanceKm ?? 0), 0);
@@ -684,7 +700,11 @@ function buildGenericWeek(args: {
       ...(!isDeload ? { structure: '4 × 30 s Strides' } : {}),
     }),
   );
-  const days = placeWorkouts([...easyWorkouts, ...retainedQuality, long], requestedRuns);
+  const reconciledWorkouts = reconcileVolumeToTarget(
+    [...easyWorkouts, ...retainedQuality, long],
+    desiredVolumeKm,
+  );
+  const days = placeWorkouts(reconciledWorkouts, requestedRuns);
   const volumeKm = days
     .filter((day): day is Workout => day.kind === 'run')
     .reduce((sum, workout) => sum + (workout.distanceKm ?? 0), 0);
