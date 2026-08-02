@@ -50,21 +50,48 @@ describe('deload cadence', () => {
 describe('weekly volume', () => {
   it('recalculates an over-aggressive week at 10%, not merely trimming it to 15%', () => {
     // 40 km -> a 50 km proposal is +25%; the rule rejects and rebuilds at +10%.
-    expect(clampWeeklyVolume(40, 50, 'intermediate')).toBeCloseTo(44);
+    expect(
+      clampWeeklyVolume({ lastLoadingWeekKm: 40, proposedKm: 50, level: 'intermediate' }),
+    ).toBeCloseTo(44);
   });
 
   it('leaves a compliant increase alone', () => {
-    expect(clampWeeklyVolume(40, 44, 'intermediate')).toBeCloseTo(44);
+    expect(
+      clampWeeklyVolume({ lastLoadingWeekKm: 40, proposedKm: 44, level: 'intermediate' }),
+    ).toBeCloseTo(44);
   });
 
   it('never exceeds the level ceiling, even after recalculation', () => {
     // Beginner recalc would give 41.8, but the absolute beginner ceiling is 40.
-    expect(clampWeeklyVolume(38, 45, 'beginner')).toBe(40);
+    expect(
+      clampWeeklyVolume({ lastLoadingWeekKm: 38, proposedKm: 45, level: 'beginner' }),
+    ).toBe(40);
   });
 
   it('handles a first week, where there is no previous volume to grow from', () => {
-    expect(clampWeeklyVolume(0, 25, 'beginner')).toBe(25);
-    expect(clampWeeklyVolume(0, 60, 'beginner')).toBe(40);
+    expect(
+      clampWeeklyVolume({ lastLoadingWeekKm: 0, proposedKm: 25, level: 'beginner' }),
+    ).toBe(25);
+    expect(
+      clampWeeklyVolume({ lastLoadingWeekKm: 0, proposedKm: 60, level: 'beginner' }),
+    ).toBe(40);
+  });
+
+  it('compares a post-deload proposal against the last loading week, not the deload week', () => {
+    expect(
+      clampWeeklyVolume({
+        lastLoadingWeekKm: 38,
+        proposedKm: 41,
+        level: 'intermediate',
+      }),
+    ).toBe(41);
+    expect(
+      clampWeeklyVolume({
+        lastLoadingWeekKm: 48,
+        proposedKm: 45,
+        level: 'intermediate',
+      }),
+    ).toBe(45);
   });
 });
 

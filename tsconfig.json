@@ -16,9 +16,5 @@
     "**/*.tsx",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
-  ],
-  "exclude": [
-    "src/lib/__tests__/planTemplates.golden.test.ts",
-    "src/lib/__tests__/paceDerivation.test.ts"
   ]
 }

@@ -5,6 +5,28 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-08-03 — plan-generation engine lands (issue #3, with issues #22/#23)
+
+- Added pure `src/lib/paceDerivation.ts`: Riegel equivalency, recent-performance-derived
+  easy/tempo/interval bands, exact 10%/15% goal-realism boundaries, and the strictly-above-15%
+  race-pace cap. Training paces remain independent of the declared goal.
+- Added pure `src/lib/planTemplates.ts`: deterministic template/fallback generation, including the
+  Ian-approved 12-week 5K golden plan (phase split, deloads, volume/long-run schedules, strides,
+  quality-session caps, rep notation, paces, HR zones, and exact race-day structure). The engine
+  also scales phase allocation, run-day count, and starting volume for non-golden inputs without
+  adding a backend or dependency.
+- Fixed issue #22 by changing `clampWeeklyVolume()` to take a named `lastLoadingWeekKm` input, so a
+  deload week cannot accidentally become the growth reference. Added regression coverage for the
+  golden post-deload weeks 5 and 9.
+- Resolved issue #23 in generated output: week 8 is the approved 30 km and every week's
+  `volumeKm` remains the exact sum of its sessions.
+- Removed the Jest, TypeScript, and ESLint quarantine exclusions. The two red-first suites now run
+  in the normal build; all 213 tests across 10 suites pass alongside typecheck and lint.
+- Review fix: `buildGenericWeek()` now reconciles assembled workouts down to the clamped
+  `targetKm` via `reconcileVolumeToTarget()`, since independently-floored pieces (a quality
+  session's minimum, the long run's floor, `distributeDistance`'s 1 km/session floor) could each
+  be individually reasonable yet stack past the clamp.
+
 ## 2026-07-12 — the last stale doc reference from issue #37, actually fixed this time
 
 Found while cleaning up branches after the four-PR merge pass. **Issue #37's sweep was recorded as

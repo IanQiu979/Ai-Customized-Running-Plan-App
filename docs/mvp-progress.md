@@ -6,18 +6,10 @@
 > Milestone definitions live in [`planning/02-product-requirements.md`](../planning/02-product-requirements.md).
 > Decision history lives in [`change_log.md`](change_log.md).
 
-**Last updated:** 2026-07-12 (integration pass: Ian's round-2 coaching sign-off closes issues #34,
-#19 and #29; goal-realism ruled, closing #33; app named **Pace Blueprint** (#35); units ruled
-km-only (#36); doc stale-reference sweep (#37). `main` returned to green by quarantining the two
-orphaned TDD suites (#41). `formatSecPerKm` pace-rounding carry bug fixed, closing #28, adding the
-first test suite under `src/components/`. Screen-reader gaps fixed, closing #31 — pace bands spoken
-as words, race day announced, plus three code-review-caught defects, including collapsing the m:ss
-formatter #28 fixed into one shared `formatSecPerKm()` so the two readouts can't drift apart.
-`FallbackNotice` gains a required quota-copy `variant` prop, closing issue #30 (issue #45 filed for
-the still-open follow-up). React Navigation's chrome now derives from `theme.ts`'s tokens instead
-of leaking the library's own stock palette, closing #27. Issue #32's frontend polish batch closed —
-nine of eleven findings fixed, two dispositioned (rejected / already stale). 121 tests passing, up
-from 82. Issue #22 remains open.)
+**Last updated:** 2026-08-03 (issue #3's pure TypeScript plan-generation engine landed:
+`paceDerivation.ts` + `planTemplates.ts`; bundled issues #22/#23 fixed; both red-first suites
+un-quarantined. Typecheck, lint, and all 213 tests across 10 suites pass. Backend wiring remains
+unbuilt.)
 
 ---
 
@@ -27,35 +19,19 @@ from 82. Issue #22 remains open.)
 |---|---|
 | M1 — Foundation (account → empty Home) | **Not started.** Infra partially provisioned |
 | M2 — Intake (questionnaire persists) | Not started |
-| M3 — Plan engine (3 tiers produce valid plans) | Not started |
+| M3 — Plan engine (3 tiers produce valid plans) | **In progress.** Pure template/pace engine done; backend/hybrid flow not started |
 | M4 — Tiers & quotas (server-side, unbypassable) | Not started |
 | M5 — My Plans (history) | Not started |
 | M6 — Polish & TestFlight | Not started |
 
-**The honest summary:** planning, design, and domain research are done to an unusual depth, and
-Phase 0's paper-reconciliation pass is now done too. **The plan-generation engine itself does not
-exist yet.** `src/lib/supabase.ts`, `planTypes.ts`, `loadRules.ts`, and (as of the 2026-07-11
-review-and-refine cycle) `notation.ts` are the app's `lib/` layer — shared vocabulary, safety
-arithmetic, and run-type/structure-string notation, all pure and tested (83 lib-layer tests, up
-from 64, after Ian's 2026-07-12 round-2 rulings on issue #34 added the long-run deload-week
-measurement fix (ruling R1c) and the race-day/strides test coverage, plus issue #32's
-strides-label regression test; the project total is **121 across 7 suites** as of the same day's
-`formatSecPerKm` carry-boundary fix (issue #28, which added the first test suite under
-`src/components/`), issue #31's screen-reader accessibility fixes, issue #27's navigation-theme
-suite under `src/constants/`, and issue #32's `theme.effort.test.ts`, which together took the
-project total 82 → 93 → 107 → 117 → 121). A golden fixture (`src/lib/fixtures/examplePlan.ts`), a rendered
-plan screen (`src/app/plan/[id].tsx` and `src/components/plan/`), and an abbreviations glossary tab
-(`src/app/(tabs)/glossary.tsx`) exist and render that fixture — but nothing generates a plan from an
-intake yet. `src/lib/planTemplates.ts` and `src/lib/paceDerivation.ts`, the actual generation logic,
-are still unwritten; two TDD test suites for them exist and intentionally fail to compile on the
-missing modules (`npm run typecheck` and `npm run lint` are red for the same reason — expected, not
-a regression). **What changed 2026-07-12: every coaching question blocking that engine's build is
-now answered.** Issue #19's HIGH-severity long-run-cap conflict — the golden plan's own numbers
-breached the coded cap — is closed; the abbreviation set, race-day notation (issue #29), strides
-placement, the Daniels brake, and peak volume are all signed off. The gap between "designed" and
-"working" is smaller than it was, but the engine itself is still ahead. Two coaching/code questions
-remain genuinely open and unrelated to this pass: issue #22 (`clampWeeklyVolume` comparing against
-the literal previous week) and issue #33 (goal-realism handling).
+**The honest summary:** the pure client/shared plan engine now exists. `src/lib/paceDerivation.ts`
+derives Riegel equivalents, training pace bands, and the ruled goal-realism/cap result;
+`src/lib/planTemplates.ts` builds deterministic template plans and reproduces the approved 12-week
+5K fixture exactly. `clampWeeklyVolume()` now names and uses the last loading week, and the golden
+week-8 output is 30 km. The former red-first suites run normally: **213 tests across 10 suites**,
+with typecheck and lint clean. The plan screen still renders the static fixture, however, and no
+intake, database, edge function, quota flow, or AI personalization exists yet; M3 is therefore only
+partially complete.
 
 ---
 
@@ -138,30 +114,9 @@ the literal previous week) and issue #33 (goal-realism handling).
       ruling — see `docs/change_log.md`'s 2026-07-12 entry. **Known gap, filed as issue #45:** the
       client can't yet derive the true variant from `Plan.isFallback` alone; blocked on
       `generate-plan` returning whether a fallback consumed quota (Phase 4).
-- [x] 121 passing tests across 7 suites (`jest-expo`), up from 64 after Ian's 2026-07-12 issue #34
-      rulings and the same day's issue #28 / #31 / #27 / #32 fixes: `supabase.test.ts`,
-      `loadRules.test.ts` (extended for ruling R1c — a deload week's long run is measured against
-      the last loading week's volume, not exempted from the cap), `notation.test.ts` (+1 for R6's
-      race-day structure string), `examplePlan.fixture.test.ts` (extended for R6, R7, and issue
-      #32's strides-label regression test), `src/components/`'s first suite (issue #28's
-      `formatSecPerKm` carry boundary, extended by issue #31's screen-reader fixes),
-      `src/constants/__tests__/navigation-theme.test.ts` (issue #27, 10 tests), and
-      `theme.effort.test.ts` (issue #32, 3 tests guarding the effort-scale derivation above).
-      Two more suites exist and **intentionally fail to compile** — they're TDD specs for code that doesn't exist yet:
-      `planTemplates.golden.test.ts` (also extended for R6/R7) and `paceDerivation.test.ts`. Both
-      already assert every current coaching ruling (45 km week 9, 300 m jog, week-11 goal-pace
-      convergence, the R6 race-day string, R7's two-strides-day weeks) — they fail only because
-      `planTemplates.ts` and `paceDerivation.ts` don't exist to import, not because their
-      expectations are stale. `test` is 5 suites passing / 2 intentionally red — this was true on
-      clean `origin/main` before the 2026-07-12 pass too; nothing here is a new failure.
-      **`typecheck` and `lint` are currently red too**, both on the same two files (`Cannot find
-      module '../planTemplates'` / `'../paceDerivation'`) — expected, not a regression, but `npm
-      run typecheck && npm run lint && npm test` will not run clean until step 3 below lands both
-      modules. Recorded plainly here and in "Known debt and risks" below: the repo cannot
-      currently satisfy `CLAUDE.md`'s own "clean typecheck && lint && test before every commit"
-      rule. **Superseded the same day by the 2026-07-12 quarantine below (issue #41)** — both
-      files are now excluded from `jest`/`tsc`/`eslint` outright, so `typecheck`, `lint`, and
-      `test` are all clean again; see "Known debt and risks."
+- [x] **213 passing tests across 10 suites (`jest-expo`) as of 2026-08-03.** This includes the
+      formerly red-first `planTemplates.golden.test.ts` and `paceDerivation.test.ts` contracts,
+      now un-quarantined and green. `npm run typecheck`, `npm run lint`, and `npm test` all pass.
 - [x] **Issue #28 fixed (2026-07-12): `formatSecPerKm`'s minute/second carry.**
       `src/components/plan/format.ts` rounded minutes and seconds independently, so a fractional
       pace could round seconds up to 60 without carrying into the next minute (359.6 s/km →
@@ -216,10 +171,8 @@ the literal previous week) and issue #33 (goal-realism handling).
       sex data the two new time fields don't provide). The one real gap found — no numeric
       race-time → training-pace method in the source — is closed by decision 13 below.
 
-**Next work: Phase 1 — the plan engine itself.** The rest of `docs/mvp-build-prompt.md`'s
-build-phase orchestration for this phase — the theme rewrite and a plan view on a local fixture —
-is now done (see "Code" above); `src/lib/planTemplates.ts` and `src/lib/paceDerivation.ts` are
-what remain.
+**Phase 1 core engine completed 2026-08-03.** The remaining backend-free step is wiring the plan
+view to `buildTemplatePlan()` instead of the static fixture; intake and server work follow.
 
 ### Design
 - [x] `docs/design/frontend-design-brief.md` — token layer with **computationally verified** contrast,
@@ -284,24 +237,16 @@ what remain.
       extend to both easy days of loading weeks 1, 2, 3, 5, 6, 7. R8: week 9's 300 m recovery jog
       is confirmed as correct. Applied to `src/lib/loadRules.ts`, `src/lib/fixtures/examplePlan.ts`,
       four test files, and five files under `docs/reference/coaching/`. Full account:
-      `docs/change_log.md`'s 2026-07-12 entry. **Issues #22 and #33 remain open** — neither was
-      part of this queue.
+      `docs/change_log.md`'s 2026-07-12 entry. Issue #33's ruling was implemented in the engine on
+      2026-08-03, and issue #22's clamp bug was fixed in the same build.
 
 ---
 
 ## In flight
 
-**Nothing is currently in flight.** The coaching-doc review-and-refine cycles below are fully
-closed — docs and code both. This section, "Next" step 3, and "Known debt" previously said
-cycle 2's code-side resync was still open; **corrected in this doc-audit pass** — it wasn't, by
-the time the actual files were read (see `docs/change_log.md`'s new correction bullet). The real
-remaining critical-path item is `src/lib/planTemplates.ts` / `paceDerivation.ts` themselves, a
-genuine gap tracked as step 3 in "Next," not a doc/fixture/test sync problem.
-
-**2026-07-12, since:** the Open items these cycles left pending (4, 6, 7) were batched into
-GitHub issue #34 along with two standalone bugs (#19, #29) and put to Ian in one sitting; see
-"Decided (2026-07-12)" and `docs/change_log.md`'s 2026-07-12 entry for the rulings. That queue is
-now also closed — only Open item 5, tracked as issue #33, is still open.
+**Nothing is currently in flight.** The pure engine and its test contracts are complete. The next
+critical-path item is step 4 below: wire the plan route to the generated template, then build the
+intake/backend flow.
 
 - **Cycle 1** (2026-07-11): Ian scored the rendered plan 3/10, five rulings applied. Docs rebuilt
   (`notation.md` added; `workout-library.md` and `example-plan-5k-pro.md` rewritten;
@@ -333,27 +278,15 @@ with **no backend at all**.
        a runner who gave no recent time — structurally *cannot* carry a measured numeral. The type
        system enforces the design's readout-bracket honesty rule.
 2. [x] **`src/lib/loadRules.ts`** — **Done 2026-07-10.** Weekly volume cap, deload cadence and the
-       35–45% band, long-run share cap, long-run spike cap, Daniels time cap, HR zones. 19 unit tests.
+       35–45% band, long-run share cap, long-run spike cap, Daniels time cap, HR zones. 31 unit tests.
        `clampLongRun()` reports which ceiling actually bound.
-3. [ ] **`src/lib/planTemplates.ts`** (+ **`src/lib/paceDerivation.ts`**, its pace-derivation
-       counterpart) — the 5K plan first: phases, workout primitives, load curve. Generates for any
-       week count, any days/week, any starting weekly volume (km). **Target `example-plan-5k-pro.md`
-       as it stands after Ian's 2026-07-12 issue #34 rulings** (45 km week 9 with a 300 m interval
-       jog, count × distance throughout, R1/R1c's long-run cap — a deload week's long run measured
-       against the last loading week's volume, never exempted — R6's race-day structure string,
-       R7's two-strides-day weeks) — the golden test and fixture below already assert
-       exactly this, so build to make them pass rather than re-deriving them. Issue #19, the one
-       coaching conflict that would have made this impossible to build correctly (the golden
-       plan's own long runs breached the coded 30% cap), is now closed, as is issue #33
-       (goal-realism handling — ruled 2026-07-12: warn at 10%, cap the race-pace anchor at 15%;
-       `GoalRealismAssessment` is typed in `planTypes.ts` and specced in `paceDerivation.test.ts`,
-       awaiting only the implementation). **One thing still blocks full correctness:** issue #22
-       (`clampWeeklyVolume()`'s last-loading-week bug, Open item 2), to be fixed as part of this
-       step.
-   - [ ] **Un-quarantine the two TDD suites.** `planTemplates.golden.test.ts` and
-         `paceDerivation.test.ts` are excluded from `jest` and `tsconfig` (see "Known debt")
-         so that `main` is green; landing the two modules means removing those exclusions and
-         getting both suites passing. This is part of this step's done-when, not a separate task.
+3. [x] **`src/lib/planTemplates.ts`** (+ **`src/lib/paceDerivation.ts`**) — **Done
+       2026-08-03.** The pure template engine reproduces the approved 12-week 5K plan exactly and
+       accepts arbitrary week counts, available run days, starting weekly volume, and supported
+       race distances. Pace derivation, goal realism, issue #22's last-loading-week clamp, and
+       issue #23's 30 km week-8 output landed in the same build.
+   - [x] **Un-quarantine the two TDD suites.** The Jest, TypeScript, and ESLint exclusions are
+         removed; both suites run in the normal gate. Typecheck, lint, and 213/213 tests pass.
    - [x] **Fixture/test resync — already done, not still open (corrected in this doc-audit
          pass).** `src/lib/__tests__/paceDerivation.test.ts`, `src/lib/__tests__/planTemplates.golden.test.ts`,
          and `src/lib/fixtures/examplePlan.ts` all already assert cycle-2's corrected numbers:
@@ -367,10 +300,9 @@ with **no backend at all**.
          writing `planTemplates.ts`/`paceDerivation.ts` themselves against these already-correct
          specs — tracked in step 3 above, not a doc/test sync problem.
 4. [ ] **Plan view rendering a real template plan.** **Partially done** — `src/app/plan/[id].tsx`
-       and `src/components/plan/` already render the golden fixture end to end (ugly-beyond-tokens
-       caveats aside), but it's still the static fixture, not `planTemplates.ts` output, since
-       that module doesn't exist yet. Left unchecked until the data source is a real generated
-       plan; swap it once step 3 lands.
+       and `src/components/plan/` render the golden fixture end to end, but the route still imports
+       that static fixture rather than calling the now-built `buildTemplatePlan()`. Wiring the
+       screen is the next backend-free step.
 5. [x] **Theme + fonts** — **Done.** `src/constants/theme.ts` replaced with the Instrument & Matter
        token system (commit `145d7e0`); stock template screens removed
        (`src/app/index.tsx` → `src/app/(tabs)/index.tsx`, rewritten; `explore.tsx` deleted);
@@ -420,8 +352,9 @@ Reduce Volume tiers are surfaced or actioned; Monitoring's triggers stay in `loa
 
 ## Decided (2026-07-12) — GitHub issue #34, coaching sign-off queue closed
 
-Full rationale for each ruling is in `docs/change_log.md`'s "2026-07-12" entry. Closes issues #19
-and #29 alongside #34; issues #22 and #33 remain open and were not part of this queue.
+Full rationale for each ruling is in `docs/change_log.md`'s "2026-07-12" entry. This queue closed
+issues #19 and #29 alongside #34; the separately tracked #22/#33 implementations landed later with
+issue #3 on 2026-08-03.
 
 | Item | Decision |
 |---|---|
@@ -469,7 +402,8 @@ Full rationale for each row in `docs/change_log.md`'s 2026-07-12 entries.
 
 ### Goal-realism handling (issue #33)
 
-Closes Open item 5 and GitHub issue #33. Full reasoning, worked cases, and the type contract:
+Closes Open item 5 and GitHub issue #33; implementation landed with issue #3 on 2026-08-03. Full
+reasoning, worked cases, and the type contract:
 [`docs/superpowers/specs/2026-07-12-goal-realism-design.md`](superpowers/specs/2026-07-12-goal-realism-design.md).
 
 | Item | Decision |
@@ -480,11 +414,8 @@ Closes Open item 5 and GitHub issue #33. Full reasoning, worked cases, and the t
 | Provenance | **Both thresholds are Ian's own.** The coaching source has no goal-realism rule — `COMPLETENESS.md` lists "goal unrealistic for current fitness" under what the library is *missing*. Nothing here is portable from McMillan, and nothing here may be changed without him. |
 | Blast radius | Training paces (easy/tempo/interval) stay **unconditionally** recent-derived at any goal size. A fantasy goal cannot corrupt everyday paces — the entire exposure is the `RP` session target, which is why capping one number is a sufficient fix. |
 
-**Landed in code 2026-07-12:** the shared types (`GoalRealism`, `GoalRealismAssessment`,
-`Plan.goalRealism`) in `src/lib/planTypes.ts`, and the ruling encoded as real tests in
-`paceDerivation.test.ts` (the `it.todo` is gone). **`src/lib/paceDerivation.ts` itself is still
-unbuilt** — issue #3 implements `assessGoalRealism()` and the widened `deriveRacePaceTarget()`
-against that contract, so the suite stays quarantined until it lands.
+**Implemented in code:** the shared types and contract tests landed 2026-07-12;
+`src/lib/paceDerivation.ts` landed 2026-08-03 with the exact ruled threshold and cap arithmetic.
 
 ---
 
@@ -501,19 +432,6 @@ against that contract, so the suite stays quarantined until it lands.
   recorded in [`apple-dev-blocked.md`](apple-dev-blocked.md); issue #7's remaining scope
   (email/password, Google OAuth, session routing) is unaffected and still workable today. The
   requirement binds only at App Store submission.
-- 🟡 **Two TDD suites are QUARANTINED so `main` can be green (2026-07-12).**
-  `src/lib/__tests__/planTemplates.golden.test.ts` and `paceDerivation.test.ts` are excluded from
-  `jest` (`jest.config.js`), `tsc` (`tsconfig.json`), and `eslint` (`eslint.config.js`) — they
-  import `planTemplates.ts` / `paceDerivation.ts`, which don't exist. PR #2 merged them ahead of
-  their modules, so every branch cut from `main` inherited a red build (issue #41) and the repo
-  could not satisfy `CLAUDE.md`'s own pre-commit gate. **Nothing in the specs is stale** — they
-  assert every current coaching ruling. `typecheck`, `lint`, and `test` (121/121, 7 suites —
-  up from 82/82, 4 suites, after the 2026-07-12 issue #28 fix (`formatSecPerKm` carry-boundary,
-  93/93, first suite under `src/components/`), issue #31's accessibility fixes on top of it,
-  issue #27's `src/constants/__tests__/navigation-theme.test.ts`, and issue #32's
-  `theme.effort.test.ts`) are now all clean. **Removing the
-  three exclusions and getting both suites green is part of step 3's done-when** (issue #3) — do
-  not land the engine without doing it.
 - 🟡 **Suspected pre-existing bug: Home's demo link may render with no border, no 48pt tap target,
   and no pressed state (found while tracing the Link for issue #31, filed as issue #51).**
   expo-router's `Link asChild` (`src/app/(tabs)/index.tsx`) uses a Radix Slot whose `mergeProps`
@@ -532,14 +450,6 @@ against that contract, so the suite stays quarantined until it lands.
   against the goal time, so it cannot run server-side until this is fixed. Belongs to the
   `generate-plan` contract (issue #9, `api-designer`) — flagged, deliberately not fixed under the
   goal-realism ruling.
-- 🟡 **`clampWeeklyVolume()`'s last-loading-week bug remains open — GitHub issue #22.**
-  `src/lib/loadRules.ts` compares a proposed week against the literal previous week; the ruling
-  encoded in the fixture (a deload week should be skipped, comparing against the last *loading*
-  week instead) isn't enforced in the typed API yet. Slated to be fixed alongside
-  `planTemplates.ts` (step 3 in "Next"). **Conceptually the same fix as ruling R1c** (the long-run
-  share cap now measures a deload week against the last loading week's volume too) — the two
-  rules agree "the last loading week" is the correct reference point, but they govern different
-  functions and #22 is not resolved by R1c.
 - 🟡 **The configure-modal design spec never mentions goal time (found 2026-07-12).**
   `docs/design/frontend-design-brief.md:564` describes the modal as distance chips + a date picker
   only, which contradicts `mvp-build-prompt.md:332` and leaves the goal-realism warning's second

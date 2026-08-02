@@ -130,23 +130,32 @@ export function deloadEveryWeeks(level: ExperienceLevel, age: number): number {
 // Weekly volume
 // ---------------------------------------------------------------------------
 
-/**
- * Clamps a proposed week against the previous week and the level's absolute ceiling.
- * A proposal above the reject threshold is recalculated at the lower rate, per
- * `load-rules.md § Rule 1 › Enforcement` — it is not merely trimmed to the threshold.
- */
-export function clampWeeklyVolume(
-  previousKm: number,
-  proposedKm: number,
-  level: ExperienceLevel,
-): number {
-  const ceiling = MAX_WEEKLY_KM[level];
-  if (previousKm <= 0) return Math.min(proposedKm, ceiling);
+/** Explicit input prevents callers from accidentally passing the literal deload week. */
+export interface WeeklyVolumeClampInput {
+  /** The most recent non-deload week, not necessarily the immediately preceding week. */
+  lastLoadingWeekKm: number;
+  proposedKm: number;
+  level: ExperienceLevel;
+}
 
-  const growth = (proposedKm - previousKm) / previousKm;
+/**
+ * Clamps a proposed week against the last loading week and the level's absolute ceiling.
+ * A deload week is skipped as the growth reference. A proposal above the reject threshold is
+ * recalculated at the lower rate, per `load-rules.md § Rule 1 › Enforcement` — it is not merely
+ * trimmed to the threshold.
+ */
+export function clampWeeklyVolume({
+  lastLoadingWeekKm,
+  proposedKm,
+  level,
+}: WeeklyVolumeClampInput): number {
+  const ceiling = MAX_WEEKLY_KM[level];
+  if (lastLoadingWeekKm <= 0) return Math.min(proposedKm, ceiling);
+
+  const growth = (proposedKm - lastLoadingWeekKm) / lastLoadingWeekKm;
   const allowed =
     growth > WEEKLY_INCREASE_REJECT_ABOVE
-      ? previousKm * (1 + WEEKLY_INCREASE_RECALC_AT)
+      ? lastLoadingWeekKm * (1 + WEEKLY_INCREASE_RECALC_AT)
       : proposedKm;
 
   return Math.min(allowed, ceiling);
