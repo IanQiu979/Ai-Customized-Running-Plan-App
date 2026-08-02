@@ -32,7 +32,7 @@ src/
   lib/
     supabase.ts             # env-guarded Supabase client
     planTypes.ts              # canonical — shared Plan/Week/Workout/Tier vocabulary
-    loadRules.ts               # canonical — deterministic safety arithmetic, 19 unit tests
+    loadRules.ts               # canonical — deterministic safety arithmetic, 31 unit tests
     notation.ts                 # canonical — run-type/structure-string notation, the code
                                  #             counterpart of `notation.md`, 13 unit tests
     paceDerivation.ts        # pure Riegel/training-pace/goal-realism arithmetic
@@ -107,7 +107,7 @@ src/lib/
   supabase.ts            # exists today
   planTypes.ts             # exists today — shared Plan/Week/Workout/Tier types, one source of
                             #                truth for the app and the edge functions
-  loadRules.ts              # exists today — deterministic safety arithmetic, 19 unit tests
+  loadRules.ts              # exists today — deterministic safety arithmetic, 31 unit tests
   notation.ts                # exists today — run-type/structure-string notation, the code
                               #                counterpart of `notation.md`, 13 unit tests
   fixtures/examplePlan.ts    # exists today — the 5K golden fixture as real `Plan` data

@@ -278,7 +278,7 @@ with **no backend at all**.
        a runner who gave no recent time — structurally *cannot* carry a measured numeral. The type
        system enforces the design's readout-bracket honesty rule.
 2. [x] **`src/lib/loadRules.ts`** — **Done 2026-07-10.** Weekly volume cap, deload cadence and the
-       35–45% band, long-run share cap, long-run spike cap, Daniels time cap, HR zones. 19 unit tests.
+       35–45% band, long-run share cap, long-run spike cap, Daniels time cap, HR zones. 31 unit tests.
        `clampLongRun()` reports which ceiling actually bound.
 3. [x] **`src/lib/planTemplates.ts`** (+ **`src/lib/paceDerivation.ts`**) — **Done
        2026-08-03.** The pure template engine reproduces the approved 12-week 5K plan exactly and
