@@ -63,20 +63,21 @@ here:
 
 **Why it's Apple-gated:** configuring Sign in with Apple requires an Apple Developer account — you
 need a registered App ID with the Sign In with Apple capability, a Services ID, and a private
-key, all created in the Apple Developer portal, before Supabase's Apple provider can be
-configured at all.
+key, all created in the Apple Developer portal, before better-auth's Apple provider can be
+configured at all (`workers/src/auth.ts`, alongside the Google provider wired there today).
 
 **Why it isn't urgent:** the requirement is an **App Store review rule** — an app that offers a
 third-party social login (Google, here) must also offer Sign in with Apple. It only binds at
 submission. It does not block building auth, and it does not block TestFlight-less development.
 
 **Do it in this order when the membership lands:** buy the membership → create the App ID /
-Services ID / key → enable Apple in the Supabase dashboard → add the button to the sign-in screen
-(per blueprint Part 7: native brand buttons, never reskinned) → then submit.
+Services ID / key → add the Apple provider to `buildSocialProviders` in `workers/src/auth.ts` and
+`wrangler secret put` its credentials → add the button to the sign-in screen (per blueprint Part
+7: native brand buttons, never reskinned) → then submit.
 
 **Related known debt, already recorded in `docs/mvp-progress.md`:** the deep-link scheme is now
-`paceblueprint://` (renamed 2026-07-12), and it is **unverified** on Supabase's redirect
-allowlist. That's a Supabase-dashboard task, not an Apple one — it belongs to issue #5.
+`paceblueprint://` (renamed 2026-07-12), and it is **unverified** on the better-auth redirect
+allowlist. That's a `workers/` config task, not an Apple one — it belongs to issue #5.
 
 ---
 
