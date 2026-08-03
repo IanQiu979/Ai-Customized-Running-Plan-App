@@ -132,3 +132,35 @@ describe('better-auth on D1', () => {
     expect(response.status).toBeGreaterThanOrEqual(400);
   });
 });
+
+describe('the intake age floor', () => {
+  const intake = (age: number) => ({
+    goal: 'Run a faster 5K',
+    age,
+    experience: 'some',
+    daysPerWeek: 4,
+    weeklyKm: 30,
+    injuries: ['none'],
+  });
+
+  it('rejects age 12 and accepts age 13', async () => {
+    const token = await signUp('agegate@example.test');
+    const put = (age: number) =>
+      SELF.fetch('https://example.test/api/intake', {
+        method: 'PUT',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(intake(age)),
+      });
+
+    const rejected = await put(12);
+    expect(rejected.status).toBe(400);
+    expect(await rejected.json()).toMatchObject({ code: 'invalid_request' });
+
+    const accepted = await put(13);
+    expect(accepted.status).toBe(200);
+    expect(await accepted.json()).toEqual({ saved: true });
+  });
+});
