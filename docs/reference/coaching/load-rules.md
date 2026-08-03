@@ -94,6 +94,16 @@ open; it is not resolved by this ruling.
 | Advanced | Every 3 weeks |
 | 50+ runners | Every 3 weeks (mandatory) |
 
+**Experience drives the cadence (Ian's ruling, 2026-08-03 — "pro runners = 3 weeks, beginners =
+4").** The engine resolves this table to exactly one number per level: `advanced` (the
+`competitive` intake answer) deloads every 3 weeks; `beginner` (`new`/`some`) every 4. The ruling
+also settles the source's open beginner-cadence gap — `workout_library.md` § Deload Frequency by
+Runner Type flagged beginner at "every 4–5 weeks" against this table's 4; Ian's ruling picks 4.
+`intermediate` is not addressed by the ruling and stays at 4, inside its source range of 3–4.
+The 50+ row wins over every level: a 50+ runner of any experience gets the mandatory 3-week
+cadence. `deloadEveryWeeks()` in `src/lib/loadRules.ts` is the single implementation of this
+composition; `planTemplates.ts` calls through it.
+
 **Reduction: 35–45% of volume** during a deload week — authoritative (Ian's decision, 2026-07-10,
 **superseding an earlier 20–30% call the same day**).
 

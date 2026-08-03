@@ -804,7 +804,12 @@ A deload week is a **planned reduction in training stress** (volume, intensity, 
 | Runners 50+ | Every 3 weeks (mandatory — slower recovery) |
 | High stress life periods | Every 3 weeks regardless of level |
 
-> ⚠️ **GAP — NEEDS IAN:** This table gives low-volume beginners a deload every 4-5 weeks, but `load_rules.md` Rule 1 and Rule 4 say beginners deload every 4 weeks. Which governs for the generator? (The 50+ every-3-weeks row agrees with Rule 1 and is already in the app spec.)
+> ✅ **RESOLVED (Ian's ruling, 2026-08-03 — "pro runners = 3 weeks, beginners = 4"):** the gap is
+> settled at **every 4 weeks** for beginners, matching `load_rules.md` Rule 1 and Rule 4. The
+> generator's deload cadence is now purely experience-driven (`deloadEveryWeeks()` in
+> `src/lib/loadRules.ts`): advanced 3, beginner 4, intermediate 4, 50+ always 3. The "high stress
+> life periods" row (every 3 regardless of level) is not modelled at intake and remains out of
+> scope for V2.2.
 
 ---
 
