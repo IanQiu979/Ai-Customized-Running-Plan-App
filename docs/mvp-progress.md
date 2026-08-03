@@ -6,9 +6,15 @@
 > Milestone definitions live in [`planning/02-product-requirements.md`](../planning/02-product-requirements.md).
 > Decision history lives in [`change_log.md`](change_log.md).
 
-**Last updated:** 2026-08-03 (issue #3's pure TypeScript plan-generation engine landed:
-`paceDerivation.ts` + `planTemplates.ts`; bundled issues #22/#23 fixed; both red-first suites
-un-quarantined. Typecheck, lint, and tests pass. This lands on top of the 2026-08-02 backend move:
+**Last updated:** 2026-08-03 (Ian's deload-cadence ruling ratified: "pro runners = 3 weeks,
+beginners = 4". The engine already keyed cadence to experience — `deloadEveryWeeks()` resolves the
+source's per-level Deload trigger table to advanced 3 / beginner 4 / intermediate 4, and the 50+
+mandatory 3-week rule still wins over every level — and `planTemplates.ts` now calls through that
+single shared function instead of inlining the same expression. Regression tests added on the
+golden and generic paths plus the unit suite: under-50 advanced → `[3, 6, 9]`, under-50 beginner →
+`[4, 8]`, 50+ any level → `[3, 6, 9]`, intermediate unchanged. Also settles the source's open
+beginner-cadence gap in `workout_library.md`. Typecheck, lint, and all 248 tests pass. This lands on
+top of the 2026-08-03 plan-engine entries below and the 2026-08-02 backend move:
 **the backend is Cloudflare — D1 + Workers + better-auth, in `workers/`** — a captain's decision
 over a Supabase project-slot constraint and a genuinely-free stack; the relational design was
 ported, not re-decided. Auth, the quota ledger, `quota-status`, `purchase-tier`, `delete-account`,

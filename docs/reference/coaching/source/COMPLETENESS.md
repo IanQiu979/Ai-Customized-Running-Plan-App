@@ -69,7 +69,7 @@ exact spot in the source file where it bites. Grep for `GAP — NEEDS IAN` to fi
 | 7 | **No goal-realism check.** Nothing links a runner's recent result to an achievable goal at another distance, so the app cannot flag a fantasy goal (25-min 5K runner asking for a sub-3 marathon) — it would just build the plan. | Same missing artifact as #1: equivalent-performance tables would fix both. Until then, plans can be built around impossible paces. | (covered by #1's annotation) |
 | 8 | **Stress-fracture guidance keyed to the wrong variable.** Timelines keyed to experience tier (with two contradictory rationales, plus a third age-keyed table); evidence keys to fracture site and grade — metatarsal shaft ~6-8 wk, navicular / femoral neck 4-6 months minimum. | Less a generator blocker than the library's highest-severity safety item: a tier-based number can return a high-risk fracture months early. Annotated prominently; output must defer to the treating clinician. | `injury_flags.md` Parts 1, 2, 3 |
 | 9 | **No ultra content.** Rule 4's ceilings (110 km/week, 35 km longest run, "marathon-specific only") structurally cannot express an ultra plan. | Blocks the planned v2 ultra scope entirely; harmless until then, but nothing is extrapolable. | `load_rules.md` Rule 4 |
-| 10 | **Minor unresolved inconsistencies.** Beginner deload every 4 weeks (`load_rules.md`) vs every 4-5 weeks (`workout_library.md`). | One-line ruling each; only matter because a deterministic engine must pick exactly one value. | `workout_library.md` § Deload Frequency by Runner Type |
+| 10 | ~~**Minor unresolved inconsistencies.** Beginner deload every 4 weeks (`load_rules.md`) vs every 4-5 weeks (`workout_library.md`).~~ **Resolved** — Ian's ruling, 2026-08-03: beginner deloads every 4 weeks, matching `load_rules.md`. See `load-rules.md` (app-facing reference) and [`change_log.md`](../../../change_log.md) 2026-08-03. | One-line ruling each; only matter because a deterministic engine must pick exactly one value. | `workout_library.md` § Deload Frequency by Runner Type |
 
 ## What would unblock, concretely
 
@@ -78,9 +78,9 @@ exact spot in the source file where it bites. Grep for `GAP — NEEDS IAN` to fi
   hard-block a paid tier.
 - **From Ian, one page of construction rules** per distance × level (phase lengths, session
   mix per week, progression and taper formulas). Fixes #2, #3, #5.
-- **From Ian, four one-line rulings:** long-run growth (#4), authoritative zone boundaries
-  (#6), beginner deload cadence (#10), and Example 1's totals-vs-days / Example 2's
-  16-vs-15-weeks (#2's inconsistencies).
+- **From Ian, three one-line rulings:** long-run growth (#4), authoritative zone boundaries
+  (#6), and Example 1's totals-vs-days / Example 2's 16-vs-15-weeks (#2's inconsistencies).
+  Beginner deload cadence (#10) is resolved.
 
 Everything else in the library — safety clamps, deload, session anatomy, distribution — is
 already generator-ready for standard road distances.

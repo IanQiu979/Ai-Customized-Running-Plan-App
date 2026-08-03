@@ -5,6 +5,30 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-08-03 — deload cadence is driven by experience level (Ian's ruling: "pro runners = 3 weeks, beginners = 4")
+
+Ian ruled that the deload cadence should be driven by experience level — "pro runners = 3 weeks,
+beginners = 4" — composing with, not replacing, the already-merged 50+ mandatory 3-week rule.
+
+- **The engine already keyed cadence to experience, and this ruling ratifies it.** Since the plan
+  engine landed, `deloadEveryWeeks()` (`src/lib/loadRules.ts`) resolved the source's per-level
+  "Deload trigger" table (`load-rules.md`: Beginner every 4, Intermediate every 3–4, Advanced every
+  3, 50+ every 3 mandatory) to one number per level. `advanced` deloads every 3 weeks; `beginner`
+  every 4. `intermediate` stays at 4 — the source's "every 3–4 weeks" range, and the ruling only
+  addresses the two extremes. This also resolves the source's open beginner-cadence gap
+  (`workout_library.md` § Deload Frequency by Runner Type, which had flagged 4 vs 4–5 weeks): the
+  ruling settles beginner at 4.
+- **Composition with the 50+ rule, made structurally explicit.** `planTemplates.ts` previously
+  inlined the same `age >= 50 || level === 'advanced' ? 3 : 4` expression; it now calls through the
+  single shared `deloadEveryWeeks(level, age)`, so the "50+ forces 3 regardless of experience,
+  otherwise experience decides" composition lives in exactly one place and can't drift.
+  Verified semantics: a 50+ runner of *any* experience level still gets the mandatory 3-week
+  cadence; an under-50 `advanced`/competitive runner now also gets 3 weeks; an under-50
+  `beginner` runner gets 4 weeks; `intermediate` is unchanged.
+- **Regression tests** on both the canonical golden 12-week/5K/4-day path and the generic path, plus
+  the `deloadEveryWeeks` unit suite: under-50 advanced → deloads `[3, 6, 9]`; under-50 beginner →
+  `[4, 8]`; 50+ of any level → `[3, 6, 9]`; intermediate unchanged.
+
 ## 2026-08-03 — long-run share cap enforced on the golden 5K path (plan-accuracy s1, bug 2)
 
 From the plan-accuracy scout's Bug 2: `clampLongRun()` had no production caller — the golden

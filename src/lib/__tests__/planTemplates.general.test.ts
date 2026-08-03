@@ -1,6 +1,6 @@
 import { buildTemplatePlan } from '../planTemplates';
 import { WEEKLY_INCREASE_REJECT_ABOVE } from '../loadRules';
-import type { Day, GoalType, IntakeResponses, RaceDistance, Workout } from '../planTypes';
+import type { Day, ExperienceAnswer, GoalType, IntakeResponses, Plan, RaceDistance, Workout } from '../planTypes';
 
 const BASE_INTAKE: IntakeResponses = {
   goal: 'Build fitness',
@@ -189,5 +189,53 @@ describe('buildTemplatePlan — parametric inputs', () => {
         .flatMap((week) => week.days.filter(isWorkout))
         .some((workout) => workout.label === 'Race Day' || workout.label === 'RP'),
     ).toBe(false);
+  });
+});
+
+describe('buildTemplatePlan — deload cadence by experience and age off the golden path (generic 12-week/10K)', () => {
+  // Ian's 2026-08-03 ruling ("pro runners = 3 weeks, beginners = 4") must hold on the generic
+  // path too, not just the canonical 5K shape, and the age >= 50 rule still beats every level.
+
+  function genericTenKPlanFor(age: number, experience: ExperienceAnswer): Plan {
+    return buildTemplatePlan({
+      intake: {
+        ...BASE_INTAKE,
+        age,
+        experience,
+        raceDistance: '10k',
+      },
+      goalType: 'race',
+      durationWeeks: 12,
+      raceDistance: '10k',
+      raceDate: '2026-10-02',
+      tierAtGeneration: 'pro',
+      density: 'paid',
+    });
+  }
+
+  function deloadWeekNumbers(plan: Plan): number[] {
+    return plan.weeks
+      .map((week, index) => (week.isDeload ? index + 1 : 0))
+      .filter((weekNumber) => weekNumber > 0);
+  }
+
+  it('deloads an under-50 advanced/competitive runner every 3 weeks (3, 6, 9)', () => {
+    expect(deloadWeekNumbers(genericTenKPlanFor(30, 'competitive'))).toEqual([3, 6, 9]);
+  });
+
+  it('deloads an under-50 beginner runner every 4 weeks (4, 8)', () => {
+    expect(deloadWeekNumbers(genericTenKPlanFor(30, 'new'))).toEqual([4, 8]);
+  });
+
+  it('keeps an under-50 intermediate runner at the every-4-week cadence (4, 8)', () => {
+    expect(deloadWeekNumbers(genericTenKPlanFor(30, 'regular'))).toEqual([4, 8]);
+  });
+
+  it('deloads a 50+ beginner every 3 weeks (3, 6, 9) — the age rule beats the beginner cadence', () => {
+    expect(deloadWeekNumbers(genericTenKPlanFor(55, 'new'))).toEqual([3, 6, 9]);
+  });
+
+  it('deloads a 50+ advanced runner every 3 weeks (3, 6, 9) — age and experience agree', () => {
+    expect(deloadWeekNumbers(genericTenKPlanFor(55, 'competitive'))).toEqual([3, 6, 9]);
   });
 });

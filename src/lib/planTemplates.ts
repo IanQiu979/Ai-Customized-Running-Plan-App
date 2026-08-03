@@ -9,6 +9,7 @@
 import {
   clampLongRun,
   clampWeeklyVolume,
+  deloadEveryWeeks,
   deloadVolume,
   MAX_SINGLE_RUN_KM,
   toExperienceLevel,
@@ -776,7 +777,7 @@ export function buildTemplatePlan(params: TemplatePlanParams): Plan {
       : undefined;
   const phases = phasesForPlan(durationWeeks, raceDistance);
   const maxSingleRunKm = MAX_SINGLE_RUN_KM[level];
-  const deloadCadence = params.intake.age >= 50 || level === 'advanced' ? 3 : 4;
+  const deloadCadence = deloadEveryWeeks(level, params.intake.age);
 
   const useGoldenFiveKShape =
     params.goalType === 'race' &&

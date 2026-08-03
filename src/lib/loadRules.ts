@@ -118,8 +118,14 @@ export function toExperienceLevel(answer: ExperienceAnswer): ExperienceLevel {
 }
 
 /**
- * NEEDS IAN: the source gives intermediate a range of "every 3–4 weeks". 4 is used so the
- * cadence tightens monotonically with experience (beginner 4, intermediate 4, advanced 3).
+ * Ian's ruling, 2026-08-03: "pro runners = 3 weeks, beginners = 4" — the deload cadence is
+ * driven by experience level. `advanced` (competitive) deloads every 3 weeks; `beginner`
+ * every 4. `intermediate` is unspecified by the ruling; the source's "every 3–4 weeks"
+ * (`docs/reference/coaching/load-rules.md` Deload trigger) is resolved to 4 so the cadence
+ * tightens monotonically with experience (beginner 4, intermediate 4, advanced 3).
+ * The 50+ rule (also 3 weeks, mandatory) overrides the experience dimension entirely: a
+ * 50+ runner of any level still gets the mandatory 3-week cadence. This is the single
+ * source of truth for the composition; `planTemplates.ts` calls through here.
  */
 export function deloadEveryWeeks(level: ExperienceLevel, age: number): number {
   if (age >= 50) return 3; // mandatory, overrides level

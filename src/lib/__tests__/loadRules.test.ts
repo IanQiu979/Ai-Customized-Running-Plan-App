@@ -35,15 +35,23 @@ describe('experience mapping', () => {
 });
 
 describe('deload cadence', () => {
-  it('tightens with experience', () => {
+  it('tightens with experience — Ian 2026-08-03: pro runners = 3 weeks, beginners = 4', () => {
     expect(deloadEveryWeeks('beginner', 30)).toBe(4);
     expect(deloadEveryWeeks('intermediate', 30)).toBe(4);
     expect(deloadEveryWeeks('advanced', 30)).toBe(3);
   });
 
-  it('forces a 3-week cadence at 50+, overriding level', () => {
+  it('keeps intermediate at 4 — the source gives "every 3–4 weeks" and the ruling only touches the extremes', () => {
+    expect(deloadEveryWeeks('intermediate', 30)).toBe(4);
+    expect(deloadEveryWeeks('intermediate', 49)).toBe(4);
+  });
+
+  it('forces a 3-week cadence at 50+, overriding every experience level', () => {
     expect(deloadEveryWeeks('beginner', 50)).toBe(3);
+    expect(deloadEveryWeeks('intermediate', 50)).toBe(3);
+    expect(deloadEveryWeeks('advanced', 50)).toBe(3);
     expect(deloadEveryWeeks('beginner', 62)).toBe(3);
+    expect(deloadEveryWeeks('advanced', 62)).toBe(3);
   });
 });
 
