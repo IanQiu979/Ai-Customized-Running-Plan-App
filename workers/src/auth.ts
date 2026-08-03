@@ -19,6 +19,7 @@
  * `user.id`, never as extra columns on `user` — see `migrations/0002_app_schema.sql`.
  */
 
+import { expo } from '@better-auth/expo';
 import { betterAuth } from 'better-auth';
 import { bearer } from 'better-auth/plugins';
 
@@ -81,8 +82,14 @@ export function createAuth(env: Env) {
      * `api.getSession()` ignores that header entirely and every app route answers 403 to a user who
      * just signed in successfully, which is exactly what `test/worker.test.ts`'s end-to-end sign-up
      * test caught.
+     *
+     * `expo()` is the server half of `@better-auth/expo`: it trusts the Expo dev client's
+     * `exp://` origin, rewrites the `origin` header from `expo-origin` (native fetch does not
+     * send a browser `Origin` header better-auth's default check can read), and redirects an
+     * OAuth callback into the app's own deep-link scheme instead of a browser location. A no-op
+     * for the email/password path; required once Google OAuth is provisioned.
      */
-    plugins: [bearer()],
+    plugins: [bearer(), expo()],
 
     advanced: {
       // Secure cookies only over https, so `wrangler dev` on plain http still works. Cross-domain
