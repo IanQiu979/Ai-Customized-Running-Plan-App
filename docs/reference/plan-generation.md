@@ -32,9 +32,11 @@ coach-authored template skeleton — it is never removed — so the same determi
 Claude's output** after generation for both of them; a model must never be able to prescribe an
 unsafe week, a deload that doesn't actually reduce volume, or intervals through a declared
 red-flag injury, at any tier. See
-[`docs/reference/coaching/plan-structure.md`](coaching/plan-structure.md) for the design rule that
-a declared red-flag injury still produces a plan — the return-to-running protocol in
-[`docs/reference/coaching/injury-rules.md`](coaching/injury-rules.md), never a refusal.
+[`docs/reference/coaching/plan-structure.md`](coaching/plan-structure.md) for the design rule
+(captain ruling, 2026-08-03) that a declared red-flag injury still produces a normal,
+volume-adjusted plan — the same mechanism as any other declared injury — with a strengthened
+professional-evaluation disclaimer, never a refusal and never a distinct return-to-running
+protocol.
 
 ## The three tiers
 
@@ -76,8 +78,8 @@ is unit-tested with no network and no Anthropic spend:
 4. **Reconcile plan length** — a race farther out than the tier's max plan length gets a delayed
    start so the taper lands on race day (ported from Echo V1's `reconcilePlanLength`); a
    compressed race gets an honest, short plan. **Never refuse.** A declared red-flag injury
-   produces the return-to-running protocol as a plan (see "Coaching source of truth" above), not
-   a rejection, and does not consume quota.
+   produces a normal, volume-adjusted plan with a strengthened disclaimer (see "Coaching source of
+   truth" above), not a rejection, and does not consume quota.
 5. **Build the parametric template skeleton** — from `planTemplates.ts` and the coaching docs:
    phases, deload cadence, weekly volumes under `loadRules.ts` caps, workout primitives from
    `workout-library.md`, Day 1–7 slots with real rest days.
