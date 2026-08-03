@@ -71,7 +71,10 @@ week that follows that 50 km loading week caps its own long run the same way —
 With this ladder and R1c's corrected measurement, the golden 5K plan (`example-plan-5k-pro.md`)
 now passes comfortably: week 4's 8 km long run is 21.1% of week 3's 38 km (the last loading
 week), and week 8's 10 km long run is 20.8% of week 7's 48 km — both far under the 32%
-intermediate cap.
+intermediate cap. Since 2026-08-03 the generator itself enforces this: `buildCanonicalFiveKWeek`
+routes every long run through `clampLongRun()` and scales quality-session distances to the
+runner's volume, so the cap holds at any baseline, not just the fixture's 35 km (a 27 km/week
+runner previously saw long runs at 34.6-35.5% of the week).
 
 **Cross-reference:** R1c is conceptually the same correction as open issue #22
 (`clampWeeklyVolume()` should compare a proposed week's total against the last loading week, not
