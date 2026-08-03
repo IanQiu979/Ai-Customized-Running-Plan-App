@@ -5,6 +5,34 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-08-03 — long-run share cap enforced on the golden 5K path (plan-accuracy s1, bug 2)
+
+From the plan-accuracy scout's Bug 2: `clampLongRun()` had no production caller — the golden
+12-week/5K/4-day path (`buildCanonicalFiveKWeek`) set long runs straight from the canonical curve,
+breaching the intermediate 32% weekly-share cap on 6 of 9 loading weeks at a 27 km/week baseline
+(up to 47.8% share at 20 km/week). Only the 35 km golden-fixture baseline was clean, which is the
+only one the existing suites exercised.
+
+- **Golden-path long runs now run through `clampLongRun()`** before they reach the plan. The
+  weekly-share ceiling is measured against the week's *assembled* volume (which can run below the
+  target — an easy run may not exceed 80% of the long run), so the clamp iterates to the fixed
+  point rather than trusting a one-pass clamp against the target volume. All four ceilings (share,
+  spike, absolute, time) now bind, with the R1c deload denominator and the runner's experience
+  level wired through. The spike cap needs `previousLongestKm`, which `buildTemplatePlan` now
+  tracks across weeks.
+- **Golden-path quality-session distances are now volume-scaled.** Tempo/interval distances are
+  scaled by the runner's declared `weeklyKm` via the same `scaleQualityDistanceKm()` the generic
+  path uses — scaled by the plan-wide factor rather than the per-week volume, so the
+  captain-validated 35 km fixture stays byte-identical (35/35 = 1) while sub-35 baselines shrink
+  the tempo/interval floor that was forcing the long run above its curve value.
+- Sweep of the fixed engine at 20/27/35/50 km/week: no loading week exceeds its level's share cap
+  at any baseline (previously 6-9 of 9 breached everywhere except 35 km). Deload weeks stay
+  compliant via R1c's last-loading-week denominator.
+- The taper shape and `FIVE_K_WEEKLY_LOAD` (ruling R2) are untouched. Known tension — the fix
+  shortens long runs on low-volume plans below the source library's 75-110 min intermediate
+  guidance — is logged separately for the captain as
+  `workout-v22-plan-accuracy-s1-decision-long-run-duration-vs-share-cap` and is not resolved here.
+
 ## 2026-08-03 — plan-generation engine lands (issue #3, with issues #22/#23)
 
 - Added pure `src/lib/paceDerivation.ts`: Riegel equivalency, recent-performance-derived
