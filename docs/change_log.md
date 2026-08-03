@@ -54,6 +54,14 @@ only one the existing suites exercised.
   `targetKm` via `reconcileVolumeToTarget()`, since independently-floored pieces (a quality
   session's minimum, the long run's floor, `distributeDistance`'s 1 km/session floor) could each
   be individually reasonable yet stack past the clamp.
+- Fixed a bug where the golden 12-week/5K/4-day path silently bypassed the mandatory 50+ 3-week
+  deload cadence (`load-rules.md` Rule 1): `buildCanonicalFiveKWeek()` hardcoded deload weeks
+  `4 || 8` and never received `deloadCadence`, so a 50+ runner on that exact path deloaded like a
+  30-year-old while the generic path correctly produced `[3, 6, 9]` for the same input.
+  `deloadCadence` now threads into `buildCanonicalFiveKWeek()` the same way it already reaches
+  `buildGenericWeek()`, and deload weeks are computed as `weekNumber % deloadCadence === 0` (with
+  the same `phase !== 'taper'` guard), mirroring the generic path exactly. Sub-50 cadence (weeks
+  4, 8) is unchanged. Regression coverage in `planTemplates.golden.test.ts`.
 
 ## 2026-08-02 — the backend is Cloudflare, not Supabase; the spine is built and running locally
 
