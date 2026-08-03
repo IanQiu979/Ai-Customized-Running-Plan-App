@@ -24,11 +24,20 @@ kept in clearly separate sections below; nothing in a "planned" section is built
 src/
   app/
     _layout.tsx          # root layout — loads the three font families; ThemeProvider is fed
-                          #                constants/navigation-theme.ts's tokened Theme, Stack
+                          #                constants/navigation-theme.ts's tokened Theme, and
+                          #                gates the whole Stack behind Stack.Protected on
+                          #                authClient.useSession() (no anonymous browsing)
+    (auth)/
+      _layout.tsx          # stack layout for the signed-out route group
+      index.tsx             # redirect anchor -> sign-in
+      sign-in.tsx            # email/password sign-in + an inert "Continue with Google" button
+      sign-up.tsx            # email/password sign-up + the same Google button
     (tabs)/
       _layout.tsx          # tab bar — Home + Glossary today (My Plans/Settings-lite land with
                             #           the backend that gives them something to show)
-      index.tsx             # Home placeholder shell + a temporary demo link to the fixture plan
+      index.tsx             # Home placeholder shell + a temporary demo link to the fixture plan,
+                             #  plus a temporary "Sign out" button (no Settings-lite screen exists
+                             #  yet to host it — see the button's own comment)
       glossary.tsx           # abbreviations glossary — sourced from notation.ts, nothing hardcoded
     plan/[id].tsx            # plan view — renders the golden fixture; `[id]` isn't read yet
   components/
@@ -43,6 +52,10 @@ src/
   hooks/                    # use-theme, use-color-scheme
   lib/
     supabase.ts             # LEGACY, unused — see below
+    apiClient.ts             # the one module that talks to `workers/`: better-auth's Expo client
+                              #  (`authClient` — sign-up/sign-in/sign-out/useSession, session
+                              #  persisted via expo-secure-store) plus typed fetch wrappers for
+                              #  every other `/api/*` route
     planTypes.ts              # canonical — shared Plan/Week/Workout/Tier vocabulary
     loadRules.ts               # canonical — deterministic safety arithmetic, 31 unit tests
     notation.ts                 # canonical — run-type/structure-string notation, the code
@@ -105,8 +118,26 @@ For the record of what it did while it was live, `src/lib/supabase.ts` exports `
 with `createClient(url, publishableKey, { auth: {...} })`: `storage: AsyncStorage` on native only,
 `autoRefreshToken`/`persistSession` on, `detectSessionInUrl: false`, `lock: processLock`, a throw
 at import time if either `EXPO_PUBLIC_SUPABASE_*` var is missing, and an `AppState` listener that
-starts/stops auto-refresh as the app foregrounds. The client half of Cloudflare auth — a
-better-auth React Native client against `workers/`, replacing this file — is not built yet.
+starts/stops auto-refresh as the app foregrounds.
+
+**The client half of Cloudflare auth now exists: `src/lib/apiClient.ts`.** It wraps better-auth's
+Expo client (`@better-auth/expo/client`, session persisted via `expo-secure-store`) as `authClient`
+— `signIn`, `signUp`, `signOut`, and `useSession` are re-exported straight from it for screens to
+call directly — plus a small typed `apiFetch<T>()` wrapper and one function per non-auth
+`/api/*` route (`getQuotaStatus`, `purchaseTier`, `deleteAccount`, `getIntake`/`putIntake`,
+`listPlans`/`getPlan`, `generatePlan`). Those custom routes attach the stored session by reading
+`authClient.getCookie()` onto the request's `cookie` header, since better-auth's Expo plugin only
+replays the session automatically for calls made through `authClient` itself, not for plain
+`fetch`. `src/app/(auth)/sign-in.tsx` and `sign-up.tsx` are the two screens built against it —
+email/password today; a "Continue with Google" button is wired end to end but inert until the
+captain provisions `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` (`workers/src/auth.ts`'s TODO). The
+root layout (`src/app/_layout.tsx`) reads `authClient.useSession()` and gates the entire route tree
+on it with Expo Router's `Stack.Protected` — there is no anonymous browsing at all, matching every
+`/api/*` route already 403ing anonymously. A known type-only friction: `@better-auth/expo` declares
+a `typescript: ^6.0.3` peer against this project's pinned `~5.9.2`; `apiClient.ts` carries a
+narrow, commented `as unknown as BetterAuthClientPlugin` cast plus a small interface merge to
+restore `getCookie()`'s type, rather than bumping TypeScript (tried, broke ambient type resolution
+project-wide, reverted).
 
 `src/lib/planTypes.ts`, `src/lib/loadRules.ts`, `src/lib/notation.ts`,
 `src/lib/paceDerivation.ts`, `src/lib/planTemplates.ts`, `src/lib/tierLimits.ts`, and
@@ -126,8 +157,9 @@ direction" below.
 reading its copy from `notation.ts`. The pure generator now exists, but the route is not wired to
 it yet: every plan id still renders the same fixture.
 
-There is no `subscription.ts` yet; no auth screens; no intake screen; no client-side API module
-talking to `workers/` yet; no `supabase/functions/`; no `supabase/migrations/`.
+There is no `subscription.ts` yet and no intake screen yet; no `supabase/functions/`; no
+`supabase/migrations/`. Auth screens (`src/app/(auth)/`) and the client-side API module
+(`src/lib/apiClient.ts`) now exist — see above.
 `tsconfig.json` maps `@/*` → `./src/*` and `@/assets/*` → `./assets/*`, and **excludes `workers/`**
 — that project has its own `tsconfig.json`, its own runtime, and its own type system, so the root
 `npm run typecheck` deliberately does not cover it (same for `eslint.config.js` and
@@ -138,7 +170,9 @@ test`).
 
 ```
 src/app/
-  (auth)/sign-in, sign-up
+  (auth)/sign-in, sign-up  # exists today — email/password; Google button wired but inert until
+                           # credentials are provisioned. Gated in by root Stack.Protected when
+                           # there is no session.
   (tabs)/index          # Home / Create plan — exists today (placeholder shell + demo link)
   (tabs)/glossary       # exists today — abbreviations glossary, not in the original blueprint's
                          # tab list; added for Ian's 2026-07-11 notation ruling (see change_log.md)
@@ -162,6 +196,8 @@ Ian's override of the recommended `floor(days since created_at / 7) + 1` design.
 ```
 src/lib/
   supabase.ts            # exists today — LEGACY, unused
+  apiClient.ts             # exists today — better-auth's Expo client (`authClient`) plus typed
+                            #                fetch wrappers for the app's `/api/*` routes
   planTypes.ts             # exists today — shared Plan/Week/Workout/Tier types, one source of
                             #                truth for the app and the Worker
   loadRules.ts              # exists today — deterministic safety arithmetic, 31 unit tests

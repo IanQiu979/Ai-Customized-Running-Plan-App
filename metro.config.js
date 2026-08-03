@@ -7,7 +7,10 @@
 // imported by app code; the traffic goes the other way (the Worker imports the shared pure modules
 // in `src/lib/`), so excluding it costs the app nothing.
 const { getDefaultConfig } = require('expo/metro-config');
-const exclusionList = require('metro-config/src/defaults/exclusionList');
+// The installed metro-config's `exports` map no longer allows the `src/defaults/...` subpath
+// directly (Node enforces it as an allowlist); `private/defaults/...` is the current path, and it
+// resolves to an ESM module whose function is under `.default`.
+const exclusionList = require('metro-config/private/defaults/exclusionList').default;
 
 const config = getDefaultConfig(__dirname);
 

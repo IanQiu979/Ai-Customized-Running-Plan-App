@@ -16,8 +16,11 @@ better-auth, in [`workers/`](workers/README.md)** (captain's decision, 2026-08-0
 only from the `generate-plan` route, never from the client. The backend spine works end to end
 against `wrangler dev` locally — auth, the quota ledger, `quota-status`, `purchase-tier`,
 `delete-account`, intake, plan reads — but **nothing is deployed** and `generate-plan` returns
-`503 engine_unavailable` until `src/lib/planTemplates.ts` exists. On the client side there are still
-no auth screens and no module that talks to `workers/`. Route tree, `lib/` layout, the
+`503 engine_unavailable` until `src/lib/planTemplates.ts` exists. On the client side, `src/lib/apiClient.ts`
+(better-auth's Expo client plus typed fetch wrappers for the other `/api/*` routes) and
+`src/app/(auth)/sign-in.tsx`/`sign-up.tsx` now exist, and `src/app/_layout.tsx` gates the whole app
+behind a session — email/password works, Google sign-in is wired but inert pending the captain's
+OAuth credentials. Route tree, `lib/` layout, the
 `generate-plan` flow, the API table, the D1 schema, and the proposed visual direction all live in
 [`docs/architecture.md`](docs/architecture.md).
 
@@ -41,11 +44,12 @@ different runner), so it will pass while the backend is broken.
 
 ## Secrets & env — read this before touching any env file
 
-- `.env` (gitignored) holds ONLY `EXPO_PUBLIC_SUPABASE_URL` and
-  `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. `.env.example` is the committed template — copy it,
-  never edit it in place. **Both are legacy since 2026-08-02** and exist only because
-  `src/lib/supabase.ts` still throws at import without them; they go when the client is moved onto
-  `workers/`. Server-side config now lives in `workers/` — see the two bullets below.
+- `.env` (gitignored) holds `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and
+  `EXPO_PUBLIC_API_BASE_URL` (the `workers/` origin `src/lib/apiClient.ts` talks to). `.env.example`
+  is the committed template — copy it, never edit it in place. **The two Supabase vars are legacy
+  since 2026-08-02** and exist only because `src/lib/supabase.ts` still throws at import without
+  them; they go when that file is deleted. Server-side config now lives in `workers/` — see the two
+  bullets below.
 - Anything prefixed `EXPO_PUBLIC_` is inlined in **plain text** into the compiled app bundle by
   Expo. Treat it as public. Always read it with static dot notation
   (`process.env.EXPO_PUBLIC_X`) — the `expo/no-dynamic-env-var` lint rule enforces this;

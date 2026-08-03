@@ -18,11 +18,13 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { NavigationThemes } from '@/constants/navigation-theme';
 import { useTheme } from '@/hooks/use-theme';
+import { authClient } from '@/lib/apiClient';
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const theme = useTheme();
+  const { data: session, isPending: sessionPending } = authClient.useSession();
 
   const [fontsLoaded] = useFonts({
     BarlowCondensed_600SemiBold,
@@ -37,15 +39,18 @@ export default function RootLayout() {
     IBMPlexMono_600SemiBold,
   });
 
+  const ready = fontsLoaded && !sessionPending;
+
   useEffect(() => {
-    if (fontsLoaded) {
+    if (ready) {
       SplashScreen.hideAsync();
     }
-  }, [fontsLoaded]);
+  }, [ready]);
 
-  if (!fontsLoaded) {
+  if (!ready) {
     // Keep the native splash screen up — nothing below can render its type-driven UI correctly
-    // until the three families finish loading.
+    // until the fonts finish loading, and routing a signed-in user into `(auth)` (or vice versa)
+    // for one frame while the session is still resolving would be a visible flash, not a state.
     return null;
   }
 
@@ -57,7 +62,23 @@ export default function RootLayout() {
             headerShown: false,
             contentStyle: { backgroundColor: theme.surface.base },
           }}
-        />
+        >
+          {/*
+            The whole app is behind a session, per the captain's explicit "no anonymous
+            browsing" decision — every `/api/*` route 403s anonymously anyway, so there is
+            nothing an anonymous user could do past sign-in/sign-up. `Stack.Protected`
+            (Expo Router's routing-guard primitive) redirects to whichever group's guard is
+            true; an authenticated user who lands on `(auth)` — or a signed-out user who lands
+            on `(tabs)` — is bounced automatically, including mid-session sign-out.
+          */}
+          <Stack.Protected guard={!!session}>
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="plan/[id]" />
+          </Stack.Protected>
+          <Stack.Protected guard={!session}>
+            <Stack.Screen name="(auth)" />
+          </Stack.Protected>
+        </Stack>
       </ThemeProvider>
     </SafeAreaProvider>
   );

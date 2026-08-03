@@ -6,15 +6,30 @@
 > Milestone definitions live in [`planning/02-product-requirements.md`](../planning/02-product-requirements.md).
 > Decision history lives in [`change_log.md`](change_log.md).
 
-**Last updated:** 2026-08-03 (Ian's deload-cadence ruling ratified: "pro runners = 3 weeks,
-beginners = 4". The engine already keyed cadence to experience — `deloadEveryWeeks()` resolves the
-source's per-level Deload trigger table to advanced 3 / beginner 4 / intermediate 4, and the 50+
-mandatory 3-week rule still wins over every level — and `planTemplates.ts` now calls through that
-single shared function instead of inlining the same expression. Regression tests added on the
-golden and generic paths plus the unit suite: under-50 advanced → `[3, 6, 9]`, under-50 beginner →
-`[4, 8]`, 50+ any level → `[3, 6, 9]`, intermediate unchanged. Also settles the source's open
-beginner-cadence gap in `workout_library.md`. Typecheck, lint, and all 248 tests pass. This lands on
-top of the 2026-08-03 plan-engine entries below and the 2026-08-02 backend move:
+**Last updated:** 2026-08-03 — client-side auth lands (`06b1f89`): `src/lib/apiClient.ts` (better-auth's
+Expo client + typed fetch wrappers for every `/api/*` route), `src/app/(auth)/sign-in.tsx` +
+`sign-up.tsx` (email/password; a "Continue with Google" button is wired but inert), and a
+`Stack.Protected` gate in `src/app/_layout.tsx` so no route is reachable without a session — the
+app now has no anonymous browsing at all, matching every `/api/*` route already 403ing anonymously.
+Verified against `wrangler dev` at the curl level (sign-up, sign-in, anonymous 403, wrong-password
+401) and by driving the running app (Expo Go/iOS Simulator + briefly web): unauthenticated launch
+redirects to `/sign-in`, sign-in navigates into `(tabs)`, and a temporary "Sign out" button on Home
+(no Settings-lite screen exists yet to host it) redirects back to `/sign-in`. **Google OAuth is the
+only remaining blocker** — the captain still has to provision `GOOGLE_CLIENT_ID`/
+`GOOGLE_CLIENT_SECRET` (`workers/src/auth.ts`'s TODO); no code changes needed once they land. Also
+fixed in the same commit, unrelated to auth: a stale `metro-config` subpath import in
+`metro.config.js` that was blocking `expo start` entirely. This lands on top of the same day's
+deload-cadence ruling: Ian's ratified "pro runners = 3 weeks, beginners = 4" — the engine already
+keyed cadence to experience — `deloadEveryWeeks()` resolves the source's per-level Deload trigger
+table to advanced 3 / beginner 4 / intermediate 4, and the 50+ mandatory 3-week rule still wins over
+every level — and `planTemplates.ts` now calls through that single shared function instead of
+inlining the same expression. Regression tests added on the golden and generic paths plus the unit
+suite: under-50 advanced → `[3, 6, 9]`, under-50 beginner → `[4, 8]`, 50+ any level → `[3, 6, 9]`,
+intermediate unchanged. Also settles the source's open beginner-cadence gap in `workout_library.md`.
+Typecheck, lint, and all 248 tests pass.
+Previous entry: issue #3's pure TypeScript plan-generation engine landed:
+`paceDerivation.ts` + `planTemplates.ts`; bundled issues #22/#23 fixed; both red-first suites
+un-quarantined. Typecheck, lint, and tests pass. This lands on top of the 2026-08-02 backend move:
 **the backend is Cloudflare — D1 + Workers + better-auth, in `workers/`** — a captain's decision
 over a Supabase project-slot constraint and a genuinely-free stack; the relational design was
 ported, not re-decided. Auth, the quota ledger, `quota-status`, `purchase-tier`, `delete-account`,
@@ -43,7 +58,7 @@ from 82. Issue #22 remains open.)
 
 | Milestone | State |
 |---|---|
-| M1 — Foundation (account → empty Home) | **Server half done.** Auth + schema + account routes work locally on Cloudflare (`workers/`); no client screens yet, nothing deployed |
+| M1 — Foundation (account → empty Home) | **In progress.** Server (auth + schema + account routes) works locally on Cloudflare (`workers/`); client-side email/password auth now exists (`src/app/(auth)/`, `src/lib/apiClient.ts`) and gates the app behind a session — Google OAuth still needs the captain's credentials, and nothing is deployed |
 | M2 — Intake (questionnaire persists) | Not started |
 | M3 — Plan engine (3 tiers produce valid plans) | **In progress.** Pure template/pace engine done; not yet wired into the Worker's `generate-plan` route |
 | M4 — Tiers & quotas (server-side, unbypassable) | **Server half done.** The quota ledger, atomic gate, fallback exemption, `quota-status` and `purchase-tier` are built and tested; no client UI |
@@ -120,8 +135,21 @@ the literal previous week) and issue #33 (goal-realism handling).
       until the plan engine exists. Details: [`workers/README.md`](../workers/README.md)
 - [x] `src/lib/tierLimits.ts` and `src/lib/quotaPeriod.ts` — pure, shared by the app and the Worker,
       as `planning/03-engineering-requirements.md` requires by name. 18 unit tests
-- [x] ~~`src/lib/supabase.ts`~~ — **legacy since 2026-08-02**, nothing imports it. Kept, not deleted:
-      the client-side replacement (a better-auth client against `workers/`) is not built yet
+- [x] ~~`src/lib/supabase.ts`~~ — **legacy since 2026-08-02**, nothing imports it. Kept, not deleted,
+      alongside its now-built replacement (see the next bullet).
+- [x] **Client-side auth against `workers/` — done 2026-08-03 (`06b1f89`).** `src/lib/apiClient.ts`
+      wraps better-auth's Expo client (`authClient` — session persisted via `expo-secure-store`)
+      plus typed fetch wrappers for every non-auth `/api/*` route; `src/app/(auth)/sign-in.tsx` and
+      `sign-up.tsx` do email/password (a "Continue with Google" button is wired end to end but
+      inert until the captain provisions credentials); `src/app/_layout.tsx` gates the whole route
+      tree behind a session with Expo Router's `Stack.Protected` — no anonymous browsing at all.
+      `workers/src/auth.ts` gained the `expo()` server plugin to support this. Verified against
+      `wrangler dev` at the curl level and by driving the actual running app (unauthenticated
+      launch → `/sign-in`, sign-in → `(tabs)`, sign-out → back to `/sign-in`); the sign-up screen
+      was verified only via the shared backend curl test, not tap-tested live. Not built in this
+      pass, deliberately: intake screen, plan generation UI, My Plans list, quota/tier display UI,
+      visual polish. A documented TypeScript-peer-version cast lives in `apiClient.ts`'s header
+      comment — see `docs/architecture.md`'s "Current — what exists in `src/`" for detail.
 - [x] `src/lib/loadRules.ts` — deterministic safety arithmetic (see "Next" step 2)
 - [x] `src/lib/notation.ts` — the code counterpart of `notation.md`: `RUN_TYPE_ABBREVIATIONS`,
       `UNABBREVIATED_RUN_TYPES`, `STRUCTURE_SHORTHAND`, and `expandLabel()` for screen-reader text.
@@ -378,13 +406,14 @@ with **no backend at all**.
        `expo-glass-effect` also removed in the same commit — the "Known debt" risk recording it as
        still-installed is stale and removed below. Not logged in `change_log.md` until this
        doc-audit pass; see its new 2026-07-10 (evening) entry.
-6. [x] **The spine** — **Server half done 2026-08-02, on Cloudflare rather than Supabase.**
-       `workers/` holds better-auth on D1, both migrations, and the account routes; there is no RLS
-       to write because SQLite has none, so ownership moved into `workers/src/lib/store.ts` (see
-       `docs/architecture.md` "Authorization without RLS"). **Still to do:** the client half — auth
-       screens and an API module against `workers/` — plus the captain's `wrangler login`/`d1
-       create`/`secret put`/`deploy`. Required sign-up is enforced server-side today (every `/api/*`
-       route 403s anonymously); the client cannot yet sign anyone up.
+6. [~] **The spine** — **Server half done 2026-08-02, client-side auth done 2026-08-03,
+       on Cloudflare rather than Supabase.** `workers/` holds better-auth on D1, both migrations,
+       and the account routes; there is no RLS to write because SQLite has none, so ownership moved
+       into `workers/src/lib/store.ts` (see `docs/architecture.md` "Authorization without RLS").
+       `src/lib/apiClient.ts` and `src/app/(auth)/` now let the app sign up, sign in, and sign out
+       against it, gated by `Stack.Protected` in the root layout. **Still to do:** Google OAuth
+       needs the captain's client id/secret (email/password works today); the captain's own
+       `wrangler login`/`d1 create`/`secret put`/`deploy`.
 7. [ ] **Intake** (8 questions, or 10 with a target race, + review) persisting to `intake_responses`.
        The server side exists: `GET`/`PUT /api/intake`, validated twice (readable message in the
        route, table CHECKs underneath). Only the screen is missing.
@@ -529,9 +558,11 @@ reasoning, worked cases, and the type contract:
   engine_unavailable`. Both are single bindings in `workers/src/deps.ts`, which names them so the
   swap has an owner. They are bound to typed *unavailable* implementations rather than mocks on
   purpose — the sibling repo's issue #128 shipped a mock as its production client.
-- 🟠 **The client still has no way to talk to `workers/`.** No auth screens, no API module; the app
-  imports the legacy `src/lib/supabase.ts`, which points at an unused Supabase project. The Worker
-  half of M1/M4 is done; the app half is not started.
+- 🟢 **Resolved 2026-08-03: the client can now talk to `workers/`.** `src/lib/apiClient.ts` and
+  `src/app/(auth)/` (email/password sign-in/sign-up, `Stack.Protected` session gate) landed in
+  `06b1f89`. What's left of this gap is narrower: Google OAuth is wired but inert pending the
+  captain's credentials, and no screen yet consumes `apiClient.ts`'s other wrappers
+  (`quota-status`, intake, plans, `generate-plan`) — those land with the screens that need them.
 - 🟡 **`supabase/` and `src/lib/supabase.ts` are dead code** kept deliberately (2026-08-02) so the
   earlier design stays readable. Deleting them is its own decision, and the `@supabase/supabase-js`
   dependency is still in `package.json` for the same reason.

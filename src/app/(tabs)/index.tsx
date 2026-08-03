@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { FontFamily, FontSize, PressedOpacity, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { EXAMPLE_PLAN_ID } from '@/lib/fixtures/examplePlan';
+import { authClient } from '@/lib/apiClient';
 
 /**
  * Placeholder shell only — proves the token/font pipeline boots. The real Home screen (Part 5 of
@@ -39,6 +40,21 @@ export default function HomeScreen() {
             </Text>
           </Pressable>
         </Link>
+        {/* Temporary, same pass as the auth gate itself: no Settings-lite screen exists yet
+            (that lands with the backend that gives it something to show — see the comment atop
+            `(tabs)/_layout.tsx`), and there is otherwise no way to exercise the signed-out
+            redirect without reinstalling the app. */}
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => authClient.signOut()}
+          style={({ pressed }) => [
+            styles.demoLink,
+            { borderColor: theme.text.secondary, marginTop: Spacing.two },
+            pressed && styles.demoLinkPressed,
+          ]}
+        >
+          <Text style={[styles.demoLinkText, { color: theme.text.secondary }]}>Sign out</Text>
+        </Pressable>
       </SafeAreaView>
     </View>
   );
