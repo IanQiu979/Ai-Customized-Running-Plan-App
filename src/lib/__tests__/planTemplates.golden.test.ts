@@ -525,3 +525,41 @@ describe('buildTemplatePlan — 5K golden fixture', () => {
     }
   });
 });
+
+describe('buildTemplatePlan — 50+ mandatory 3-week deload on the golden 12-week/5K/4-day path', () => {
+  // Bug 3 from the plan-accuracy scout: the golden path hardcoded deload weeks 4 and 8 and never
+  // received `deloadCadence`, silently bypassing the mandatory 50+ cadence
+  // (docs/reference/coaching/load-rules.md:92 — "50+ runners | Every 3 weeks (mandatory)").
+  // Regression: the same `weekNumber % deloadCadence === 0` mechanism the generic path uses must
+  // drive the golden path too, with no change to the sub-50 cadence.
+
+  function goldenFiveKPlanForAge(age: number): Plan {
+    const intake: IntakeResponses = {
+      ...FIXTURE_INTAKE,
+      age,
+    };
+    const params: TemplatePlanParams = {
+      ...FIXTURE_PARAMS,
+      intake,
+    };
+    return buildTemplatePlan(params);
+  }
+
+  function deloadWeekNumbers(plan: Plan): number[] {
+    return plan.weeks
+      .map((week, index) => (week.isDeload ? index + 1 : 0))
+      .filter((weekNumber) => weekNumber > 0);
+  }
+
+  it('deloads a 55-year-old every 3 weeks (3, 6, 9) — matching the generic path for the same age', () => {
+    expect(deloadWeekNumbers(goldenFiveKPlanForAge(55))).toEqual([3, 6, 9]);
+  });
+
+  it('keeps a 30-year-old on the identical path at the existing every-4-week cadence (4, 8)', () => {
+    expect(deloadWeekNumbers(goldenFiveKPlanForAge(30))).toEqual([4, 8]);
+  });
+
+  it('keeps the 25-year-old golden fixture at the existing every-4-week cadence (4, 8)', () => {
+    expect(deloadWeekNumbers(goldenFiveKPlanForAge(25))).toEqual([4, 8]);
+  });
+});

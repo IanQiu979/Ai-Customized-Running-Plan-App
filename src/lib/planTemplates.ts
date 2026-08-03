@@ -439,6 +439,7 @@ function buildCanonicalFiveKWeek(args: {
   level: ExperienceLevel;
   previousLongestKm: number;
   lastLoadingWeekKm: number;
+  deloadCadence: number;
 }): Week {
   const {
     weekNumber,
@@ -454,10 +455,11 @@ function buildCanonicalFiveKWeek(args: {
     level,
     previousLongestKm,
     lastLoadingWeekKm,
+    deloadCadence,
   } = args;
   const weekIndex = weekNumber - 1;
   const isRaceWeek = weekNumber === durationWeeks;
-  const isDeload = !isRaceWeek && (weekNumber === 4 || weekNumber === 8);
+  const isDeload = !isRaceWeek && phase !== 'taper' && weekNumber % deloadCadence === 0;
   const desiredVolumeKm = targetVolumeKm(intake.weeklyKm, weekIndex, durationWeeks);
 
   if (isRaceWeek) {
@@ -799,6 +801,7 @@ export function buildTemplatePlan(params: TemplatePlanParams): Plan {
           level,
           previousLongestKm,
           lastLoadingWeekKm,
+          deloadCadence,
         })
       : buildGenericWeek({
           weekNumber: index + 1,
