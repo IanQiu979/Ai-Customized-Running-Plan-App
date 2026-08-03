@@ -45,6 +45,8 @@
 - **Pro vs Elite:** Elite gets more than quantity — extras proposed in the spec (mid-plan
   adjustments, race-day strategy, deeper periodization) → **user to confirm/edit**.
 - **Stack:** same as Echo V1 (Expo/React Native + TypeScript, Supabase, Claude via edge functions).
+  Supabase was later replaced by Cloudflare (D1 + Workers + better-auth) — see
+  [`planning/03-engineering-requirements.md`](03-engineering-requirements.md)'s vendor note.
 
 ---
 

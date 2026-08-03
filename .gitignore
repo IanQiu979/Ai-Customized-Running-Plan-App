@@ -34,6 +34,13 @@ yarn-error.*
 .env
 .env*.local
 supabase/functions/.env
+# Cloudflare Workers local secrets — wrangler dev's equivalent of supabase/functions/.env.
+# workers/.dev.vars.example is committed as the template.
+workers/.dev.vars
+
+# Cloudflare Workers — local Miniflare state (the local D1 file lives here) and build output
+workers/.wrangler/
+workers/node_modules/
 
 # typescript
 *.tsbuildinfo

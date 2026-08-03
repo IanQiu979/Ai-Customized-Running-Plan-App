@@ -1,5 +1,17 @@
 # V2.2 — Engineering Requirements (Part B: How)
 
+> **Vendor note (2026-08-02):** this spec is written against Supabase, which was replaced by
+> Cloudflare (D1 + Workers + better-auth, in [`workers/`](../workers/README.md)) — a captain's
+> decision over a project-slot constraint and a genuinely-free stack. **Every rule here still
+> holds**: the tables, the tier limits, the atomic quota gate, the fallback exemption, the
+> validation policy, the "no business rules in the client" line, and the `tierLimits.ts` /
+> `currentPeriod()` single-source requirements were all ported, not reopened. What changed is the
+> mechanism, and only where SQLite forced it — most consequentially, **there is no RLS**, so the
+> "RLS on every table" rule below is enforced in Worker code instead. The current state is
+> [`docs/architecture.md`](../docs/architecture.md); the full list of Postgres constructs with no
+> SQLite equivalent is in `workers/migrations/0002_app_schema.sql`. This document is left as
+> written so the reasoning behind each rule stays readable.
+
 > Status: draft (2026-07-07). Stack mirrors Echo V1 deliberately — known tools, cherry-pickable code.
 
 ## Tech stack (explicit)

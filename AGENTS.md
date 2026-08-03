@@ -48,16 +48,19 @@ break existing behavior.**
 
 **HIGH/CRITICAL — schema/migration changes, auth/security-sensitive code, anything touching
 production config, cross-service changes, or anything the user explicitly flags as risky.**
-Always HIGH, whatever the diff size: auth, RLS, schema, payments, secrets or env, edge functions,
-plan generation, adding a dependency.
+Always HIGH, whatever the diff size: auth, schema/migrations, payments, secrets or env, anything
+under `workers/src/`, plan generation, adding a dependency.
 → Full chain: planning subagent → design/architecture review subagent → implementation
 subagent(s) → testing subagent → security/review subagent → `doc-writer` → final
 verification/QA subagent (`verifier`). Branches (`feat/<slug>` or `fix/<slug>`) and opens a PR
 via `github-ops` — never a direct commit (CLAUDE.md → Git etiquette).
-- Writing or deploying the `generate-plan` edge function (AI call + cross-service + secrets, all
+- Writing or deploying the `generate-plan` Worker route (AI call + cross-service + secrets, all
   three independently HIGH).
-- Any Postgres migration or RLS policy change.
-- Wiring or debugging Supabase auth (OAuth, PKCE, redirects, auth-keyed RLS).
+- Any D1 migration (`workers/migrations/`).
+- Wiring or debugging auth (better-auth config, OAuth, sessions).
+- **Any change to `workers/src/lib/store.ts`.** D1 has no row-level security, so that file *is* the
+  authorization layer — a statement missing its `user_id` predicate is a data leak with no second
+  net behind it.
 - Adding any new npm dependency, even when the diff touches only `package.json`.
 
 **Skipping a required step for a task's severity tier is not allowed** unless the user overrides
@@ -121,13 +124,13 @@ drop one its tier requires, without an explicit user override in the same messag
 | Add a feature | MEDIUM | `feature-planner` → `implementer` → `test-writer` → `verifier` → `code-reviewer` → `doc-writer` (if user-facing) |
 | Fix a described bug (root cause known, single file) | LOW–MEDIUM | `debugger` → `verifier` (add `test-writer` if it needs new coverage) |
 | Chase a vague symptom | MEDIUM | `bug-planner` → `debugger` → `verifier` |
-| Touch DB schema, migrations, or RLS | HIGH | `database-engineer` → `security-auditor` → `verifier` → `doc-writer` → `github-ops` (branch + PR) |
-| Anything Supabase **auth** (OAuth, PKCE, redirects) | HIGH | `supabase-auth` → `security-auditor` → `verifier` → `doc-writer` → `github-ops` (branch + PR) |
-| Write or deploy an edge function | HIGH | `api-designer` → `jobs-queues-edge` → `security-auditor` → `verifier` → `doc-writer` → `github-ops` (branch + PR) |
+| Touch DB schema or migrations (`workers/migrations/`) | HIGH | `database-engineer` → `security-auditor` → `verifier` → `doc-writer` → `github-ops` (branch + PR) |
+| Anything **auth** (better-auth config, OAuth, sessions) | HIGH | `supabase-auth` (the auth specialist; ignore its Supabase-specific tooling — this project is better-auth on D1) → `security-auditor` → `verifier` → `doc-writer` → `github-ops` (branch + PR) |
+| Write or change a Worker route | HIGH | `api-designer` → `jobs-queues-edge` → `security-auditor` → `verifier` → `doc-writer` → `github-ops` (branch + PR) |
 | Build the `generate-plan` AI flow | HIGH | `prompt-engineer` → `ai-feature-builder` → `llm-eval` → `security-auditor` → `verifier` → `doc-writer` → `github-ops` (branch + PR) |
 | Design a screen | MEDIUM | `ui-designer` → `frontend-builder` → `accessibility-reviewer` → `verifier` → `doc-writer` (if user-facing) |
 | Add or change theme tokens | LOW–MEDIUM | `design-system` → `verifier` (single-value fix is LOW; a new token or system-wide change is MEDIUM — never hardcode, CLAUDE.md → Code conventions) |
-| Touch `.env`, secrets, or edge-function env | HIGH | `env-config-manager` → `verifier` → `doc-writer` → `github-ops` (branch + PR) |
+| Touch `.env`, `workers/.dev.vars`, `wrangler.toml [vars]`, or any secret | HIGH | `env-config-manager` → `verifier` → `doc-writer` → `github-ops` (branch + PR) |
 | Ship to TestFlight / stores | HIGH | `release-versioning` → `mobile-release` → `verifier` → `doc-writer` → `github-ops` (branch + PR) |
 | Bump Expo SDK or a major dep | HIGH | `migration-planner` → `framework-upgrader` → `verifier` → `doc-writer` → `github-ops` (branch + PR) |
 | Add any new npm dependency | HIGH | `dependency-auditor` → `implementer` → `verifier` → `doc-writer` → `github-ops` (branch + PR) |
@@ -165,10 +168,24 @@ Built-ins also available: `Explore`, `Plan`, `general-purpose`. Plugin agents ar
 
 ## V2.2 guardrails agents must respect
 
-- **No business rules in the client.** Tier, quota, and plan generation are edge-function work —
+- **The backend is Cloudflare (D1 + Workers + better-auth) in `workers/`, not Supabase**
+  (2026-08-02). `supabase/` and `src/lib/supabase.ts` are dead scaffold — do not build against
+  them, do not delete them. Start at [`workers/README.md`](workers/README.md).
+- **`workers/` is a separate npm project with its own gate.** The root
+  `typecheck && lint && test` deliberately excludes it, so it passes while the backend is broken.
+  Anything touching `workers/` must also run
+  `npm --prefix workers run typecheck && npm --prefix workers test`.
+- **There is no RLS.** Authorization is enforced in `workers/src/lib/store.ts` and by the single
+  pre-dispatch session check in `workers/src/index.ts`. See that store's header before touching it.
+- **No business rules in the client.** Tier, quota, and plan generation are Worker work —
   `jobs-queues-edge`, not `frontend-builder`.
 - **`ANTHROPIC_API_KEY` never leaves the server.** Any agent touching env goes through
-  `env-config-manager`; `EXPO_PUBLIC_*` is plain text in the bundle.
+  `env-config-manager`. Two committed-file traps, not one: `EXPO_PUBLIC_*` is plain text in the app
+  bundle, and `workers/wrangler.toml` is committed — secrets go in `workers/.dev.vars` (gitignored)
+  and `wrangler secret put`.
+- **Never run `wrangler login`, `wrangler deploy`, `wrangler d1 create`, or `wrangler secret put`.**
+  Those need the captain's own Cloudflare account. Everything is verifiable offline against
+  `wrangler dev`'s local emulation.
 - **AI output validation is structural, not strict-content.** `ai-feature-builder` and
   `prompt-engineer` follow [`docs/reference/plan-generation.md`](docs/reference/plan-generation.md):
   validate shape, retry once, fall back to a template.
@@ -180,5 +197,6 @@ Built-ins also available: `Explore`, `Plan`, `general-purpose`. Plugin agents ar
 ## Maintaining this file
 
 Keep this file limited to durable routing and guardrail rules useful to almost every future
-session. Prefer pointers to canonical docs or code over copying implementation detail, and update
+session. Do not repeat what the codebase already shows; point to the authoritative file or
+command instead. Prefer rewriting or pruning existing entries over appending new ones, and update
 or remove stale guidance when the project changes.

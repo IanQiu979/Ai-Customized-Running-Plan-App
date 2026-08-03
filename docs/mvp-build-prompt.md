@@ -203,8 +203,8 @@ Present these with the recommended defaults so Ian can accept or override in one
     encodes the closed set.*
 11. **Rule 10 disclaimer placement.** *Recommended: static footer section on every plan view +
     one line in the generating modal's fine print.*
-12. **iPad support** (*recommended: phone-only v1*), **password minimum** (*verify what the
-    live Supabase project actually enforces; align sign-up copy to it*).
+12. **iPad support** (*recommended: phone-only v1*). Password minimum is resolved — better-auth
+    enforces 8 characters (`workers/src/auth.ts`), matching the sign-up copy.
 
 Once answered: `doc-writer` records every ruling + decision in `docs/change_log.md` and syncs
 `planning/*` (these are Ian-authorized spec changes) before any code is written.
@@ -298,19 +298,23 @@ The demoable core: a real template plan rendered on a real screen, zero network.
 
 ## Phase 2 — The spine (M1; step 6)
 
-1. `env-config-manager`: `supabase login` + `supabase init` (no `config.toml` exists — the
-   comment in `supabase/functions/.env` claiming otherwise is false), link project
-   `vvvcaulmbwbujeszfvbo`, `supabase secrets set ANTHROPIC_API_KEY` (never yet run), verify the
-   deep-link scheme is on the Supabase redirect allowlist.
-2. `database-engineer`: migrations in `supabase/migrations/` for `profiles` (+ auth trigger),
-   `intake_responses`, `subscriptions`, `plans` (with `idempotency_key` + unique index);
-   RLS on every table (select/insert own rows; **no delete/update on plans**; tier writes
-   service-role only); the atomic quota RPC. Then run the Supabase security advisors and get
-   them clean.
+**Superseded 2026-08-02: the backend moved from Supabase to Cloudflare (D1 + Workers +
+better-auth), and steps 1-2 and 4 below are done against that stack — see
+[`workers/README.md`](../workers/README.md), `workers/migrations/`, and
+[`docs/mvp-progress.md`](mvp-progress.md) for current state.** Step 3 (auth screens/session
+routing in the client) is still open; do it against `workers/` via `api.ts` (planned, see
+README's project structure), not Supabase.
+
+1. ~~`env-config-manager`: `supabase login` + `supabase init`...~~ done instead as the Cloudflare
+   spine: `workers/wrangler.toml`, `workers/.dev.vars` / `wrangler secret put`.
+2. ~~`database-engineer`: migrations in `supabase/migrations/`...~~ done instead as
+   `workers/migrations/0001_better_auth.sql` and `0002_app_schema.sql`; ownership enforced in
+   `workers/src/lib/store.ts` (D1 has no RLS).
 3. `supabase-auth`: sign-in/sign-up screens per the blueprint (Google OAuth with deep-link
    return, **Apple Sign-In — App Store-mandatory, currently unconfigured**, email/password),
    session routing: signed-out → auth; signed-in without intake → intake; else → tabs.
-4. `security-auditor` (read-only pass): RLS, quota bypass, secrets posture.
+4. ~~`security-auditor` (read-only pass): RLS, quota bypass, secrets posture.~~ done for the
+   backend spine; re-run once the client's auth screens (step 3) exist.
 5. Gate (M1 done): a new user creates an account and lands on an empty Home.
 
 ## Phase 3 — Intake (M2; step 7)

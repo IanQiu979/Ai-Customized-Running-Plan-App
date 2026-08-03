@@ -1,0 +1,36 @@
+# -----------------------------------------------------------------------------
+# Template for workers/.dev.vars — copy it, then fill in. Committed on purpose;
+# keep it free of real values.
+#
+#   cp workers/.dev.vars.example workers/.dev.vars
+#
+# `.dev.vars` is `wrangler dev`'s local secret store and is gitignored. It is the
+# Cloudflare equivalent of `supabase/functions/.env`. In production these same
+# names are set with `wrangler secret put <NAME>`, which needs the captain's own
+# `wrangler login` — the exact analogue of `supabase secrets set`.
+#
+# NOTHING HERE MAY EVER GET AN `EXPO_PUBLIC_` PREFIX OR MOVE INTO THE REPO-ROOT
+# `.env`. Expo inlines `EXPO_PUBLIC_*` in plain text into the compiled app
+# bundle, so a key placed there is a published key. Non-secret Worker config goes
+# in `wrangler.toml [vars]` instead — that file is committed, so nothing secret
+# goes there either.
+# -----------------------------------------------------------------------------
+
+# better-auth's signing key for sessions and tokens.
+# Generate one with: openssl rand -base64 32
+BETTER_AUTH_SECRET=
+
+# console.anthropic.com -> Settings -> API keys
+# Read by workers/src/lib/model.ts and nowhere else. Leave EMPTY for local work:
+# with no key, generate-plan degrades to the template plan (marked isFallback,
+# which is quota-exempt) instead of calling the model. That is deliberate — see
+# workers/src/lib/model.ts.
+ANTHROPIC_API_KEY=
+
+# Google OAuth (optional — email/password works without it).
+# Google Cloud Console -> APIs & Services -> Credentials -> OAuth 2.0 Client ID,
+# type "Web application", authorized redirect URI:
+#   http://localhost:8787/api/auth/callback/google
+# Leave both empty and better-auth simply does not register the provider.
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=

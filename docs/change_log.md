@@ -27,6 +27,66 @@ make a behavior-changing commit, add a bullet under today's date — create a ne
   session's minimum, the long run's floor, `distributeDistance`'s 1 km/session floor) could each
   be individually reasonable yet stack past the clamp.
 
+## 2026-08-02 — the backend is Cloudflare, not Supabase; the spine is built and running locally
+
+**Captain's decision: the backend moves to Cloudflare (D1 + Workers + better-auth).** Two reasons,
+neither of them a technical verdict on Supabase — a Supabase project-slot constraint, and a
+preference for a stack that stays genuinely free at this stage. Cloudflare also clears the bar that
+ruled Firebase's free tier out: Workers can make outbound `fetch` calls, which `generate-plan` needs
+to reach Anthropic.
+
+**The relational design was not re-decided.** Same tables, same quota rules, same API shape as the
+draft `docs/architecture.md` and `planning/03-engineering-requirements.md` already carried — ported
+to SQLite, not reopened.
+
+New: `workers/`, a separate npm project (so `wrangler`/`better-auth` never enter the Expo bundle;
+`metro.config.js` was added to keep Metro out of its dependency tree, and the root
+`tsconfig`/`eslint`/`jest` configs each exclude it).
+
+- **Auth** — better-auth on D1, email/password, sessions via `Authorization: Bearer` (its
+  `bearer()` plugin is mandatory, not polish: a React Native client has no browser cookie jar, and
+  without it every route 403s a user who just signed in — caught by an end-to-end test, not by
+  reasoning). Google OAuth is coded and gated behind credentials only the captain can create.
+- **Schema** — `workers/migrations/`, applied locally. `0001` is better-auth's four tables,
+  verified against its own schema builder; `0002` is `profiles`, `intake_responses`,
+  `subscriptions`, `plans`.
+- **Routes** — `generate-plan`, `quota-status`, `purchase-tier`, `delete-account`, plus
+  `GET/PUT /api/intake` and `GET /api/plans[/:id]`. Those last three are new *routes* only because
+  they were direct RLS-guarded client reads under Supabase and D1 has no client-facing API.
+- **Shared logic** — `src/lib/tierLimits.ts` and `src/lib/quotaPeriod.ts` are new, pure, and
+  imported by both the app and the Worker, as `planning/03-engineering-requirements.md` demanded by
+  name. 18 new jest tests; 75 vitest tests in `workers/`, run inside real `workerd` against real
+  D1.
+
+Behavioral consequences worth knowing:
+
+- **No RLS.** SQLite has no policy system, so the Postgres design's last line of defence is gone.
+  Authorization is enforced in `workers/src/lib/store.ts` — every statement binds a `userId` from
+  the verified session — and by authenticating once ahead of dispatch. Tests pin both ends. The
+  full list of Postgres constructs with no SQLite equivalent is in `docs/architecture.md` and at the
+  top of `workers/migrations/0002_app_schema.sql`.
+- **The atomic quota gate got simpler, legitimately.** Postgres needed a `SECURITY DEFINER` RPC
+  holding `pg_advisory_xact_lock`; SQLite serializes writes and D1 funnels a database through one
+  Durable Object, so one conditional `INSERT ... SELECT ... WHERE count < limit` is genuinely
+  atomic. Eight concurrent reservations against a three-slot limit yield exactly three, asserted.
+- **`subscriptions` stores `purchased_at`, not `period_start`/`period_end`.** Storing boundaries
+  needs something to roll them over, contradicting the "computed at read time, no cron" rule stated
+  next to them in the draft. The client contract is unchanged: `purchase-tier` still returns both,
+  computed.
+- **`generate-plan` returns `503 engine_unavailable` and consumes no quota.** All eleven pipeline
+  steps are implemented and tested; two of them have no implementation to call yet — the
+  deterministic skeleton (`src/lib/planTemplates.ts`, being built in parallel) and the Pro/Elite
+  prompt. Both are bound to typed *unavailable* implementations rather than mocks, on purpose: the
+  sibling repo `running-form-v2.3` shipped a mock as its production client (its issue #128) and
+  served dead ends for weeks. Each is one binding in `workers/src/deps.ts`, which names them.
+- **Nothing is deployed and no key is set.** `wrangler.toml`'s `database_id` is an obviously fake
+  placeholder. `wrangler login`, `wrangler d1 create`, `wrangler secret put`, and `wrangler deploy`
+  are the captain's to run — the exact analogue of `supabase login` / `supabase secrets set`.
+  Everything above was verified against `wrangler dev`'s local emulation, offline, with no account.
+
+`supabase/` and `src/lib/supabase.ts` are left in place, untouched and unused, and marked legacy in
+the docs. Deleting them is a separate decision.
+
 ## 2026-07-12 — the last stale doc reference from issue #37, actually fixed this time
 
 Found while cleaning up branches after the four-PR merge pass. **Issue #37's sweep was recorded as

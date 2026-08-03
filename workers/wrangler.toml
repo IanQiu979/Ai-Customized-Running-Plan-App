@@ -1,0 +1,44 @@
+# Cloudflare Workers config for Pace Blueprint's backend.
+#
+# NOTHING HERE IS DEPLOYED. `database_id` below is a placeholder — see the comment on it. Every
+# command that touches a real Cloudflare account (`wrangler login`, `wrangler d1 create`,
+# `wrangler secret put`, `wrangler deploy`) is the captain's to run; this repo is verified against
+# `wrangler dev`'s local Miniflare emulation, which needs no account and no network.
+
+name = "pace-blueprint"
+main = "src/index.ts"
+compatibility_date = "2026-07-01"
+
+# better-auth reaches for node:crypto / node:buffer through its dependency tree.
+compatibility_flags = ["nodejs_compat"]
+
+[observability]
+enabled = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "pace-blueprint"
+# PLACEHOLDER. `wrangler dev --local` and `vitest` ignore this value entirely (Miniflare creates a
+# local SQLite file under `.wrangler/state/`), so local work needs no account. Before anything
+# remote, the captain runs `wrangler login && wrangler d1 create pace-blueprint` and pastes the
+# real uuid it prints here. Committing a real database id is harmless — it is not a secret — but
+# fabricating one is not, so this stays obviously fake until a real one exists.
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"
+
+[vars]
+# Non-secret configuration only. Anything secret goes to `.dev.vars` locally and
+# `wrangler secret put` in production — never here, because this file is committed.
+#
+# The origin the Worker is served from. better-auth signs cookies and builds OAuth callback URLs
+# against it, so a wrong value here breaks sign-in with a confusing "state mismatch", not a clear
+# error. The local value matches `wrangler dev`'s default port.
+BETTER_AUTH_URL = "http://localhost:8787"
+
+# Deep-link scheme the Expo app is registered for. better-auth's `trustedOrigins` must contain it
+# or an OAuth return into the app is rejected as an untrusted redirect.
+APP_SCHEME = "paceblueprint://"
+
+[env.production.vars]
+BETTER_AUTH_URL = "https://pace-blueprint.workers.dev"
+APP_SCHEME = "paceblueprint://"

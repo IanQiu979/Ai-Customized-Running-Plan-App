@@ -130,7 +130,9 @@ MVP scope by decision, 2026-07-10 — see "What it does (v1)" above). Deliberate
 
 ## Milestones & definition of done
 
-- **M1 — Foundation**: Expo app scaffolded, Supabase project, required sign-up working.
+- **M1 — Foundation**: Expo app scaffolded, backend + auth working (Cloudflare, not Supabase —
+  see [`planning/03-engineering-requirements.md`](03-engineering-requirements.md)'s vendor note),
+  required sign-up working.
   *Done when: a new user can create an account and land on an empty Home.*
 - **M2 — Intake**: onboarding questionnaire persists to DB.
   *Done when: intake answers survive logout/login.*

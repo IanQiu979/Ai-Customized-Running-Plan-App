@@ -127,8 +127,8 @@ These surfaced during design. Each needs a human answer. Four of them change cod
    notes are never read by an AI. Recommendation: hide it, or show it disabled with an honest line,
    rather than silently collecting text that goes nowhere.
 
-4. **Password minimum length.** Copy assumes 8 characters. Confirm against what Supabase Auth is
-   actually configured to enforce and match the string to it.
+4. **Password minimum length — RESOLVED 2026-08-02.** Copy's 8-character assumption is confirmed:
+   better-auth is configured with `minPasswordLength: 8` (`workers/src/auth.ts`).
 
 5. **`expo-glass-effect` — RESOLVED 2026-07-10 (Ruling 18, `145d7e0`): removed.** It directly
    contradicted this design's "no blur, no glass — depth comes from surfaces and hairlines" rule
@@ -485,7 +485,7 @@ not a redesign. Confirm-password appears only on the email path. There is no "we
 hands straight off to intake.
 
 > Copy — **"Create your account"**, sub **"Start with a free plan. No credit card required."**
-> Password helper **"Use 8 characters or more."** *(Confirm against Supabase's actual policy — Part 1.)*
+> Password helper **"Use 8 characters or more."** *(Confirmed against better-auth's policy — Part 1.)*
 
 ### Intake — 8-10 questions + 1 review · *system theme, motif deliberately absent*
 
