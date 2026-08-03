@@ -57,6 +57,59 @@ only one the existing suites exercised.
   guidance — is logged separately for the captain as
   `workout-v22-plan-accuracy-s1-decision-long-run-duration-vs-share-cap` and is not resolved here.
 
+## 2026-08-03 — client-side auth lands: sign-in/sign-up, an API client, and a session gate (`06b1f89`)
+
+The app's first module that actually talks to `workers/`. No new backend routes — this wires the
+client onto the account routes that landed 2026-08-02.
+
+- **New `src/lib/apiClient.ts`.** Wraps better-auth's Expo client (`@better-auth/expo/client`,
+  session persisted via `expo-secure-store`) as `authClient`, re-exporting `signIn`, `signUp`,
+  `signOut`, and `useSession` for screens to call directly. Adds a small typed `apiFetch<T>()` and
+  one function per non-auth `/api/*` route: `getQuotaStatus`, `purchaseTier`, `deleteAccount`,
+  `getIntake`/`putIntake`, `listPlans`/`getPlan`, `generatePlan`. Those custom routes attach the
+  session by reading `authClient.getCookie()` onto the request's `cookie` header — better-auth's
+  Expo plugin only replays the stored session automatically for calls made through `authClient`
+  itself, not for a plain `fetch`.
+- **New `src/app/(auth)/`**: `sign-in.tsx` and `sign-up.tsx` (email/password, plus a "Continue with
+  Google" button that is wired end to end but inert until the captain provisions Google OAuth
+  credentials), `_layout.tsx`, and `index.tsx` (a redirect anchor).
+- **`src/app/_layout.tsx` now gates the whole app behind a session.** Reads
+  `authClient.useSession()` and uses Expo Router's `Stack.Protected` to route a signed-in user into
+  `(tabs)`/`plan/[id]` and everyone else into `(auth)` — including mid-session sign-out. This is the
+  captain's explicit "no anonymous browsing" decision, and it matches reality: every `/api/*` route
+  already 403s anonymously, so there was nothing an anonymous user could do past sign-in anyway.
+- **`workers/src/auth.ts` gains the `expo()` server plugin from `@better-auth/expo`**, paired with
+  the existing `bearer()` plugin — needed for OAuth deep-link redirects and origin trust; a no-op
+  for the email/password path already in use.
+- **New dependencies:** `better-auth`, `@better-auth/expo`, `expo-secure-store`, `expo-network`
+  (root); `@better-auth/expo` (`workers/`).
+- **`.env.example` gains `EXPO_PUBLIC_API_BASE_URL`** — the Worker's origin
+  (`http://localhost:8787` for local dev), not a secret.
+- **A known type friction, documented in place rather than worked around silently:**
+  `@better-auth/expo`'s `package.json` declares a `typescript: ^6.0.3` peer; this project is pinned
+  to `~5.9.2` (bumping to TS 6 broke `expo/tsconfig.base`'s ambient type resolution project-wide —
+  tried, reverted). `apiClient.ts` carries a narrow `as unknown as BetterAuthClientPlugin` cast plus
+  a small interface merge to restore `getCookie()`'s type, with a comment explaining why.
+- **Unrelated pre-existing bug fixed in the same commit, needed to run the app at all for manual
+  verification:** `metro.config.js` was importing `metro-config/src/defaults/exclusionList`, a
+  subpath the installed `metro-config`'s `exports` map no longer allows; fixed to
+  `metro-config/private/defaults/exclusionList`.
+- **Verified:** `npm run typecheck && npm run lint && npm test` clean at root;
+  `npm --prefix workers run typecheck && npm --prefix workers test` clean. Curl-level, against
+  `wrangler dev`: sign-up, sign-in, anonymous 403, wrong-password 401 all behave exactly as
+  `workers/src/index.ts`'s route table documents. Drove the running app (Expo Go/iOS Simulator,
+  briefly web): unauthenticated launch redirects to `/sign-in`; a successful email/password sign-in
+  navigates into the protected `(tabs)` group; a temporary "Sign out" button added to Home for this
+  purpose (there's no Settings-lite screen yet) redirects back to `/sign-in`. The sign-up screen was
+  verified only via the same backend curl test, not tap-tested live in the running app (an Expo Go
+  dev-menu tooltip blocked further UI automation) — it shares the sign-in screen's code path and
+  structure.
+- **Not built in this pass, deliberately:** intake screen, plan generation UI, My Plans list,
+  quota/tier display UI, visual design polish (function over form, captain's explicit call).
+- **Still outstanding:** Google OAuth client id/secret — the captain provides them through a
+  separate channel; once they land in `workers/.dev.vars` (local) and `wrangler secret put`
+  (production), no code changes are needed.
+
 ## 2026-08-03 — plan-generation engine lands (issue #3, with issues #22/#23)
 
 - Added pure `src/lib/paceDerivation.ts`: Riegel equivalency, recent-performance-derived
