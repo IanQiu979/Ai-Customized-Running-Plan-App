@@ -5,6 +5,19 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-08-03 — intake age floor raised from 10 to 13 (captain's ruling)
+
+Ian ruled V2.2's minimum accepted intake age is 13 — the number that simultaneously clears
+Apple's App Store 9+ rating floor for exercise-recommendation apps, COPPA's under-13
+verifiable-parental-consent line, and Texas SB2420's lowest legally-defined age band (scout report
+`v22-apple-kids-guidelines-research-s1` §6.4/§6.5).
+
+- `workers/src/routes.ts`'s `validateIntake` now rejects `age < 13` (was `< 10`).
+- New migration `workers/migrations/0003_raise_intake_age_floor.sql` rebuilds `intake_responses`
+  with `CHECK (age >= 13 AND age <= 100)`, the real backstop behind the validator, dropping any
+  pre-existing rows with `age < 13` rather than grandfathering them.
+- New test: age 12 rejected (`400`), age 13 accepted (`200`).
+
 ## 2026-08-03 — deload cadence is driven by experience level (Ian's ruling: "pro runners = 3 weeks, beginners = 4")
 
 Ian ruled that the deload cadence should be driven by experience level — "pro runners = 3 weeks,

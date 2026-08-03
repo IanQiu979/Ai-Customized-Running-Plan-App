@@ -211,6 +211,12 @@ the literal previous week) and issue #33 (goal-realism handling).
       ruling — see `docs/change_log.md`'s 2026-07-12 entry. **Known gap, filed as issue #45:** the
       client can't yet derive the true variant from `Plan.isFallback` alone; blocked on
       `generate-plan` returning whether a fallback consumed quota (Phase 4).
+- [x] **Intake age floor raised 10 → 13 (2026-08-03), captain's ruling.** `workers/src/routes.ts`'s
+      `validateIntake` now rejects `age < 13`; new migration
+      `workers/migrations/0003_raise_intake_age_floor.sql` moves the D1 `CHECK` constraint to
+      match, rebuilding `intake_responses` and dropping any `age < 13` rows rather than
+      grandfathering them. Clears Apple's 9+ rating floor, COPPA, and Texas SB2420. Full
+      rationale: `docs/change_log.md`'s 2026-08-03 entry.
 - [x] **213 passing tests across 10 suites (`jest-expo`) as of 2026-08-03.** This includes the
       formerly red-first `planTemplates.golden.test.ts` and `paceDerivation.test.ts` contracts,
       now un-quarantined and green. `npm run typecheck`, `npm run lint`, and `npm test` all pass.
