@@ -251,9 +251,10 @@ the swap has an owner.
    can't be used to farm unlimited template plans.
 4. **Reconcile plan length** — a race farther out than the tier's max plan length gets a delayed
    start so the taper lands on race day (ported from Echo V1's `reconcilePlanLength`); a
-   compressed race gets an honest short plan. **Never refuse.** A declared red-flag injury
-   produces the return-to-running protocol as a plan, never a rejection, and does not consume
-   quota.
+   compressed race gets an honest short plan. **Never refuse.** A declared red-flag injury still
+   produces a plan — a normal, volume-adjusted one carrying a strengthened disclaimer (captain
+   ruling, 2026-08-03; see `docs/reference/coaching/plan-structure.md`), not a separate
+   return-to-running protocol — never a rejection, and does not consume quota.
 5. **Build the template skeleton** — parametric, from `planTemplates.ts` and the coaching docs:
    phases, deload cadence, weekly volumes under `loadRules.ts` caps, workout primitives from
    `workout-library.md`. **All three tiers build on this same coach-authored skeleton — it is

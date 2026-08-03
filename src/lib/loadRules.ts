@@ -11,7 +11,7 @@
  * Pure module — imported by the app and by the Deno edge functions. No runtime deps.
  */
 
-import type { ExperienceAnswer, ExperienceLevel, HrZone } from './planTypes';
+import type { ExperienceAnswer, ExperienceLevel, HrZone, InjuryFlag } from './planTypes';
 
 // ---------------------------------------------------------------------------
 // Rule 1 — weekly volume
@@ -271,4 +271,65 @@ export function clampLongRun(args: {
     }
   }
   return { km, limitedBy };
+}
+
+// ---------------------------------------------------------------------------
+// Rule 5 / Rule 6 — declared-injury volume adjustment
+// ---------------------------------------------------------------------------
+
+/**
+ * "This week" volume cut applied when a closed-set injury is declared at intake — this app's
+ * only encounter with the runner, so "this week" (`injury_flags.md`'s per-pattern coaching
+ * responses) means the plan's first generated week. Sourced per flag:
+ *
+ * - `knee` — `injury_flags.md:29`, `load_rules.md:206`: "reduce volume 15%".
+ * - `shin_splints` — `injury_flags.md:49`, `load_rules.md:217`: "reduce volume 15%".
+ * - `plantar_arch` — `injury_flags.md:69`: "Reduce volume 20% this week" (Ian's ruling,
+ *   2026-08-03: add a dedicated flag for this pattern — see `plan-structure.md`).
+ * - `ankle_achilles`, `it_band`, `hip_glute`, `lower_back` — none of these has its own
+ *   pattern-specific *volume-percentage* figure in the source: Achilles (`injury_flags.md:109`)
+ *   only says "immediate volume reduction" with no number; IT band (`injury_flags.md:89`) gives
+ *   "reduce hard sessions by 50%", a session-count metric, not a weekly-volume one; hip/glute and
+ *   lower back have no dedicated injury pattern in the source at all. Each falls back to Rule 5's
+ *   own generic "Reduce Volume Triggers" tier response — "reducing your training volume by 20%
+ *   this week" (`load_rules.md:185`, restated at `:189`) — the source's own number for a
+ *   declared, non-emergency injury lacking a body-specific one. Flagged for captain review in
+ *   `plan-structure.md`.
+ */
+export const INJURY_VOLUME_REDUCTION_PCT: Record<InjuryFlag, number> = {
+  knee: 0.15,
+  shin_splints: 0.15,
+  plantar_arch: 0.2,
+  ankle_achilles: 0.2,
+  it_band: 0.2,
+  hip_glute: 0.2,
+  lower_back: 0.2,
+  none: 0,
+};
+
+/**
+ * Closed-set flags the source treats with materially higher urgency than the rest of the set.
+ * `injury_flags.md` labels exactly one of the app's covered patterns "(HIGH PRIORITY)" —
+ * Achilles (`injury_flags.md:107-109`): the only one of these patterns whose coaching response
+ * includes an explicit stop-and-rest branch and "worsens quickly when pushed through" language,
+ * one tier below the source's own "HIGHEST PRIORITY"/"STOP RUNNING" stress-fracture pattern
+ * (which the closed set has no equivalent flag for — bone pain is out of scope for a body-
+ * location picker). No other closed-set flag carries a priority label in the source. This is an
+ * interpretive judgment call, not a literal "RED FLAG" label on the pattern itself — flagged for
+ * captain review in `plan-structure.md`.
+ */
+export const RED_FLAG_INJURIES: ReadonlySet<InjuryFlag> = new Set<InjuryFlag>(['ankle_achilles']);
+
+/** Most conservative combination when multiple injuries are declared at once — not itself a
+ * sourced coaching number, just how the app combines several sourced ones safely. */
+export function injuryVolumeReductionPct(injuries: readonly InjuryFlag[]): number {
+  return injuries.reduce((max, flag) => Math.max(max, INJURY_VOLUME_REDUCTION_PCT[flag]), 0);
+}
+
+export function hasDeclaredInjury(injuries: readonly InjuryFlag[]): boolean {
+  return injuries.some((flag) => flag !== 'none');
+}
+
+export function hasRedFlagInjury(injuries: readonly InjuryFlag[]): boolean {
+  return injuries.some((flag) => RED_FLAG_INJURIES.has(flag));
 }

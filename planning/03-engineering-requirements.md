@@ -84,7 +84,9 @@ supabase/functions/
 4. **Reconcile plan length.** A race farther out than the tier's max plan length gets a delayed
    start so the taper lands on race day (ported from Echo V1's `reconcilePlanLength`); a
    compressed race gets an honest short plan. **Never refuse.** A declared red-flag injury
-   produces the return-to-running protocol as a plan, not a rejection, and does not consume quota.
+   produces a normal, volume-adjusted plan with a strengthened disclaimer (captain ruling,
+   2026-08-03; see `docs/reference/coaching/plan-structure.md`), not a separate
+   return-to-running protocol and not a rejection, and does not consume quota.
 5. Branch by tier. **All three tiers build on the same coach-authored template skeleton. The
    skeleton is never removed — it is the safety guarantee and the product's differentiation.**
    What scales across tiers is how much of the runner the plan reasons about, and how much it
