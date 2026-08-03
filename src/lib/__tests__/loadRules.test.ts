@@ -4,7 +4,11 @@ import {
   deloadEveryWeeks,
   deloadVolume,
   estimateMaxHr,
+  hasDeclaredInjury,
+  hasRedFlagInjury,
   hrZoneBpm,
+  injuryVolumeReductionPct,
+  INJURY_VOLUME_REDUCTION_PCT,
   isValidDeload,
   LONG_RUN_SHARE_CAP,
   toExperienceLevel,
@@ -323,5 +327,40 @@ describe('long run — deload weekly-share ceiling measured against the last loa
     });
     expect(km).toBeCloseTo(27);
     expect(limitedBy).toBe('time');
+  });
+});
+
+describe('declared-injury volume adjustment (scout report Bug 1 / mandated finding B)', () => {
+  it('sources knee and shin splints at 15% (injury_flags.md:29,49)', () => {
+    expect(INJURY_VOLUME_REDUCTION_PCT.knee).toBe(0.15);
+    expect(INJURY_VOLUME_REDUCTION_PCT.shin_splints).toBe(0.15);
+  });
+
+  it('sources the new plantar_arch flag at 20% (Ruling 2; injury_flags.md:69)', () => {
+    expect(INJURY_VOLUME_REDUCTION_PCT.plantar_arch).toBe(0.2);
+  });
+
+  it('gives no reduction for none', () => {
+    expect(INJURY_VOLUME_REDUCTION_PCT.none).toBe(0);
+  });
+
+  it('takes the most conservative (largest) reduction across multiple declared injuries', () => {
+    expect(injuryVolumeReductionPct(['knee', 'plantar_arch'])).toBeCloseTo(0.2);
+    expect(injuryVolumeReductionPct(['shin_splints'])).toBeCloseTo(0.15);
+    expect(injuryVolumeReductionPct(['none'])).toBe(0);
+  });
+
+  it('treats an empty or all-none injuries array as no declared injury', () => {
+    expect(hasDeclaredInjury(['none'])).toBe(false);
+    expect(hasDeclaredInjury([])).toBe(false);
+    expect(hasDeclaredInjury(['knee'])).toBe(true);
+    expect(hasDeclaredInjury(['none', 'hip_glute'])).toBe(true);
+  });
+
+  it("flags ankle_achilles as the closed set's red-flag member and nothing else as red-flag by default", () => {
+    expect(hasRedFlagInjury(['ankle_achilles'])).toBe(true);
+    expect(hasRedFlagInjury(['knee'])).toBe(false);
+    expect(hasRedFlagInjury(['plantar_arch'])).toBe(false);
+    expect(hasRedFlagInjury(['none'])).toBe(false);
   });
 });

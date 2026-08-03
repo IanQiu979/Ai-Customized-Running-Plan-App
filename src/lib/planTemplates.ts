@@ -11,6 +11,9 @@ import {
   clampWeeklyVolume,
   deloadEveryWeeks,
   deloadVolume,
+  hasDeclaredInjury,
+  hasRedFlagInjury,
+  injuryVolumeReductionPct,
   MAX_SINGLE_RUN_KM,
   toExperienceLevel,
 } from './loadRules';
@@ -64,6 +67,28 @@ const GENERAL_DISCLAIMER =
   'This is not medical advice. Consult a doctor before starting any training program or if ' +
   'you experience pain, persistent soreness, dizziness, chest discomfort, or any health ' +
   'concern. PACE provides coaching guidance, not medical diagnosis or treatment.';
+
+/** Rule 10, injury-related output disclaimer — exact string,
+ * `docs/reference/coaching/load-rules.md:265-267`. Attached whenever `injuries` is declared. */
+const INJURY_DISCLAIMER =
+  'If you are experiencing significant pain, swelling, or symptoms that concern you, please ' +
+  'seek assessment from a qualified sports medicine professional or physiotherapist before ' +
+  'continuing training.';
+
+/**
+ * Strengthened professional-evaluation language for a red-flag injury (`loadRules.ts`'s
+ * `RED_FLAG_INJURIES`) — captain ruling 2026-08-03 (see `plan-structure.md`): the plan itself
+ * stays a normal, volume-adjusted plan (Ruling 1), but the recommendation to see a professional
+ * must be visibly stronger than the standard injury disclaimer. Adapted, not invented, from the
+ * source's own language for this pattern: "worsens quickly when pushed through", "stop", "pain
+ * is above 3/10", "does not improve in 5-7 days" (`injury_flags.md:109`), plus Rule 10's own
+ * "qualified sports medicine professional or physiotherapist" phrase reused verbatim.
+ */
+const RED_FLAG_INJURY_DISCLAIMER =
+  'You declared an injury the coaching library treats as high-priority — it can worsen ' +
+  'quickly if pushed through. Please see a qualified sports medicine professional or ' +
+  'physiotherapist for an evaluation before continuing training. If pain is above 3/10 or ' +
+  'does not improve within 5–7 days, stop running and seek assessment.';
 
 /** Ian-approved 12-week 5K load shape, normalized to the 35 km worked-example baseline. */
 const FIVE_K_WEEKLY_LOAD = [34, 35, 38, 23, 41, 45, 48, 30, 45, 48, 40, 28] as const;
@@ -294,6 +319,21 @@ function targetVolumeKm(
 }
 
 /**
+ * A declared injury's coaching response is "reduce volume X% *this week*" — this app meets the
+ * runner exactly once, at intake, so "this week" is the plan's first generated week. Weeks after
+ * it are unaffected here; they still ramp off week 1's own (reduced) volume through the existing
+ * `lastLoadingWeekKm` growth-cap mechanism, so the cut isn't silently re-applied or erased.
+ */
+function applyInjuryVolumeAdjustment(
+  desiredVolumeKm: number,
+  weekNumber: number,
+  injuryReductionPct: number,
+): number {
+  if (weekNumber !== 1 || injuryReductionPct <= 0) return desiredVolumeKm;
+  return Math.max(1, Math.round(desiredVolumeKm * (1 - injuryReductionPct)));
+}
+
+/**
  * Nominal quality-workout distances (tempo/interval) are written against the 35 km
  * worked-example baseline, same as `FIVE_K_WEEKLY_LOAD`. Scaling them by a volume ratio keeps
  * a hard session from single-handedly exceeding the clamp on a low-volume week or plan.
@@ -441,6 +481,7 @@ function buildCanonicalFiveKWeek(args: {
   previousLongestKm: number;
   lastLoadingWeekKm: number;
   deloadCadence: number;
+  injuryReductionPct: number;
 }): Week {
   const {
     weekNumber,
@@ -457,11 +498,16 @@ function buildCanonicalFiveKWeek(args: {
     previousLongestKm,
     lastLoadingWeekKm,
     deloadCadence,
+    injuryReductionPct,
   } = args;
   const weekIndex = weekNumber - 1;
   const isRaceWeek = weekNumber === durationWeeks;
   const isDeload = !isRaceWeek && phase !== 'taper' && weekNumber % deloadCadence === 0;
-  const desiredVolumeKm = targetVolumeKm(intake.weeklyKm, weekIndex, durationWeeks);
+  const desiredVolumeKm = applyInjuryVolumeAdjustment(
+    targetVolumeKm(intake.weeklyKm, weekIndex, durationWeeks),
+    weekNumber,
+    injuryReductionPct,
+  );
 
   if (isRaceWeek) {
     const race = raceDayWorkout('5k');
@@ -634,6 +680,7 @@ function buildGenericWeek(args: {
   deloadCadence: number;
   level: ExperienceLevel;
   lastLoadingWeekKm: number;
+  injuryReductionPct: number;
 }): Week {
   const {
     weekNumber,
@@ -651,20 +698,25 @@ function buildGenericWeek(args: {
     deloadCadence,
     level,
     lastLoadingWeekKm,
+    injuryReductionPct,
   } = args;
   const isRaceWeek = goalType === 'race' && weekNumber === durationWeeks;
   const isDeload = !isRaceWeek && phase !== 'taper' && weekNumber % deloadCadence === 0;
   const rawVolumeKm = targetVolumeKm(intake.weeklyKm, weekNumber - 1, durationWeeks);
-  const desiredVolumeKm = isDeload
-    ? lastLoadingWeekKm > 0
-      ? Math.max(1, Math.round(deloadVolume(lastLoadingWeekKm)))
-      : rawVolumeKm
-    : Math.max(
-        1,
-        Math.round(
-          clampWeeklyVolume({ lastLoadingWeekKm, proposedKm: rawVolumeKm, level }),
+  const desiredVolumeKm = applyInjuryVolumeAdjustment(
+    isDeload
+      ? lastLoadingWeekKm > 0
+        ? Math.max(1, Math.round(deloadVolume(lastLoadingWeekKm)))
+        : rawVolumeKm
+      : Math.max(
+          1,
+          Math.round(
+            clampWeeklyVolume({ lastLoadingWeekKm, proposedKm: rawVolumeKm, level }),
+          ),
         ),
-      );
+    weekNumber,
+    injuryReductionPct,
+  );
 
   if (isRaceWeek) {
     const race = raceDayWorkout(raceDistance);
@@ -778,6 +830,7 @@ export function buildTemplatePlan(params: TemplatePlanParams): Plan {
   const phases = phasesForPlan(durationWeeks, raceDistance);
   const maxSingleRunKm = MAX_SINGLE_RUN_KM[level];
   const deloadCadence = deloadEveryWeeks(level, params.intake.age);
+  const injuryReductionPct = injuryVolumeReductionPct(params.intake.injuries);
 
   const useGoldenFiveKShape =
     params.goalType === 'race' &&
@@ -803,6 +856,7 @@ export function buildTemplatePlan(params: TemplatePlanParams): Plan {
           previousLongestKm,
           lastLoadingWeekKm,
           deloadCadence,
+          injuryReductionPct,
         })
       : buildGenericWeek({
           weekNumber: index + 1,
@@ -820,6 +874,7 @@ export function buildTemplatePlan(params: TemplatePlanParams): Plan {
           deloadCadence,
           level,
           lastLoadingWeekKm,
+          injuryReductionPct,
         });
     if (!week.isDeload) lastLoadingWeekKm = week.volumeKm;
     previousLongestKm = Math.max(
@@ -841,6 +896,12 @@ export function buildTemplatePlan(params: TemplatePlanParams): Plan {
         })
       : undefined;
 
+  const disclaimers = [
+    GENERAL_DISCLAIMER,
+    ...(hasDeclaredInjury(params.intake.injuries) ? [INJURY_DISCLAIMER] : []),
+    ...(hasRedFlagInjury(params.intake.injuries) ? [RED_FLAG_INJURY_DISCLAIMER] : []),
+  ];
+
   return {
     title:
       params.goalType === 'race'
@@ -856,7 +917,7 @@ export function buildTemplatePlan(params: TemplatePlanParams): Plan {
     weeklyLoad: weeks.map((week) => week.volumeKm),
     weeks,
     extras: [],
-    disclaimers: [GENERAL_DISCLAIMER],
+    disclaimers,
     ...(goalRealism ? { goalRealism } : {}),
   };
 }

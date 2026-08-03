@@ -46,6 +46,15 @@ data. A rule only survives this port if a one-time intake can actually drive it.
   numbers the engine already generates. → `load-rules.md`
 - **Injury red flags, triage subset** — `load_rules.md` Rule 5, the parts a *declared* symptom at
   signup can drive (as opposed to a per-run report). → `load-rules.md`, `injury-rules.md`
+- **Per-flag injury volume reduction (2026-08-03).** `injury_flags.md` Part 1 / `load_rules.md`
+  Rule 6's per-pattern coaching-response magnitudes — knee 15% (`injury_flags.md:29`), shin
+  splints 15% (`:49`), plantar fasciitis/arch 20% (`:69`) — repurposed: the *detection* mechanism
+  those sections describe (from logged cadence/mileage data) stays out of scope, unchanged from
+  below, but V2.2 already collects body location as a declared closed-set `InjuryFlag` at intake,
+  so the same magnitude numbers apply to that one-time declaration instead of a detected pattern.
+  Flags without their own magnitude (`ankle_achilles`, `it_band`, `hip_glute`, `lower_back`) fall
+  back to Rule 5's generic Reduce Volume tier (20%, `load_rules.md:185`). → `load-rules.md`,
+  `src/lib/loadRules.ts`.
 - **Disclaimers** — `load_rules.md` Rule 10, verbatim, non-negotiable. → `load-rules.md`
 - **Training zones, whole model** — `training_zones.md`. Zones are computed from age
   (`220 − age`), which V2.2 collects, so the whole zone table is drivable. → `training-zones.md`
@@ -64,9 +73,13 @@ data. A rule only survives this port if a one-time intake can actually drive it.
   prehab) — not explicitly named in the porting brief, but it fails on both counts that rule out
   other sections below: it detects patterns *from logged run data* (none exists — same reason as
   `injury_flags.md` Part 1) and its remedy is a prehab exercise library (out of scope — same
-  reason as Part 4). Noted here for completeness.
+  reason as Part 4). Noted here for completeness. **Its per-pattern volume-reduction
+  *magnitudes*, however, are reused** for the closed-set `InjuryFlag`'s fixed at-intake cut — see
+  the "Per-flag injury volume reduction" bullet under "Ported" above. Only the log-detection
+  mechanism itself stays out of scope, not the numbers it prescribes.
 - `injury_flags.md` **Part 1** (injury pattern detection from run data) — no run data exists;
-  V2.2 never sees a run after it's assigned.
+  V2.2 never sees a run after it's assigned. (Same carve-out as Rule 6 above: the numbers survive,
+  repurposed for a declared flag; the detection-from-logs mechanism does not.)
 - `injury_flags.md` **Part 3** (special populations) — the female-specific rules need **sex**,
   which V2.2 does not collect (age is collected and is used elsewhere). The Runners-50+
   sub-section's *age-keyed stress-fracture timeline* is also dropped — see correction (f) below,
@@ -113,6 +126,13 @@ how the ported rules get used. Applied without second-guessing:
    don't cover goes back to Ian as a specific question before Phase 1 codes it — nothing is
    invented. This is the "no numeric race-time → training-pace method in the source" gap the
    2026-07-10 re-check found; decision 13 is its resolution, not a new coaching rule.
+9. **Red-flag injury plan shape (2026-08-03, captain ruling, injury-handling task brief).** A
+   declared red-flag injury produces a normal, volume-adjusted plan — the same mechanism as any
+   other closed-set flag — not the return-to-running protocol. See `plan-structure.md`'s "Design
+   rule" section for the full ruling and what it supersedes.
+10. **Add `plantar_arch` to the closed `InjuryFlag` set (2026-08-03, captain ruling).** Resolves
+    the plan-accuracy scout's mandated finding B (arch/plantar coverage gap). Wired at its
+    library-prescribed 20% reduction (`injury_flags.md:69`).
 
 ## Corrections made while porting
 

@@ -261,6 +261,40 @@ self-report the runner has no basis to make before running a single session on t
 suggestions, both out of scope here; the pain-threshold guidance and volume-reduction percentages
 are kept as the actionable plan-generation content.)
 
+### Per-flag volume reduction (closed-set `InjuryFlag`, added 2026-08-03)
+
+The closed `InjuryFlag` set (`src/lib/planTypes.ts`) is a body-location picker, not the symptom
+vocabulary above — `knee`, `ankle_achilles`, `shin_splints`, `it_band`, `hip_glute`, `lower_back`,
+`plantar_arch` (added 2026-08-03, captain ruling — resolves the plan-accuracy scout's mandated
+finding B), `none`. A declared flag applies a one-time "this week" volume cut to the plan's first
+generated week, sourced per flag from `injury_flags.md` Part 1's pattern-specific coaching
+response where one gives a body-specific figure:
+
+| Flag | Reduction | Source |
+|---|---|---|
+| `knee` | 15% | `injury_flags.md:29`, `load_rules.md:206` |
+| `shin_splints` | 15% | `injury_flags.md:49`, `load_rules.md:217` |
+| `plantar_arch` | 20% | `injury_flags.md:69` |
+| `ankle_achilles` | 20% (fallback) | `injury_flags.md:109` gives no volume figure ("immediate volume reduction" only); falls back to the generic Reduce Volume tier below |
+| `it_band` | 20% (fallback) | `injury_flags.md:89` gives "reduce hard sessions by 50%" — a session-count metric, not a weekly-volume one; falls back to the generic tier |
+| `hip_glute` | 20% (fallback) | no dedicated pattern in the source; generic tier |
+| `lower_back` | 20% (fallback) | no dedicated pattern in the source; generic tier |
+
+The four fallback rows use this section's own generic "Reduce Volume Triggers" figure (20%,
+`load_rules.md:185,189`) rather than an invented number. Multiple declared flags combine at the
+largest reduction, not additively — an engine-combination choice, not a sourced coaching number.
+Implementation: `src/lib/loadRules.ts`'s `INJURY_VOLUME_REDUCTION_PCT`,
+`injuryVolumeReductionPct()`.
+
+**Red-flag disclaimer strengthening.** `ankle_achilles` is, today, the closed set's one member the
+2026-08-03 captain ruling treats as red-flag for disclaimer purposes (`src/lib/loadRules.ts`'s
+`RED_FLAG_INJURIES`) — an interpretive judgment call, since the source never literally labels a
+body-location pattern "RED FLAG" (that label appears only on the stress-fracture/bone-pain pattern
+and the female-athlete-triad pattern, neither of which the closed set has an equivalent flag for).
+Achilles is the one pattern here carrying the source's "(HIGH PRIORITY)" label and an explicit
+stop-and-rest branch (`injury_flags.md:107-109`). Flagged for captain review, not a settled
+taxonomy — see `plan-structure.md`'s "Design rule" section for the full ruling this implements.
+
 ## Rule 10: Non-Negotiable Disclaimers
 
 *(load_rules.md § Rule 10 — legally required, non-negotiable)*
@@ -280,6 +314,11 @@ are kept as the actionable plan-generation content.)
 Compliance notes from the source: these disclaimers must appear in all injury flag alerts and any
 response involving health guidance; non-compliance is a liability risk. (*Where* in the UI they
 render is a product decision, not specified in the source — see `00-README.md`.)
+
+**Wired 2026-08-03.** The plan-accuracy scout found this exact string existed nowhere in the
+codebase despite a declared knee injury. `src/lib/planTemplates.ts` now attaches it to
+`Plan.disclaimers` whenever `intake.injuries` is not `['none']` (`hasDeclaredInjury()`,
+`src/lib/loadRules.ts`), alongside the general disclaimer that's always present.
 
 ## Not ported from `load_rules.md`
 

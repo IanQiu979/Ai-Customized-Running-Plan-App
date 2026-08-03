@@ -186,6 +186,26 @@ the literal previous week) and issue #33 (goal-realism handling).
 - [x] **213 passing tests across 10 suites (`jest-expo`) as of 2026-08-03.** This includes the
       formerly red-first `planTemplates.golden.test.ts` and `paceDerivation.test.ts` contracts,
       now un-quarantined and green. `npm run typecheck`, `npm run lint`, and `npm test` all pass.
+- [x] **`intake.injuries` now drives plan generation (2026-08-03) — fixes the plan-accuracy
+      scout's Bug 1.** The scout found the field was read nowhere in `planTemplates.ts`: every
+      injury combination, including all six original flags plus red-flag free text, produced a
+      byte-identical plan to `['none']`. Two captain rulings closed the open design questions
+      (both in `docs/reference/coaching/plan-structure.md`'s "Design rule" section): a red-flag
+      injury produces a normal, volume-adjusted plan — the same mechanism as any other flag, not
+      a separate return-to-running protocol generator (least-token option, still discloses
+      clearly); and a new `plantar_arch` `InjuryFlag` closes the mandated finding B coverage gap.
+      A declared flag now cuts the plan's first week's volume by its library-sourced percentage
+      (knee/shin splints 15%, `injury_flags.md:29,49`; plantar_arch 20%, `:69`; the four flags
+      lacking their own figure — ankle_achilles, it_band, hip_glute, lower_back — fall back to
+      Rule 5's generic 20% Reduce Volume tier, `load_rules.md:185`; multiple declared flags take
+      the largest, not additive). The Rule 10 injury disclaimer (previously nowhere in the
+      codebase despite a declared knee injury) now attaches to `Plan.disclaimers` whenever
+      `injuries` isn't `['none']`; a red-flag declaration (today, `ankle_achilles` — an
+      interpretive call flagged for review, see `load-rules.md`) additionally carries a
+      strengthened professional-evaluation disclaimer adapted from the source's own language.
+      `injuryNotes` still never gates arithmetic. New `src/lib/__tests__/planTemplates.injuries.test.ts`
+      plus additions to `loadRules.test.ts`. **256 passing tests across 14 suites**, `typecheck`,
+      `lint`, and `test` all clean.
 - [x] **Issue #28 fixed (2026-07-12): `formatSecPerKm`'s minute/second carry.**
       `src/components/plan/format.ts` rounded minutes and seconds independently, so a fractional
       pace could round seconds up to 60 without carrying into the next minute (359.6 s/km →
@@ -469,7 +489,7 @@ Full rationale for each is in `docs/change_log.md`'s "2026-07-10 (Phase 0)" entr
 | Goal-vs-recent improvement threshold | ⚠️ **Superseded twice — see "Goal-realism handling" in the 2026-07-12 row below for the behavior that is actually live.** As originally decided (R-A addendum): 10%, gating race-pace session targets only — beyond 10%, goal-pace sessions would use the recent-time-equivalent pace instead. Ruling 3 (2026-07-11) retired that pace gate; the 2026-07-12 goal-realism ruling reuses the 10% number for a *warning* line, not a pace gate. The one part that never changed: training paces are **unconditionally** recent-time-derived — the goal never drives everyday paces, at any threshold. |
 | "Experienced" maps to intermediate or advanced? | **Intermediate** (kept as coded) — safer, tighter caps. |
 | Intermediate deload cadence | **4 weeks** (kept as coded); 50+ still always forces 3. |
-| Shape of the intake `injuries` field | Closed-set `InjuryFlag` flags + optional free-text notes (length-limited/sanitized). Flags alone drive Rule 5's triage; notes inform paid prompts only. |
+| Shape of the intake `injuries` field | Closed-set `InjuryFlag` flags + optional free-text notes (length-limited/sanitized). Flags alone drive Rule 5's triage; notes inform paid prompts only. **Set now includes `plantar_arch` (2026-08-03) — see the 2026-08-03 row below.** |
 | Where Rule 10 disclaimers render | Static footer section on every plan view + one line in the generating modal's fine print. |
 | Elite extras | **Cut for MVP.** Elite = richest personalization prompt + per-workout "why" only; `Plan.extras` can carry them later without a schema change. |
 | iPad / tablet a v1 target? | **No — phone-only v1.** iPad and desktop/computer support move to v2 (Ian: "phone only for phase 1, then ipad and computer in phase two"). |
@@ -477,7 +497,7 @@ Full rationale for each is in `docs/change_log.md`'s "2026-07-10 (Phase 0)" entr
 | Does a fallback plan burn quota? | **Not the first 3 in a period** (`is_fallback` filter in both `generate-plan` and `quota-status`; `notes` length-limited and sanitized). **A 4th+ fallback in the same period keeps the already-reserved slot (R-B addendum)** — nobody is refused, but that attempt counts against quota, and the fallback card must say so. |
 | Free-tier configure gating | Free sees all options; out-of-tier selections render locked and route to the paywall on tap — never a dead disabled button. |
 | "Next workout" / "current week" card | **Dropped.** Home shows the plan link + quota state only. No current-week arithmetic exists in v1. |
-| Red-flag injury protocol representation | Rendered as a conservative fixed-length plan whose weeks carry the protocol's phases, plus a pain-gated-progression `extras` `PlanSection`, plus Rule 10 disclaimers. Does not consume quota. |
+| Red-flag injury protocol representation | ⚠️ **Superseded 2026-08-03 — see the 2026-08-03 row below.** As originally decided: rendered as a conservative fixed-length plan whose weeks carry the protocol's phases, plus a pain-gated-progression `extras` `PlanSection`, plus Rule 10 disclaimers. Does not consume quota. Never built; the captain ruled for the simpler alternative when Bug 1 (the field having no effect at all) was fixed. |
 | Pace-derivation method | Cross-distance equivalency via the Riegel formula (`T2 = T1 × (D2/D1)^1.06`); training paces anchored to the source's own relative rules. Any remaining numeric gap goes back to Ian — nothing invented. |
 
 ## Decided (2026-07-12)
@@ -509,6 +529,19 @@ reasoning, worked cases, and the type contract:
 
 **Implemented in code:** the shared types and contract tests landed 2026-07-12;
 `src/lib/paceDerivation.ts` landed 2026-08-03 with the exact ruled threshold and cap arithmetic.
+
+## Decided (2026-08-03) — injury-handling task brief
+
+Closes the plan-accuracy scout's Bug 1 and mandated finding B. Full rationale:
+`docs/reference/coaching/plan-structure.md`'s "Design rule" section and `load-rules.md`'s
+"Per-flag volume reduction" section.
+
+| Item | Decision |
+|---|---|
+| Red-flag injury plan shape | **The simpler of the scout's two options** ("whichever uses the least amount of tokens but still maintain professionality"): a red-flag declaration produces a normal, volume-adjusted plan — the same mechanism as any other closed-set flag — not a separate return-to-running protocol generator. Still discloses clearly: a strengthened professional-evaluation disclaimer attaches on top of the standard Rule 10 injury disclaimer, adapted from the source's own language, not invented. Supersedes the "Red-flag injury protocol representation" row above. |
+| `plantar_arch` closed-set flag | **Added**, resolving mandated finding B. Wired at its library-prescribed 20% reduction (`injury_flags.md:69`). |
+| Which flag(s) count as "red-flag" for the disclaimer | **`ankle_achilles`, today** — an interpretive judgment call, not a literal source label (the source only ever labels the stress-fracture/bone-pain pattern and the female-athlete-triad pattern "RED FLAG"; neither has a closed-set equivalent). Achilles is the one covered pattern carrying the source's own "(HIGH PRIORITY)" label. Flagged for captain review in `src/lib/loadRules.ts`'s `RED_FLAG_INJURIES` and `load-rules.md`. |
+| Per-flag volume-reduction percentages for flags with no body-specific source figure (`ankle_achilles`, `it_band`, `hip_glute`, `lower_back`) | **Fall back to Rule 5's generic "Reduce Volume Triggers" tier, 20%** (`load_rules.md:185`) — the source's own number for a declared injury lacking its own pattern-specific figure, not an invented one. |
 
 ---
 

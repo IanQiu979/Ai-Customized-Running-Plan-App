@@ -6,10 +6,17 @@ scope for running-only plans) are not ported — full reasoning in `00-README.md
 
 ## When this protocol applies
 
-Per the design rule in `plan-structure.md`: when a runner's declared injury at intake matches one
-of `load-rules.md` Rule 5's Immediate Stop or Reduce Volume triggers, the app does not generate a
-normal training plan — it generates the protocol below instead, with the disclaimers from
-`load-rules.md` Rule 10 attached.
+**Not currently wired into intake (2026-08-03 captain ruling — see `plan-structure.md`'s
+"Design rule" section).** A red-flag injury declaration now produces a normal, volume-adjusted
+plan with a strengthened disclaimer, not this protocol. The content below remains documented,
+unused source content — the same status Rule 5's "Monitoring" tier already has — kept for a
+future ruling that decides to build it, not deleted.
+
+Original design intent, never implemented, superseded above: per the design rule in
+`plan-structure.md`, when a runner's declared injury at intake matches one of `load-rules.md` Rule
+5's Immediate Stop or Reduce Volume triggers, the app does not generate a normal training plan —
+it generates the protocol below instead, with the disclaimers from `load-rules.md` Rule 10
+attached.
 
 The source's day-by-day example schedules for these phases (e.g. "Day 6: Rest or cross-train,
 Swimming/cycling") are not reproduced verbatim below: some slots specify cross-training, out of

@@ -95,6 +95,40 @@ that doesn't conflict with anything above:
 
 ## Design rule: a declared red-flag injury still produces a plan
 
+**SUPERSEDED 2026-08-03 (captain ruling, injury-handling task brief `fm/v22-injury-handling-r1` —
+"whichever uses the least amount of tokens but still maintain professionalism").** The rule below
+this note was V2.2's original design intent and was never built — the plan-accuracy scout's Bug 1
+(`/Users/Guestyyyyyyyy/firstmate/data/workout-v22-plan-accuracy-s1/report.md`) found
+`intake.injuries` had no effect on plan generation at all, closed-set flag or red-flag alike. When
+Bug 1 was fixed, the captain was asked which of the scout's two options to build, and ruled for
+the simpler one — **not** the return-to-running protocol generator described below. This is a
+deliberate simplification, not an oversight: do not "restore" the original text without a new
+ruling.
+
+**What ships instead:** a red-flag injury declaration produces a **normal plan with the flag's
+prescribed volume reduction applied — the same mechanism as any other closed-set `InjuryFlag`**
+(`load-rules.md`'s per-flag reduction table, `src/lib/loadRules.ts`'s
+`INJURY_VOLUME_REDUCTION_PCT`). There is no separate return-to-running protocol, no
+`extras` `PlanSection`, and no distinct plan shape — a red-flag plan and an ordinary injury plan
+differ only in their disclaimers, never in structure. "Still maintain professionalism" means the
+plan must not understate a genuine red-flag situation: it carries a **strengthened
+professional-evaluation disclaimer** on top of the standard Rule 10 injury disclaimer, adapted
+from the source's own language for the flag in question rather than inventing new copy (see
+`src/lib/planTemplates.ts`'s `RED_FLAG_INJURY_DISCLAIMER`). Today the closed set's one red-flag
+member is `ankle_achilles` — an interpretive judgment call (the source labels its pattern "(HIGH
+PRIORITY)", `injury_flags.md:107-109`, the only closed-set pattern carrying a priority label at
+all) documented and flagged for captain review in `src/lib/loadRules.ts`'s `RED_FLAG_INJURIES`
+comment, not a literal "RED FLAG" tag on the pattern itself.
+
+The return-to-running protocol in `injury-rules.md` is **not deleted** — it remains documented,
+unused source content, the same status Rule 5's "Monitoring" tier already has (see
+`00-README.md`). It could be built later behind a genuine captain ruling to do so; nothing in this
+codebase currently invokes it.
+
+---
+
+**Original rule (superseded above; kept for history — do not re-implement without a new ruling):**
+
 **Ian's decision**, not a literal source quote — this is how V2.2 uses the ported red-flag rules
 (`load-rules.md` Rule 5) and return-to-running protocol (`injury-rules.md`) together:
 

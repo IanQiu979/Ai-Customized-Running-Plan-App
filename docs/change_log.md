@@ -29,6 +29,59 @@ beginners = 4" — composing with, not replacing, the already-merged 50+ mandato
   the `deloadEveryWeeks` unit suite: under-50 advanced → deloads `[3, 6, 9]`; under-50 beginner →
   `[4, 8]`; 50+ of any level → `[3, 6, 9]`; intermediate unchanged.
 
+## 2026-08-03 — `intake.injuries` now drives plan generation (plan-accuracy s1, bug 1 + mandated finding B)
+
+From the plan-accuracy scout's Bug 1: `intake.injuries` was read nowhere in `planTemplates.ts` —
+every injury combination, including all six original flags plus red-flag free text, produced a
+byte-identical plan to `['none']`. Two captain rulings closed the open design questions this
+depended on (full text: `docs/reference/coaching/plan-structure.md`'s "Design rule" section,
+`load-rules.md`'s "Per-flag volume reduction" section):
+
+- **Ruling 1 — red-flag injury plan shape.** "Whichever uses the least amount of tokens but still
+  maintain professionalism": a red-flag declaration produces a normal, volume-adjusted plan — the
+  same mechanism as any other closed-set flag — **not** the return-to-running protocol generator
+  `plan-structure.md` previously described as the intended design. That section is updated in
+  this pass to record the supersession, dated and cited, per this project's convention for
+  ruling changes; the original text is kept below the note, not deleted. "Still maintain
+  professionalism" is met by a strengthened professional-evaluation disclaimer, adapted from the
+  source's own language rather than invented, layered on top of the standard Rule 10 injury
+  disclaimer for a red-flag declaration.
+- **Ruling 2 — add `plantar_arch` to the closed `InjuryFlag` set,** resolving mandated finding B's
+  coverage gap. Wired at its library-prescribed 20% reduction (`injury_flags.md:69`).
+
+Implementation:
+
+- `src/lib/planTypes.ts`: `InjuryFlag` gains `'plantar_arch'`.
+- `src/lib/loadRules.ts`: new `INJURY_VOLUME_REDUCTION_PCT` (per-flag "this week" volume cut —
+  knee/shin splints 15% from their own body-specific source figures, plantar_arch 20%; the four
+  flags without a body-specific figure — `ankle_achilles`, `it_band`, `hip_glute`, `lower_back` —
+  fall back to Rule 5's generic 20% Reduce Volume tier, not an invented number), `RED_FLAG_INJURIES`
+  (today, `ankle_achilles` only — an interpretive call, flagged for captain review, since the
+  source never literally labels a body-location pattern "RED FLAG"), and the
+  `injuryVolumeReductionPct()` / `hasDeclaredInjury()` / `hasRedFlagInjury()` helpers. Multiple
+  declared flags combine at the largest reduction, not additively — an engine-combination choice,
+  not a sourced number.
+- `src/lib/planTemplates.ts`: both `buildCanonicalFiveKWeek` and `buildGenericWeek` now apply the
+  declared reduction to the plan's first generated week only ("this week" in every source
+  coaching response); later weeks ramp off week 1's actual reduced volume through the existing
+  `lastLoadingWeekKm` mechanism, unchanged. `Plan.disclaimers` now attaches the Rule 10 injury
+  disclaimer (exact string, `load-rules.md:265-267` — previously nowhere in the codebase despite
+  a declared knee injury) whenever `injuries` isn't `['none']`, plus the new strengthened
+  disclaimer for a red-flag declaration. `injuryNotes` continues to never gate arithmetic
+  (`planTypes.ts`'s existing documented contract, unchanged).
+- New `src/lib/__tests__/planTemplates.injuries.test.ts` (12 tests): inverts the scout's
+  all-identical A/B, checks the per-flag reduction percentages (golden and generic engine paths),
+  the disclaimer's presence/absence, and that a red-flag plan is structurally identical to an
+  ordinary injury plan at the same reduction tier — same phases, same deload cadence, no `extras`,
+  differing only in disclaimers. Extended `loadRules.test.ts` with direct coverage of the new
+  helpers. **256 passing tests across 14 suites**, `typecheck`, `lint`, and `test` all clean.
+- Docs updated in the same pass: `plan-structure.md`, `injury-rules.md` (notes the
+  return-to-running protocol is documented, unused source content — not deleted, same status as
+  Rule 5's "Monitoring" tier), `load-rules.md` (new per-flag table), `00-README.md` (clarifies
+  that Rule 6/`injury_flags.md` Part 1's per-pattern *magnitudes* are reused for the closed-set
+  flag's at-intake cut even though the log-detection *mechanism* stays out of scope, plus two new
+  decision entries), `mvp-progress.md`, `architecture.md`.
+
 ## 2026-08-03 — long-run share cap enforced on the golden 5K path (plan-accuracy s1, bug 2)
 
 From the plan-accuracy scout's Bug 2: `clampLongRun()` had no production caller — the golden
