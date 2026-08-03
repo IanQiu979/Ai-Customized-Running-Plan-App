@@ -206,8 +206,8 @@ function validateIntake(intake: IntakeResponses): string | null {
   }
   // Age is not optional and never inferred: max HR is `220 − age`, so without it no HR zone is
   // computable at any tier, and 50+ forces a 3-week deload cadence.
-  if (typeof intake.age !== 'number' || intake.age < 10 || intake.age > 100) {
-    return 'age must be a number between 10 and 100.';
+  if (typeof intake.age !== 'number' || intake.age < 13 || intake.age > 100) {
+    return 'age must be a number between 13 and 100.';
   }
   if (typeof intake.experience !== 'string' || !EXPERIENCE_ANSWERS.has(intake.experience)) {
     return 'experience must be one of new|some|regular|experienced|competitive.';
