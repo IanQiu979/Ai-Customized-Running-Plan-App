@@ -164,3 +164,58 @@ describe('the intake age floor', () => {
     expect(await accepted.json()).toEqual({ saved: true });
   });
 });
+
+describe('PUT /api/intake', () => {
+  /** A full, otherwise-valid IntakeResponses body — only `injuries` varies per test. */
+  function intakeBody(injuries: string[]) {
+    return {
+      goal: 'race',
+      age: 34,
+      experience: 'regular',
+      daysPerWeek: 4,
+      weeklyKm: 30,
+      raceDistance: '10k',
+      injuries,
+    };
+  }
+
+  async function putIntake(token: string, body: unknown) {
+    return SELF.fetch('https://example.test/api/intake', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+      body: JSON.stringify(body),
+    });
+  }
+
+  it('accepts plantar_arch — added to the InjuryFlag union per Ian ruling 2026-08-03', async () => {
+    // Regression test: the worker's INJURY_FLAGS whitelist previously omitted this flag even
+    // though it is fully implemented in loadRules.ts, so a valid request was wrongly rejected.
+    const token = await signUp('plantar-arch@example.test');
+
+    const response = await putIntake(token, intakeBody(['plantar_arch']));
+
+    const body = await response.text();
+    expect(response.status, body).toBe(200);
+    expect(JSON.parse(body)).toEqual({ saved: true });
+  });
+
+  it('accepts multiple injury flags together, order notwithstanding', async () => {
+    const token = await signUp('multi-injury@example.test');
+
+    const response = await putIntake(token, intakeBody(['plantar_arch', 'knee']));
+
+    const body = await response.text();
+    expect(response.status, body).toBe(200);
+    expect(JSON.parse(body)).toEqual({ saved: true });
+  });
+
+  it('still rejects a flag outside the closed set with 400 invalid_request', async () => {
+    // Pins that the set stays closed — this is not a validation bypass.
+    const token = await signUp('bad-injury@example.test');
+
+    const response = await putIntake(token, intakeBody(['not_a_real_flag']));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ code: 'invalid_request' });
+  });
+});

@@ -2,31 +2,31 @@
  * The two seams `generate-plan` builds a plan through: the deterministic skeleton builder, and the
  * paid-tier personalizer that decorates it.
  *
- * NEITHER HAS A REAL IMPLEMENTATION IN THIS BRANCH, and that is deliberate rather than unfinished:
+ * **Skeleton — swap 1, now landed.** `createTemplateSkeletonBuilder()` wires this to
+ * `src/lib/planTemplates.ts`'s `buildTemplatePlan`, the deterministic engine ported from Ian's
+ * coaching library. `createUnavailableSkeletonBuilder()` is kept below (and exercised by its own
+ * test) as the documented fallback shape — the structured 503 `generate-plan-flow.ts` returns if a
+ * skeleton builder is ever unbound again — not because it is still the production binding.
  *
- *   - The skeleton comes from `src/lib/planTemplates.ts` + `src/lib/paceDerivation.ts`, which are
- *     being written in a parallel task against the red TDD suites already in the repo
- *     (`planTemplates.golden.test.ts`, `paceDerivation.test.ts`, quarantined in `jest.config.js`).
- *     Writing a second, competing generator here — or serving `fixtures/examplePlan.ts` as if it
- *     were generated — is exactly the failure the sibling repo shipped as its issue #128, where a
- *     mock bound as production served every user for weeks.
- *   - The personalization prompt is coaching-sensitive work of its own
- *     (`docs/reference/plan-generation.md` step 7). `CLAUDE.md`'s "Coaching domain" section is
- *     explicit that training content is not the code's to invent.
+ * **Personalizer — swap 2, still open.** The Pro/Elite personalization prompt is coaching-sensitive
+ * work of its own (`docs/reference/plan-generation.md` step 7). `CLAUDE.md`'s "Coaching domain"
+ * section is explicit that training content is not the code's to invent, so
+ * `createPlanPersonalizer` still takes `promptBuilder: null` in production
+ * (`workers/src/deps.ts`) — paid tiers get the same coach-authored skeleton as Free, marked as a
+ * quota-exempt fallback, until that prompt is written.
  *
- * So both production factories return a typed *unavailable*, and `generate-plan-flow.ts` handles
- * that as a first-class outcome: the reservation is released, no quota is consumed, and the caller
- * gets a structured `503`. The alternative — a plausible-looking plan from nowhere — is the one
- * outcome a running app must never produce.
+ * Serving `fixtures/examplePlan.ts` as if it were generated, or writing a second, competing
+ * generator here, is exactly the failure the sibling repo shipped as its issue #128, where a mock
+ * bound as production served every user for weeks — that is why the skeleton swap goes through
+ * the one ported, tested engine and nothing improvised alongside it.
  *
- * THE SWAP HAS A NAMED OWNER, because "a later task will replace this binding" is how issue #128
- * happened: the swap is `createDeps()` in `workers/src/deps.ts`, one binding each, and the plan
- * engine's own done-when (deleting the two `jest.config.js` quarantine lines) is not met until it
- * is done.
+ * THE REMAINING SWAP HAS A NAMED OWNER: `createDeps()` in `workers/src/deps.ts`, one binding, same
+ * as the first.
  */
 
 import type { Engine, IntakeResponses, Plan, Tier } from '../../../src/lib/planTypes';
 import type { GoalType, RaceDistance } from '../../../src/lib/planTypes';
+import { buildTemplatePlan } from '../../../src/lib/planTemplates';
 import type { ModelCaller } from './model';
 import { isPlanShaped } from './planValidation';
 
@@ -77,7 +77,11 @@ export type PromptBuilder = (input: PersonalizeInput) => {
   extract: (response: unknown) => unknown;
 };
 
-/** The production skeleton builder, until `src/lib/planTemplates.ts` exists. See the file header. */
+/**
+ * The typed-unavailable skeleton builder — the shape `generate-plan-flow.ts` falls back to if a
+ * skeleton is ever unbound again, not the production binding (`createDeps()` in
+ * `workers/src/deps.ts` binds `createTemplateSkeletonBuilder` below).
+ */
 export function createUnavailableSkeletonBuilder(): SkeletonBuilder {
   return {
     async build() {
@@ -88,6 +92,61 @@ export function createUnavailableSkeletonBuilder(): SkeletonBuilder {
           'The plan engine (src/lib/planTemplates.ts) is not built yet. generate-plan is wired ' +
           'end to end and will serve real plans the moment it is bound in workers/src/deps.ts.',
       };
+    },
+  };
+}
+
+const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Abuse-prevention ceiling on how many weeks a single generated plan may span — arithmetic
+ * bound-checking, not a coaching decision. Every McMillan plan example in the coaching library
+ * tops out well under a year (`docs/reference/plan-generation.md` step 7 talks in terms of
+ * "24–30 weeks"); 104 weeks (two years) is generous headroom while still bounding the cost of
+ * `buildTemplatePlan`'s per-week generation loop against a client sending an absurd
+ * `durationWeeks` or a race date decades out — before this was wired to a real engine, that input
+ * was inert (every request 503'd first), so nothing enforced it.
+ */
+export const MAX_PLAN_DURATION_WEEKS = 104;
+
+/**
+ * How many weeks a race-goal plan should span when the client sends a race date instead of an
+ * explicit duration: the gap between `now` and `raceDate`, rounded to the nearest whole week,
+ * clamped to `[1, MAX_PLAN_DURATION_WEEKS]`. The clamp is the abuse-prevention bound above; it is
+ * NOT the tier-specific "a race farther out than the tier's max plan length gets a delayed start"
+ * behavior `docs/reference/plan-generation.md` step 4 describes — no tier max-plan-length number
+ * has been ruled on yet, so that part is deliberately not implemented here rather than guessed
+ * at. A race beyond the cap still gets a real, honest plan; it's simply capped at the same length
+ * as any other over-long request, not silently truncated without a floor.
+ */
+function weeksUntilRace(raceDate: string, now: string): number {
+  const diffMs = Date.parse(raceDate) - Date.parse(now);
+  return Math.min(MAX_PLAN_DURATION_WEEKS, Math.max(1, Math.round(diffMs / MS_PER_WEEK)));
+}
+
+/**
+ * The production skeleton builder, wired to the deterministic template engine
+ * (`src/lib/planTemplates.ts`'s `buildTemplatePlan`). Density (`'free'` vs `'paid'`) is the lever
+ * that engine already exposes for what's tier-gated in a template plan's own output (numeric
+ * pace/HR fields) — this wiring only selects which side of it a request gets, it invents nothing.
+ */
+export function createTemplateSkeletonBuilder(): SkeletonBuilder {
+  return {
+    async build(input) {
+      const durationWeeks =
+        input.durationWeeks ?? (input.raceDate ? weeksUntilRace(input.raceDate, input.now) : 1);
+
+      const plan = buildTemplatePlan({
+        intake: input.intake,
+        goalType: input.goalType,
+        durationWeeks,
+        raceDistance: input.raceDistance,
+        raceDate: input.raceDate,
+        tierAtGeneration: input.tier,
+        density: input.tier === 'free' ? 'free' : 'paid',
+      });
+
+      return { ok: true, plan };
     },
   };
 }

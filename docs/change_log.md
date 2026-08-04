@@ -5,6 +5,49 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-08-04 — four bugs fixed in the E2E verification pass over the intake/generate-plan/My Plans frontend loop
+
+This branch wired up the app's first end-to-end user loop: the intake screen against `GET`/`PUT
+/api/intake`, the generate-plan action against `POST /api/generate-plan`, the plan view rendering
+real generated plans via `GET /api/plans/:id` (alongside the permanent static golden fixture), and
+a My Plans list off `GET /api/plans`. An E2E pass over that loop found and this pass fixed four
+bugs, all verified (unit-tested and/or re-verified live against `wrangler dev`):
+
+- **Sign-up → Intake auto-redirect race.** `src/app/(auth)/sign-up.tsx`'s own `useEffect` watching
+  `session` could lose a React unmount race against `src/app/_layout.tsx`'s `Stack.Protected`
+  unmounting the `(auth)` group in the same commit — an unlucky ordering could leave a freshly
+  signed-up user on no screen at all. Fixed with a new one-shot module-level flag,
+  `src/lib/postSignupRedirect.ts` (`markPostSignupRedirect()` / `consumePostSignupRedirect()`):
+  `sign-up.tsx` marks it on a successful signup, and `_layout.tsx` — which never unmounts —
+  consumes it in a `useEffect` watching `session`, then calls `router.replace('/intake')`. New test:
+  `src/lib/__tests__/postSignupRedirect.test.ts`. E2E-verified: two independent fresh signups both
+  landed on Intake.
+- **Long-run distance floating-point display bug.** `src/lib/planTemplates.ts`'s long-run
+  convergence loop assigned `clampLongRun()`'s raw fractional km straight into the rendered plan
+  (e.g. `"5.666666666666667 km"`). Fixed by flooring (`Math.floor`, never rounding up — rounding up
+  could re-breach a safety-cap ceiling) each iteration before comparing or assigning. Verified
+  against the existing exact-equality/byte-identical assertions in
+  `src/lib/__tests__/planTemplates.longRunCap.test.ts` (unchanged, still green) and E2E-verified
+  across a real 10-week 5K and a real 32-week Marathon plan generated through the actual endpoint.
+- **My Plans list went stale after navigating away and back.** `src/app/(tabs)/my-plans.tsx`
+  fetched via a mount-only `useEffect`, but Expo Router tab screens stay mounted across
+  navigation — the same staleness class as an earlier Home-screen fix on this branch. Fixed by
+  switching to `useFocusEffect(useCallback(...))`. E2E-verified: a newly generated plan appeared on
+  tab revisit with no manual reload.
+- **Race Day distance unrounded for Half/Marathon.** Found by the E2E re-verification pass itself,
+  not part of the original three. `raceDayWorkout()` in `src/lib/planTemplates.ts` computed
+  `distanceKm: raceKm + 5` with no rounding — harmless for 5K/10K's whole-number race distances, but
+  Half Marathon (21.1 km) and Marathon (42.195 km) rendered a literal `"47.195 km"` in `WorkoutRow`,
+  since `WorkoutRow.tsx` applies no formatting of its own. Fixed by wrapping the sum in
+  `Math.round()` — the exact race distance is still spelled out in the workout's `structure`
+  string, so nothing is lost; only the summary number changes. New coverage in the existing
+  parametric suite, `src/lib/__tests__/planTemplates.general.test.ts`'s `describe('buildTemplatePlan
+  — parametric inputs')`, asserting the race-day `distanceKm` is a whole number across all four
+  supported race distances.
+
+All 270 root tests + 85 `workers/` tests pass clean: `npm run typecheck && npm run lint && npm test`
+plus `npm --prefix workers run typecheck && npm --prefix workers test`.
+
 ## 2026-08-03 — intake age floor raised from 10 to 13 (captain's ruling)
 
 Ian ruled V2.2's minimum accepted intake age is 13 — the number that simultaneously clears

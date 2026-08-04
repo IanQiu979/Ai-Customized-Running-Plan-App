@@ -33,13 +33,18 @@ src/
       sign-in.tsx            # email/password sign-in + an inert "Continue with Google" button
       sign-up.tsx            # email/password sign-up + the same Google button
     (tabs)/
-      _layout.tsx          # tab bar — Home + Glossary today (My Plans/Settings-lite land with
-                            #           the backend that gives them something to show)
+      _layout.tsx          # tab bar — Home, Glossary, and My Plans today; Settings-lite still
+                            #           planned (dummy paywall + tier display)
       index.tsx             # Home placeholder shell + a temporary demo link to the fixture plan,
                              #  plus a temporary "Sign out" button (no Settings-lite screen exists
                              #  yet to host it — see the button's own comment)
       glossary.tsx           # abbreviations glossary — sourced from notation.ts, nothing hardcoded
-    plan/[id].tsx            # plan view — renders the golden fixture; `[id]` isn't read yet
+      my-plans.tsx           # My Plans — lists plans off GET /api/plans, refetched on every tab
+                              #            focus (useFocusEffect), not just on mount
+    intake/                  # onboarding questionnaire, against GET/PUT /api/intake
+    plan/[id].tsx            # plan view — `[id]` now selects: renders a real generated plan via
+                              #  GET /api/plans/:id, or the permanent static golden fixture for the
+                              #  example-plan id
   components/
     plan/                   # WeekAccordion, WorkoutRow, EffortChip, ReadoutBracket,
                              # PlanNameplate, DisclaimerFooter, FallbackNotice, format.ts
@@ -56,6 +61,8 @@ src/
                               #  (`authClient` — sign-up/sign-in/sign-out/useSession, session
                               #  persisted via expo-secure-store) plus typed fetch wrappers for
                               #  every other `/api/*` route
+    postSignupRedirect.ts    # one-shot module-level flag so a fresh signup lands on Intake — see
+                              #  "Sign-up → Intake redirect" below
     planTypes.ts              # canonical — shared Plan/Week/Workout/Tier vocabulary
     loadRules.ts               # canonical — deterministic safety arithmetic, 31 unit tests
     notation.ts                 # canonical — run-type/structure-string notation, the code
@@ -107,8 +114,9 @@ it is — lives in [`workers/README.md`](../workers/README.md).
 **Working today**, verified against `wrangler dev` and by the test suite: email/password auth with
 Bearer sessions, the quota ledger (reserve → settle/release, atomic gate, idempotency replay,
 fallback exemption), `quota-status`, `purchase-tier`, `delete-account`, intake read/write, and plan
-reads. **`generate-plan` returns `503 engine_unavailable` and consumes no quota** — everything
-around the plan engine is built; the engine itself is not. See "generate-plan" below.
+reads. **`generate-plan` now returns a real plan**, as of the 2026-08-04 skeleton binding — Free
+and, as a template fallback, Pro/Elite. The Pro/Elite personalization prompt is the one remaining
+unbound seam; see "generate-plan" below.
 
 `src/lib/supabase.ts` and `supabase/functions/.env.example` are **legacy**. Nothing imports the
 Supabase client any more and no Supabase project is used. Both are kept rather than deleted so the
@@ -133,7 +141,19 @@ email/password today; a "Continue with Google" button is wired end to end but in
 captain provisions `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` (`workers/src/auth.ts`'s TODO). The
 root layout (`src/app/_layout.tsx`) reads `authClient.useSession()` and gates the entire route tree
 on it with Expo Router's `Stack.Protected` — there is no anonymous browsing at all, matching every
-`/api/*` route already 403ing anonymously. A known type-only friction: `@better-auth/expo` declares
+`/api/*` route already 403ing anonymously.
+
+**Sign-up → Intake redirect (2026-08-04).** A fresh signup must land on Intake, not on `(auth)` or
+nowhere. `sign-up.tsx` unmounts as soon as `_layout.tsx`'s `Stack.Protected` swaps the signed-in
+user into `(tabs)`/`intake`, in the same commit that its session becomes truthy — so a redirect
+driven by `sign-up.tsx`'s own `useEffect` can lose that unmount race. The fix is
+`src/lib/postSignupRedirect.ts`: a one-shot module-level flag (`markPostSignupRedirect()` /
+`consumePostSignupRedirect()`), set by `sign-up.tsx` on a successful signup and consumed by
+`_layout.tsx` — which never unmounts — in its own `useEffect` watching `session`, followed by
+`router.replace('/intake')`. Any future post-signup routing decision belongs in `_layout.tsx` for
+the same reason, not in a screen that's about to unmount.
+
+A known type-only friction: `@better-auth/expo` declares
 a `typescript: ^6.0.3` peer against this project's pinned `~5.9.2`; `apiClient.ts` carries a
 narrow, commented `as unknown as BetterAuthClientPlugin` cast plus a small interface merge to
 restore `getCookie()`'s type, rather than bumping TypeScript (tried, broke ambient type resolution
@@ -154,12 +174,16 @@ direction" below.
 `src/lib/fixtures/examplePlan.ts` is the 5K golden fixture rendered as real `Plan` data —
 `src/app/plan/[id].tsx` and `src/components/plan/` render it end to end on a real screen
 (ugly-beyond-tokens caveats aside), and `src/app/(tabs)/glossary.tsx` explains its abbreviations,
-reading its copy from `notation.ts`. The pure generator now exists, but the route is not wired to
-it yet: every plan id still renders the same fixture.
+reading its copy from `notation.ts`. **As of 2026-08-04, the pure generator is also wired into the
+route**: `src/app/plan/[id].tsx` renders a real generated plan fetched via `GET /api/plans/:id` for
+any real plan id, and falls back to the static fixture only for the example-plan id — the fixture
+is the permanent demo/glossary example, not a stand-in for missing wiring.
 
-There is no `subscription.ts` yet and no intake screen yet; no `supabase/functions/`; no
-`supabase/migrations/`. Auth screens (`src/app/(auth)/`) and the client-side API module
-(`src/lib/apiClient.ts`) now exist — see above.
+There is no `subscription.ts` yet. Intake now has a screen (`src/app/intake/`, against `GET`/`PUT
+/api/intake`), and My Plans now has one too (`src/app/(tabs)/my-plans.tsx`, against `GET
+/api/plans`) — both as of 2026-08-04. No `supabase/functions/`; no `supabase/migrations/`. Auth
+screens (`src/app/(auth)/`) and the client-side API module (`src/lib/apiClient.ts`) now exist — see
+above.
 `tsconfig.json` maps `@/*` → `./src/*` and `@/assets/*` → `./assets/*`, and **excludes `workers/`**
 — that project has its own `tsconfig.json`, its own runtime, and its own type system, so the root
 `npm run typecheck` deliberately does not cover it (same for `eslint.config.js` and
@@ -176,10 +200,13 @@ src/app/
   (tabs)/index          # Home / Create plan — exists today (placeholder shell + demo link)
   (tabs)/glossary       # exists today — abbreviations glossary, not in the original blueprint's
                          # tab list; added for Ian's 2026-07-11 notation ruling (see change_log.md)
-  (tabs)/plans          # My Plans (history) — planned, needs the backend first
+  (tabs)/my-plans       # My Plans (history) — exists today, lists GET /api/plans
   (tabs)/settings       # third tab — dummy paywall + settings-lite (decision 1, 2026-07-10) — planned
-  intake/                # onboarding questionnaire (stack) — planned
-  plan/[id]              # plan view — exists today, renders the golden fixture only
+  intake/                # onboarding questionnaire (stack) — exists today, against GET/PUT
+                         #  /api/intake
+  plan/[id]              # plan view — exists today; renders a real generated plan via
+                         #  GET /api/plans/:id, or the permanent static golden fixture for the
+                         #  example-plan id
 ```
 
 **Decision 1 (2026-07-10):** the paywall and a settings-lite screen (sign out, tier display,
@@ -228,14 +255,16 @@ The core of the app. Full tier/quota/validation detail:
 implemented in `workers/src/lib/generate-plan-flow.ts`, with each dependency injected so every
 branch is unit-testable without a network or a cent of Anthropic spend.
 
-**Two steps have no implementation behind them yet, deliberately.** Steps 4/5/8/9 (the
-deterministic skeleton) need `src/lib/planTemplates.ts` and `src/lib/paceDerivation.ts`, which are
-being written separately against the red TDD suites already quarantined in `jest.config.js`; step 7
-needs the Pro/Elite personalization prompt, which is coaching-sensitive work of its own. Both are
-bound to typed *unavailable* implementations rather than to mocks, so the endpoint answers a
-structured `503` and releases its quota reservation instead of serving a plausible-looking plan
-from nowhere. Each is one binding in `workers/src/deps.ts`, and that file names them explicitly so
-the swap has an owner.
+**One step has no implementation behind it yet, deliberately.** Steps 4/5/8/9 (the deterministic
+skeleton, built from `src/lib/planTemplates.ts` and `src/lib/paceDerivation.ts`) were bound in
+`workers/src/deps.ts` on 2026-08-04 via `createTemplateSkeletonBuilder()`, so `generate-plan` now
+returns a real plan instead of `503`. **Step 7's Pro/Elite personalization prompt is still
+unbound** — coaching-sensitive work of its own — so Pro/Elite generation currently falls back to
+the same template every tier gets. It stays bound to a typed *unavailable* implementation rather
+than a mock, so the endpoint would answer a structured `503` and release its quota reservation
+rather than serve a plausible-looking personalized plan from nowhere, if that path were ever
+reached. It is one binding in `workers/src/deps.ts`, which names it explicitly so the swap has an
+owner.
 
 1. **Auth** — verify the session, reject anonymous requests. Happens once in
    `workers/src/index.ts`, ahead of dispatch, so no handler can be reached anonymously.
@@ -316,7 +345,7 @@ it `getSession()` ignores the header and every route 403s a user who just signed
 |---|---|---|---|---|
 | `ANY /api/auth/*` | — | better-auth's own | better-auth's own | Sign-up, sign-in, sign-out, session, OAuth callbacks. Email/password works today; Google needs credentials only the captain can create (`workers/src/auth.ts`'s TODO). |
 | `GET /health` | none | — | `{ ok: true }` | Liveness. Touches no database. |
-| `POST /api/generate-plan` | session | `{ goalType: "race"\|"duration", raceDistance?, raceDate?, durationWeeks?, notes?, idempotencyKey }` | `{ plan, planId, isFallback }`, or `402` over-quota / `403` anon / `409` intake-required / **`503` engine-unavailable (today)** | Enforces tier + quota server-side, branches by tier, validates, persists. A duplicate `idempotencyKey` returns the existing plan instead of generating twice. |
+| `POST /api/generate-plan` | session | `{ goalType: "race"\|"duration", raceDistance?, raceDate?, durationWeeks?, notes?, idempotencyKey }` | `{ plan, planId, isFallback }`, or `402` over-quota / `403` anon / `409` intake-required | Enforces tier + quota server-side, branches by tier, validates, persists. A duplicate `idempotencyKey` returns the existing plan instead of generating twice. As of 2026-08-04, Free gets the template plan and Pro/Elite fall back to the same template (`isFallback: true`, quota-exempt) pending the Pro/Elite personalization prompt — see "Current — `generate-plan`" above. |
 | `GET /api/quota-status` | session | — | `{ tier, used, limit, periodEnd }` | Drives the Home "2 of 3 plans left" UI. `used` counts **non-fallback** plans in the current purchase-anchored period, server-side, never a client counter. `periodEnd` is `null` for Free, whose allowance is lifetime — the UI must not render a countdown for it. |
 | `POST /api/purchase-tier` | session | `{ tier: "pro"\|"elite", source: "dummy" }` | `{ tier, periodStart, periodEnd }` | v1 dummy flow. v2 swaps `source` to `"revenuecat"` and verifies the receipt — same route, same table write. `source: "revenuecat"` is refused in v1 rather than trusted. |
 | `POST /api/delete-account` | session | — | `{ deleted: true }` | Really deletes; no soft-delete flag, because the app's own copy promises erasure. The only route that deletes a plan. |

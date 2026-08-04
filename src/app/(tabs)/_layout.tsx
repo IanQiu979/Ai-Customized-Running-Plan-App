@@ -5,11 +5,11 @@ import { FontFamily, FontSize, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 /**
- * The tab group. Phase 1 ships two of the eventual three tabs (`docs/design/mvp-blueprint.md`
- * Part 8 — Home / My Plans / Settings-lite): Home and the new Glossary tab from Ian's
- * 2026-07-11 notation ruling. My Plans and Settings-lite land with the backend that gives them
- * something to show. `src/app/plan/[id].tsx` stays a Stack route outside this group by design —
- * the plan view is a full-screen destination, not a tab.
+ * The tab group. Ships three of the eventual four tabs (`docs/design/mvp-blueprint.md` Part 8 —
+ * Home / My Plans / Settings-lite): Home, Glossary (Ian's 2026-07-11 notation ruling), and now
+ * My Plans, backed by `GET /api/plans`. Settings-lite still has nothing to show and isn't built.
+ * `src/app/plan/[id].tsx` stays a Stack route outside this group by design — the plan view is a
+ * full-screen destination, not a tab.
  *
  * Flat `surface.raised`, one top hairline, no shadow — `mvp-blueprint.md` Part 8. The active
  * tab renders in `text.primary` with a hairline tick beneath the label (a caliper mark, not a
@@ -51,6 +51,17 @@ export default function TabLayout() {
         name="glossary"
         options={{
           title: 'Glossary',
+          tabBarLabel: ({ focused, color, children }) => (
+            <TabLabel focused={focused} color={color}>
+              {children}
+            </TabLabel>
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="my-plans"
+        options={{
+          title: 'My Plans',
           tabBarLabel: ({ focused, color, children }) => (
             <TabLabel focused={focused} color={color}>
               {children}

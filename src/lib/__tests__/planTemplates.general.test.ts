@@ -82,9 +82,11 @@ describe('buildTemplatePlan — parametric inputs', () => {
     expect(plan.weeks.map((week) => week.weekNumber)).toEqual(
       Array.from({ length: durationWeeks }, (_, index) => index + 1),
     );
-    expect(plan.weeks.at(-1)?.days.filter(isWorkout).some((day) => day.label === 'Race Day')).toBe(
-      true,
-    );
+    const raceDay = plan.weeks.at(-1)?.days.filter(isWorkout).find((day) => day.label === 'Race Day');
+    expect(raceDay).toBeDefined();
+    // Half (21.1 km) and marathon (42.195 km) race distances are fractional — the rendered
+    // padded total must round to a whole km, never leak the raw decimal into the UI.
+    expect(raceDay?.distanceKm).toBe(Math.round(raceDay?.distanceKm ?? 0));
   });
 
   it.each([2, 3, 4, 5, 6, 7])(

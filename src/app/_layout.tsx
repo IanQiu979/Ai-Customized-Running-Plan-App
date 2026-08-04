@@ -11,7 +11,7 @@ import {
 import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 import { ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -19,11 +19,13 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationThemes } from '@/constants/navigation-theme';
 import { useTheme } from '@/hooks/use-theme';
 import { authClient } from '@/lib/apiClient';
+import { consumePostSignupRedirect } from '@/lib/postSignupRedirect';
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const theme = useTheme();
+  const router = useRouter();
   const { data: session, isPending: sessionPending } = authClient.useSession();
 
   const [fontsLoaded] = useFonts({
@@ -46,6 +48,14 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
     }
   }, [ready]);
+
+  // This layout never unmounts, unlike `sign-up.tsx` — see `postSignupRedirect.ts`'s header for
+  // why the redirect has to be consumed from here rather than from the sign-up screen itself.
+  useEffect(() => {
+    if (session && consumePostSignupRedirect()) {
+      router.replace('/intake');
+    }
+  }, [session, router]);
 
   if (!ready) {
     // Keep the native splash screen up — nothing below can render its type-driven UI correctly
@@ -74,6 +84,7 @@ export default function RootLayout() {
           <Stack.Protected guard={!!session}>
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="plan/[id]" />
+            <Stack.Screen name="intake" />
           </Stack.Protected>
           <Stack.Protected guard={!session}>
             <Stack.Screen name="(auth)" />

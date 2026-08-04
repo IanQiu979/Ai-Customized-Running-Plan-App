@@ -237,11 +237,14 @@ function shakeoutRun(distanceKm: number, density: TemplateDensity, structure: st
 
 function raceDayWorkout(distance: RaceDistance): Workout {
   const raceKm = RACE_DISTANCE_KM[distance];
+  // `raceKm` itself is fractional for half/full marathon (21.1 / 42.195), so the padded total
+  // needs rounding — the exact race distance is still spelled out in `structure` below, this is
+  // only the summary number shown next to the workout.
   return {
     kind: 'run',
     effort: 'interval',
     label: 'Race Day',
-    distanceKm: raceKm + 5,
+    distanceKm: Math.round(raceKm + 5),
     effortDescription: RACE_DESCRIPTION,
     structure: `WU 3 km · ${raceDistanceText(distance)} race · CD 2 km`,
   };
@@ -625,8 +628,14 @@ function buildCanonicalFiveKWeek(args: {
       isDeload,
       lastLoadingWeekKm,
     });
-    if (km >= longDistanceKm) break;
-    longDistanceKm = km;
+    // Floored, not the raw fraction `clampLongRun` returns: a share-cap ceiling like
+    // `weeklyKm * LONG_RUN_SHARE_CAP[level]` is rarely a whole number, and the unrounded value
+    // was leaking straight into the rendered plan (e.g. "5.666666666666667 km"). Flooring only
+    // ever shrinks the value, so it can never push the long run back over the ceiling that just
+    // produced it — the convergence loop's own invariant is preserved.
+    const flooredKm = Math.floor(km);
+    if (flooredKm >= longDistanceKm) break;
+    longDistanceKm = flooredKm;
   }
   const long = longRun(longDistanceKm, easyPace, density);
 

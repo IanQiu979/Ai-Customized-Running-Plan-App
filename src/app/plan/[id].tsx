@@ -1,5 +1,6 @@
-import { Stack } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { Stack, useLocalSearchParams } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -7,16 +8,20 @@ import { DisclaimerFooter } from '@/components/plan/DisclaimerFooter';
 import { FallbackNotice } from '@/components/plan/FallbackNotice';
 import { PlanNameplate } from '@/components/plan/PlanNameplate';
 import { WeekAccordion } from '@/components/plan/WeekAccordion';
-import { Spacing } from '@/constants/theme';
+import { FontFamily, FontSize, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { examplePlan } from '@/lib/fixtures/examplePlan';
+import { ApiError, getPlan } from '@/lib/apiClient';
+import { EXAMPLE_PLAN_ID, examplePlan } from '@/lib/fixtures/examplePlan';
+import type { Plan } from '@/lib/planTypes';
 
 /**
- * Plan view — the hero screen. Phase 1 has no backend, so the `[id]` route segment is
- * intentionally unread here: every id renders the same local fixture
- * (`src/lib/fixtures/examplePlan.ts`). Phase 2 swaps this for a real fetch by id; the
- * loading/error states that fetch will need are a design TODO
- * (`docs/design/mvp-blueprint.md` Part 13), not built here.
+ * Plan view — the hero screen. Branches on the `[id]` route param: `EXAMPLE_PLAN_ID` always
+ * renders the local `examplePlan` fixture with no fetch (the captain's explicit "never remove
+ * the sample plan" call — it stays reachable from `(tabs)/my-plans.tsx`'s pinned row forever).
+ * Any other id is a real plan, fetched via `getPlan(id)` — `loading` and `error` states cover the
+ * fetch; a successful fetch renders through the exact same JSX below, since `PlanNameplate`,
+ * `FallbackNotice`, `WeekAccordion`, and `DisclaimerFooter` only ever need a `Plan`-shaped object
+ * and carry no opinion on where it came from.
  *
  * Plain native scroll, one continuous surface — no per-row stagger, no wave, no
  * scroll-driven animation (all Phase 6+). `Animated.ScrollView` (Reanimated) is used in place
@@ -26,7 +31,62 @@ import { examplePlan } from '@/lib/fixtures/examplePlan';
 export default function PlanScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const plan = examplePlan;
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const isExample = id === EXAMPLE_PLAN_ID;
+
+  const [plan, setPlan] = useState<Plan | null>(isExample ? examplePlan : null);
+  const [loading, setLoading] = useState(!isExample);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isExample) {
+      setPlan(examplePlan);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+
+    (async () => {
+      try {
+        const response = await getPlan(id);
+        if (!cancelled) setPlan(response.plan);
+      } catch (fetchError) {
+        if (!cancelled) {
+          setError(fetchError instanceof ApiError ? fetchError.body.error : 'Could not load this plan.');
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id, isExample]);
+
+  if (loading) {
+    return (
+      <View style={[styles.centered, { backgroundColor: theme.surface.base }]}>
+        <Stack.Screen options={{ headerShown: true, headerTitle: '' }} />
+        <ActivityIndicator color={theme.text.primary} />
+      </View>
+    );
+  }
+
+  if (error || !plan) {
+    return (
+      <View style={[styles.centered, { backgroundColor: theme.surface.base }]}>
+        <Stack.Screen options={{ headerShown: true, headerTitle: '' }} />
+        <Text style={[styles.error, { color: theme.status.error }]}>
+          {error ?? 'This plan could not be found.'}
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: theme.surface.base }]}>
@@ -70,6 +130,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  centered: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.four,
+  },
   scroll: {
     flex: 1,
   },
@@ -80,5 +146,10 @@ const styles = StyleSheet.create({
   },
   ribbon: {
     gap: Spacing.one,
+  },
+  error: {
+    fontFamily: FontFamily.body.medium,
+    fontSize: FontSize.sm,
+    textAlign: 'center',
   },
 });

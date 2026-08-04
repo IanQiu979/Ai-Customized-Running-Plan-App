@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { authClient } from '@/lib/apiClient';
 import { FontFamily, FontSize, PressedOpacity, Radius, Spacing } from '@/constants/theme';
+import { markPostSignupRedirect } from '@/lib/postSignupRedirect';
 import { useTheme } from '@/hooks/use-theme';
 
 /** Function over form for this pass — see `sign-in.tsx`'s header for the same note. */
@@ -26,7 +27,14 @@ export default function SignUpScreen() {
     setSubmitting(false);
     if (signUpError) {
       setError(signUpError.message ?? 'Sign-up failed. Try a different email or a longer password.');
+      return;
     }
+    // A brand-new account has no intake yet, so send it straight there instead of leaving Home's
+    // "complete your intake" prompt for the runner to notice and tap themselves. This screen
+    // cannot reliably do that navigation itself — see `postSignupRedirect.ts`'s header — so it
+    // only sets the flag; `_layout.tsx` performs the actual `router.replace` once `session` (and
+    // therefore the `intake` route) exists.
+    markPostSignupRedirect();
   }
 
   async function handleGoogleSignIn() {
