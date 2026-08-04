@@ -45,7 +45,7 @@ bugs, all verified (unit-tested and/or re-verified live against `wrangler dev`):
   — parametric inputs')`, asserting the race-day `distanceKm` is a whole number across all four
   supported race distances.
 
-All 270 root tests + 85 `workers/` tests pass clean: `npm run typecheck && npm run lint && npm test`
+All 270 root tests + 86 `workers/` tests pass clean: `npm run typecheck && npm run lint && npm test`
 plus `npm --prefix workers run typecheck && npm --prefix workers test`.
 
 ## 2026-08-03 — intake age floor raised from 10 to 13 (captain's ruling)

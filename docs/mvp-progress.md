@@ -14,7 +14,7 @@ floating-point display bug in `planTemplates.ts` (fixed by flooring, not roundin
 My Plans staleness on tab revisit (`useFocusEffect` instead of a mount-only `useEffect`), and an
 unrounded Race Day distance for Half/Marathon (`raceDayWorkout()` now wraps the summed distance in
 `Math.round()`; the exact race distance stays spelled out in the workout's `structure` string). All
-four are verified, unit-tested and/or re-verified live against `wrangler dev`. 270 root tests + 85
+four are verified, unit-tested and/or re-verified live against `wrangler dev`. 270 root tests + 86
 `workers/` tests pass clean. Full account: `docs/change_log.md`'s 2026-08-04 entry.
 Previous entry: 2026-08-03 — client-side auth lands (`06b1f89`): `src/lib/apiClient.ts` (better-auth's
 Expo client + typed fetch wrappers for every `/api/*` route), `src/app/(auth)/sign-in.tsx` +
@@ -177,7 +177,7 @@ the literal previous week) and issue #33 (goal-realism handling).
       navigation; (4) an unrounded Race Day distance for Half/Marathon (found by the
       re-verification pass itself), fixed by wrapping `raceDayWorkout()`'s summed distance in
       `Math.round()` — the exact race distance stays spelled out in the workout's `structure`
-      string. 270 root tests + 85 `workers/` tests pass clean. Full account: `docs/change_log.md`'s
+      string. 270 root tests + 86 `workers/` tests pass clean. Full account: `docs/change_log.md`'s
       2026-08-04 entry.
 - [x] `src/lib/loadRules.ts` — deterministic safety arithmetic (see "Next" step 2)
 - [x] `src/lib/notation.ts` — the code counterpart of `notation.md`: `RUN_TYPE_ABBREVIATIONS`,

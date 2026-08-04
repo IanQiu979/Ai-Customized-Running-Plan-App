@@ -49,7 +49,7 @@ workers/
     lib/
       store.ts               # every D1 statement. Authorization lives here — read its header.
       generate-plan-flow.ts  # the eleven pipeline steps, pure, all deps injected
-      planEngine.ts          # skeleton + personalizer seams (neither implemented yet — see below)
+      planEngine.ts          # skeleton + personalizer seams (skeleton bound 2026-08-04, personalizer not — see below)
       planValidation.ts      # structural validation, shape only
       model.ts               # the Anthropic call, behind an injectable seam
   test/                  # vitest, inside real workerd + real D1 (Miniflare). No network.
@@ -57,24 +57,21 @@ workers/
 
 ## What works today, and what does not
 
-Working end to end, verified against `wrangler dev` and by 75 tests:
+Working end to end, verified against `wrangler dev` and by 86 tests:
 
 - email/password sign-up and sign-in, sessions, Bearer-token auth for the React Native client
 - the quota ledger: reserve → settle/release, atomic gate, idempotency replay, fallback exemption
 - `quota-status`, `purchase-tier`, `delete-account`, intake read/write, plan reads
+- `generate-plan` — Free tier (and, as a template fallback, Pro/Elite) returns a real generated
+  plan, as of the 2026-08-04 `createTemplateSkeletonBuilder()` binding in `src/deps.ts`
 
-**`generate-plan` returns `503 engine_unavailable` and consumes no quota.** Everything around the
-plan engine is built and tested; the engine itself is not. Two bindings in `src/deps.ts` are the
-whole of the remaining wiring:
+**One binding in `src/deps.ts` remains unwired: `promptBuilder`.** It needs the Pro/Elite
+personalization prompt, which is coaching-sensitive work of its own — until it lands, Pro/Elite
+generation falls back to the same template Free gets (`isFallback: true`, quota-exempt).
 
-1. `skeleton:` — needs `src/lib/planTemplates.ts` + `src/lib/paceDerivation.ts` (being built in a
-   parallel task, against the red TDD suites already quarantined in `jest.config.js`).
-2. `promptBuilder` — needs the Pro/Elite personalization prompt, which is coaching-sensitive work
-   of its own.
-
-Both are deliberately unimplemented rather than mocked. `src/lib/planEngine.ts`'s header explains
-why at length; the short version is that the sibling repo shipped a mock as its production client
-and served nothing but dead ends for weeks.
+It is deliberately bound to a typed unimplemented seam rather than a mock. `src/lib/planEngine.ts`'s
+header explains why at length; the short version is that the sibling repo shipped a mock as its
+production client and served nothing but dead ends for weeks.
 
 ## What the captain has to do (nobody else can)
 
