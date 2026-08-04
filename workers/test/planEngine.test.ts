@@ -11,6 +11,7 @@ import { describe, expect, it } from 'vitest';
 import type { ModelCallResult, ModelCaller } from '../src/lib/model';
 import {
   createPlanPersonalizer,
+  createTemplateSkeletonBuilder,
   createUnavailableSkeletonBuilder,
   type PromptBuilder,
 } from '../src/lib/planEngine';
@@ -125,5 +126,97 @@ describe('createUnavailableSkeletonBuilder', () => {
     });
 
     expect(result).toMatchObject({ ok: false, reason: 'engine_unavailable' });
+  });
+});
+
+describe('createTemplateSkeletonBuilder', () => {
+  it('builds a real plan from an explicit duration', async () => {
+    const result = await createTemplateSkeletonBuilder().build({
+      tier: 'free',
+      goalType: 'duration',
+      durationWeeks: 8,
+      intake: INTAKE,
+      now: '2026-08-01T00:00:00.000Z',
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.plan.durationWeeks).toBe(8);
+    expect(result.ok && result.plan.weeks).toHaveLength(8);
+  });
+
+  it('reconciles a race date into a whole number of weeks when no duration is given', async () => {
+    // 2026-08-01 -> 2026-10-24 is exactly 12 weeks (84 days).
+    const result = await createTemplateSkeletonBuilder().build({
+      tier: 'free',
+      goalType: 'race',
+      raceDistance: '5k',
+      raceDate: '2026-10-24T00:00:00.000Z',
+      intake: INTAKE,
+      now: '2026-08-01T00:00:00.000Z',
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.plan.durationWeeks).toBe(12);
+  });
+
+  it('clamps a far-future race date at MAX_PLAN_DURATION_WEEKS instead of an unbounded plan', async () => {
+    const result = await createTemplateSkeletonBuilder().build({
+      tier: 'free',
+      goalType: 'race',
+      raceDistance: '5k',
+      raceDate: '2126-08-01T00:00:00.000Z', // a century out
+      intake: INTAKE,
+      now: '2026-08-01T00:00:00.000Z',
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.plan.durationWeeks).toBe(104);
+    expect(result.ok && result.plan.weeks).toHaveLength(104);
+  });
+
+  it('floors a race date in the past (or this week) at a one-week plan, never refusing', async () => {
+    const result = await createTemplateSkeletonBuilder().build({
+      tier: 'free',
+      goalType: 'race',
+      raceDistance: '5k',
+      raceDate: '2026-08-02T00:00:00.000Z',
+      intake: INTAKE,
+      now: '2026-08-01T00:00:00.000Z',
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.plan.durationWeeks).toBe(1);
+  });
+
+  it('gates numeric pace fields on tier density — free gets none, pro gets them', async () => {
+    const intakeWithRecent = {
+      ...INTAKE,
+      recentPerformance: { distance: '5k' as const, timeSec: 1200 },
+    };
+
+    const free = await createTemplateSkeletonBuilder().build({
+      tier: 'free',
+      goalType: 'duration',
+      durationWeeks: 4,
+      intake: intakeWithRecent,
+      now: '2026-08-01T00:00:00.000Z',
+    });
+    const pro = await createTemplateSkeletonBuilder().build({
+      tier: 'pro',
+      goalType: 'duration',
+      durationWeeks: 4,
+      intake: intakeWithRecent,
+      now: '2026-08-01T00:00:00.000Z',
+    });
+
+    const freeRuns = (free.ok ? free.plan.weeks : []).flatMap((week) =>
+      week.days.filter((day): day is Extract<typeof day, { kind: 'run' }> => day.kind === 'run')
+    );
+    const proRuns = (pro.ok ? pro.plan.weeks : []).flatMap((week) =>
+      week.days.filter((day): day is Extract<typeof day, { kind: 'run' }> => day.kind === 'run')
+    );
+
+    expect(freeRuns.some((run) => run.pace !== undefined)).toBe(false);
+    expect(proRuns.some((run) => run.pace !== undefined)).toBe(true);
   });
 });

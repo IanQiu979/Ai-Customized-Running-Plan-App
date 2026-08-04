@@ -6,14 +6,15 @@ deliberately narrow — it builds plans, it is not a training log.
 
 ## Status
 
-**Backend spine built; client still pre-implementation.** The Cloudflare backend in
-[`workers/`](workers/README.md) works end to end against local emulation — auth, the quota ledger,
-`quota-status`, `purchase-tier`, `delete-account`, intake, plan reads — but nothing is deployed, and
-`generate-plan` returns `503 engine_unavailable` because the plan engine (`src/lib/planTemplates.ts`)
-does not exist yet. The app itself is still close to the stock Expo SDK 54 template: no auth screens,
-no intake screen, no module that talks to the backend. Everything described below that is marked
-*planned* is design, not shipped behavior. Current state: [`docs/mvp-progress.md`](docs/mvp-progress.md).
-Full spec:
+**Backend spine built; the first end-to-end user loop (sign-up → intake → generate a plan → view
+it → My Plans) works client-side too.** The Cloudflare backend in [`workers/`](workers/README.md)
+works end to end against local emulation — auth, the quota ledger, `quota-status`, `purchase-tier`,
+`delete-account`, intake, plan reads, and `generate-plan`'s free-tier template engine — but nothing
+is deployed, and the Pro/Elite AI-generation path is not yet built. On the client, auth screens,
+the intake screen, the generate-plan action, a plan view (real plans plus the permanent
+golden-fixture example), and a My Plans list all exist. Still missing: quota/tier display UI and
+the dummy paywall. Everything described below that is marked *planned* is design, not shipped
+behavior. Current state: [`docs/mvp-progress.md`](docs/mvp-progress.md). Full spec:
 
 - [`planning/01-brainstorm.md`](planning/01-brainstorm.md) — goal, milestones, open questions
 - [`planning/02-product-requirements.md`](planning/02-product-requirements.md) — who it's for, tiers, user flow, milestones
@@ -99,11 +100,16 @@ What exists today:
 src/
   app/
     _layout.tsx
+    (auth)/
+      sign-in.tsx, sign-up.tsx  # email/password; a "Continue with Google" button is wired but inert
     (tabs)/
       _layout.tsx
       index.tsx          # Home
       glossary.tsx        # run-type abbreviations glossary
-    plan/[id].tsx          # plan view
+      my-plans.tsx          # My Plans — lists GET /api/plans
+    intake/                 # onboarding questionnaire, against GET/PUT /api/intake
+    plan/[id].tsx          # plan view — real plans via GET /api/plans/:id, plus the permanent
+                            #  golden-fixture example
   components/
     plan/                  # plan-view UI: nameplate, effort chip, workout row, week accordion, ...
   constants/
@@ -111,43 +117,38 @@ src/
   hooks/
     use-color-scheme.ts, use-color-scheme.web.ts, use-theme.ts
   lib/
+    apiClient.ts             # better-auth's Expo client + typed fetch wrappers for every /api/* route
     loadRules.ts             # deterministic safety clamp
     notation.ts               # run-type abbreviations + structure-string shorthand
     planTypes.ts               # shared Plan/Week/Workout types
-    tierLimits.ts               # the one copy of the tier limits — app AND worker
-    quotaPeriod.ts               # currentPeriod() — app AND worker
-    supabase.ts                   # LEGACY, unused
-    fixtures/examplePlan.ts        # golden fixture plan
+    planTemplates.ts             # free-tier deterministic template plans
+    paceDerivation.ts             # pace/HR-zone derivation
+    tierLimits.ts                   # the one copy of the tier limits — app AND worker
+    quotaPeriod.ts                   # currentPeriod() — app AND worker
+    supabase.ts                       # LEGACY, unused
+    fixtures/examplePlan.ts            # golden fixture plan
 
 workers/                     # the Cloudflare backend — see workers/README.md
   wrangler.toml
   migrations/                 # 0001 better-auth's tables, 0002 the app's
   src/                         # index, auth, routes, deps, lib/{store,generate-plan-flow,model,...}
-  test/                         # 75 tests in real workerd against real D1
+  test/                         # 86 tests in real workerd against real D1
 ```
 
-Planned layout (not yet built — see `planning/03-engineering-requirements.md`):
+Planned, not yet built — see `planning/03-engineering-requirements.md`:
 
 ```
 src/app/
-  (auth)/sign-in, sign-up
-  (tabs)/plans         # My Plans (history)
-  intake/               # onboarding questionnaire
-  paywall, settings
-
-lib/
-  planTemplates.ts      # free-tier plans (parametric template generator) — blocks generate-plan
-  paceDerivation.ts     # its pace counterpart
-  api.ts                # the client's calls into workers/ — replaces supabase.ts
+  paywall, settings   # dummy paywall + tier display
 ```
 
 ## Roadmap
 
-- **M1 — Foundation**: Expo app scaffolded, backend + auth working, required sign-up. *Server half done; client screens not started.*
-- **M2 — Intake**: onboarding questionnaire persists to the database.
-- **M3 — Plan engine**: free template plans + paid AI plans generate reliably; plan view renders.
-- **M4 — Tiers & quotas**: dummy paywall, tier and quota enforcement server-side.
-- **M5 — My Plans**: history tab, plan persistence, re-open past plans.
+- **M1 — Foundation**: Expo app scaffolded, backend + auth working, required sign-up. *Client auth screens done; Google OAuth needs the captain's credentials.*
+- **M2 — Intake**: onboarding questionnaire persists to the database. *Done.*
+- **M3 — Plan engine**: free template plans + paid AI plans generate reliably; plan view renders. *Template path done; Pro/Elite AI personalization not yet built.*
+- **M4 — Tiers & quotas**: dummy paywall, tier and quota enforcement server-side. *Server-side quota enforcement done; no client UI yet.*
+- **M5 — My Plans**: history tab, plan persistence, re-open past plans. *Done.*
 - **M6 — Polish & TestFlight**: empty states, errors, loading, app icon/splash, TestFlight build.
 
 Full milestone "done" criteria are in `planning/02-product-requirements.md`.

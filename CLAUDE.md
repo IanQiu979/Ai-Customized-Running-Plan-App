@@ -15,12 +15,14 @@ better-auth, in [`workers/`](workers/README.md)** (captain's decision, 2026-08-0
 `src/lib/supabase.ts` are dead scaffold, kept but unused). AI: Claude (`claude-sonnet-5`), called
 only from the `generate-plan` route, never from the client. The backend spine works end to end
 against `wrangler dev` locally — auth, the quota ledger, `quota-status`, `purchase-tier`,
-`delete-account`, intake, plan reads — but **nothing is deployed** and `generate-plan` returns
-`503 engine_unavailable` until `src/lib/planTemplates.ts` exists. On the client side, `src/lib/apiClient.ts`
-(better-auth's Expo client plus typed fetch wrappers for the other `/api/*` routes) and
-`src/app/(auth)/sign-in.tsx`/`sign-up.tsx` now exist, and `src/app/_layout.tsx` gates the whole app
-behind a session — email/password works, Google sign-in is wired but inert pending the captain's
-OAuth credentials. Route tree, `lib/` layout, the
+`delete-account`, intake, plan reads, and `generate-plan`'s free-tier deterministic template
+engine (`src/lib/planTemplates.ts`) — but **nothing is deployed**, and the Pro/Elite AI-generation
+path is not yet built. On the client side, `src/lib/apiClient.ts`
+(better-auth's Expo client plus typed fetch wrappers for the other `/api/*` routes),
+`src/app/(auth)/sign-in.tsx`/`sign-up.tsx`, the intake screen, the generate-plan action, the plan
+view (real plans plus the permanent example-plan fixture), and the My Plans list all exist, and
+`src/app/_layout.tsx` gates the whole app behind a session — email/password works, Google sign-in
+is wired but inert pending the captain's OAuth credentials. Route tree, `lib/` layout, the
 `generate-plan` flow, the API table, the D1 schema, and the proposed visual direction all live in
 [`docs/architecture.md`](docs/architecture.md).
 

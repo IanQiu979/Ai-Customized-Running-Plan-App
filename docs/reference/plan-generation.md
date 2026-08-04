@@ -5,11 +5,13 @@
 > types disagree, the types win. The `generate-plan` **endpoint** also exists, on Cloudflare
 > Workers (`workers/`, 2026-08-02 — the backend is Cloudflare, not Supabase; see
 > [`docs/architecture.md`](../architecture.md)): all eleven steps below are implemented and tested,
-> and the quota, idempotency, validation, and fallback rules on this page are live. What the
-> endpoint does **not** have yet is a wire-up to that plan engine — `workers/src/deps.ts` still
-> binds the skeleton builder and Pro/Elite prompt (step 7) to a typed *unavailable*, so it answers a
-> structured `503` and releases its quota reservation rather than inventing a plan. This document
-> describes the design in
+> and the quota, idempotency, validation, and fallback rules on this page are live. As of
+> 2026-08-04, `workers/src/deps.ts` binds the skeleton builder to that plan engine
+> (`createTemplateSkeletonBuilder()`), so the endpoint returns a real plan for Free (and, as a
+> template fallback, Pro/Elite). What it does **not** have yet is the Pro/Elite personalization
+> prompt (step 7) — `deps.ts` still binds it to a typed *unavailable*, so that path would answer a
+> structured `503` and release its quota reservation rather than inventing a plan, if it were ever
+> reached. This document describes the design in
 > [`planning/02-product-requirements.md`](../../planning/02-product-requirements.md) and
 > [`planning/03-engineering-requirements.md`](../../planning/03-engineering-requirements.md).
 > See [`docs/architecture.md`](../architecture.md) for how it fits the rest of the system and

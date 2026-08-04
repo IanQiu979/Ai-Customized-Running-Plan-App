@@ -70,6 +70,14 @@ describe('request validation', () => {
     ['a race goal with no date', { goalType: 'race', raceDistance: '5k', idempotencyKey: 'k' }],
     ['a duration goal with no weeks', { goalType: 'duration', idempotencyKey: 'k' }],
     ['over-long notes', { ...VALID_REQUEST, notes: 'x'.repeat(1001) }],
+    ['an absurd explicit durationWeeks', { ...VALID_REQUEST, durationWeeks: 999_999 }],
+    // A "race" request has no business carrying `durationWeeks` at all, but nothing stops a
+    // client from sending one anyway — it must share the same ceiling `weeksUntilRace`
+    // (`planEngine.ts`) clamps to, not bypass it via this unrelated field.
+    [
+      'a race goal with an absurd explicit durationWeeks',
+      { goalType: 'race', raceDistance: '5k', raceDate: '2026-10-01', durationWeeks: 999_999, idempotencyKey: 'k' },
+    ],
   ])('rejects %s before reserving anything', async (_label, request) => {
     const { deps, store } = makeDeps();
 

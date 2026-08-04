@@ -6,7 +6,17 @@
 > Milestone definitions live in [`planning/02-product-requirements.md`](../planning/02-product-requirements.md).
 > Decision history lives in [`change_log.md`](change_log.md).
 
-**Last updated:** 2026-08-03 — client-side auth lands (`06b1f89`): `src/lib/apiClient.ts` (better-auth's
+**Last updated:** 2026-08-04 — the first end-to-end user loop is wired up (intake screen, the
+generate-plan action, the plan view rendering real generated plans alongside the permanent golden
+fixture, and a My Plans list), and an E2E verification pass over that loop found and fixed four
+bugs: a sign-up → Intake redirect race (new `src/lib/postSignupRedirect.ts`), a long-run distance
+floating-point display bug in `planTemplates.ts` (fixed by flooring, not rounding, each iteration),
+My Plans staleness on tab revisit (`useFocusEffect` instead of a mount-only `useEffect`), and an
+unrounded Race Day distance for Half/Marathon (`raceDayWorkout()` now wraps the summed distance in
+`Math.round()`; the exact race distance stays spelled out in the workout's `structure` string). All
+four are verified, unit-tested and/or re-verified live against `wrangler dev`. 270 root tests + 86
+`workers/` tests pass clean. Full account: `docs/change_log.md`'s 2026-08-04 entry.
+Previous entry: 2026-08-03 — client-side auth lands (`06b1f89`): `src/lib/apiClient.ts` (better-auth's
 Expo client + typed fetch wrappers for every `/api/*` route), `src/app/(auth)/sign-in.tsx` +
 `sign-up.tsx` (email/password; a "Continue with Google" button is wired but inert), and a
 `Stack.Protected` gate in `src/app/_layout.tsx` so no route is reachable without a session — the
@@ -59,10 +69,10 @@ from 82. Issue #22 remains open.)
 | Milestone | State |
 |---|---|
 | M1 — Foundation (account → empty Home) | **In progress.** Server (auth + schema + account routes) works locally on Cloudflare (`workers/`); client-side email/password auth now exists (`src/app/(auth)/`, `src/lib/apiClient.ts`) and gates the app behind a session — Google OAuth still needs the captain's credentials, and nothing is deployed |
-| M2 — Intake (questionnaire persists) | Not started |
-| M3 — Plan engine (3 tiers produce valid plans) | **In progress.** Pure template/pace engine done; not yet wired into the Worker's `generate-plan` route |
+| M2 — Intake (questionnaire persists) | **In progress.** Intake screen now exists, wired to `GET`/`PUT /api/intake` |
+| M3 — Plan engine (3 tiers produce valid plans) | **In progress.** Pure template/pace engine now wired into the Worker's `generate-plan` route and the client's generate-plan action; the plan view renders a real generated plan (via `GET /api/plans/:id`) alongside the permanent static golden fixture |
 | M4 — Tiers & quotas (server-side, unbypassable) | **Server half done.** The quota ledger, atomic gate, fallback exemption, `quota-status` and `purchase-tier` are built and tested; no client UI |
-| M5 — My Plans (history) | Not started |
+| M5 — My Plans (history) | **In progress.** A My Plans tab lists plans off `GET /api/plans` |
 | M6 — Polish & TestFlight | Not started |
 
 **The honest summary:** planning, design, and domain research are done to an unusual depth, and
@@ -73,12 +83,12 @@ client/shared plan engine also exists.** `src/lib/paceDerivation.ts` derives Rie
 training pace bands, and the ruled goal-realism/cap result; `src/lib/planTemplates.ts` builds
 deterministic template plans and reproduces the approved 12-week 5K fixture exactly.
 `clampWeeklyVolume()` now names and uses the last loading week, and the golden week-8 output is
-30 km. The former red-first suites run normally, with typecheck and lint clean. **What is still
-missing is the wiring between the two**: `workers/src/deps.ts` still binds `generate-plan`'s
-skeleton builder and Pro/Elite prompt to a typed *unavailable* rather than to
-`src/lib/planTemplates.ts`, which is why `generate-plan` still answers `503` and charges nothing.
-The plan screen also still renders the static fixture, not a generated plan; M3 is therefore only
-partially complete.
+30 km. The former red-first suites run normally, with typecheck and lint clean. **The wiring
+between the two landed 2026-08-04**: `workers/src/deps.ts` now binds `generate-plan`'s skeleton
+builder to `src/lib/planTemplates.ts` (`createTemplateSkeletonBuilder()`), so `generate-plan`
+returns a real plan instead of `503`, and the plan screen renders it via `GET /api/plans/:id`. The
+Pro/Elite personalization prompt is the one seam in `deps.ts` still bound to a typed *unavailable*;
+M3 is complete for the deterministic/template path and incomplete only for that prompt.
 
 `planTypes.ts`, `loadRules.ts`, and (as of the 2026-07-11
 review-and-refine cycle) `notation.ts` are the app's `lib/` layer — shared vocabulary, safety
@@ -150,6 +160,25 @@ the literal previous week) and issue #33 (goal-realism handling).
       pass, deliberately: intake screen, plan generation UI, My Plans list, quota/tier display UI,
       visual polish. A documented TypeScript-peer-version cast lives in `apiClient.ts`'s header
       comment — see `docs/architecture.md`'s "Current — what exists in `src/`" for detail.
+- [x] **The first end-to-end user loop — intake, generate-plan, plan view, My Plans — done
+      2026-08-04, plus a same-pass bug-fix batch.** The intake screen now exists and is wired to
+      `GET`/`PUT /api/intake`; a generate-plan action calls `POST /api/generate-plan`; the plan
+      view (`src/app/plan/[id].tsx`) now renders a real generated plan via `GET /api/plans/:id`
+      alongside the permanent static example-plan fixture; and a My Plans tab
+      (`src/app/(tabs)/my-plans.tsx`) lists plans off `GET /api/plans`. An E2E pass over that loop
+      found and fixed four bugs, all verified: (1) a sign-up → Intake redirect race, fixed with a
+      new one-shot module-level flag, `src/lib/postSignupRedirect.ts`, consumed by the never-
+      unmounting root `_layout.tsx` instead of relying on `sign-up.tsx`'s own effect to win an
+      unmount race; (2) a long-run distance floating-point display bug in
+      `src/lib/planTemplates.ts`'s convergence loop (e.g. `"5.666666666666667 km"`), fixed by
+      flooring — never rounding up, which could re-breach a safety cap — each iteration; (3) My
+      Plans going stale on tab revisit, fixed by switching its fetch to
+      `useFocusEffect(useCallback(...))` since Expo Router tab screens stay mounted across
+      navigation; (4) an unrounded Race Day distance for Half/Marathon (found by the
+      re-verification pass itself), fixed by wrapping `raceDayWorkout()`'s summed distance in
+      `Math.round()` — the exact race distance stays spelled out in the workout's `structure`
+      string. 270 root tests + 86 `workers/` tests pass clean. Full account: `docs/change_log.md`'s
+      2026-08-04 entry.
 - [x] `src/lib/loadRules.ts` — deterministic safety arithmetic (see "Next" step 2)
 - [x] `src/lib/notation.ts` — the code counterpart of `notation.md`: `RUN_TYPE_ABBREVIATIONS`,
       `UNABBREVIATED_RUN_TYPES`, `STRUCTURE_SHORTHAND`, and `expandLabel()` for screen-reader text.
@@ -367,9 +396,10 @@ view to `buildTemplatePlan()` instead of the static fixture; intake and server w
 
 ## In flight
 
-**Nothing is currently in flight.** The pure engine and its test contracts are complete. The next
-critical-path item is step 4 below: wire the plan route to the generated template, then build the
-intake/backend flow.
+**Nothing is currently in flight.** The pure engine and its test contracts are complete, and as of
+2026-08-04 steps 4, 7, 8, and 10 below (plan view, intake, `generate-plan`, My Plans) are wired end
+to end and E2E-verified. The next critical-path items are step 9 (quota UI + dummy paywall) and the
+Pro/Elite personalization prompt noted in step 8.
 
 - **Cycle 1** (2026-07-11): Ian scored the rendered plan 3/10, five rulings applied. Docs rebuilt
   (`notation.md` added; `workout-library.md` and `example-plan-5k-pro.md` rewritten;
@@ -422,10 +452,10 @@ with **no backend at all**.
          read the actual files; see `docs/change_log.md`'s new correction bullet. What remains is
          writing `planTemplates.ts`/`paceDerivation.ts` themselves against these already-correct
          specs — tracked in step 3 above, not a doc/test sync problem.
-4. [ ] **Plan view rendering a real template plan.** **Partially done** — `src/app/plan/[id].tsx`
-       and `src/components/plan/` render the golden fixture end to end, but the route still imports
-       that static fixture rather than calling the now-built `buildTemplatePlan()`. Wiring the
-       screen is the next backend-free step.
+4. [x] **Plan view rendering a real template plan — done 2026-08-04.** `src/app/plan/[id].tsx`
+       now renders a real generated plan via `GET /api/plans/:id`, alongside the permanent static
+       golden fixture (which stays the demo/example plan, not the route's default). E2E-verified
+       against `wrangler dev`, including the same-pass long-run and Race Day distance fixes above.
 5. [x] **Theme + fonts** — **Done.** `src/constants/theme.ts` replaced with the Instrument & Matter
        token system (commit `145d7e0`); stock template screens removed
        (`src/app/index.tsx` → `src/app/(tabs)/index.tsx`, rewritten; `explore.tsx` deleted);
@@ -440,15 +470,21 @@ with **no backend at all**.
        against it, gated by `Stack.Protected` in the root layout. **Still to do:** Google OAuth
        needs the captain's client id/secret (email/password works today); the captain's own
        `wrangler login`/`d1 create`/`secret put`/`deploy`.
-7. [ ] **Intake** (8 questions, or 10 with a target race, + review) persisting to `intake_responses`.
-       The server side exists: `GET`/`PUT /api/intake`, validated twice (readable message in the
-       route, table CHECKs underneath). Only the screen is missing.
-8. [~] **`generate-plan`** — tier branch, quota check, validate, retry once, fall back: **all built
-       and tested** in `workers/`. Clamp and skeleton are not, because `src/lib/planTemplates.ts`
-       does not exist (step 3), so the route returns `503 engine_unavailable` and charges no quota.
-       Finishing it is two bindings in `workers/src/deps.ts`, not a rewrite.
+7. [x] **Intake** (8 questions, or 10 with a target race, + review) persisting to
+       `intake_responses` — **screen done 2026-08-04**, wired to the already-built server side
+       (`GET`/`PUT /api/intake`, validated twice: readable message in the route, table CHECKs
+       underneath).
+8. [x] **`generate-plan`** — tier branch, quota check, validate, retry once, fall back, clamp, and
+       the deterministic skeleton binding are now **all built, tested, and wired** — `POST
+       /api/generate-plan` calls through to `src/lib/planTemplates.ts` via
+       `workers/src/deps.ts`'s `createTemplateSkeletonBuilder()` and returns a real plan. The
+       client action calling it, and the plan view rendering the result, landed the same pass (step
+       4 above). The Pro/Elite personalization prompt (`workers/src/deps.ts`'s second swap) is
+       still unbound — see "Known debt and risks" below.
 9. [ ] **Quota UI + dummy paywall.**
-10. [ ] **My Plans.**
+10. [x] **My Plans** — **done 2026-08-04.** A My Plans tab (`src/app/(tabs)/my-plans.tsx`) lists
+        plans off `GET /api/plans`, fetched via `useFocusEffect` so the list stays fresh across tab
+        revisits (fixed in the same pass — see `docs/change_log.md`'s 2026-08-04 entry).
 11. [ ] **Motion + polish**, last, because the reveal choreographs the finalised `Plan` types.
 12. [x] **Abbreviations glossary tab.** **Done.** `src/app/(tabs)/glossary.tsx`, sourced from
         `src/lib/notation.ts`'s `RUN_TYPE_ABBREVIATIONS`/`UNABBREVIATED_RUN_TYPES`/
@@ -591,12 +627,14 @@ Closes the plan-accuracy scout's Bug 1 and mandated finding B. Full rationale:
   `wrangler.toml`'s `database_id` is a deliberately fake placeholder. Local work is unaffected —
   `wrangler dev` and the test suite need no account — but nothing is reachable from a phone. Full
   list in "Blocked" above.
-- 🟠 **`generate-plan` cannot actually generate a plan yet.** The route, quota gate, idempotency,
-  validation, and fallback are built and tested; the deterministic skeleton
-  (`src/lib/planTemplates.ts`) and the Pro/Elite prompt are not, so it returns `503
-  engine_unavailable`. Both are single bindings in `workers/src/deps.ts`, which names them so the
-  swap has an owner. They are bound to typed *unavailable* implementations rather than mocks on
-  purpose — the sibling repo's issue #128 shipped a mock as its production client.
+- 🟢 **Resolved 2026-08-04: `generate-plan` can now actually generate a plan.** The deterministic
+  skeleton binding (`workers/src/deps.ts` → `createTemplateSkeletonBuilder()` →
+  `src/lib/planTemplates.ts`) landed, so the route, quota gate, idempotency, validation, and
+  fallback that were already built and tested now serve a real plan instead of `503
+  engine_unavailable`. **What's left of this gap:** the Pro/Elite personalization prompt is still
+  bound to a typed *unavailable* in `deps.ts` — on purpose, matching the sibling repo's issue #128
+  lesson against shipping a mock as a production client — so Pro/Elite generation still falls back
+  to the template rather than getting a personalized prompt.
 - 🟢 **Resolved 2026-08-03: the client can now talk to `workers/`.** `src/lib/apiClient.ts` and
   `src/app/(auth)/` (email/password sign-in/sign-up, `Stack.Protected` session gate) landed in
   `06b1f89`. What's left of this gap is narrower: Google OAuth is wired but inert pending the

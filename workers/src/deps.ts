@@ -11,18 +11,17 @@
  * THE TWO BINDINGS A FOLLOW-UP TASK CHANGES — this list exists so no swap is left ownerless the
  * way the sibling repo's issue #128 was.
  * ============================================================================================
- *   1. `skeleton:` — swap `createUnavailableSkeletonBuilder()` for a builder over
- *      `src/lib/planTemplates.ts` + `src/lib/paceDerivation.ts` once the plan-engine task lands
- *      them. Until then `generate-plan` returns a structured 503 and consumes no quota.
- *   2. `promptBuilder` (the second argument to `createPlanPersonalizer`) — swap `null` for the
- *      real Pro/Elite prompt once that work lands. Until then paid tiers fall back to the
+ *   1. `skeleton:` — DONE. `createTemplateSkeletonBuilder()` wires `src/lib/planTemplates.ts` +
+ *      `src/lib/paceDerivation.ts`, now that the plan-engine task has landed them.
+ *   2. `promptBuilder` (the second argument to `createPlanPersonalizer`) — still `null`, swap it
+ *      for the real Pro/Elite prompt once that work lands. Until then paid tiers fall back to the
  *      template plan, marked `isFallback: true`, which is quota-exempt.
  * Neither swap needs anything else in this project to change.
  */
 
 import type { Env } from './env';
 import type { GeneratePlanDeps } from './lib/generate-plan-flow';
-import { createPlanPersonalizer, createUnavailableSkeletonBuilder } from './lib/planEngine';
+import { createPlanPersonalizer, createTemplateSkeletonBuilder } from './lib/planEngine';
 import { resolveModelCaller } from './lib/model';
 import { D1PlanStore } from './lib/store';
 
@@ -42,7 +41,7 @@ export function createDeps(env: Env): Deps {
     store,
     generatePlan: {
       store,
-      skeleton: createUnavailableSkeletonBuilder(), // swap 1 — see the header
+      skeleton: createTemplateSkeletonBuilder(), // swap 1 — see the header
       personalizer: createPlanPersonalizer(modelCaller, null), // swap 2 — see the header
       loadIntake: (userId) => store.getIntake(userId),
       now: () => new Date().toISOString(),

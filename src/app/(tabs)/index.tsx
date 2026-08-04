@@ -1,62 +1,311 @@
-import { Link } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FontFamily, FontSize, PressedOpacity, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { EXAMPLE_PLAN_ID } from '@/lib/fixtures/examplePlan';
-import { authClient } from '@/lib/apiClient';
+import { ApiError, authClient, generatePlan, getIntake } from '@/lib/apiClient';
+import { mintIdempotencyKey } from '@/lib/idempotencyKey';
+import type { GoalType, RaceDistance } from '@/lib/planTypes';
+
+const RACE_DISTANCE_OPTIONS: { value: RaceDistance; label: string }[] = [
+  { value: '5k', label: '5K' },
+  { value: '10k', label: '10K' },
+  { value: 'half', label: 'Half Marathon' },
+  { value: 'marathon', label: 'Marathon' },
+];
+
+/** `generate-plan-flow.ts`'s own cap on free-text `notes` — mirrored here only so the field
+ * stops accepting keystrokes rather than the runner discovering the limit from a server error. */
+const MAX_NOTES_LENGTH = 1000;
 
 /**
- * Placeholder shell only — proves the token/font pipeline boots. The real Home screen (Part 5 of
- * `docs/design/frontend-design-brief.md`) is `frontend-builder` work for a later wave.
- *
- * The link below is a temporary demo gate for Phase 1's plan-view work
- * (`docs/mvp-build-prompt.md` Phase 1, step 3) — it is not the real "View plan" row Home will
- * carry once `quota-status` and a plan list exist.
+ * Home. On mount, checks whether the signed-in runner has completed intake (`getIntake()`). No
+ * intake yet: a prompt links to `/intake`. Intake done: a compact generate-configuration panel —
+ * goal type, then either a race distance + date or a duration in weeks, plus optional notes —
+ * that calls `generatePlan()` and pushes straight to the real plan view on success. The one-time
+ * static-fixture demo link this screen used to carry has moved to the "My Plans" tab, where it
+ * now sits permanently pinned above real, backend-fetched plans.
  */
 export default function HomeScreen() {
   const theme = useTheme();
+  const router = useRouter();
+
+  const [checkingIntake, setCheckingIntake] = useState(true);
+  const [hasIntake, setHasIntake] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const [goalType, setGoalType] = useState<GoalType>('race');
+  const [raceDistance, setRaceDistance] = useState<RaceDistance | undefined>(undefined);
+  const [raceDate, setRaceDate] = useState('');
+  const [durationWeeks, setDurationWeeks] = useState('');
+  const [notes, setNotes] = useState('');
+
+  const [generating, setGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
+
+  // Held across retries of the SAME attempt (a dropped connection, a re-press before the first
+  // reply lands) so the backend's idempotency replay returns that attempt's own result rather than
+  // reserving a second quota slot. Re-minted only once a generation actually settles, so the next
+  // *distinct* "Generate plan" press isn't silently replayed as the previous one
+  // (`generate-plan-flow.ts`'s replay path matches on this key alone, not on the request body).
+  const [idempotencyKey, setIdempotencyKey] = useState(() => mintIdempotencyKey());
+
+  // `useFocusEffect` (not a plain mount-only `useEffect`) because Expo Router keeps tab screens
+  // mounted across navigation — leaving Home for Intake and coming back is a focus event, not a
+  // remount, so a mount-only effect would keep showing "complete your intake" forever after the
+  // runner had just done exactly that.
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      setCheckingIntake(true);
+      setLoadError(null);
+
+      (async () => {
+        try {
+          const { intake } = await getIntake();
+          if (!cancelled) setHasIntake(!!intake);
+        } catch (fetchError) {
+          if (!cancelled) {
+            setLoadError(fetchError instanceof ApiError ? fetchError.body.error : 'Could not load your intake.');
+            setHasIntake(false);
+          }
+        } finally {
+          if (!cancelled) setCheckingIntake(false);
+        }
+      })();
+
+      return () => {
+        cancelled = true;
+      };
+    }, [])
+  );
+
+  async function handleGenerate() {
+    setGenerateError(null);
+
+    if (goalType === 'race') {
+      if (!raceDistance) {
+        setGenerateError('Select a race distance.');
+        return;
+      }
+      if (!raceDate.trim()) {
+        setGenerateError('Race date is required.');
+        return;
+      }
+    } else {
+      const weeksNum = Number(durationWeeks);
+      if (!durationWeeks.trim() || Number.isNaN(weeksNum) || weeksNum <= 0) {
+        setGenerateError('Duration must be a number of weeks greater than 0.');
+        return;
+      }
+    }
+
+    setGenerating(true);
+    try {
+      const response = await generatePlan({
+        goalType,
+        ...(goalType === 'race' ? { raceDistance, raceDate: raceDate.trim() } : {}),
+        ...(goalType === 'duration' ? { durationWeeks: Number(durationWeeks) } : {}),
+        ...(notes.trim() ? { notes: notes.trim() } : {}),
+        idempotencyKey,
+      });
+      setIdempotencyKey(mintIdempotencyKey());
+      router.push({ pathname: '/plan/[id]', params: { id: response.planId } });
+    } catch (generatePlanError) {
+      if (generatePlanError instanceof ApiError) {
+        if (generatePlanError.body.code === 'intake_required') {
+          setHasIntake(false);
+        } else {
+          setGenerateError(generatePlanError.body.error);
+        }
+      } else {
+        setGenerateError('Something went wrong. Try again.');
+      }
+    } finally {
+      setGenerating(false);
+    }
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: theme.surface.base }]}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        <Text style={[styles.title, { color: theme.text.primary }]}>Pace Blueprint</Text>
-        <Text style={[styles.body, { color: theme.text.secondary }]}>
-          Intake, generation, and plan view land in later build phases.
-        </Text>
-        <Text style={[styles.mono, { color: theme.text.secondary }]}>PHASE 1 — TOKEN SHELL</Text>
-        <Link href={{ pathname: '/plan/[id]', params: { id: EXAMPLE_PLAN_ID } }} asChild>
+        <ScrollView contentContainerStyle={styles.content}>
+          <Text style={[styles.title, { color: theme.text.primary }]}>Pace Blueprint</Text>
+
+          {checkingIntake ? (
+            <ActivityIndicator color={theme.text.primary} style={styles.checkingSpinner} />
+          ) : !hasIntake ? (
+            <View style={styles.section}>
+              {loadError && <Text style={[styles.error, { color: theme.status.error }]}>{loadError}</Text>}
+              <Text style={[styles.body, { color: theme.text.secondary }]}>
+                Complete your intake to generate a plan.
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.push('/intake')}
+                style={({ pressed }) => [
+                  styles.primaryButton,
+                  { backgroundColor: theme.accent.hivis },
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text style={[styles.primaryButtonText, { color: theme.accent.onAccent }]}>
+                  Complete intake
+                </Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View style={styles.section}>
+              <Text style={[styles.fieldLabel, { color: theme.text.secondary }]}>GOAL TYPE</Text>
+              <View style={styles.chipRow}>
+                <Chip
+                  label="Race"
+                  selected={goalType === 'race'}
+                  onPress={() => setGoalType('race')}
+                  theme={theme}
+                />
+                <Chip
+                  label="Duration"
+                  selected={goalType === 'duration'}
+                  onPress={() => setGoalType('duration')}
+                  theme={theme}
+                />
+              </View>
+
+              {goalType === 'race' ? (
+                <>
+                  <Text style={[styles.fieldLabel, { color: theme.text.secondary }]}>RACE DISTANCE</Text>
+                  <View style={styles.chipRow}>
+                    {RACE_DISTANCE_OPTIONS.map((option) => (
+                      <Chip
+                        key={option.value}
+                        label={option.label}
+                        selected={raceDistance === option.value}
+                        onPress={() => setRaceDistance(option.value)}
+                        theme={theme}
+                      />
+                    ))}
+                  </View>
+                  <Text style={[styles.fieldLabel, { color: theme.text.secondary }]}>
+                    RACE DATE (YYYY-MM-DD)
+                  </Text>
+                  <TextInput
+                    value={raceDate}
+                    onChangeText={setRaceDate}
+                    placeholder="2026-09-26"
+                    placeholderTextColor={theme.text.secondary}
+                    autoCapitalize="none"
+                    style={[
+                      styles.input,
+                      { color: theme.text.primary, borderColor: theme.hairline, backgroundColor: theme.surface.raised },
+                    ]}
+                  />
+                </>
+              ) : (
+                <>
+                  <Text style={[styles.fieldLabel, { color: theme.text.secondary }]}>DURATION (WEEKS)</Text>
+                  <TextInput
+                    value={durationWeeks}
+                    onChangeText={setDurationWeeks}
+                    placeholder="e.g. 12"
+                    placeholderTextColor={theme.text.secondary}
+                    keyboardType="number-pad"
+                    style={[
+                      styles.input,
+                      { color: theme.text.primary, borderColor: theme.hairline, backgroundColor: theme.surface.raised },
+                    ]}
+                  />
+                </>
+              )}
+
+              <Text style={[styles.fieldLabel, { color: theme.text.secondary }]}>NOTES (OPTIONAL)</Text>
+              <TextInput
+                value={notes}
+                onChangeText={(text) => setNotes(text.slice(0, MAX_NOTES_LENGTH))}
+                placeholder="Anything else the plan should account for"
+                placeholderTextColor={theme.text.secondary}
+                multiline
+                maxLength={MAX_NOTES_LENGTH}
+                style={[
+                  styles.input,
+                  styles.notesInput,
+                  { color: theme.text.primary, borderColor: theme.hairline, backgroundColor: theme.surface.raised },
+                ]}
+              />
+
+              {generateError && (
+                <Text style={[styles.error, { color: theme.status.error }]}>{generateError}</Text>
+              )}
+
+              <Pressable
+                accessibilityRole="button"
+                disabled={generating}
+                onPress={handleGenerate}
+                style={({ pressed }) => [
+                  styles.primaryButton,
+                  { backgroundColor: theme.accent.hivis },
+                  (pressed || generating) && styles.pressed,
+                ]}
+              >
+                {generating ? (
+                  <ActivityIndicator color={theme.accent.onAccent} />
+                ) : (
+                  <Text style={[styles.primaryButtonText, { color: theme.accent.onAccent }]}>
+                    Generate plan
+                  </Text>
+                )}
+              </Pressable>
+            </View>
+          )}
+
           <Pressable
-            accessibilityRole="link"
+            accessibilityRole="button"
+            onPress={() => authClient.signOut()}
             style={({ pressed }) => [
-              styles.demoLink,
-              { borderColor: theme.text.primary },
-              pressed && styles.demoLinkPressed,
+              styles.secondaryButton,
+              { borderColor: theme.text.secondary },
+              pressed && styles.pressed,
             ]}
           >
-            <Text style={[styles.demoLinkText, { color: theme.text.primary }]}>
-              View the sample 5K plan (demo)
-            </Text>
+            <Text style={[styles.secondaryButtonText, { color: theme.text.secondary }]}>Sign out</Text>
           </Pressable>
-        </Link>
-        {/* Temporary, same pass as the auth gate itself: no Settings-lite screen exists yet
-            (that lands with the backend that gives it something to show — see the comment atop
-            `(tabs)/_layout.tsx`), and there is otherwise no way to exercise the signed-out
-            redirect without reinstalling the app. */}
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => authClient.signOut()}
-          style={({ pressed }) => [
-            styles.demoLink,
-            { borderColor: theme.text.secondary, marginTop: Spacing.two },
-            pressed && styles.demoLinkPressed,
-          ]}
-        >
-          <Text style={[styles.demoLinkText, { color: theme.text.secondary }]}>Sign out</Text>
-        </Pressable>
+        </ScrollView>
       </SafeAreaView>
     </View>
+  );
+}
+
+function Chip({
+  label,
+  selected,
+  onPress,
+  theme,
+}: {
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+  theme: ReturnType<typeof useTheme>;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.chip,
+        {
+          borderColor: selected ? theme.text.primary : theme.hairline,
+          backgroundColor: selected ? theme.text.primary : theme.surface.raised,
+        },
+        pressed && styles.pressed,
+      ]}
+    >
+      <Text style={[styles.chipText, { color: selected ? theme.surface.base : theme.text.primary }]}>
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -66,42 +315,89 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+  },
+  content: {
     paddingHorizontal: Spacing.four,
-    gap: Spacing.two,
+    paddingTop: Spacing.four,
+    paddingBottom: Spacing.six,
+    gap: Spacing.four,
   },
   title: {
     fontFamily: FontFamily.display.bold,
     fontSize: FontSize.xxl,
-    textAlign: 'center',
+  },
+  checkingSpinner: {
+    marginTop: Spacing.four,
+  },
+  section: {
+    gap: Spacing.two,
   },
   body: {
     fontFamily: FontFamily.body.regular,
     fontSize: FontSize.sm,
-    textAlign: 'center',
   },
-  mono: {
-    fontFamily: FontFamily.mono.regular,
+  fieldLabel: {
+    fontFamily: FontFamily.mono.medium,
     fontSize: FontSize.xs,
-    textAlign: 'center',
-    marginTop: Spacing.three,
+    marginTop: Spacing.two,
   },
-  demoLink: {
-    marginTop: Spacing.four,
-    minHeight: Spacing.six, // 48pt minimum tap target
-    paddingHorizontal: Spacing.four,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: Radius.control,
-    // Outline button — 1.5px ink border, per frontend-design-brief.md Part 2 "Base components".
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.two,
+  },
+  chip: {
+    minHeight: Spacing.six,
     borderWidth: 1.5,
+    borderRadius: Radius.control,
+    paddingHorizontal: Spacing.three,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  demoLinkPressed: {
-    opacity: PressedOpacity,
+  chipText: {
+    fontFamily: FontFamily.body.medium,
+    fontSize: FontSize.sm,
   },
-  demoLinkText: {
+  input: {
+    minHeight: Spacing.six,
+    borderWidth: 1,
+    borderRadius: Radius.control,
+    paddingHorizontal: Spacing.three,
+    fontFamily: FontFamily.body.regular,
+    fontSize: FontSize.sm,
+  },
+  notesInput: {
+    minHeight: Spacing.six * 1.5,
+    paddingVertical: Spacing.two,
+    textAlignVertical: 'top',
+  },
+  error: {
+    fontFamily: FontFamily.body.medium,
+    fontSize: FontSize.xs,
+  },
+  primaryButton: {
+    minHeight: Spacing.six,
+    borderRadius: Radius.control,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: Spacing.two,
+  },
+  primaryButtonText: {
     fontFamily: FontFamily.body.semiBold,
     fontSize: FontSize.sm,
+  },
+  secondaryButton: {
+    minHeight: Spacing.six,
+    borderRadius: Radius.control,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondaryButtonText: {
+    fontFamily: FontFamily.body.semiBold,
+    fontSize: FontSize.sm,
+  },
+  pressed: {
+    opacity: PressedOpacity,
   },
 });

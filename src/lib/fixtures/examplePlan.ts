@@ -1,10 +1,12 @@
 /**
  * Local fixture — a hand-built 12-week 5K plan at Pro-tier density, modeled on
- * `docs/reference/coaching/example-plan-5k-pro.md`. `src/app/plan/[id].tsx` renders this
- * regardless of route id in Phase 1, since there is no backend yet (mvp-build-prompt.md
- * Phase 1, step 3). It exists to prove the plan-view screen against a real, source-derived
- * plan shape — it is a screen fixture, not the golden fixture `planTemplates.ts`'s own tests
- * work from (that agent works from the coaching docs directly).
+ * `docs/reference/coaching/example-plan-5k-pro.md`. `src/app/plan/[id].tsx` renders this,
+ * un-fetched, whenever the route id equals `EXAMPLE_PLAN_ID` below — the captain's explicit
+ * "never remove the sample plan" call, kept permanently reachable from the pinned row atop
+ * `src/app/(tabs)/my-plans.tsx` now that real, backend-fetched plans render alongside it. It
+ * exists to prove the plan-view screen against a real, source-derived plan shape — it is a
+ * screen fixture, not the golden fixture `planTemplates.ts`'s own tests work from (that agent
+ * works from the coaching docs directly).
  *
  * REBUILT 2026-07-11 against the source doc's 2026-07-11 revision. Ian scored the previously
  * rendered plan 3/10 and issued five rulings: quality-session size is keyed to race distance,
@@ -103,7 +105,12 @@
 
 import type { Day, Pace, Phase, Plan, RestDay, Week, Week7, Workout } from '@/lib/planTypes';
 
-/** Fixed route param for the temporary demo link on `src/app/(tabs)/index.tsx`. */
+/**
+ * Fixed route param `src/app/plan/[id].tsx` checks for to render this fixture instead of
+ * fetching a real plan, and the id the pinned "Example Plan" row on
+ * `src/app/(tabs)/my-plans.tsx` always links to. The captain has required this static example
+ * stay permanently viewable, real backend or not.
+ */
 export const EXAMPLE_PLAN_ID = 'example-5k-pro';
 
 const REST: RestDay = { kind: 'rest' };
@@ -230,7 +237,7 @@ function week(
 }
 
 export const examplePlan: Plan = {
-  title: '5K Plan',
+  title: 'Example Plan (5K)',
   goalType: 'race',
   raceDistance: '5k',
   raceDate: '2026-09-26',

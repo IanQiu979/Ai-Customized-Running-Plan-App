@@ -16,7 +16,7 @@
 
 import type { IntakeResponses, Plan, Tier } from '../../../src/lib/planTypes';
 import type { GeneratePlanRequest } from '../../../src/lib/planTypes';
-import type { PlanPersonalizer, SkeletonBuilder } from './planEngine';
+import { MAX_PLAN_DURATION_WEEKS, type PlanPersonalizer, type SkeletonBuilder } from './planEngine';
 import type { PlanStore } from './store';
 
 export interface GeneratePlanDeps {
@@ -206,6 +206,12 @@ function validateRequest(request: GeneratePlanRequest): string | null {
     if (typeof request.durationWeeks !== 'number' || request.durationWeeks <= 0) {
       return 'durationWeeks must be a positive number when goalType is "duration".';
     }
+  }
+  // Checked regardless of goalType: a "race" request may still carry an explicit `durationWeeks`
+  // (the client shouldn't, but nothing stops it), and that value would otherwise bypass
+  // `weeksUntilRace`'s own clamp (`planEngine.ts`) entirely — the two must share one ceiling.
+  if (request.durationWeeks !== undefined && request.durationWeeks > MAX_PLAN_DURATION_WEEKS) {
+    return `durationWeeks must be ${MAX_PLAN_DURATION_WEEKS} or fewer.`;
   }
   if (request.notes !== undefined) {
     if (typeof request.notes !== 'string') return 'notes must be a string.';

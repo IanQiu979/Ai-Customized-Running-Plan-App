@@ -197,6 +197,7 @@ const INJURY_FLAGS = new Set([
   'it_band',
   'hip_glute',
   'lower_back',
+  'plantar_arch',
   'none',
 ]);
 
