@@ -20,6 +20,40 @@ const RACE_DISTANCE_OPTIONS: { value: RaceDistance; label: string }[] = [
  * stops accepting keystrokes rather than the runner discovering the limit from a server error. */
 const MAX_NOTES_LENGTH = 1000;
 
+/** As-you-type mask for a `YYYY-MM-DD` field: strips non-digits, caps at 8 digits, and inserts
+ * the two `-` separators as they're reached. No native date picker here — see the routing note
+ * in AGENTS.md on new dependencies; this is the deliberate text-input fallback. Mirrors
+ * `intake.tsx`'s identical helper — kept local rather than shared per this fix's file scope. */
+function formatDateInput(text: string): string {
+  const digits = text.replace(/\D/g, '').slice(0, 8);
+  let out = digits.slice(0, 4);
+  if (digits.length > 4) out += `-${digits.slice(4, 6)}`;
+  if (digits.length > 6) out += `-${digits.slice(6, 8)}`;
+  return out;
+}
+
+/** Inline, complete-but-invalid check for a `YYYY-MM-DD` field. Returns `null` while the runner
+ * is still typing (fewer than 8 digits) so the message doesn't flash on every keystroke — only
+ * once all 8 digits are in does an out-of-range month/day or non-existent calendar date surface. */
+function dateFieldError(text: string): string | null {
+  const digits = text.replace(/\D/g, '');
+  if (digits.length < 8) return null;
+  const year = Number(text.slice(0, 4));
+  const month = Number(text.slice(5, 7));
+  const day = Number(text.slice(8, 10));
+  if (month < 1 || month > 12) return 'Enter a valid month (01-12).';
+  if (day < 1 || day > 31) return 'Enter a valid day (01-31).';
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (
+    parsed.getUTCFullYear() !== year ||
+    parsed.getUTCMonth() !== month - 1 ||
+    parsed.getUTCDate() !== day
+  ) {
+    return 'Enter a valid calendar date.';
+  }
+  return null;
+}
+
 /**
  * Home. On mount, checks whether the signed-in runner has completed intake (`getIntake()`). No
  * intake yet: a prompt links to `/intake`. Intake done: a compact generate-configuration panel —
@@ -51,6 +85,10 @@ export default function HomeScreen() {
   // *distinct* "Generate plan" press isn't silently replayed as the previous one
   // (`generate-plan-flow.ts`'s replay path matches on this key alone, not on the request body).
   const [idempotencyKey, setIdempotencyKey] = useState(() => mintIdempotencyKey());
+
+  // Inline, as-you-type feedback for the masked race-date field — derived from the current text
+  // on every render, only while it's the active goal type.
+  const raceDateError = goalType === 'race' ? dateFieldError(raceDate) : null;
 
   // `useFocusEffect` (not a plain mount-only `useEffect`) because Expo Router keeps tab screens
   // mounted across navigation — leaving Home for Intake and coming back is a focus event, not a
@@ -92,6 +130,10 @@ export default function HomeScreen() {
       }
       if (!raceDate.trim()) {
         setGenerateError('Race date is required.');
+        return;
+      }
+      if (raceDate.replace(/\D/g, '').length < 8 || dateFieldError(raceDate)) {
+        setGenerateError('Race date must be a valid YYYY-MM-DD date.');
         return;
       }
     } else {
@@ -193,15 +235,26 @@ export default function HomeScreen() {
                   </Text>
                   <TextInput
                     value={raceDate}
-                    onChangeText={setRaceDate}
+                    onChangeText={(text) => setRaceDate(formatDateInput(text))}
                     placeholder="2026-09-26"
                     placeholderTextColor={theme.text.secondary}
                     autoCapitalize="none"
+                    keyboardType="number-pad"
+                    maxLength={10}
                     style={[
                       styles.input,
-                      { color: theme.text.primary, borderColor: theme.hairline, backgroundColor: theme.surface.raised },
+                      {
+                        color: theme.text.primary,
+                        borderColor: raceDateError ? theme.status.error : theme.hairline,
+                        backgroundColor: theme.surface.raised,
+                      },
                     ]}
                   />
+                  {raceDateError && (
+                    <Text style={[styles.fieldError, { color: theme.status.error }]}>
+                      {raceDateError}
+                    </Text>
+                  )}
                 </>
               ) : (
                 <>
@@ -374,6 +427,11 @@ const styles = StyleSheet.create({
   error: {
     fontFamily: FontFamily.body.medium,
     fontSize: FontSize.xs,
+  },
+  fieldError: {
+    fontFamily: FontFamily.body.medium,
+    fontSize: FontSize.xs,
+    marginTop: Spacing.half,
   },
   primaryButton: {
     minHeight: Spacing.six,

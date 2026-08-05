@@ -8,7 +8,7 @@ import { DisclaimerFooter } from '@/components/plan/DisclaimerFooter';
 import { FallbackNotice } from '@/components/plan/FallbackNotice';
 import { PlanNameplate } from '@/components/plan/PlanNameplate';
 import { WeekAccordion } from '@/components/plan/WeekAccordion';
-import { FontFamily, FontSize, Spacing } from '@/constants/theme';
+import { EffortOrder, FontFamily, FontSize, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { ApiError, getPlan } from '@/lib/apiClient';
 import { EXAMPLE_PLAN_ID, examplePlan } from '@/lib/fixtures/examplePlan';
@@ -109,6 +109,25 @@ export default function PlanScreen() {
       >
         <PlanNameplate plan={plan} />
         {/*
+          The ribbon below (`WeekAccordion`) colours each run day by effort but carries no key of
+          its own — a screen reader gets the effort word per day from `describeDays`, but a
+          sighted user previously had no way to decode the colours at all (UX audit finding 3).
+          One legend here, not one per week: it's plan-level information, not per-week, and
+          repeating it in every `WeekAccordion` row would be noisier than the bug it fixes.
+        */}
+        <View
+          style={styles.legend}
+          accessible
+          accessibilityLabel={`Effort levels: ${EffortOrder.map(capitalize).join(', ')}.`}
+        >
+          {EffortOrder.map((level) => (
+            <View key={level} style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: theme.effort[level] }]} />
+              <Text style={[styles.legendLabel, { color: theme.text.secondary }]}>{capitalize(level)}</Text>
+            </View>
+          ))}
+        </View>
+        {/*
           `variant` is hardcoded because `Plan` carries no signal for it: `isFallback` is a bare
           boolean, and only the server knows whether this fallback landed inside the 3-per-period
           exemption or past it. `exempt` is correct for the fixture and for the common case;
@@ -124,6 +143,13 @@ export default function PlanScreen() {
       </Animated.ScrollView>
     </View>
   );
+}
+
+/** "recovery" -> "Recovery" — `EffortLevel`s are stored lowercase (`planTypes.ts`); the legend
+ * spells them as ordinary words rather than reusing the all-caps convention `PlanNameplate`'s
+ * metadata line uses, since this is prose, not a serial-plate field. */
+function capitalize(word: string): string {
+  return word.charAt(0).toUpperCase() + word.slice(1);
 }
 
 const styles = StyleSheet.create({
@@ -143,6 +169,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.four,
     paddingTop: Spacing.four,
     gap: Spacing.five,
+  },
+  legend: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    columnGap: Spacing.three,
+    rowGap: Spacing.one,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+  },
+  legendDot: {
+    width: Spacing.two,
+    height: Spacing.two,
+    borderRadius: Spacing.one,
+  },
+  legendLabel: {
+    fontFamily: FontFamily.mono.medium,
+    fontSize: FontSize.xs,
   },
   ribbon: {
     gap: Spacing.one,

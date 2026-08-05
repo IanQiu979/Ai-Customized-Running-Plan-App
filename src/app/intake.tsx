@@ -74,6 +74,75 @@ function clockToSec(text: string): number | null {
   return h * 3600 + m * 60 + s;
 }
 
+/** As-you-type mask for a `YYYY-MM-DD` field: strips non-digits, caps at 8 digits, and inserts
+ * the two `-` separators as they're reached. No native date picker here — see the routing note
+ * in AGENTS.md on new dependencies; this is the deliberate text-input fallback. */
+function formatDateInput(text: string): string {
+  const digits = text.replace(/\D/g, '').slice(0, 8);
+  let out = digits.slice(0, 4);
+  if (digits.length > 4) out += `-${digits.slice(4, 6)}`;
+  if (digits.length > 6) out += `-${digits.slice(6, 8)}`;
+  return out;
+}
+
+/** Inline, complete-but-invalid check for a `YYYY-MM-DD` field. Returns `null` while the runner
+ * is still typing (fewer than 8 digits) so the message doesn't flash on every keystroke — only
+ * once all 8 digits are in does an out-of-range month/day or non-existent calendar date surface. */
+function dateFieldError(text: string): string | null {
+  const digits = text.replace(/\D/g, '');
+  if (digits.length < 8) return null;
+  const year = Number(text.slice(0, 4));
+  const month = Number(text.slice(5, 7));
+  const day = Number(text.slice(8, 10));
+  if (month < 1 || month > 12) return 'Enter a valid month (01-12).';
+  if (day < 1 || day > 31) return 'Enter a valid day (01-31).';
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (
+    parsed.getUTCFullYear() !== year ||
+    parsed.getUTCMonth() !== month - 1 ||
+    parsed.getUTCDate() !== day
+  ) {
+    return 'Enter a valid calendar date.';
+  }
+  return null;
+}
+
+/** As-you-type mask for a "MM:SS"/"H:MM:SS" field: strips non-digits, caps at 6 digits, and
+ * groups them from the right into seconds, then minutes, then whatever's left as hours — so
+ * "1234" becomes "12:34" and "12345" becomes "1:23:45", matching `secToClock`'s own format. */
+function formatTimeInput(text: string): string {
+  const digits = text.replace(/\D/g, '').slice(0, 6);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) {
+    return `${digits.slice(0, digits.length - 2)}:${digits.slice(-2)}`;
+  }
+  const seconds = digits.slice(-2);
+  const minutes = digits.slice(-4, -2);
+  const hours = digits.slice(0, -4);
+  return `${hours}:${minutes}:${seconds}`;
+}
+
+/** Inline, complete-but-invalid check for a "MM:SS"/"H:MM:SS" field. Waits until the seconds
+ * group has both digits typed before judging anything "complete", so an in-progress "1:2" isn't
+ * flagged while the runner is still typing. */
+function timeFieldError(text: string): string | null {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  const parts = trimmed.split(':');
+  if (parts.length < 2 || parts.length > 3) return null;
+  const secondsPart = parts[parts.length - 1];
+  if (secondsPart.length < 2) return null;
+  const numbers = parts.map(Number);
+  if (numbers.some((n) => Number.isNaN(n) || n < 0)) {
+    return 'Enter a valid time (MM:SS or H:MM:SS).';
+  }
+  const seconds = numbers[numbers.length - 1];
+  const minutes = numbers[numbers.length - 2];
+  if (seconds > 59) return 'Seconds must be less than 60.';
+  if (parts.length === 3 && minutes > 59) return 'Minutes must be less than 60.';
+  return null;
+}
+
 /**
  * The intake questionnaire — all 10 `IntakeResponses` fields (`planTypes.ts`), prefilled from
  * `getIntake()` when the runner already has one saved, saved back via `putIntake()`. Hand-rolled
@@ -120,6 +189,12 @@ export default function IntakeScreen() {
 
   const [injuries, setInjuries] = useState<InjuryFlag[]>(['none']);
   const [injuryNotes, setInjuryNotes] = useState('');
+
+  // Inline, as-you-type feedback for the three masked date/time fields — derived from the current
+  // text on every render rather than held in their own state, so there's nothing to keep in sync.
+  const raceDateError = raceDistance ? dateFieldError(raceDate) : null;
+  const goalTimeError = raceDistance ? timeFieldError(goalTime) : null;
+  const recentTimeError = timeFieldError(recentTime);
 
   useEffect(() => {
     let cancelled = false;
@@ -211,6 +286,15 @@ export default function IntakeScreen() {
         setError('Recent time must be in MM:SS or H:MM:SS format.');
         return;
       }
+    }
+
+    if (
+      raceDistance &&
+      raceDate.trim().length > 0 &&
+      (raceDate.replace(/\D/g, '').length < 8 || dateFieldError(raceDate))
+    ) {
+      setError('Race date must be a valid YYYY-MM-DD date.');
+      return;
     }
 
     let goalTimeSec: number | undefined;
@@ -345,22 +429,44 @@ export default function IntakeScreen() {
               <Field label="Race date (optional, YYYY-MM-DD)" theme={theme}>
                 <TextInput
                   value={raceDate}
-                  onChangeText={setRaceDate}
+                  onChangeText={(text) => setRaceDate(formatDateInput(text))}
                   placeholder="2026-09-26"
                   placeholderTextColor={theme.text.secondary}
                   autoCapitalize="none"
-                  style={[styles.input, inputThemeStyle(theme)]}
+                  keyboardType="number-pad"
+                  maxLength={10}
+                  style={[
+                    styles.input,
+                    inputThemeStyle(theme),
+                    raceDateError && { borderColor: theme.status.error },
+                  ]}
                 />
+                {raceDateError && (
+                  <Text style={[styles.fieldError, { color: theme.status.error }]}>
+                    {raceDateError}
+                  </Text>
+                )}
               </Field>
 
               <Field label="Goal time (optional, MM:SS or H:MM:SS)" theme={theme}>
                 <TextInput
                   value={goalTime}
-                  onChangeText={setGoalTime}
+                  onChangeText={(text) => setGoalTime(formatTimeInput(text))}
                   placeholder="24:00"
                   placeholderTextColor={theme.text.secondary}
-                  style={[styles.input, inputThemeStyle(theme)]}
+                  keyboardType="number-pad"
+                  maxLength={8}
+                  style={[
+                    styles.input,
+                    inputThemeStyle(theme),
+                    goalTimeError && { borderColor: theme.status.error },
+                  ]}
                 />
+                {goalTimeError && (
+                  <Text style={[styles.fieldError, { color: theme.status.error }]}>
+                    {goalTimeError}
+                  </Text>
+                )}
               </Field>
             </>
           ) : null}
@@ -381,11 +487,23 @@ export default function IntakeScreen() {
             </View>
             <TextInput
               value={recentTime}
-              onChangeText={setRecentTime}
+              onChangeText={(text) => setRecentTime(formatTimeInput(text))}
               placeholder="Time — MM:SS or H:MM:SS"
               placeholderTextColor={theme.text.secondary}
-              style={[styles.input, inputThemeStyle(theme), styles.recentTimeInput]}
+              keyboardType="number-pad"
+              maxLength={8}
+              style={[
+                styles.input,
+                inputThemeStyle(theme),
+                styles.recentTimeInput,
+                recentTimeError && { borderColor: theme.status.error },
+              ]}
             />
+            {recentTimeError && (
+              <Text style={[styles.fieldError, { color: theme.status.error }]}>
+                {recentTimeError}
+              </Text>
+            )}
           </Field>
 
           <Field label="Injuries" theme={theme}>
@@ -604,6 +722,11 @@ const styles = StyleSheet.create({
   error: {
     fontFamily: FontFamily.body.medium,
     fontSize: FontSize.xs,
+  },
+  fieldError: {
+    fontFamily: FontFamily.body.medium,
+    fontSize: FontSize.xs,
+    marginTop: Spacing.half,
   },
   saved: {
     fontFamily: FontFamily.body.medium,

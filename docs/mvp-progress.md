@@ -6,7 +6,8 @@
 > Milestone definitions live in [`planning/02-product-requirements.md`](../planning/02-product-requirements.md).
 > Decision history lives in [`change_log.md`](change_log.md).
 
-**Last updated:** 2026-08-05 — phone testing fixed three onboarding UX problems: signed-out launches now default to Sign Up (with the existing returning-user Sign In link retained); Intake has an always-visible "Skip for now" header action that replaces to Home, whose existing missing-intake state lets the runner resume later; and the race-date label now explicitly says optional, matching its payload and validation behavior. The deliberate post-signup `router.replace('/intake')` remains because it avoids the protected-route unmount race documented in `src/lib/postSignupRedirect.ts`. Focused auth-default and Intake-exit regression tests were added.
+**Last updated:** 2026-08-05 — a UX audit fix batch closed Findings 1-5 of a 7-finding external audit report (`v22-ux-audit-r1`; Findings 6-7 out of scope, untouched). The tab bar no longer shows React Navigation's dev-only `MissingIcon` placeholder (`tabBarIcon: () => null` on all three tabs); Google sign-in shows "Google sign-in isn't available yet." instead of the raw `PROVIDER_NOT_FOUND` backend string (button stays visible; OAuth credentials are still not configured, see "Blocked" below); the plan view gained a one-line effort-color legend so sighted users get the same info screen readers already had via `describeDays()`; My Plans dropped the internal `plan.engine.toUpperCase()` ("TEMPLATE") label from user-facing copy; and Intake/Home's `raceDate`/`goalTime`/`recentTime` fields gained as-you-type masking and inline validation instead of raw free-text — deliberately not a native date/time picker (a new dependency, out of scope, logged as a possible follow-up). A code-review pass caught and closed a related gap in the same commit: an incomplete race date (e.g. `"2026-09"`) previously passed submit-time validation silently. 272/272 tests pass. Full account: `docs/change_log.md`'s 2026-08-05 UX audit fix batch entry.
+Previous entry: 2026-08-05 — phone testing fixed three onboarding UX problems: signed-out launches now default to Sign Up (with the existing returning-user Sign In link retained); Intake has an always-visible "Skip for now" header action that replaces to Home, whose existing missing-intake state lets the runner resume later; and the race-date label now explicitly says optional, matching its payload and validation behavior. The deliberate post-signup `router.replace('/intake')` remains because it avoids the protected-route unmount race documented in `src/lib/postSignupRedirect.ts`. Focused auth-default and Intake-exit regression tests were added.
 Previous entry: 2026-08-04 — the first end-to-end user loop is wired up (intake screen, the
 generate-plan action, the plan view rendering real generated plans alongside the permanent golden
 fixture, and a My Plans list), and an E2E verification pass over that loop found and fixed four
@@ -656,6 +657,11 @@ Closes the plan-accuracy scout's Bug 1 and mandated finding B. Full rationale:
   spreads `style` as an *object*, but the wrapped `Pressable`'s `style` prop is a *function*
   (`({ pressed }) => [...]`) — spreading a function yields `{}`, silently dropping every rule the
   function would have returned. Derived from reading the source, not device-verified.
+- 🟡 **Race date/goal time/recent time are masked text input, not a native picker (UX audit
+  Finding 5, `1c1e174`).** Intake and Home mask keystrokes and validate inline, but a real
+  `@react-native-community/datetimepicker` was deliberately withheld — a new dependency is HIGH
+  tier under `AGENTS.md`'s routing rules and needs a `dependency-auditor`-led chain and explicit
+  sign-off, not bundled into a UX-copy batch. Revisit if masked text proves error-prone in use.
 - 🟠 **Deep-link scheme `paceblueprint://` still unverified against a built app.** It is now
   configured as `APP_SCHEME` in `workers/wrangler.toml` and passed to better-auth's
   `trustedOrigins`, so there is no third-party allowlist to update any more — but the value itself
