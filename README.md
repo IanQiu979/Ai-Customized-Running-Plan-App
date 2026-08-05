@@ -145,7 +145,7 @@ src/app/
 
 ## Roadmap
 
-- **M1 — Foundation**: Expo app scaffolded, backend + auth working, required sign-up. *Client auth screens done; Google OAuth needs the captain's credentials.*
+- **M1 — Foundation**: Expo app scaffolded, backend + auth working, required sign-up. *Client auth screens done; Google OAuth verified in local dev, production `wrangler secret put` pending.*
 - **M2 — Intake**: onboarding questionnaire persists to the database. *Done.*
 - **M3 — Plan engine**: free template plans + paid AI plans generate reliably; plan view renders. *Template path done; Pro/Elite AI personalization not yet built.*
 - **M4 — Tiers & quotas**: dummy paywall, tier and quota enforcement server-side. *Server-side quota enforcement done; no client UI yet.*
