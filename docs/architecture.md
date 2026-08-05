@@ -29,7 +29,7 @@ src/
                           #                authClient.useSession() (no anonymous browsing)
     (auth)/
       _layout.tsx          # stack layout for the signed-out route group
-      index.tsx             # redirect anchor -> sign-in
+      index.tsx             # redirect anchor -> sign-up (returning-user link reaches sign-in)
       sign-in.tsx            # email/password sign-in + an inert "Continue with Google" button
       sign-up.tsx            # email/password sign-up + the same Google button
     (tabs)/
@@ -41,7 +41,8 @@ src/
       glossary.tsx           # abbreviations glossary — sourced from notation.ts, nothing hardcoded
       my-plans.tsx           # My Plans — lists plans off GET /api/plans, refetched on every tab
                               #            focus (useFocusEffect), not just on mount
-    intake/                  # onboarding questionnaire, against GET/PUT /api/intake
+    intake.tsx               # onboarding questionnaire, against GET/PUT /api/intake; its
+                              # always-visible "Skip for now" header action replaces to Home
     plan/[id].tsx            # plan view — `[id]` now selects: renders a real generated plan via
                               #  GET /api/plans/:id, or the permanent static golden fixture for the
                               #  example-plan id
@@ -151,7 +152,10 @@ driven by `sign-up.tsx`'s own `useEffect` can lose that unmount race. The fix is
 `consumePostSignupRedirect()`), set by `sign-up.tsx` on a successful signup and consumed by
 `_layout.tsx` — which never unmounts — in its own `useEffect` watching `session`, followed by
 `router.replace('/intake')`. Any future post-signup routing decision belongs in `_layout.tsx` for
-the same reason, not in a screen that's about to unmount.
+the same reason, not in a screen that's about to unmount. Intake itself therefore owns an explicit,
+always-visible "Skip for now" header action that replaces to `/(tabs)`: Home permits a missing
+intake and presents the existing "Complete your intake" prompt, so this is a working escape without
+weakening the deliberate one-shot post-signup replace.
 
 A known type-only friction: `@better-auth/expo` declares
 a `typescript: ^6.0.3` peer against this project's pinned `~5.9.2`; `apiClient.ts` carries a

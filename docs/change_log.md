@@ -5,6 +5,13 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-08-05 — phone-test UX fixes for auth landing and Intake
+
+- Signed-out launches now default to `/(auth)/sign-up`; the existing "Already have an account? Sign in" action remains on the sign-up screen for returning runners.
+- Intake now has an always-visible, accessible header action labeled "Skip for now". It replaces to `/(tabs)`, where Home already supports a missing intake by showing its "Complete your intake" prompt, so the deliberate post-signup `router.replace('/intake')` remains intact and does not recreate the sign-up redirect race.
+- The conditional race-date label now says `Race date (optional, YYYY-MM-DD)`, matching its existing optional payload and validation behavior.
+- Added focused regression tests for the auth anchor's sign-up default and the explicit Intake exit action.
+
 ## 2026-08-04 — four bugs fixed in the E2E verification pass over the intake/generate-plan/My Plans frontend loop
 
 This branch wired up the app's first end-to-end user loop: the intake screen against `GET`/`PUT
