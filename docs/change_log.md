@@ -5,6 +5,49 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-08-05 — UX audit fix batch: tab bar icon, Google error copy, plan legend, plan status label, date/time masking (`1c1e174`)
+
+Findings 1-5 of a 7-finding UX audit report (`v22-ux-audit-r1`, external to this repo). Findings 6
+and 7 are explicitly out of scope for this batch and untouched.
+
+- **Finding 1 — tab bar no longer shows React Navigation's dev-only `MissingIcon` placeholder.**
+  `src/app/(tabs)/_layout.tsx` never supplied a `tabBarIcon`, so React Navigation's fallback was
+  rendering and clipping the tab labels — a dev affordance shipping to real users. All three
+  `Tabs.Screen` entries now set `tabBarIcon: () => null`; no icon set is being added (that remains
+  a deliberate label + caliper-tick design, `mvp-blueprint.md` Part 8, and a HIGH-tier new
+  dependency per `AGENTS.md`).
+- **Finding 2 — Google sign-in shows a human message instead of the raw backend error string.**
+  `src/app/(auth)/sign-in.tsx` and `sign-up.tsx` both caught `socialError` and rendered
+  `socialError.message` verbatim, which for better-auth's `PROVIDER_NOT_FOUND` code is the literal
+  string "Provider not found." Both screens now special-case that code and show "Google sign-in
+  isn't available yet." instead; the button itself stays visible either way. This is copy only —
+  Google OAuth credentials are still not configured (tracked separately, `v22-google-oauth-creds`
+  in "Blocked" in `mvp-progress.md`); no code path changed.
+- **Finding 3 — plan view gained a one-line effort-color legend.** `src/app/plan/[id].tsx`'s week
+  ribbon (`WeekAccordion`) colors each day by effort with no key of its own; a screen-reader user
+  already got the effort word per day via `describeDays()`, but a sighted user had no way to decode
+  the colors. One legend under the plan title, sourced from the same `EffortOrder`/`theme.effort`
+  tokens the ribbon uses, not repeated per week (plan-level information, not per-week).
+- **Finding 4 — My Plans drops the internal "TEMPLATE" engine label from user-facing copy.**
+  `src/app/(tabs)/my-plans.tsx`'s `PlanRow` metadata line was printing `plan.engine.toUpperCase()`
+  next to `TIER: FREE` — an internal implementation detail (which generation engine produced the
+  plan), redundant with the tier the runner already sees. Removed from the visible line; nothing
+  else about `PlanSummary` changed.
+- **Finding 5 — Intake and Home's date/time fields gained as-you-type masking and inline
+  validation.** `raceDate` (Intake, Home), `goalTime`, and `recentTime` (Intake) were raw free-text
+  inputs accepting any keystroke. Both screens now mask input live (`formatDateInput`/
+  `formatTimeInput`, digits-only, auto-inserted separators) and show an inline error once a field
+  is digit-complete but invalid (`dateFieldError`/`timeFieldError`) — the error message doesn't
+  flash mid-keystroke. A native date/time picker was deliberately not added: it would be a new
+  dependency (HIGH tier, `AGENTS.md`), out of scope for this batch, and is logged as a possible
+  follow-up. A code-review pass over this fix caught a related gap and closed it in the same
+  commit: an incomplete race date (e.g. `"2026-09"`) previously passed submit-time validation
+  silently on both screens; submit now also checks digit-completeness, not just calendar validity.
+
+Verified: `npm run typecheck && npm run lint && npm test` — 272/272 passing. Reviewed by
+`code-reviewer` (one finding, the incomplete-date gap above, fixed in the same commit) and
+`security-auditor` (the Google error-handling change; no issues) against the combined diff.
+
 ## 2026-08-05 — phone-test UX fixes for auth landing and Intake
 
 - Signed-out launches now default to `/(auth)/sign-up`; the existing "Already have an account? Sign in" action remains on the sign-up screen for returning runners.
