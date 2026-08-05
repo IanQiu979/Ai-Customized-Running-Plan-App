@@ -657,6 +657,11 @@ Closes the plan-accuracy scout's Bug 1 and mandated finding B. Full rationale:
   spreads `style` as an *object*, but the wrapped `Pressable`'s `style` prop is a *function*
   (`({ pressed }) => [...]`) — spreading a function yields `{}`, silently dropping every rule the
   function would have returned. Derived from reading the source, not device-verified.
+- 🟡 **Race date/goal time/recent time are masked text input, not a native picker (UX audit
+  Finding 5, `1c1e174`).** Intake and Home mask keystrokes and validate inline, but a real
+  `@react-native-community/datetimepicker` was deliberately withheld — a new dependency is HIGH
+  tier under `AGENTS.md`'s routing rules and needs a `dependency-auditor`-led chain and explicit
+  sign-off, not bundled into a UX-copy batch. Revisit if masked text proves error-prone in use.
 - 🟠 **Deep-link scheme `paceblueprint://` still unverified against a built app.** It is now
   configured as `APP_SCHEME` in `workers/wrangler.toml` and passed to better-auth's
   `trustedOrigins`, so there is no third-party allowlist to update any more — but the value itself
