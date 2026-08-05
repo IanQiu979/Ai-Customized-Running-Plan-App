@@ -1,0 +1,232 @@
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { FontFamily, FontSize, PressedOpacity, Radius, Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
+import { ApiError, authClient, deleteAccount, getQuotaStatus } from '@/lib/apiClient';
+import { formatQuotaLine } from '@/lib/quotaDisplay';
+import type { QuotaStatus } from '@/lib/planTypes';
+
+/**
+ * Settings. On focus, fetches `getQuotaStatus()` and renders the runner's tier and quota line
+ * (`formatQuotaLine`). Free tier gets a proactive "Upgrade" entry point to `/paywall` (no quota
+ * param — that route is reserved for the 402 redirect out of Home). Sign-out (moved here from
+ * Home) and Delete Account (native confirm, then `deleteAccount()`) round it out — no
+ * on delete-account success, an explicit `authClient.signOut()` invalidates the local session
+ * store so `src/app/_layout.tsx`'s `Stack.Protected` guard bounces to `(auth)`.
+ */
+export default function SettingsScreen() {
+  const theme = useTheme();
+  const router = useRouter();
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [quota, setQuota] = useState<QuotaStatus | null>(null);
+
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      setLoading(true);
+      setError(null);
+
+      (async () => {
+        try {
+          const status = await getQuotaStatus();
+          if (!cancelled) setQuota(status);
+        } catch (fetchError) {
+          if (!cancelled) {
+            setError(fetchError instanceof ApiError ? fetchError.body.error : 'Could not load your account.');
+          }
+        } finally {
+          if (!cancelled) setLoading(false);
+        }
+      })();
+
+      return () => {
+        cancelled = true;
+      };
+    }, [])
+  );
+
+  function confirmDeleteAccount() {
+    Alert.alert(
+      'Delete account',
+      'This permanently deletes your account, intake, and plans. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: handleDeleteAccount },
+      ]
+    );
+  }
+
+  async function handleDeleteAccount() {
+    setDeleteError(null);
+    setDeleting(true);
+    try {
+      await deleteAccount();
+      // The server-side session row is gone, but `authClient`'s own session store doesn't know
+      // that yet — it only refetches on an explicit sign-in/out call, not on a plain `apiFetch`.
+      // Call `signOut()` to invalidate it locally so `Stack.Protected`'s `!!session` guard reacts.
+      await authClient.signOut();
+    } catch (deleteAccountError) {
+      setDeleteError(
+        deleteAccountError instanceof ApiError
+          ? deleteAccountError.body.error
+          : 'Something went wrong. Try again.'
+      );
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  return (
+    <View style={[styles.container, { backgroundColor: theme.surface.base }]}>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        <ScrollView contentContainerStyle={styles.content}>
+          <Text style={[styles.title, { color: theme.text.primary }]}>Settings</Text>
+
+          {loading ? (
+            <ActivityIndicator color={theme.text.primary} style={styles.spinner} />
+          ) : (
+            <View style={styles.section}>
+              {error && <Text style={[styles.error, { color: theme.status.error }]}>{error}</Text>}
+              {quota && (
+                <>
+                  <Text style={[styles.fieldLabel, { color: theme.text.secondary }]}>TIER</Text>
+                  <Text style={[styles.tierValue, { color: theme.text.primary }]}>
+                    {quota.tier.toUpperCase()}
+                  </Text>
+                  <Text style={[styles.body, { color: theme.text.secondary }]}>
+                    {formatQuotaLine(quota)}
+                  </Text>
+                  {quota.tier === 'free' && (
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => router.push('/paywall')}
+                      style={({ pressed }) => [
+                        styles.primaryButton,
+                        { backgroundColor: theme.accent.hivis },
+                        pressed && styles.pressed,
+                      ]}
+                    >
+                      <Text style={[styles.primaryButtonText, { color: theme.accent.onAccent }]}>
+                        Upgrade
+                      </Text>
+                    </Pressable>
+                  )}
+                </>
+              )}
+            </View>
+          )}
+
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => authClient.signOut()}
+            style={({ pressed }) => [
+              styles.secondaryButton,
+              { borderColor: theme.text.secondary },
+              pressed && styles.pressed,
+            ]}
+          >
+            <Text style={[styles.secondaryButtonText, { color: theme.text.secondary }]}>Sign out</Text>
+          </Pressable>
+
+          <View style={styles.section}>
+            {deleteError && (
+              <Text style={[styles.error, { color: theme.status.error }]}>{deleteError}</Text>
+            )}
+            <Pressable
+              accessibilityRole="button"
+              disabled={deleting}
+              onPress={confirmDeleteAccount}
+              style={({ pressed }) => [
+                styles.secondaryButton,
+                { borderColor: theme.status.error },
+                (pressed || deleting) && styles.pressed,
+              ]}
+            >
+              {deleting ? (
+                <ActivityIndicator color={theme.status.error} />
+              ) : (
+                <Text style={[styles.secondaryButtonText, { color: theme.status.error }]}>
+                  Delete Account
+                </Text>
+              )}
+            </Pressable>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  safeArea: {
+    flex: 1,
+  },
+  content: {
+    paddingHorizontal: Spacing.four,
+    paddingTop: Spacing.four,
+    paddingBottom: Spacing.six,
+    gap: Spacing.four,
+  },
+  title: {
+    fontFamily: FontFamily.display.bold,
+    fontSize: FontSize.xxl,
+  },
+  spinner: {
+    marginTop: Spacing.four,
+  },
+  section: {
+    gap: Spacing.two,
+  },
+  fieldLabel: {
+    fontFamily: FontFamily.mono.medium,
+    fontSize: FontSize.xs,
+  },
+  tierValue: {
+    fontFamily: FontFamily.display.bold,
+    fontSize: FontSize.xl,
+  },
+  body: {
+    fontFamily: FontFamily.body.regular,
+    fontSize: FontSize.sm,
+  },
+  error: {
+    fontFamily: FontFamily.body.medium,
+    fontSize: FontSize.xs,
+  },
+  primaryButton: {
+    minHeight: Spacing.six,
+    borderRadius: Radius.control,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: Spacing.two,
+  },
+  primaryButtonText: {
+    fontFamily: FontFamily.body.semiBold,
+    fontSize: FontSize.sm,
+  },
+  secondaryButton: {
+    minHeight: Spacing.six,
+    borderRadius: Radius.control,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondaryButtonText: {
+    fontFamily: FontFamily.body.semiBold,
+    fontSize: FontSize.sm,
+  },
+  pressed: {
+    opacity: PressedOpacity,
+  },
+});

@@ -16,6 +16,7 @@ import { IntakeExitAction } from '@/components/intake/IntakeExitAction';
 import { FontFamily, FontSize, PressedOpacity, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { ApiError, getIntake, putIntake } from '@/lib/apiClient';
+import { assessGoalRealism } from '@/lib/paceDerivation';
 import type { ExperienceAnswer, InjuryFlag, IntakeResponses, RaceDistance } from '@/lib/planTypes';
 
 const EXPERIENCE_OPTIONS: { value: ExperienceAnswer; label: string }[] = [
@@ -156,6 +157,15 @@ export default function IntakeScreen() {
   const theme = useTheme();
   const router = useRouter();
 
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  // Distinct from `saved` (which only reflects a save made *this* session) — set once from the
+  // initial load, so the header reads "Done" for a runner revisiting an already-completed intake
+  // even before they touch anything.
+  const [hadIntakeOnLoad, setHadIntakeOnLoad] = useState(false);
+
   const intakeHeaderOptions = {
     headerShown: true,
     headerTitle: 'Intake',
@@ -165,14 +175,10 @@ export default function IntakeScreen() {
       <IntakeExitAction
         color={theme.text.primary}
         onPress={() => router.replace('/(tabs)')}
+        label={hadIntakeOnLoad || saved ? 'Done' : 'Skip for now'}
       />
     ),
   };
-
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
 
   const [goal, setGoal] = useState('');
   const [age, setAge] = useState('');
@@ -196,6 +202,22 @@ export default function IntakeScreen() {
   const goalTimeError = raceDistance ? timeFieldError(goalTime) : null;
   const recentTimeError = timeFieldError(recentTime);
 
+  // Derived, not stateful — recomputed every render like the error checks above. Only meaningful
+  // once both a complete goal time and a complete recent performance are entered; `undefined`
+  // otherwise (mirrors `assessGoalRealism`'s own "both or neither" contract).
+  const goalTimeSecForRealism =
+    raceDistance && !goalTimeError && goalTime.trim() ? clockToSec(goalTime) : null;
+  const recentTimeSecForRealism =
+    recentDistance && !recentTimeError && recentTime.trim() ? clockToSec(recentTime) : null;
+  const goalRealism =
+    raceDistance && goalTimeSecForRealism !== null && recentDistance && recentTimeSecForRealism !== null
+      ? assessGoalRealism({
+          goalTimeSec: goalTimeSecForRealism,
+          raceDistance,
+          recent: { distance: recentDistance, timeSec: recentTimeSecForRealism },
+        })
+      : undefined;
+
   useEffect(() => {
     let cancelled = false;
 
@@ -203,6 +225,7 @@ export default function IntakeScreen() {
       try {
         const { intake } = await getIntake();
         if (cancelled || !intake) return;
+        setHadIntakeOnLoad(true);
         setGoal(intake.goal);
         setAge(String(intake.age));
         setExperience(intake.experience);
@@ -327,6 +350,7 @@ export default function IntakeScreen() {
     try {
       await putIntake(payload);
       setSaved(true);
+      router.replace('/(tabs)');
     } catch (saveError) {
       setError(saveError instanceof ApiError ? saveError.body.error : 'Something went wrong. Try again.');
     } finally {
@@ -467,6 +491,12 @@ export default function IntakeScreen() {
                     {goalTimeError}
                   </Text>
                 )}
+                {!goalTimeError && goalRealism && goalRealism.realism !== 'realistic' ? (
+                  <Text style={[styles.fieldError, { color: theme.text.secondary }]}>
+                    Based on your recent performance, that goal is {goalRealism.realism} — the plan
+                    will target a more sustainable pace.
+                  </Text>
+                ) : null}
               </Field>
             </>
           ) : null}
@@ -532,9 +562,6 @@ export default function IntakeScreen() {
           </Field>
 
           {error && <Text style={[styles.error, { color: theme.status.error }]}>{error}</Text>}
-          {saved && !error ? (
-            <Text style={[styles.saved, { color: theme.status.success }]}>Saved.</Text>
-          ) : null}
 
           <Pressable
             accessibilityRole="button"
@@ -727,10 +754,6 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.body.medium,
     fontSize: FontSize.xs,
     marginTop: Spacing.half,
-  },
-  saved: {
-    fontFamily: FontFamily.body.medium,
-    fontSize: FontSize.xs,
   },
   primaryButton: {
     minHeight: Spacing.six,

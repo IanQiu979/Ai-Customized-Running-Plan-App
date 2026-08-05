@@ -85,6 +85,7 @@ export default function RootLayout() {
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="plan/[id]" />
             <Stack.Screen name="intake" />
+            <Stack.Screen name="paywall" />
           </Stack.Protected>
           <Stack.Protected guard={!session}>
             <Stack.Screen name="(auth)" />

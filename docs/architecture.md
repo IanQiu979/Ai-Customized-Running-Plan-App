@@ -34,22 +34,35 @@ src/
                               #   working against local dev (2026-08-05); production pending
       sign-up.tsx            # email/password sign-up + the same Google button
     (tabs)/
-      _layout.tsx          # tab bar — Home, Glossary, and My Plans today; Settings-lite still
-                            #           planned (dummy paywall + tier display)
-      index.tsx             # Home placeholder shell + a temporary demo link to the fixture plan,
-                             #  plus a temporary "Sign out" button (no Settings-lite screen exists
-                             #  yet to host it — see the button's own comment)
+      _layout.tsx          # tab bar — all four tabs today: Home, Glossary, My Plans, Settings
+                            #           (Settings added 2026-08-05)
+      index.tsx             # Home placeholder shell + a temporary demo link to the fixture plan;
+                             #  as of 2026-08-05 also prefills raceDistance/raceDate from saved
+                             #  intake (once per mount) and shows GET /api/quota-status inline.
+                             #  The temporary "Sign out" button that lived here is gone — moved to
+                             #  settings.tsx.
+      settings.tsx           # Settings tab (new 2026-08-05) — tier + quota (GET
+                              #  /api/quota-status, src/lib/quotaDisplay.ts), sign-out (moved off
+                              #  Home), a Free-tier "Upgrade" entry point to /paywall, and Delete
+                              #  Account (native confirm -> deleteAccount() -> authClient.signOut())
       glossary.tsx           # abbreviations glossary — sourced from notation.ts, nothing hardcoded
       my-plans.tsx           # My Plans — lists plans off GET /api/plans, refetched on every tab
                               #            focus (useFocusEffect), not just on mount
     intake.tsx               # onboarding questionnaire, against GET/PUT /api/intake; its
-                              # always-visible "Skip for now" header action replaces to Home
+                              # exit-header action replaces to Home ("Done" once intake exists,
+                              # "Skip for now" otherwise), and as of 2026-08-05 a successful save
+                              # also router.replace('/(tabs)')s there instead of staying put
     plan/[id].tsx            # plan view — `[id]` now selects: renders a real generated plan via
                               #  GET /api/plans/:id, or the permanent static golden fixture for the
-                              #  example-plan id
+                              #  example-plan id; as of 2026-08-05 shows GoalRealismNotice when
+                              #  goalRealism.realism is 'implausible'
+    paywall.tsx              # dummy paywall (new 2026-08-05) — a Stack route, reached from
+                              #  Settings or from Home's generate-plan 402 over_quota catch;
+                              #  calls POST /api/purchase-tier, honest "test upgrade" copy
   components/
     plan/                   # WeekAccordion, WorkoutRow, EffortChip, ReadoutBracket,
-                             # PlanNameplate, DisclaimerFooter, FallbackNotice, format.ts
+                             # PlanNameplate, DisclaimerFooter, FallbackNotice, GoalRealismNotice
+                             # (new 2026-08-05 — renders Plan.goalRealism), format.ts
   constants/
     theme.ts                # "Instrument & Matter" token system — current, see below
     navigation-theme.ts      # bridges theme.ts's tokens into @react-navigation/native's `Theme`
@@ -77,10 +90,14 @@ src/
     quotaPeriod.ts                # canonical — `currentPeriod(anchorDate, now)`, the purchase-day
                                    #            anchored window with the month-end clamp. Shared
                                    #            by the app and `workers/`. 10 unit tests
+    quotaDisplay.ts          # pure, app-only display helper (new 2026-08-05) — `formatQuotaLine()`
+                              #  phrases a `QuotaStatus` for Settings/Home/the paywall; the numbers
+                              #  themselves stay server-computed, this only formats them
     fixtures/examplePlan.ts  # hand-built 5K screen fixture; `plan/[id].tsx` still renders it
     __tests__/               # supabase, loadRules, notation, examplePlan.fixture, tierLimits,
-                              # quotaPeriod, planTemplates (golden + general), paceDerivation —
-                              # the two engine contracts included
+                              # quotaPeriod, planTemplates (golden + general), paceDerivation,
+                              # quotaDisplay (6 tests, new 2026-08-05) — the two engine contracts
+                              # included
 ```
 
 `src/lib/tierLimits.ts` and `src/lib/quotaPeriod.ts` are, like `planTypes.ts`, **pure and
@@ -190,11 +207,13 @@ route**: `src/app/plan/[id].tsx` renders a real generated plan fetched via `GET 
 any real plan id, and falls back to the static fixture only for the example-plan id — the fixture
 is the permanent demo/glossary example, not a stand-in for missing wiring.
 
-There is no `subscription.ts` yet. Intake now has a screen (`src/app/intake/`, against `GET`/`PUT
-/api/intake`), and My Plans now has one too (`src/app/(tabs)/my-plans.tsx`, against `GET
-/api/plans`) — both as of 2026-08-04. No `supabase/functions/`; no `supabase/migrations/`. Auth
-screens (`src/app/(auth)/`) and the client-side API module (`src/lib/apiClient.ts`) now exist — see
-above.
+There is no `subscription.ts` file — that planned module was never needed as its own thing;
+`apiClient.ts`'s `getQuotaStatus()`/`purchaseTier()` wrappers cover the same ground, now consumed
+by `src/app/(tabs)/settings.tsx` and `src/app/paywall.tsx` (both new 2026-08-05) as well as Home.
+Intake now has a screen (`src/app/intake/`, against `GET`/`PUT /api/intake`), and My Plans now has
+one too (`src/app/(tabs)/my-plans.tsx`, against `GET /api/plans`) — both as of 2026-08-04. No
+`supabase/functions/`; no `supabase/migrations/`. Auth screens (`src/app/(auth)/`) and the
+client-side API module (`src/lib/apiClient.ts`) now exist — see above.
 `tsconfig.json` maps `@/*` → `./src/*` and `@/assets/*` → `./assets/*`, and **excludes `workers/`**
 — that project has its own `tsconfig.json`, its own runtime, and its own type system, so the root
 `npm run typecheck` deliberately does not cover it (same for `eslint.config.js` and
@@ -212,17 +231,23 @@ src/app/
   (tabs)/glossary       # exists today — abbreviations glossary, not in the original blueprint's
                          # tab list; added for Ian's 2026-07-11 notation ruling (see change_log.md)
   (tabs)/my-plans       # My Plans (history) — exists today, lists GET /api/plans
-  (tabs)/settings       # third tab — dummy paywall + settings-lite (decision 1, 2026-07-10) — planned
+  (tabs)/settings       # exists today (2026-08-05) — tier + quota display, sign-out, delete
+                         # account, an "Upgrade" entry point to /paywall (decision 1, 2026-07-10)
   intake/                # onboarding questionnaire (stack) — exists today, against GET/PUT
                          #  /api/intake
   plan/[id]              # plan view — exists today; renders a real generated plan via
                          #  GET /api/plans/:id, or the permanent static golden fixture for the
                          #  example-plan id
+  paywall                # exists today (2026-08-05) — dummy purchase-tier UI, a Stack route
+                         #  reached from Settings or from Home's 402 over_quota catch
 ```
 
 **Decision 1 (2026-07-10):** the paywall and a settings-lite screen (sign out, tier display,
 restore purchases) are restored to MVP scope, using the blueprint's reserved third tab slot
 (`docs/design/mvp-blueprint.md` Part 8) rather than shipping as detached modal-only routes.
+**Built 2026-08-05** — see `(tabs)/settings` and `paywall` above; "restore purchases" has no
+counterpart yet since v1's in-app purchase flow is dummy-only, with no real store receipt to
+restore.
 
 **Decision 5 (2026-07-10):** Home shows the plan link (or "Create a plan") and quota state only —
 no "next workout" or "current week" card. No current-week arithmetic exists in v1; days are
@@ -256,7 +281,10 @@ src/lib/
   paceDerivation.ts        # exists — Riegel cross-distance equivalency, source-relative training
                             #          bands, and the ruled goal-realism/race-pace cap (decision
                             #          13, 2026-07-10)
-  subscription.ts          # planned — tier read + dummy purchase (now a `quota-status` call)
+  quotaDisplay.ts          # exists (2026-08-05) — `formatQuotaLine()`, pure display phrasing for
+                            #          `QuotaStatus`. There is no separate `subscription.ts`; the
+                            #          tier-read/dummy-purchase ground it would have covered is
+                            #          `apiClient.ts`'s `getQuotaStatus()`/`purchaseTier()`.
 ```
 
 ## Current — `generate-plan`, and what is still missing from it
@@ -357,9 +385,9 @@ it `getSession()` ignores the header and every route 403s a user who just signed
 | `ANY /api/auth/*` | — | better-auth's own | better-auth's own | Sign-up, sign-in, sign-out, session, OAuth callbacks. Email/password works today; Google is provisioned and verified in local dev (2026-08-05) — production still needs the captain to run `wrangler secret put GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` (`workers/src/auth.ts`'s TODO). |
 | `GET /health` | none | — | `{ ok: true }` | Liveness. Touches no database. |
 | `POST /api/generate-plan` | session | `{ goalType: "race"\|"duration", raceDistance?, raceDate?, durationWeeks?, notes?, idempotencyKey }` | `{ plan, planId, isFallback }`, or `402` over-quota / `403` anon / `409` intake-required | Enforces tier + quota server-side, branches by tier, validates, persists. A duplicate `idempotencyKey` returns the existing plan instead of generating twice. As of 2026-08-04, Free gets the template plan and Pro/Elite fall back to the same template (`isFallback: true`, quota-exempt) pending the Pro/Elite personalization prompt — see "Current — `generate-plan`" above. |
-| `GET /api/quota-status` | session | — | `{ tier, used, limit, periodEnd }` | Drives the Home "2 of 3 plans left" UI. `used` counts **non-fallback** plans in the current purchase-anchored period, server-side, never a client counter. `periodEnd` is `null` for Free, whose allowance is lifetime — the UI must not render a countdown for it. |
-| `POST /api/purchase-tier` | session | `{ tier: "pro"\|"elite", source: "dummy" }` | `{ tier, periodStart, periodEnd }` | v1 dummy flow. v2 swaps `source` to `"revenuecat"` and verifies the receipt — same route, same table write. `source: "revenuecat"` is refused in v1 rather than trusted. |
-| `POST /api/delete-account` | session | — | `{ deleted: true }` | Really deletes; no soft-delete flag, because the app's own copy promises erasure. The only route that deletes a plan. |
+| `GET /api/quota-status` | session | — | `{ tier, used, limit, periodEnd }` | Drives Home's and Settings' "N of M plans used" line (`src/lib/quotaDisplay.ts`'s `formatQuotaLine()`, consumed by both since 2026-08-05). `used` counts **non-fallback** plans in the current purchase-anchored period, server-side, never a client counter. `periodEnd` is `null` for Free, whose allowance is lifetime — the UI must not render a countdown for it. |
+| `POST /api/purchase-tier` | session | `{ tier: "pro"\|"elite", source: "dummy" }` | `{ tier, periodStart, periodEnd }` | v1 dummy flow, called from `src/app/paywall.tsx` (new 2026-08-05) with honest "test upgrade, no payment required" copy. v2 swaps `source` to `"revenuecat"` and verifies the receipt — same route, same table write. `source: "revenuecat"` is refused in v1 rather than trusted. |
+| `POST /api/delete-account` | session | — | `{ deleted: true }` | Really deletes; no soft-delete flag, because the app's own copy promises erasure. The only route that deletes a plan. Called from Settings' Delete Account flow (new 2026-08-05), followed client-side by `authClient.signOut()` to invalidate the local session store. |
 | `GET /api/intake` | session | — | `{ intake }` or `{ intake: null }` | Was a direct client read under Supabase. |
 | `PUT /api/intake` | session | `IntakeResponses` | `{ saved: true }` | Was a direct client upsert under Supabase. |
 | `GET /api/plans` | session | — | `{ plans: [summary] }` | My Plans. Summaries only — full documents would be megabytes for a heavy user. |
