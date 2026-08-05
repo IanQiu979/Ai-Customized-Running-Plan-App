@@ -1,4 +1,4 @@
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import {
@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { IntakeExitAction } from '@/components/intake/IntakeExitAction';
 import { FontFamily, FontSize, PressedOpacity, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { ApiError, getIntake, putIntake } from '@/lib/apiClient';
@@ -84,6 +85,20 @@ function clockToSec(text: string): number | null {
  */
 export default function IntakeScreen() {
   const theme = useTheme();
+  const router = useRouter();
+
+  const intakeHeaderOptions = {
+    headerShown: true,
+    headerTitle: 'Intake',
+    headerShadowVisible: false,
+    headerStyle: { backgroundColor: theme.surface.base },
+    headerRight: () => (
+      <IntakeExitAction
+        color={theme.text.primary}
+        onPress={() => router.replace('/(tabs)')}
+      />
+    ),
+  };
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -238,7 +253,7 @@ export default function IntakeScreen() {
   if (loading) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: theme.surface.base }]}>
-        <Stack.Screen options={{ headerShown: true, headerTitle: 'Intake' }} />
+        <Stack.Screen options={intakeHeaderOptions} />
         <ActivityIndicator color={theme.text.primary} />
       </View>
     );
@@ -246,14 +261,7 @@ export default function IntakeScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.surface.base }]}>
-      <Stack.Screen
-        options={{
-          headerShown: true,
-          headerTitle: 'Intake',
-          headerShadowVisible: false,
-          headerStyle: { backgroundColor: theme.surface.base },
-        }}
-      />
+      <Stack.Screen options={intakeHeaderOptions} />
       <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <Field label="Goal" theme={theme}>
@@ -334,7 +342,7 @@ export default function IntakeScreen() {
 
           {raceDistance ? (
             <>
-              <Field label="Race date (YYYY-MM-DD)" theme={theme}>
+              <Field label="Race date (optional, YYYY-MM-DD)" theme={theme}>
                 <TextInput
                   value={raceDate}
                   onChangeText={setRaceDate}
