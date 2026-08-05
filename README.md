@@ -12,9 +12,10 @@ works end to end against local emulation — auth, the quota ledger, `quota-stat
 `delete-account`, intake, plan reads, and `generate-plan`'s free-tier template engine — but nothing
 is deployed, and the Pro/Elite AI-generation path is not yet built. On the client, auth screens,
 the intake screen, the generate-plan action, a plan view (real plans plus the permanent
-golden-fixture example), and a My Plans list all exist. Still missing: quota/tier display UI and
-the dummy paywall. Everything described below that is marked *planned* is design, not shipped
-behavior. Current state: [`docs/mvp-progress.md`](docs/mvp-progress.md). Full spec:
+golden-fixture example), a My Plans list, a Settings tab (tier/quota display, sign-out, delete
+account), and a dummy paywall all exist. Everything described below that is marked *planned* is
+design, not shipped behavior. Current state: [`docs/mvp-progress.md`](docs/mvp-progress.md). Full
+spec:
 
 - [`planning/01-brainstorm.md`](planning/01-brainstorm.md) — goal, milestones, open questions
 - [`planning/02-product-requirements.md`](planning/02-product-requirements.md) — who it's for, tiers, user flow, milestones
@@ -108,7 +109,9 @@ src/
       index.tsx          # Home
       glossary.tsx        # run-type abbreviations glossary
       my-plans.tsx          # My Plans — lists GET /api/plans
+      settings.tsx           # Settings — tier/quota display, sign-out, delete account
     intake.tsx              # onboarding questionnaire, against GET/PUT /api/intake
+    paywall.tsx              # dummy paywall — calls POST /api/purchase-tier
     plan/[id].tsx          # plan view — real plans via GET /api/plans/:id, plus the permanent
                             #  golden-fixture example
   components/
@@ -136,19 +139,12 @@ workers/                     # the Cloudflare backend — see workers/README.md
   test/                         # 86 tests in real workerd against real D1
 ```
 
-Planned, not yet built — see `planning/03-engineering-requirements.md`:
-
-```
-src/app/
-  paywall, settings   # dummy paywall + tier display
-```
-
 ## Roadmap
 
 - **M1 — Foundation**: Expo app scaffolded, backend + auth working, required sign-up. *Client auth screens done; Google OAuth verified in local dev, production `wrangler secret put` pending.*
 - **M2 — Intake**: onboarding questionnaire persists to the database. *Done.*
 - **M3 — Plan engine**: free template plans + paid AI plans generate reliably; plan view renders. *Template path done; Pro/Elite AI personalization not yet built.*
-- **M4 — Tiers & quotas**: dummy paywall, tier and quota enforcement server-side. *Server-side quota enforcement done; no client UI yet.*
+- **M4 — Tiers & quotas**: dummy paywall, tier and quota enforcement server-side. *Done — server-side enforcement plus a Settings tab (tier/quota display) and dummy paywall client-side.*
 - **M5 — My Plans**: history tab, plan persistence, re-open past plans. *Done.*
 - **M6 — Polish & TestFlight**: empty states, errors, loading, app icon/splash, TestFlight build.
 
