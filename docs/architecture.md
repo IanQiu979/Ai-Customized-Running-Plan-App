@@ -30,7 +30,8 @@ src/
     (auth)/
       _layout.tsx          # stack layout for the signed-out route group
       index.tsx             # redirect anchor -> sign-up (returning-user link reaches sign-in)
-      sign-in.tsx            # email/password sign-in + an inert "Continue with Google" button
+      sign-in.tsx            # email/password sign-in + a "Continue with Google" button, verified
+                              #   working against local dev (2026-08-05); production pending
       sign-up.tsx            # email/password sign-up + the same Google button
     (tabs)/
       _layout.tsx          # tab bar — Home, Glossary, and My Plans today; Settings-lite still
@@ -138,9 +139,15 @@ call directly — plus a small typed `apiFetch<T>()` wrapper and one function pe
 `authClient.getCookie()` onto the request's `cookie` header, since better-auth's Expo plugin only
 replays the session automatically for calls made through `authClient` itself, not for plain
 `fetch`. `src/app/(auth)/sign-in.tsx` and `sign-up.tsx` are the two screens built against it —
-email/password today; a "Continue with Google" button is wired end to end but inert until the
-captain provisions `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` (`workers/src/auth.ts`'s TODO). The
-root layout (`src/app/_layout.tsx`) reads `authClient.useSession()` and gates the entire route tree
+email/password, plus a "Continue with Google" button. **Google OAuth credentials are provisioned
+and verified in local dev as of 2026-08-05**: `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` live in
+`workers/.dev.vars`, and `POST /api/auth/sign-in/social` (provider `google`) against `wrangler dev`
+returns a real `accounts.google.com` authorization URL that Google's server accepts (a real
+sign-in page, not `invalid_client`/`redirect_uri_mismatch`). Production is not done —
+`wrangler secret put GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` still needs the captain's own
+Cloudflare login (`workers/src/auth.ts`'s TODO), and the client secret should be rotated in Google
+Cloud Console before that, since it was pasted in plaintext into a chat pane earlier the same
+session. The root layout (`src/app/_layout.tsx`) reads `authClient.useSession()` and gates the entire route tree
 on it with Expo Router's `Stack.Protected` — there is no anonymous browsing at all, matching every
 `/api/*` route already 403ing anonymously.
 
@@ -198,9 +205,9 @@ test`).
 
 ```
 src/app/
-  (auth)/sign-in, sign-up  # exists today — email/password; Google button wired but inert until
-                           # credentials are provisioned. Gated in by root Stack.Protected when
-                           # there is no session.
+  (auth)/sign-in, sign-up  # exists today — email/password; Google button verified working against
+                           # local dev (2026-08-05), production secret put still pending. Gated in
+                           # by root Stack.Protected when there is no session.
   (tabs)/index          # Home / Create plan — exists today (placeholder shell + demo link)
   (tabs)/glossary       # exists today — abbreviations glossary, not in the original blueprint's
                          # tab list; added for Ian's 2026-07-11 notation ruling (see change_log.md)
@@ -347,7 +354,7 @@ it `getSession()` ignores the header and every route 403s a user who just signed
 
 | Method / Route | Auth | Body | Returns | Notes |
 |---|---|---|---|---|
-| `ANY /api/auth/*` | — | better-auth's own | better-auth's own | Sign-up, sign-in, sign-out, session, OAuth callbacks. Email/password works today; Google needs credentials only the captain can create (`workers/src/auth.ts`'s TODO). |
+| `ANY /api/auth/*` | — | better-auth's own | better-auth's own | Sign-up, sign-in, sign-out, session, OAuth callbacks. Email/password works today; Google is provisioned and verified in local dev (2026-08-05) — production still needs the captain to run `wrangler secret put GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` (`workers/src/auth.ts`'s TODO). |
 | `GET /health` | none | — | `{ ok: true }` | Liveness. Touches no database. |
 | `POST /api/generate-plan` | session | `{ goalType: "race"\|"duration", raceDistance?, raceDate?, durationWeeks?, notes?, idempotencyKey }` | `{ plan, planId, isFallback }`, or `402` over-quota / `403` anon / `409` intake-required | Enforces tier + quota server-side, branches by tier, validates, persists. A duplicate `idempotencyKey` returns the existing plan instead of generating twice. As of 2026-08-04, Free gets the template plan and Pro/Elite fall back to the same template (`isFallback: true`, quota-exempt) pending the Pro/Elite personalization prompt — see "Current — `generate-plan`" above. |
 | `GET /api/quota-status` | session | — | `{ tier, used, limit, periodEnd }` | Drives the Home "2 of 3 plans left" UI. `used` counts **non-fallback** plans in the current purchase-anchored period, server-side, never a client counter. `periodEnd` is `null` for Free, whose allowance is lifetime — the UI must not render a countdown for it. |

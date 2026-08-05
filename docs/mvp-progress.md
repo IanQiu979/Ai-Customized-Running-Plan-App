@@ -6,7 +6,15 @@
 > Milestone definitions live in [`planning/02-product-requirements.md`](../planning/02-product-requirements.md).
 > Decision history lives in [`change_log.md`](change_log.md).
 
-**Last updated:** 2026-08-05 — a UX audit fix batch closed Findings 1-5 of a 7-finding external audit report (`v22-ux-audit-r1`; Findings 6-7 out of scope, untouched). The tab bar no longer shows React Navigation's dev-only `MissingIcon` placeholder (`tabBarIcon: () => null` on all three tabs); Google sign-in shows "Google sign-in isn't available yet." instead of the raw `PROVIDER_NOT_FOUND` backend string (button stays visible; OAuth credentials are still not configured, see "Blocked" below); the plan view gained a one-line effort-color legend so sighted users get the same info screen readers already had via `describeDays()`; My Plans dropped the internal `plan.engine.toUpperCase()` ("TEMPLATE") label from user-facing copy; and Intake/Home's `raceDate`/`goalTime`/`recentTime` fields gained as-you-type masking and inline validation instead of raw free-text — deliberately not a native date/time picker (a new dependency, out of scope, logged as a possible follow-up). A code-review pass caught and closed a related gap in the same commit: an incomplete race date (e.g. `"2026-09"`) previously passed submit-time validation silently. 272/272 tests pass. Full account: `docs/change_log.md`'s 2026-08-05 UX audit fix batch entry.
+**Last updated:** 2026-08-05 — Google OAuth's credentials are provisioned and verified working in
+local dev: `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` are in `workers/.dev.vars`, and
+`POST /api/auth/sign-in/social` against `wrangler dev` returns a real Google authorization URL
+that Google's own server accepts (a real sign-in page, not `invalid_client`). Production is not
+done — the captain still has to run `wrangler secret put GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`
+themselves — and the client secret should be rotated in Google Cloud Console before that, since it
+was pasted in plaintext into a chat pane earlier the same session. Full account:
+`docs/change_log.md`'s 2026-08-05 entry.
+Previous entry: 2026-08-05 — a UX audit fix batch closed Findings 1-5 of a 7-finding external audit report (`v22-ux-audit-r1`; Findings 6-7 out of scope, untouched). The tab bar no longer shows React Navigation's dev-only `MissingIcon` placeholder (`tabBarIcon: () => null` on all three tabs); Google sign-in shows "Google sign-in isn't available yet." instead of the raw `PROVIDER_NOT_FOUND` backend string (button stays visible; at the time of this fix, OAuth credentials were still not configured — since resolved, see the entry above); the plan view gained a one-line effort-color legend so sighted users get the same info screen readers already had via `describeDays()`; My Plans dropped the internal `plan.engine.toUpperCase()` ("TEMPLATE") label from user-facing copy; and Intake/Home's `raceDate`/`goalTime`/`recentTime` fields gained as-you-type masking and inline validation instead of raw free-text — deliberately not a native date/time picker (a new dependency, out of scope, logged as a possible follow-up). A code-review pass caught and closed a related gap in the same commit: an incomplete race date (e.g. `"2026-09"`) previously passed submit-time validation silently. 272/272 tests pass. Full account: `docs/change_log.md`'s 2026-08-05 UX audit fix batch entry.
 Previous entry: 2026-08-05 — phone testing fixed three onboarding UX problems: signed-out launches now default to Sign Up (with the existing returning-user Sign In link retained); Intake has an always-visible "Skip for now" header action that replaces to Home, whose existing missing-intake state lets the runner resume later; and the race-date label now explicitly says optional, matching its payload and validation behavior. The deliberate post-signup `router.replace('/intake')` remains because it avoids the protected-route unmount race documented in `src/lib/postSignupRedirect.ts`. Focused auth-default and Intake-exit regression tests were added.
 Previous entry: 2026-08-04 — the first end-to-end user loop is wired up (intake screen, the
 generate-plan action, the plan view rendering real generated plans alongside the permanent golden
@@ -26,9 +34,11 @@ app now has no anonymous browsing at all, matching every `/api/*` route already 
 Verified against `wrangler dev` at the curl level (sign-up, sign-in, anonymous 403, wrong-password
 401) and by driving the running app (Expo Go/iOS Simulator + briefly web): unauthenticated launch
 redirects to `/sign-in`, sign-in navigates into `(tabs)`, and a temporary "Sign out" button on Home
-(no Settings-lite screen exists yet to host it) redirects back to `/sign-in`. **Google OAuth is the
-only remaining blocker** — the captain still has to provision `GOOGLE_CLIENT_ID`/
-`GOOGLE_CLIENT_SECRET` (`workers/src/auth.ts`'s TODO); no code changes needed once they land. Also
+(no Settings-lite screen exists yet to host it) redirects back to `/sign-in`. Google OAuth was the
+only remaining blocker at the time — **resolved in local dev 2026-08-05: see that entry below.**
+The captain's `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` (`workers/src/auth.ts`'s TODO) are now
+provisioned and verified working against `wrangler dev`; only production's `wrangler secret put`
+remains. Also
 fixed in the same commit, unrelated to auth: a stale `metro-config` subpath import in
 `metro.config.js` that was blocking `expo start` entirely. This lands on top of the same day's
 deload-cadence ruling: Ian's ratified "pro runners = 3 weeks, beginners = 4" — the engine already
@@ -70,7 +80,7 @@ from 82. Issue #22 remains open.)
 
 | Milestone | State |
 |---|---|
-| M1 — Foundation (account → empty Home) | **In progress.** Server (auth + schema + account routes) works locally on Cloudflare (`workers/`); client-side email/password auth now exists (`src/app/(auth)/`, `src/lib/apiClient.ts`) and gates the app behind a session — Google OAuth still needs the captain's credentials, and nothing is deployed |
+| M1 — Foundation (account → empty Home) | **In progress.** Server (auth + schema + account routes) works locally on Cloudflare (`workers/`); client-side email/password auth now exists (`src/app/(auth)/`, `src/lib/apiClient.ts`) and gates the app behind a session — Google OAuth credentials are now provisioned and verified working in local dev (2026-08-05); only the production `wrangler secret put` step remains, and nothing is deployed |
 | M2 — Intake (questionnaire persists) | **In progress.** Intake screen now exists, wired to `GET`/`PUT /api/intake` |
 | M3 — Plan engine (3 tiers produce valid plans) | **In progress.** Pure template/pace engine now wired into the Worker's `generate-plan` route and the client's generate-plan action; the plan view renders a real generated plan (via `GET /api/plans/:id`) alongside the permanent static golden fixture |
 | M4 — Tiers & quotas (server-side, unbypassable) | **Server half done.** The quota ledger, atomic gate, fallback exemption, `quota-status` and `purchase-tier` are built and tested; no client UI |
@@ -133,8 +143,9 @@ the literal previous week) and issue #33 (goal-realism handling).
       `wrangler secret put`, `wrangler deploy`: all the captain's, all unrun. See "Blocked" below.
 - ~~Supabase project `v2.2_plan_generation`~~ — **superseded 2026-08-02.** The backend is Cloudflare
   now (`workers/`); the Supabase project is unused, and `supabase/` is dead scaffold kept for
-  reference. Google OAuth and email/password were enabled on it and are not carried over: better-auth
-  does email/password today, and Google needs a fresh client id/secret from the captain.
+  reference. Google OAuth and email/password were enabled on it and were not carried over:
+  better-auth does email/password today, and Google runs on a fresh client id/secret from the
+  captain — provisioned and verified in local dev 2026-08-05 (see that entry below).
 
 ### Code
 - [x] Expo SDK 54 scaffold — TypeScript strict, expo-router, `@/*` path alias
@@ -152,9 +163,11 @@ the literal previous week) and issue #33 (goal-realism handling).
 - [x] **Client-side auth against `workers/` — done 2026-08-03 (`06b1f89`).** `src/lib/apiClient.ts`
       wraps better-auth's Expo client (`authClient` — session persisted via `expo-secure-store`)
       plus typed fetch wrappers for every non-auth `/api/*` route; `src/app/(auth)/sign-in.tsx` and
-      `sign-up.tsx` do email/password (a "Continue with Google" button is wired end to end but
-      inert until the captain provisions credentials); `src/app/_layout.tsx` gates the whole route
-      tree behind a session with Expo Router's `Stack.Protected` — no anonymous browsing at all.
+      `sign-up.tsx` do email/password plus a "Continue with Google" button — **as of 2026-08-05
+      the captain's Google OAuth credentials are provisioned and verified working against local
+      dev** (production's `wrangler secret put` still pending, see that day's entry below);
+      `src/app/_layout.tsx` gates the whole route tree behind a session with Expo Router's
+      `Stack.Protected` — no anonymous browsing at all.
       `workers/src/auth.ts` gained the `expo()` server plugin to support this. Verified against
       `wrangler dev` at the curl level and by driving the actual running app (unauthenticated
       launch → `/sign-in`, sign-in → `(tabs)`, sign-out → back to `/sign-in`); the sign-up screen
@@ -469,9 +482,11 @@ with **no backend at all**.
        and the account routes; there is no RLS to write because SQLite has none, so ownership moved
        into `workers/src/lib/store.ts` (see `docs/architecture.md` "Authorization without RLS").
        `src/lib/apiClient.ts` and `src/app/(auth)/` now let the app sign up, sign in, and sign out
-       against it, gated by `Stack.Protected` in the root layout. **Still to do:** Google OAuth
-       needs the captain's client id/secret (email/password works today); the captain's own
-       `wrangler login`/`d1 create`/`secret put`/`deploy`.
+       against it, gated by `Stack.Protected` in the root layout. **Google OAuth's client id/secret
+       are now provisioned and verified working against local dev (2026-08-05)** — email/password
+       already worked. **Still to do:** the production `wrangler secret put GOOGLE_CLIENT_ID`/
+       `GOOGLE_CLIENT_SECRET` (needs the captain's own Cloudflare login), plus their `wrangler
+       login`/`d1 create`/`deploy`.
 7. [x] **Intake** (8 questions, or 10 with a target race, + review) persisting to
        `intake_responses` — **screen done 2026-08-04**, wired to the already-built server side
        (`GET`/`PUT /api/intake`, validated twice: readable message in the route, table CHECKs
@@ -519,7 +534,7 @@ to "Decided" below.
 | `wrangler login` (interactive) | every remote Cloudflare action below | **Ian.** Opens a browser; nothing else can run first |
 | `wrangler d1 create pace-blueprint` | a real remote database; `wrangler.toml`'s `database_id` is a deliberately fake placeholder until its uuid is pasted in | **Ian**, after login |
 | `wrangler secret put BETTER_AUTH_SECRET` / `ANTHROPIC_API_KEY` | production auth; any real model call | **Ian.** The exact analogue of `supabase secrets set`. Generate the auth secret with `openssl rand -base64 32` |
-| Google OAuth client id + secret | Google sign-in (email/password works without it) | **Ian.** A Google Cloud OAuth 2.0 "Web application" client, redirect URI `${BETTER_AUTH_URL}/api/auth/callback/google`. Exact steps: `workers/src/auth.ts`'s TODO |
+| `wrangler secret put GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` (production) | Google sign-in in production (email/password works without it; the credentials are already provisioned and verified working in local dev, see the 2026-08-05 entry) | **Ian**, after login. Also recommend rotating the client secret in Google Cloud Console first — it was pasted in plaintext into a chat pane before landing in `workers/.dev.vars` |
 | `APP_SCHEME` = `paceblueprint://` | the OAuth return into the app | **Ian.** Renamed 2026-07-12 and never verified against a built app |
 | `wrangler deploy` | anything reachable from a phone | **Ian**, after all of the above |
 
@@ -639,18 +654,22 @@ Closes the plan-accuracy scout's Bug 1 and mandated finding B. Full rationale:
   to the template rather than getting a personalized prompt.
 - 🟢 **Resolved 2026-08-03: the client can now talk to `workers/`.** `src/lib/apiClient.ts` and
   `src/app/(auth)/` (email/password sign-in/sign-up, `Stack.Protected` session gate) landed in
-  `06b1f89`. What's left of this gap is narrower: Google OAuth is wired but inert pending the
-  captain's credentials, and no screen yet consumes `apiClient.ts`'s other wrappers
-  (`quota-status`, intake, plans, `generate-plan`) — those land with the screens that need them.
+  `06b1f89`. **Google OAuth resolved in local dev 2026-08-05** — credentials provisioned and
+  verified working against `wrangler dev`; production's `wrangler secret put` is the one piece
+  still pending, and is the captain's own step (needs their Cloudflare login). No screen yet
+  consumes `apiClient.ts`'s other wrappers (`quota-status`, intake, plans, `generate-plan`) —
+  those land with the screens that need them.
 - 🟡 **`supabase/` and `src/lib/supabase.ts` are dead code** kept deliberately (2026-08-02) so the
   earlier design stays readable. Deleting them is its own decision, and the `@supabase/supabase-js`
   dependency is still in `package.json` for the same reason.
 - 🟠 **Apple Sign-In is not configured — and is now formally parked.** App Store rules require it
-  once Google sign-in is offered, but configuring it needs an Apple Developer Program membership
-  (App ID + Services ID + key) that Ian does not hold yet. Carved out of issue #7 on 2026-07-12 and
-  recorded in [`apple-dev-blocked.md`](apple-dev-blocked.md); issue #7's remaining scope
-  (email/password, Google OAuth, session routing) is unaffected and still workable today. The
-  requirement binds only at App Store submission.
+  once Google sign-in is offered in production, but configuring it needs an Apple Developer
+  Program membership (App ID + Services ID + key) that Ian does not hold yet. Carved out of issue
+  #7 on 2026-07-12 and recorded in [`apple-dev-blocked.md`](apple-dev-blocked.md); issue #7's
+  remaining scope (email/password, Google OAuth, session routing) is unaffected and still workable
+  today — Google OAuth itself is now verified working in local dev (2026-08-05), with production
+  still pending the captain's `wrangler secret put`. The Apple requirement binds only at App Store
+  submission, i.e. once Google is actually deployed, not before.
 - 🟡 **Suspected pre-existing bug: Home's demo link may render with no border, no 48pt tap target,
   and no pressed state (found while tracing the Link for issue #31, filed as issue #51).**
   expo-router's `Link asChild` (`src/app/(tabs)/index.tsx`) uses a Radix Slot whose `mergeProps`
@@ -666,7 +685,11 @@ Closes the plan-accuracy scout's Bug 1 and mandated finding B. Full rationale:
   configured as `APP_SCHEME` in `workers/wrangler.toml` and passed to better-auth's
   `trustedOrigins`, so there is no third-party allowlist to update any more — but the value itself
   was renamed from `v22workoutplangenerator://` in the 2026-07-12 identifier rename and has never
-  been checked against what the app actually registers. Google OAuth will dead-end if it is wrong.
+  been checked against what the app actually registers. Confirmed 2026-08-05 that `APP_SCHEME`
+  matches `app.json`'s `expo.scheme` (`paceblueprint://` both places) and that
+  `BETTER_AUTH_URL`'s redirect URI is correctly registered with Google — what's still unverified is
+  an actual interactive login carrying the deep link back into a running app; that needs a human
+  clicking through Google's consent screen, which wasn't done here.
 - 🟠 **`GeneratePlanRequest` has no `goalTimeSec` field, so the per-generation goal cannot reach the
   engine at all (found 2026-07-12).** `docs/mvp-build-prompt.md:332` promises that race
   distance/date/goal-time *travel per-generation* — "intake's stored race is a default, not the
@@ -710,3 +733,9 @@ Closes the plan-accuracy scout's Bug 1 and mandated finding B. Full rationale:
   lands.
 - 🟡 **Payments are dummy-only.** Real IAP (RevenueCat/StoreKit) is required before public App Store
   release; deferred to v2 per `planning/02-product-requirements.md`.
+- 🟠 **Google OAuth client secret should be rotated before shipping (found 2026-08-05).** The
+  captain pasted the real `GOOGLE_CLIENT_SECRET` in plaintext into a chat pane twice while
+  provisioning it — it is now in `workers/.dev.vars` (gitignored, never committed or logged), but
+  the plaintext exposure itself means it should be treated as compromised. Recommend rotating it
+  in Google Cloud Console once the credentials are confirmed stable; that rotation is the
+  captain's call, not done as part of this change.

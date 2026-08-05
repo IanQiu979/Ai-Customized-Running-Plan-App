@@ -5,6 +5,35 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-08-05 — Google OAuth credentials provisioned and verified in local dev
+
+The captain provided real `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` values, closing the blocker
+`workers/src/auth.ts`'s TODO above `buildSocialProviders` had tracked since 2026-08-03.
+
+- Credentials were written to `workers/.dev.vars` (gitignored, local-only — never committed, never
+  logged in any tracked file).
+- Verified with `wrangler dev` running locally: `POST /api/auth/sign-in/social` with provider
+  `google` now returns a real `accounts.google.com/o/oauth2/v2/auth` authorization URL, with the
+  correct `client_id` and `redirect_uri` (`http://localhost:8787/api/auth/callback/google`,
+  matching `workers/wrangler.toml`'s local `BETTER_AUTH_URL`).
+- Fetched that generated URL directly and confirmed Google's own server serves a real sign-in
+  page — not `invalid_client` or `redirect_uri_mismatch` — proving the credentials are valid and
+  correctly registered.
+- Confirmed `APP_SCHEME` (`paceblueprint://` in `workers/wrangler.toml`) matches `app.json`'s
+  `expo.scheme`, so the deep-link return into the app is also correctly configured.
+- **Not done, deliberately:** a full interactive human login. There's no test Google account
+  available, and logging into a real one isn't something to automate — verification stops at
+  "Google accepts these credentials and serves the real consent flow," the strongest check
+  possible without a human clicking through Google's UI.
+- **Production is not done.** `wrangler secret put GOOGLE_CLIENT_ID` and
+  `wrangler secret put GOOGLE_CLIENT_SECRET` still need to run, and only the captain can run them
+  (needs their own Cloudflare login) — not run as part of this change. See `docs/mvp-progress.md`'s
+  "Blocked" table.
+- **Flagged: the client secret was pasted in plaintext into a chat pane twice this session**
+  before landing in `workers/.dev.vars`. It should be treated as exposed and rotated in Google
+  Cloud Console once the credentials are confirmed stable — that rotation is the captain's call,
+  not done here.
+
 ## 2026-08-05 — UX audit fix batch: tab bar icon, Google error copy, plan legend, plan status label, date/time masking (`1c1e174`)
 
 Findings 1-5 of a 7-finding UX audit report (`v22-ux-audit-r1`, external to this repo). Findings 6

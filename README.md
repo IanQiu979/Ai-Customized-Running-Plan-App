@@ -101,7 +101,8 @@ src/
   app/
     _layout.tsx
     (auth)/
-      sign-in.tsx, sign-up.tsx  # email/password; a "Continue with Google" button is wired but inert
+      sign-in.tsx, sign-up.tsx  # email/password; "Continue with Google" verified in local dev,
+                                 #   production pending (see docs/mvp-progress.md)
     (tabs)/
       _layout.tsx
       index.tsx          # Home
@@ -144,7 +145,7 @@ src/app/
 
 ## Roadmap
 
-- **M1 — Foundation**: Expo app scaffolded, backend + auth working, required sign-up. *Client auth screens done; Google OAuth needs the captain's credentials.*
+- **M1 — Foundation**: Expo app scaffolded, backend + auth working, required sign-up. *Client auth screens done; Google OAuth verified in local dev, production `wrangler secret put` pending.*
 - **M2 — Intake**: onboarding questionnaire persists to the database. *Done.*
 - **M3 — Plan engine**: free template plans + paid AI plans generate reliably; plan view renders. *Template path done; Pro/Elite AI personalization not yet built.*
 - **M4 — Tiers & quotas**: dummy paywall, tier and quota enforcement server-side. *Server-side quota enforcement done; no client UI yet.*
