@@ -34,7 +34,15 @@ export default function SignInScreen() {
     setError(null);
     const { error: socialError } = await authClient.signIn.social({ provider: 'google', callbackURL: '/' });
     if (socialError) {
-      setError(socialError.message ?? 'Google sign-in failed.');
+      // better-auth returns { code: 'PROVIDER_NOT_FOUND', message: 'Provider not found' } when a
+      // provider isn't registered — the case here until the captain's Google OAuth credentials
+      // land (v22-google-oauth-creds). Show a plain, honest message instead of the raw backend
+      // string; keep the button visible either way.
+      if (socialError.code === 'PROVIDER_NOT_FOUND') {
+        setError("Google sign-in isn't available yet.");
+      } else {
+        setError(socialError.message ?? 'Google sign-in failed.');
+      }
     }
   }
 

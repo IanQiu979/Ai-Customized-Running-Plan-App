@@ -101,7 +101,6 @@ function PlanRow({ plan }: { plan: PlanSummary }) {
   const theme = useTheme();
   const metadata = [
     `TIER: ${plan.tierAtGeneration.toUpperCase()}`,
-    plan.engine.toUpperCase(),
     plan.isFallback ? 'FALLBACK' : null,
     formatPlanDate(plan.createdAt.slice(0, 10)),
   ]

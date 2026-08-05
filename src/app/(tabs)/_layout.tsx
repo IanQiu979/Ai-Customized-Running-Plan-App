@@ -40,6 +40,7 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Home',
+          tabBarIcon: () => null,
           tabBarLabel: ({ focused, color, children }) => (
             <TabLabel focused={focused} color={color}>
               {children}
@@ -51,6 +52,7 @@ export default function TabLayout() {
         name="glossary"
         options={{
           title: 'Glossary',
+          tabBarIcon: () => null,
           tabBarLabel: ({ focused, color, children }) => (
             <TabLabel focused={focused} color={color}>
               {children}
@@ -62,6 +64,7 @@ export default function TabLayout() {
         name="my-plans"
         options={{
           title: 'My Plans',
+          tabBarIcon: () => null,
           tabBarLabel: ({ focused, color, children }) => (
             <TabLabel focused={focused} color={color}>
               {children}
