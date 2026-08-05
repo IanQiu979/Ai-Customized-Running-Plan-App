@@ -2,16 +2,25 @@ import { Pressable, StyleSheet, Text } from 'react-native';
 
 import { FontFamily, FontSize, PressedOpacity, Spacing } from '@/constants/theme';
 
-export function IntakeExitAction({ color, onPress }: { color: string; onPress: () => void }) {
+export function IntakeExitAction({
+  color,
+  onPress,
+  label,
+}: {
+  color: string;
+  onPress: () => void;
+  /** "Skip for now" before a save, "Done" once intake existed on load or was just saved. */
+  label: string;
+}) {
   return (
     <Pressable
-      accessibilityLabel="Skip intake for now"
+      accessibilityLabel={label}
       accessibilityRole="button"
       hitSlop={Spacing.two}
       onPress={onPress}
       style={({ pressed }) => pressed && styles.pressed}
     >
-      <Text style={[styles.text, { color }]}>Skip for now</Text>
+      <Text style={[styles.text, { color }]}>{label}</Text>
     </Pressable>
   );
 }

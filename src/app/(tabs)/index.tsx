@@ -1,13 +1,16 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { GoalRealismNotice } from '@/components/plan/GoalRealismNotice';
 import { FontFamily, FontSize, PressedOpacity, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { ApiError, authClient, generatePlan, getIntake } from '@/lib/apiClient';
+import { ApiError, generatePlan, getIntake, getQuotaStatus } from '@/lib/apiClient';
 import { mintIdempotencyKey } from '@/lib/idempotencyKey';
-import type { GoalType, RaceDistance } from '@/lib/planTypes';
+import { assessGoalRealism } from '@/lib/paceDerivation';
+import { formatQuotaLine } from '@/lib/quotaDisplay';
+import type { GoalType, IntakeResponses, QuotaStatus, RaceDistance } from '@/lib/planTypes';
 
 const RACE_DISTANCE_OPTIONS: { value: RaceDistance; label: string }[] = [
   { value: '5k', label: '5K' },
@@ -68,13 +71,22 @@ export default function HomeScreen() {
 
   const [checkingIntake, setCheckingIntake] = useState(true);
   const [hasIntake, setHasIntake] = useState(false);
+  const [intake, setIntake] = useState<IntakeResponses | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  const [quota, setQuota] = useState<QuotaStatus | null>(null);
+  const [quotaError, setQuotaError] = useState<string | null>(null);
 
   const [goalType, setGoalType] = useState<GoalType>('race');
   const [raceDistance, setRaceDistance] = useState<RaceDistance | undefined>(undefined);
   const [raceDate, setRaceDate] = useState('');
   const [durationWeeks, setDurationWeeks] = useState('');
   const [notes, setNotes] = useState('');
+
+  // Prefill the panel's race distance/date from the runner's saved intake exactly once per
+  // mount — refiring on every refocus would clobber an in-progress edit the moment the runner
+  // tabs away and back.
+  const hasPrefilled = useRef(false);
 
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
@@ -90,6 +102,24 @@ export default function HomeScreen() {
   // on every render, only while it's the active goal type.
   const raceDateError = goalType === 'race' ? dateFieldError(raceDate) : null;
 
+  // Read-only preview of the same `assessGoalRealism()` the server runs — no new request field,
+  // computed client-side from the runner's already-saved intake. The saved `goalTimeSec` was
+  // entered against `intake.raceDistance` specifically, and this panel's own `raceDistance` chip
+  // is independently editable, so the preview is only meaningful while the two still agree —
+  // otherwise it'd silently judge a goal time against a distance it was never set for.
+  const goalRealismPreview =
+    goalType === 'race' &&
+    raceDistance &&
+    intake?.raceDistance === raceDistance &&
+    intake?.goalTimeSec !== undefined &&
+    intake?.recentPerformance
+      ? assessGoalRealism({
+          goalTimeSec: intake.goalTimeSec,
+          raceDistance,
+          recent: intake.recentPerformance,
+        })
+      : undefined;
+
   // `useFocusEffect` (not a plain mount-only `useEffect`) because Expo Router keeps tab screens
   // mounted across navigation — leaving Home for Intake and coming back is a focus event, not a
   // remount, so a mount-only effect would keep showing "complete your intake" forever after the
@@ -99,11 +129,20 @@ export default function HomeScreen() {
       let cancelled = false;
       setCheckingIntake(true);
       setLoadError(null);
+      setQuotaError(null);
 
       (async () => {
         try {
-          const { intake } = await getIntake();
-          if (!cancelled) setHasIntake(!!intake);
+          const { intake: fetchedIntake } = await getIntake();
+          if (cancelled) return;
+          setHasIntake(!!fetchedIntake);
+          setIntake(fetchedIntake);
+
+          if (!hasPrefilled.current && fetchedIntake) {
+            if (fetchedIntake.raceDistance) setRaceDistance(fetchedIntake.raceDistance);
+            if (fetchedIntake.raceDate) setRaceDate(fetchedIntake.raceDate);
+            hasPrefilled.current = true;
+          }
         } catch (fetchError) {
           if (!cancelled) {
             setLoadError(fetchError instanceof ApiError ? fetchError.body.error : 'Could not load your intake.');
@@ -111,6 +150,17 @@ export default function HomeScreen() {
           }
         } finally {
           if (!cancelled) setCheckingIntake(false);
+        }
+
+        try {
+          const quotaStatus = await getQuotaStatus();
+          if (!cancelled) setQuota(quotaStatus);
+        } catch (quotaFetchError) {
+          if (!cancelled) {
+            setQuotaError(
+              quotaFetchError instanceof ApiError ? quotaFetchError.body.error : 'Could not load your quota.'
+            );
+          }
         }
       })();
 
@@ -159,6 +209,11 @@ export default function HomeScreen() {
       if (generatePlanError instanceof ApiError) {
         if (generatePlanError.body.code === 'intake_required') {
           setHasIntake(false);
+        } else if (generatePlanError.body.code === 'over_quota') {
+          router.push({
+            pathname: '/paywall',
+            params: { quota: JSON.stringify(generatePlanError.body.quota) },
+          });
         } else {
           setGenerateError(generatePlanError.body.error);
         }
@@ -200,6 +255,11 @@ export default function HomeScreen() {
             </View>
           ) : (
             <View style={styles.section}>
+              {quotaError && <Text style={[styles.error, { color: theme.status.error }]}>{quotaError}</Text>}
+              {quota && (
+                <Text style={[styles.body, { color: theme.text.secondary }]}>{formatQuotaLine(quota)}</Text>
+              )}
+
               <Text style={[styles.fieldLabel, { color: theme.text.secondary }]}>GOAL TYPE</Text>
               <View style={styles.chipRow}>
                 <Chip
@@ -255,6 +315,9 @@ export default function HomeScreen() {
                       {raceDateError}
                     </Text>
                   )}
+                  {goalRealismPreview && goalRealismPreview.realism !== 'realistic' ? (
+                    <GoalRealismNotice assessment={goalRealismPreview} />
+                  ) : null}
                 </>
               ) : (
                 <>
@@ -312,18 +375,6 @@ export default function HomeScreen() {
               </Pressable>
             </View>
           )}
-
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => authClient.signOut()}
-            style={({ pressed }) => [
-              styles.secondaryButton,
-              { borderColor: theme.text.secondary },
-              pressed && styles.pressed,
-            ]}
-          >
-            <Text style={[styles.secondaryButtonText, { color: theme.text.secondary }]}>Sign out</Text>
-          </Pressable>
         </ScrollView>
       </SafeAreaView>
     </View>
@@ -441,17 +492,6 @@ const styles = StyleSheet.create({
     marginTop: Spacing.two,
   },
   primaryButtonText: {
-    fontFamily: FontFamily.body.semiBold,
-    fontSize: FontSize.sm,
-  },
-  secondaryButton: {
-    minHeight: Spacing.six,
-    borderRadius: Radius.control,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  secondaryButtonText: {
     fontFamily: FontFamily.body.semiBold,
     fontSize: FontSize.sm,
   },

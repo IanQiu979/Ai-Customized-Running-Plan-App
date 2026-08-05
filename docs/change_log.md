@@ -5,6 +5,66 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-08-05 — Settings tab, dummy paywall, and goal-realism UI land; Intake's dead-end save fixed (closes issues #12, #15)
+
+Client-only batch, no `workers/` changes, nothing deployed. Closes GitHub issues #12 and #15,
+`docs/mvp-progress.md`'s "Next" step 9 (quota UI + dummy paywall), and the "goal-realism UI half
+not built" doc-vs-code drift item from a recent launch-readiness audit (external to this repo).
+
+- **New Settings tab, `src/app/(tabs)/settings.tsx` — the fourth tab alongside Home / Glossary /
+  My Plans.** On focus, fetches `GET /api/quota-status` and renders the tier plus a quota line via
+  a new pure helper, `src/lib/quotaDisplay.ts`'s `formatQuotaLine()` ("N of M plans used" for
+  Free's lifetime allowance, "N of M plans used this period" for Pro/Elite) — mirroring
+  `tierLimits.ts`'s existing "display helper only, server enforces the number" convention. Free
+  tier also gets an "Upgrade" button to `/paywall`. **Sign-out moved here from Home** (Home's
+  temporary button, in place since the 2026-08-03 auth commit for lack of anywhere else to put it,
+  is removed). **New Delete Account flow**: a native `Alert.alert` confirm, then `deleteAccount()`,
+  then an explicit `authClient.signOut()` — the server-side session row is gone after the delete
+  call, but better-auth's Expo client only refetches on an explicit sign-in/out call, not on a
+  plain `apiFetch`, so `signOut()` is needed to invalidate the local session store and let
+  `src/app/_layout.tsx`'s `Stack.Protected` guard react.
+- **New dummy paywall screen, `src/app/paywall.tsx`** — a `Stack.Screen` route (registered in
+  `src/app/_layout.tsx` alongside `(tabs)`/`plan/[id]`/`intake`), reached two ways: reactively, from
+  Home's generate-plan action catching a `402 over_quota` response and pushing to `/paywall` with
+  the server's `quota` object JSON-stringified as a route param (parsed defensively — a missing or
+  malformed param degrades to generic copy rather than throwing); or proactively, from Settings'
+  "Upgrade" row for a Free-tier runner (no `quota` param). Calls `purchaseTier('pro' | 'elite')`
+  (the existing dummy purchase route) and says so honestly: "This is a test upgrade — no payment
+  required."
+- **Intake's dead-end save is fixed.** `src/app/intake.tsx` previously saved and left the runner on
+  the same screen with only a transient "Saved." text; it now calls `router.replace('/(tabs)')`
+  after a successful `putIntake()`, landing the runner on Home. The header's exit action
+  (`src/components/intake/IntakeExitAction.tsx`, now taking an explicit `label` prop instead of a
+  hardcoded "Skip for now") reads "Done" once intake already existed on load or was just saved this
+  session, and "Skip for now" otherwise — so a runner revisiting a completed intake, or one who just
+  saved, no longer sees a label that implies they're abandoning something incomplete.
+- **Home (`src/app/(tabs)/index.tsx`) now prefills `raceDistance`/`raceDate` from the runner's saved
+  intake**, once per mount (a `useRef` flag, not on every refocus) so it doesn't clobber an
+  in-progress edit when the runner tabs away and back. Home also now fetches and displays
+  `GET /api/quota-status` inline (`formatQuotaLine`), and its `generate-plan` catch branch routes a
+  `402 over_quota` response straight to `/paywall` instead of just surfacing the raw error text.
+- **`Plan.goalRealism` is now surfaced in the UI, not just computed server-side.** New
+  `src/components/plan/GoalRealismNotice.tsx` — a calm, neutral raised-surface card (same treatment
+  as `FallbackNotice`, never `status.error`: this is a coaching judgment call, not a failure) — is
+  rendered in three places: `src/app/plan/[id].tsx` shows it whenever the generated plan's
+  `goalRealism.realism === 'implausible'` ("Your goal pace was adjusted."); and a live, read-only
+  preview of the same `assessGoalRealism()` call runs client-side at both goal-entry points ahead of
+  generation — Intake's goal-time field (once both a complete goal time and a complete recent
+  performance are entered) and Home's goal-entry panel. Home's preview only renders when the
+  panel's currently-selected race distance matches the distance the saved `goalTimeSec` was recorded
+  against — the saved goal time was entered against `intake.raceDistance` specifically, and the
+  panel's own race-distance chip is independently editable, so judging a stored goal time against a
+  distance it was never set for would be a silently wrong preview, not a stale-but-honest one.
+  `'ambitious'` gets a softer heads-up copy than `'implausible'`'s "was adjusted" copy, since an
+  ambitious goal still anchors race-pace reps at the runner's actual declared goal — the notice must
+  not claim an adjustment that didn't happen.
+- 278 tests pass (272 pre-existing + 6 new for `quotaDisplay.ts`), `npm run typecheck` and
+  `npm run lint` both clean. No `workers/` change, so the Workers gate wasn't re-run.
+- **Not touched by this batch, deliberately:** the backend deploy (still captain-only, see
+  "Blocked" in `docs/mvp-progress.md`) and the Pro/Elite AI-generation prompt (still the one unbound
+  seam in `workers/src/deps.ts`) — only the free-tier template engine plus this client polish
+  landed.
+
 ## 2026-08-05 — Google OAuth credentials provisioned and verified in local dev
 
 The captain provided real `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` values, closing the blocker

@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DisclaimerFooter } from '@/components/plan/DisclaimerFooter';
 import { FallbackNotice } from '@/components/plan/FallbackNotice';
+import { GoalRealismNotice } from '@/components/plan/GoalRealismNotice';
 import { PlanNameplate } from '@/components/plan/PlanNameplate';
 import { WeekAccordion } from '@/components/plan/WeekAccordion';
 import { EffortOrder, FontFamily, FontSize, Spacing } from '@/constants/theme';
@@ -108,6 +109,9 @@ export default function PlanScreen() {
         ]}
       >
         <PlanNameplate plan={plan} />
+        {plan.goalRealism?.realism === 'implausible' ? (
+          <GoalRealismNotice assessment={plan.goalRealism} />
+        ) : null}
         {/*
           The ribbon below (`WeekAccordion`) colours each run day by effort but carries no key of
           its own — a screen reader gets the effort word per day from `describeDays`, but a

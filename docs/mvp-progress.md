@@ -6,7 +6,27 @@
 > Milestone definitions live in [`planning/02-product-requirements.md`](../planning/02-product-requirements.md).
 > Decision history lives in [`change_log.md`](change_log.md).
 
-**Last updated:** 2026-08-05 — Google OAuth's credentials are provisioned and verified working in
+**Last updated:** 2026-08-05 — a client-only batch lands the Settings tab, the dummy paywall, and
+the goal-realism UI, and fixes Intake's dead-end save, closing GitHub issues #12 and #15, "Next"
+step 9 below (quota UI + dummy paywall), and a launch-readiness audit's "goal-realism UI half not
+built" doc-vs-code drift finding (external to this repo). `src/app/(tabs)/settings.tsx` is now the
+fourth tab: tier + quota display (`GET /api/quota-status`, new pure `src/lib/quotaDisplay.ts`),
+sign-out (moved off Home), and Delete Account (native confirm → `deleteAccount()` →
+`authClient.signOut()` to invalidate the local session). `src/app/paywall.tsx` is a new `Stack`
+route reached either from Home's `generate-plan` action on a `402 over_quota` response or
+proactively from Settings, calling `purchaseTier('pro' | 'elite')` with honest "test upgrade, no
+payment required" copy. Intake now calls `router.replace('/(tabs)')` after a successful save
+instead of leaving the runner on the same screen, and its exit-header label reads "Done" instead of
+always "Skip for now" once intake exists. Home now prefills `raceDistance`/`raceDate` from saved
+intake (once per mount). A new `GoalRealismNotice` component surfaces `Plan.goalRealism` on the
+plan screen and as a live read-only preview at both goal-entry points (Intake, Home — Home's
+preview only shows when the panel's selected race distance still matches the one the saved goal
+time was recorded against). 278 tests pass (272 + 6 new for `quotaDisplay.ts`), typecheck and lint
+clean; no `workers/` change in this batch. **Not touched, deliberately:** the backend deploy
+(captain-only) and the Pro/Elite AI-generation prompt (still the one unbound seam in
+`workers/src/deps.ts`) — only the free-tier template engine plus this client polish landed. Full
+account: `docs/change_log.md`'s 2026-08-05 entry (the newest one, above the Google OAuth entry).
+Previous entry: 2026-08-05 — Google OAuth's credentials are provisioned and verified working in
 local dev: `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` are in `workers/.dev.vars`, and
 `POST /api/auth/sign-in/social` against `wrangler dev` returns a real Google authorization URL
 that Google's own server accepts (a real sign-in page, not `invalid_client`). Production is not
@@ -83,7 +103,7 @@ from 82. Issue #22 remains open.)
 | M1 — Foundation (account → empty Home) | **In progress.** Server (auth + schema + account routes) works locally on Cloudflare (`workers/`); client-side email/password auth now exists (`src/app/(auth)/`, `src/lib/apiClient.ts`) and gates the app behind a session — Google OAuth credentials are now provisioned and verified working in local dev (2026-08-05); only the production `wrangler secret put` step remains, and nothing is deployed |
 | M2 — Intake (questionnaire persists) | **In progress.** Intake screen now exists, wired to `GET`/`PUT /api/intake` |
 | M3 — Plan engine (3 tiers produce valid plans) | **In progress.** Pure template/pace engine now wired into the Worker's `generate-plan` route and the client's generate-plan action; the plan view renders a real generated plan (via `GET /api/plans/:id`) alongside the permanent static golden fixture |
-| M4 — Tiers & quotas (server-side, unbypassable) | **Server half done.** The quota ledger, atomic gate, fallback exemption, `quota-status` and `purchase-tier` are built and tested; no client UI |
+| M4 — Tiers & quotas (server-side, unbypassable) | **In progress.** The quota ledger, atomic gate, fallback exemption, `quota-status` and `purchase-tier` are built and tested server-side; a Settings tab now displays tier/quota and a dummy paywall now lets a runner call `purchase-tier` (2026-08-05) |
 | M5 — My Plans (history) | **In progress.** A My Plans tab lists plans off `GET /api/plans` |
 | M6 — Polish & TestFlight | Not started |
 
@@ -194,6 +214,27 @@ the literal previous week) and issue #33 (goal-realism handling).
       `Math.round()` — the exact race distance stays spelled out in the workout's `structure`
       string. 270 root tests + 86 `workers/` tests pass clean. Full account: `docs/change_log.md`'s
       2026-08-04 entry.
+- [x] **Settings tab, dummy paywall, and goal-realism UI — done 2026-08-05, client-only, closes
+      issues #12 and #15.** `src/app/(tabs)/settings.tsx` is the new fourth tab: tier + quota
+      display (`GET /api/quota-status`, new pure `src/lib/quotaDisplay.ts`'s `formatQuotaLine()`),
+      a Free-tier "Upgrade" entry point, sign-out (moved off Home), and a Delete Account flow
+      (native confirm → `deleteAccount()` → `authClient.signOut()` to invalidate the local session
+      store). `src/app/paywall.tsx` is a new `Stack` route calling `POST /api/purchase-tier` with
+      honest "test upgrade, no payment required" copy, reached either from Settings or from Home's
+      `generate-plan` action catching a `402 over_quota` response. Intake's dead-end save is fixed
+      — `router.replace('/(tabs)')` after a successful save, and its exit-header label
+      (`IntakeExitAction`, now taking an explicit `label` prop) reads "Done" once intake already
+      existed on load or was just saved, "Skip for now" otherwise. Home now prefills
+      `raceDistance`/`raceDate` from saved intake once per mount. New
+      `src/components/plan/GoalRealismNotice.tsx` surfaces `Plan.goalRealism` on the plan screen
+      (`realism === 'implausible'`) and as a live read-only preview at both goal-entry points
+      (Intake's goal-time field, Home's goal panel — Home's preview only shows when the panel's
+      selected race distance still matches the one the saved goal time was recorded against, to
+      avoid judging a stored goal time against a distance it was never set for). This also closes
+      a launch-readiness audit's "goal-realism UI half not built" doc-vs-code drift finding
+      (external to this repo). 278 tests pass (272 + 6 new for `quotaDisplay.ts`), typecheck and
+      lint clean; no `workers/` change. Full account: `docs/change_log.md`'s 2026-08-05 entry (the
+      newest one, above the Google OAuth entry).
 - [x] `src/lib/loadRules.ts` — deterministic safety arithmetic (see "Next" step 2)
 - [x] `src/lib/notation.ts` — the code counterpart of `notation.md`: `RUN_TYPE_ABBREVIATIONS`,
       `UNABBREVIATED_RUN_TYPES`, `STRUCTURE_SHORTHAND`, and `expandLabel()` for screen-reader text.
@@ -413,8 +454,9 @@ view to `buildTemplatePlan()` instead of the static fixture; intake and server w
 
 **Nothing is currently in flight.** The pure engine and its test contracts are complete, and as of
 2026-08-04 steps 4, 7, 8, and 10 below (plan view, intake, `generate-plan`, My Plans) are wired end
-to end and E2E-verified. The next critical-path items are step 9 (quota UI + dummy paywall) and the
-Pro/Elite personalization prompt noted in step 8.
+to end and E2E-verified. **As of 2026-08-05, step 9 (quota UI + dummy paywall) is also done** — see
+"Done" below. The one remaining critical-path item is the Pro/Elite personalization prompt noted in
+step 8, which is server-only (`workers/`) and untouched by this client-only batch.
 
 - **Cycle 1** (2026-07-11): Ian scored the rendered plan 3/10, five rulings applied. Docs rebuilt
   (`notation.md` added; `workout-library.md` and `example-plan-5k-pro.md` rewritten;
@@ -498,7 +540,13 @@ with **no backend at all**.
        client action calling it, and the plan view rendering the result, landed the same pass (step
        4 above). The Pro/Elite personalization prompt (`workers/src/deps.ts`'s second swap) is
        still unbound — see "Known debt and risks" below.
-9. [ ] **Quota UI + dummy paywall.**
+9. [x] **Quota UI + dummy paywall — done 2026-08-05.** `src/app/(tabs)/settings.tsx` (the new
+       fourth tab) shows tier + a quota line off `GET /api/quota-status` (new pure
+       `src/lib/quotaDisplay.ts`) and a Free-tier "Upgrade" entry point; `src/app/paywall.tsx` (a
+       `Stack` route) calls `POST /api/purchase-tier` with honest "test upgrade, no payment
+       required" copy, reached from there or from Home's `generate-plan` action on a `402
+       over_quota` response. Settings also gained sign-out (moved off Home) and a Delete Account
+       flow. Full account: `docs/change_log.md`'s 2026-08-05 entry (the newest one).
 10. [x] **My Plans** — **done 2026-08-04.** A My Plans tab (`src/app/(tabs)/my-plans.tsx`) lists
         plans off `GET /api/plans`, fetched via `useFocusEffect` so the list stays fresh across tab
         revisits (fixed in the same pass — see `docs/change_log.md`'s 2026-08-04 entry).
@@ -581,7 +629,7 @@ Full rationale for each is in `docs/change_log.md`'s "2026-07-10 (Phase 0)" entr
 | Where Rule 10 disclaimers render | Static footer section on every plan view + one line in the generating modal's fine print. |
 | Elite extras | **Cut for MVP.** Elite = richest personalization prompt + per-workout "why" only; `Plan.extras` can carry them later without a schema change. |
 | iPad / tablet a v1 target? | **No — phone-only v1.** iPad and desktop/computer support move to v2 (Ian: "phone only for phase 1, then ipad and computer in phase two"). |
-| Paywall + Settings in MVP? | **Restored.** Minimal dummy paywall + settings-lite (sign out, tier display, restore), in the blueprint's reserved third tab slot. |
+| Paywall + Settings in MVP? | **Restored.** Minimal dummy paywall + settings-lite (sign out, tier display, restore), in the blueprint's reserved third tab slot. **Built 2026-08-05** — `src/app/(tabs)/settings.tsx` (tier, quota, sign-out, delete account) and `src/app/paywall.tsx` (dummy `purchase-tier` call); "restore purchases" itself has no counterpart yet since v1's IAP is dummy-only, not a real store receipt. |
 | Does a fallback plan burn quota? | **Not the first 3 in a period** (`is_fallback` filter in both `generate-plan` and `quota-status`; `notes` length-limited and sanitized). **A 4th+ fallback in the same period keeps the already-reserved slot (R-B addendum)** — nobody is refused, but that attempt counts against quota, and the fallback card must say so. |
 | Free-tier configure gating | Free sees all options; out-of-tier selections render locked and route to the paywall on tap — never a dead disabled button. |
 | "Next workout" / "current week" card | **Dropped.** Home shows the plan link + quota state only. No current-week arithmetic exists in v1. |
@@ -617,6 +665,9 @@ reasoning, worked cases, and the type contract:
 
 **Implemented in code:** the shared types and contract tests landed 2026-07-12;
 `src/lib/paceDerivation.ts` landed 2026-08-03 with the exact ruled threshold and cap arithmetic.
+**The client-facing warning landed 2026-08-05** — `GoalRealismNotice` on the plan screen, plus a
+live preview at both goal-entry points (Intake, Home), closing the gap between this ruling and what
+the runner actually saw. See `docs/change_log.md`'s 2026-08-05 entry.
 
 ## Decided (2026-08-03) — injury-handling task brief
 
