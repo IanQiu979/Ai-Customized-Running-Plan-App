@@ -87,7 +87,8 @@ export function createAuth(env: Env) {
      * `exp://` origin, rewrites the `origin` header from `expo-origin` (native fetch does not
      * send a browser `Origin` header better-auth's default check can read), and redirects an
      * OAuth callback into the app's own deep-link scheme instead of a browser location. A no-op
-     * for the email/password path; required once Google OAuth is provisioned.
+     * for the email/password path; required for Google OAuth, provisioned in local dev and
+     * pending the captain's production `wrangler secret put` (see `buildSocialProviders` below).
      */
     plugins: [bearer(), expo()],
 
@@ -102,22 +103,15 @@ export function createAuth(env: Env) {
 /**
  * Google OAuth, if and only if both halves of the credential are present.
  *
- * TODO (captain): Google sign-in is configured but NOT provisioned. Nothing here can be finished
- * without values only the captain can create, and fabricating them would produce a build that
- * looks wired and fails at the consent screen. What is needed:
+ * TODO (captain): Google sign-in is provisioned and verified in local dev (2026-08-05) —
+ * `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` are in `workers/.dev.vars`, and `APP_SCHEME` has been
+ * confirmed to match the app's real scheme. Production is not done: only the captain can run
+ * `wrangler secret put GOOGLE_CLIENT_ID` and `wrangler secret put GOOGLE_CLIENT_SECRET` (needs
+ * their own Cloudflare login). See `docs/change_log.md`'s 2026-08-05 entry for the full account,
+ * including a recommendation to rotate the client secret before shipping.
  *
- *   1. A Google Cloud project → APIs & Services → Credentials → OAuth 2.0 Client ID (type "Web
- *      application"). Note that this is a *web* client even for a mobile app, because the OAuth
- *      round trip terminates at this Worker, not in the app.
- *   2. Its authorized redirect URI set to `${BETTER_AUTH_URL}/api/auth/callback/google` — for
- *      local work that is `http://localhost:8787/api/auth/callback/google`.
- *   3. `wrangler secret put GOOGLE_CLIENT_ID` and `wrangler secret put GOOGLE_CLIENT_SECRET`
- *      (and the same two keys in `workers/.dev.vars` for local runs).
- *   4. `APP_SCHEME` in `wrangler.toml` confirmed against the app's real scheme — it was renamed to
- *      `paceblueprint://` on 2026-07-12 and has not been verified against a built app since.
- *
- * Until then this returns `{}` and only email/password is available. That is a working sign-in
- * path, not a broken one, which is why it is safe to ship in this state.
+ * Until the production secrets are set this returns `{}` and only email/password is available.
+ * That is a working sign-in path, not a broken one, which is why it is safe to ship in this state.
  */
 function buildSocialProviders(env: Env) {
   if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {

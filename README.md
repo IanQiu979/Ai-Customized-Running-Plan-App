@@ -101,7 +101,8 @@ src/
   app/
     _layout.tsx
     (auth)/
-      sign-in.tsx, sign-up.tsx  # email/password; a "Continue with Google" button is wired but inert
+      sign-in.tsx, sign-up.tsx  # email/password; "Continue with Google" verified in local dev,
+                                 #   production pending (see docs/mvp-progress.md)
     (tabs)/
       _layout.tsx
       index.tsx          # Home
