@@ -107,7 +107,7 @@ src/
       index.tsx          # Home
       glossary.tsx        # run-type abbreviations glossary
       my-plans.tsx          # My Plans — lists GET /api/plans
-    intake/                 # onboarding questionnaire, against GET/PUT /api/intake
+    intake.tsx              # onboarding questionnaire, against GET/PUT /api/intake
     plan/[id].tsx          # plan view — real plans via GET /api/plans/:id, plus the permanent
                             #  golden-fixture example
   components/
