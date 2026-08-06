@@ -3,6 +3,17 @@
 Ported subset of `training_zones.md`. The whole zone model survives the port because max HR is
 computed from age (`220 − age`), and age is one of the ten intake fields.
 
+**Adults (age ≥ 18) only, as of 2026-08-06.** Captain-approved youth policy (§6-A,
+`v22-youth-policy-research-s1` report): under-18 plans never emit `hrZone` on any tier. Four
+sourced findings converged — `220 − age` is measurably wrong in youth by a wider margin than in
+adults (Mahon 2010; Carli 2023 meta-analysis), the definitive youth-running consensus (Krabak
+2021, Br J Sports Med) prescribes zero HR-zone training, and `ECHO_Framework_CORRECTED.md:47`
+("DO NOT use age-predicted zones") already argued against this rule. `loadRules.ts`'s
+`rpeForZone` substitutes the RPE this same file's § RPE scale already maps to each zone — no new
+coaching content, just the existing table wired to the population it fits best. See
+`docs/superpowers/specs/2026-08-06-youth-hr-zone-replacement-design.md` for the alternatives
+considered.
+
 ## Max heart rate estimation
 
 **Formula: `220 − age`** *(training_zones.md § Max Heart Rate Estimation)*. Example: age 35 →

@@ -48,6 +48,15 @@ DO NOT use age-predicted zones (e.g., "220 - age").
 Instead: Establish individual heart rate baselines through testing.
 
 > ℹ️ **NOTE — INTERNAL CONTRADICTION, SCOPED BY RULING (Ian, 2026-07-10):** This instruction contradicts `training_zones.md`, which builds all of its zone tables on 220 − age. Ian — shown Tanaka et al. 2001 (208 − 0.7 × age is more accurate; ±10-12 bpm scatter around any age formula) — ruled to keep 220 − age as the estimate *where no individual data exists*. That is exactly V2.2's situation: a one-time 8-field intake with no logging, so age is the only HR input available. Both positions stand, scoped: 220 − age is the no-data default; this pillar's individual-baseline principle applies whenever longitudinal HR data exists (Ian's live coaching, any future product with run logging).
+>
+> ℹ️ **FOLLOW-UP RULING (captain, 2026-08-06), narrowing the scope above:** the "220 − age is the
+> no-data default" resolution no longer covers under-18 runners. `v22-youth-policy-research-s1`
+> found the formula's error margin is *worse* in youth than adults (Mahon 2010; Carli 2023) and
+> that the definitive youth-running consensus (Krabak 2021) prescribes no HR-zone training at any
+> age under 18 — this instruction's "DO NOT use age-predicted zones" turns out to be the correct
+> call for that population specifically, not merely a generic caution. V2.2 now suppresses
+> `hrZone` for `age < 18` and substitutes RPE (`docs/reference/coaching/training-zones.md`'s own
+> § RPE scale) instead. 220 − age remains the no-data default for adults, unchanged.
 
 Economy Measurement Methods:
 1. Heart rate at a given pace (declining HR week-to-week = better economy)

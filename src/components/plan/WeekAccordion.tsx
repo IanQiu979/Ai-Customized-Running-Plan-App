@@ -18,8 +18,8 @@ const WEEK_GUTTER_WIDTH = Spacing.six; // 48
  * One row per week: a mono week number, a seven-cell ribbon (colour + monotonic height, rest
  * days as real gaps, an unbroken baseline), and a chevron that expands the week's workouts in
  * place. Whether a bracket or a "why" line ever appears is entirely driven by whether `pace`,
- * `hrZone`, or `why` are populated on the data — there is no separate tier flag here, because
- * a fallback or Free-tier plan simply never populates those fields.
+ * `hrZone`/`rpe`, or `why` are populated on the data — there is no separate tier flag here,
+ * because a fallback or Free-tier plan simply never populates those fields.
  * `mvp-blueprint.md` Part 3 / Part 7 "Plan view".
  */
 export function WeekAccordion({ week }: { week: Week }) {

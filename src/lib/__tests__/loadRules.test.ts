@@ -9,8 +9,11 @@ import {
   hrZoneBpm,
   injuryVolumeReductionPct,
   INJURY_VOLUME_REDUCTION_PCT,
+  isUnder18,
   isValidDeload,
   LONG_RUN_SHARE_CAP,
+  rpeForZone,
+  RPE_FOR_ZONE,
   toExperienceLevel,
 } from '../loadRules';
 
@@ -25,6 +28,23 @@ describe('heart-rate zones', () => {
 
   it('reproduces zone 2 for the same runner (130-148)', () => {
     expect(hrZoneBpm(2, 35)).toEqual({ low: 130, high: 148 });
+  });
+});
+
+describe('youth (under-18) — RPE replaces HR zones', () => {
+  it('classifies under-18 by strict less-than, 18 itself counts as adult', () => {
+    expect(isUnder18(17)).toBe(true);
+    expect(isUnder18(18)).toBe(false);
+    expect(isUnder18(10)).toBe(true);
+  });
+
+  it('maps each zone to the training-zones.md RPE scale entry that names that exact zone', () => {
+    expect(rpeForZone(1)).toBe(3); // "RPE 3 | Zone 1 | Light. Easy run, fully comfortable."
+    expect(rpeForZone(2)).toBe(5); // "RPE 5 | Zone 2 | Somewhat hard. Steady state."
+    expect(rpeForZone(3)).toBe(7); // "RPE 7 | Zone 3 | Very hard. Threshold effort."
+    expect(rpeForZone(4)).toBe(8); // "RPE 8 | Zone 4 | Very very hard. VO2 max effort."
+    expect(rpeForZone(5)).toBe(10); // "RPE 10 | Zone 5 | Maximum effort. All-out sprint."
+    expect(RPE_FOR_ZONE).toEqual({ 1: 3, 2: 5, 3: 7, 4: 8, 5: 10 });
   });
 });
 

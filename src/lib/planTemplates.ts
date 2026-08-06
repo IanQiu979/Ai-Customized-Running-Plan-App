@@ -14,7 +14,9 @@ import {
   hasDeclaredInjury,
   hasRedFlagInjury,
   injuryVolumeReductionPct,
+  isUnder18,
   MAX_SINGLE_RUN_KM,
+  rpeForZone,
   toExperienceLevel,
 } from './loadRules';
 import {
@@ -90,6 +92,16 @@ const RED_FLAG_INJURY_DISCLAIMER =
   'physiotherapist for an evaluation before continuing training. If pain is above 3/10 or ' +
   'does not improve within 5–7 days, stop running and seek assessment.';
 
+/** Captain's exact sign-off text (2026-08-06) — verbatim, do not paraphrase. Appended whenever
+ * `intake.age` is under 18, alongside the HR-zone→RPE substitution (§6-A,
+ * `v22-youth-policy-research-s1` report). */
+const UNDER_18_DISCLAIMER =
+  'This plan is generated for a runner under 18. It does not replace a pre-participation ' +
+  'medical evaluation - check with a doctor before starting, especially around growth-plate ' +
+  'and bone-health considerations at this age. A parent or guardian should stay aware of ' +
+  'training load and has the right to pause or stop the plan at any time. This plan does not ' +
+  "account for individual medical history, injuries, or a coach's in-person supervision.";
+
 /** Ian-approved 12-week 5K load shape, normalized to the 35 km worked-example baseline. */
 const FIVE_K_WEEKLY_LOAD = [34, 35, 38, 23, 41, 45, 48, 30, 45, 48, 40, 28] as const;
 const FIVE_K_LONG_RUNS = [10, 11, 12, 8, 13, 14, 15, 10, 14, 15, 12] as const;
@@ -146,15 +158,18 @@ function formatPace(secPerKm: number): string {
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }
 
+/** `hrZone` for adults, `rpe` for under-18 — never both. See `loadRules.ts`'s `isUnder18`
+ * and `rpeForZone` (captain-approved youth policy §6-A). */
 function paidFields(
   density: TemplateDensity,
   pace: Pace | undefined,
   hrZone: HrZone | undefined,
-): Pick<Workout, 'pace' | 'hrZone'> {
+  age: number,
+): Pick<Workout, 'pace' | 'hrZone' | 'rpe'> {
   if (density !== 'paid') return {};
   return {
     ...(pace ? { pace } : {}),
-    ...(hrZone ? { hrZone } : {}),
+    ...(hrZone ? (isUnder18(age) ? { rpe: rpeForZone(hrZone) } : { hrZone }) : {}),
   };
 }
 
@@ -162,6 +177,7 @@ function easyRun(args: {
   distanceKm: number;
   pace?: Pace;
   density: TemplateDensity;
+  age: number;
   structure?: string;
   strides?: boolean;
 }): Workout {
@@ -171,19 +187,24 @@ function easyRun(args: {
     label: args.strides ? 'ER + Strides' : 'ER',
     distanceKm: args.distanceKm,
     effortDescription: EASY_DESCRIPTION,
-    ...paidFields(args.density, args.pace, 1),
+    ...paidFields(args.density, args.pace, 1, args.age),
     ...(args.structure ? { structure: args.structure } : {}),
   };
 }
 
-function longRun(distanceKm: number, pace: Pace | undefined, density: TemplateDensity): Workout {
+function longRun(
+  distanceKm: number,
+  pace: Pace | undefined,
+  density: TemplateDensity,
+  age: number,
+): Workout {
   return {
     kind: 'run',
     effort: 'easy',
     label: 'LR',
     distanceKm,
     effortDescription: LONG_DESCRIPTION,
-    ...paidFields(density, pace, 1),
+    ...paidFields(density, pace, 1, age),
     isLongRun: true,
   };
 }
@@ -193,6 +214,7 @@ function tempoRun(args: {
   durationMin: number;
   pace?: Pace;
   density: TemplateDensity;
+  age: number;
 }): Workout {
   return {
     kind: 'run',
@@ -200,7 +222,7 @@ function tempoRun(args: {
     label: 'TR',
     distanceKm: Math.min(args.distanceKm, 10),
     effortDescription: TEMPO_DESCRIPTION,
-    ...paidFields(args.density, args.pace, 3),
+    ...paidFields(args.density, args.pace, 3, args.age),
     structure: `WU 2 km · ${args.durationMin} min @ tempo · CD 2 km`,
   };
 }
@@ -210,6 +232,7 @@ function intervalRun(args: {
   structure: string;
   pace?: Pace;
   density: TemplateDensity;
+  age: number;
   racePace?: boolean;
 }): Workout {
   return {
@@ -218,19 +241,24 @@ function intervalRun(args: {
     label: args.racePace ? 'RP' : 'INT',
     distanceKm: Math.min(args.distanceKm, 11),
     effortDescription: args.racePace ? RACE_PACE_DESCRIPTION : INTERVAL_DESCRIPTION,
-    ...paidFields(args.density, args.pace, 4),
+    ...paidFields(args.density, args.pace, 4, args.age),
     structure: args.structure,
   };
 }
 
-function shakeoutRun(distanceKm: number, density: TemplateDensity, structure: string): Workout {
+function shakeoutRun(
+  distanceKm: number,
+  density: TemplateDensity,
+  age: number,
+  structure: string,
+): Workout {
   return {
     kind: 'run',
     effort: 'recovery',
     label: 'SR',
     distanceKm,
     effortDescription: SHAKEOUT_DESCRIPTION,
-    ...paidFields(density, undefined, 1),
+    ...paidFields(density, undefined, 1, age),
     structure,
   };
 }
@@ -517,15 +545,16 @@ function buildCanonicalFiveKWeek(args: {
     const nonRaceKm = Math.max(3, desiredVolumeKm - (race.distanceKm ?? 0));
     const easyDistances = distributeDistance(nonRaceKm, 3, Math.max(1, nonRaceKm));
     const workouts = [
-      easyRun({ distanceKm: easyDistances[0], pace: easyPace, density }),
+      easyRun({ distanceKm: easyDistances[0], pace: easyPace, density, age: intake.age }),
       easyRun({
         distanceKm: easyDistances[1],
         pace: easyPace,
         density,
+        age: intake.age,
         strides: true,
         structure: '4 × 20 s Strides @ GP',
       }),
-      shakeoutRun(easyDistances[2], density, '2 × 30 s Strides @ GP'),
+      shakeoutRun(easyDistances[2], density, intake.age, '2 × 30 s Strides @ GP'),
       race,
     ];
     const days: Week7<Day> = [workouts[0], REST, workouts[1], REST, workouts[2], REST, workouts[3]];
@@ -543,6 +572,7 @@ function buildCanonicalFiveKWeek(args: {
           durationMin: FIVE_K_TEMPO_MIN[weekNumber],
           pace: tempoPace,
           density,
+          age: intake.age,
         }),
       );
     }
@@ -556,6 +586,7 @@ function buildCanonicalFiveKWeek(args: {
           structure: `WU 2 km · 8 × 600 m @ ${paceText} w/ 300 m jog · CD 2 km`,
           pace: intervalPace,
           density,
+          age: intake.age,
         }),
       );
     } else if (weekNumber === 10) {
@@ -568,6 +599,7 @@ function buildCanonicalFiveKWeek(args: {
           structure: `WU 2 km · 5 × 1000 m @ ${paceText} w/ 400 m jog · CD 2 km`,
           pace: intervalPace,
           density,
+          age: intake.age,
         }),
       );
     } else if (weekNumber === 11) {
@@ -577,6 +609,7 @@ function buildCanonicalFiveKWeek(args: {
           structure: 'WU 2 km · 3 × 1600 m @ GP w/ ~400 m jog · CD 2 km',
           pace: racePace,
           density,
+          age: intake.age,
           racePace: true,
         }),
       );
@@ -637,7 +670,7 @@ function buildCanonicalFiveKWeek(args: {
     if (flooredKm >= longDistanceKm) break;
     longDistanceKm = flooredKm;
   }
-  const long = longRun(longDistanceKm, easyPace, density);
+  const long = longRun(longDistanceKm, easyPace, density, intake.age);
 
   const remainingKm = desiredVolumeKm - longDistanceKm - qualityKm;
   const easyDistances = distributeDistance(remainingKm, easyCount, longDistanceKm * 0.8);
@@ -650,6 +683,7 @@ function buildCanonicalFiveKWeek(args: {
       distanceKm,
       pace: easyPace,
       density,
+      age: intake.age,
       strides,
       ...(strides
         ? { structure: taperStrideDay ? '4 × 30 s Strides @ GP' : '4 × 30 s Strides' }
@@ -735,8 +769,8 @@ function buildGenericWeek(args: {
     const easyDistances = distributeDistance(easyBudgetKm, easyCount, maxSingleRunKm);
     const easyWorkouts = easyDistances.map((distanceKm, index) =>
       index === easyDistances.length - 1
-        ? shakeoutRun(distanceKm, density, '2 × 30 s Strides @ GP')
-        : easyRun({ distanceKm, pace: easyPace, density }),
+        ? shakeoutRun(distanceKm, density, intake.age, '2 × 30 s Strides @ GP')
+        : easyRun({ distanceKm, pace: easyPace, density, age: intake.age }),
     );
     const reconciledEasyWorkouts = reconcileVolumeToTarget(easyWorkouts, easyBudgetKm);
     const days = placeWorkouts([...reconciledEasyWorkouts, race], requestedRuns);
@@ -754,6 +788,7 @@ function buildGenericWeek(args: {
         durationMin: phase === 'base' ? 20 : phase === 'build' ? 24 : 29,
         pace: tempoPace,
         density,
+        age: intake.age,
       }),
     );
   }
@@ -764,6 +799,7 @@ function buildGenericWeek(args: {
         structure: 'WU 2 km · 5 × 1000 m @ current-fitness interval effort w/ 400 m jog · CD 2 km',
         pace: intervalPace,
         density,
+        age: intake.age,
       }),
     );
   }
@@ -774,6 +810,7 @@ function buildGenericWeek(args: {
         structure: 'WU 2 km · 3 × 1600 m @ GP w/ ~400 m jog · CD 2 km',
         pace: racePace,
         density,
+        age: intake.age,
         racePace: true,
       }),
     );
@@ -796,7 +833,7 @@ function buildGenericWeek(args: {
   );
   const longRunVolumeBudget = Math.max(longRunFloor, desiredVolumeKm - qualityKm - easyCount);
   const longDistanceKm = Math.min(maxSingleRunKm, longRunFromCurve, longRunVolumeBudget);
-  const long = longRun(longDistanceKm, easyPace, density);
+  const long = longRun(longDistanceKm, easyPace, density, intake.age);
   const easyDistances = distributeDistance(
     desiredVolumeKm - longDistanceKm - qualityKm,
     easyCount,
@@ -807,6 +844,7 @@ function buildGenericWeek(args: {
       distanceKm,
       pace: easyPace,
       density,
+      age: intake.age,
       strides: !isDeload,
       ...(!isDeload ? { structure: '4 × 30 s Strides' } : {}),
     }),
@@ -907,6 +945,7 @@ export function buildTemplatePlan(params: TemplatePlanParams): Plan {
 
   const disclaimers = [
     GENERAL_DISCLAIMER,
+    ...(isUnder18(params.intake.age) ? [UNDER_18_DISCLAIMER] : []),
     ...(hasDeclaredInjury(params.intake.injuries) ? [INJURY_DISCLAIMER] : []),
     ...(hasRedFlagInjury(params.intake.injuries) ? [RED_FLAG_INJURY_DISCLAIMER] : []),
   ];

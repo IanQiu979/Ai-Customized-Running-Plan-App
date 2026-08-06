@@ -92,8 +92,11 @@ is unit-tested with no network and no Anthropic spend:
    Echo V1's token strategy: a brevity mandate, a `max_tokens` ceiling, a **forced tool call** for
    guaranteed JSON, streaming so the server isn't CPU-killed mid-response, and
    truncation detection. Personalization is paces (**only if a recent time exists — otherwise no
-   numeric pace is emitted at any tier**), HR zones (from age), warm-ups/drills, a weekly "why"
-   (Pro) or per-workout "why" (Elite).
+   numeric pace is emitted at any tier**), HR zones (from age — **adults only; under-18 gets RPE
+   instead, `loadRules.ts`'s `rpeForZone`, captain-approved youth policy §6-A, 2026-08-06**),
+   warm-ups/drills, a weekly "why" (Pro) or per-workout "why" (Elite). When this route is built,
+   model output carrying `hrZone` for an under-18 runner must be stripped/converted, not just
+   clamped — see "AI output validation is structural" in `CLAUDE.md`.
 8. **Deterministic expander** — typed code materializes every calendar week from the
    representative weeks, scaling distances along the phase's load curve (Echo V1's expander is
    the reference).

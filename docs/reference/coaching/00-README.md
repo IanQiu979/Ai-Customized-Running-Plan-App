@@ -57,7 +57,9 @@ data. A rule only survives this port if a one-time intake can actually drive it.
   `src/lib/loadRules.ts`.
 - **Disclaimers** — `load_rules.md` Rule 10, verbatim, non-negotiable. → `load-rules.md`
 - **Training zones, whole model** — `training_zones.md`. Zones are computed from age
-  (`220 − age`), which V2.2 collects, so the whole zone table is drivable. → `training-zones.md`
+  (`220 − age`), which V2.2 collects, so the whole zone table is drivable. → `training-zones.md`.
+  **Adults only as of 2026-08-06** — under-18 plans substitute the same file's RPE scale instead
+  (captain-approved youth policy §6-A; see `training-zones.md`'s own note).
 - **Running sessions** — `workout_library.md` Part 1, all 9 session types, minus the fuel/fueling
   sub-sections (out of scope, see below). → `workout-library.md`
 - **Return-to-running protocol** — `injury_flags.md` Part 2. → `injury-rules.md`
@@ -101,9 +103,12 @@ how the ported rules get used. Applied without second-guessing:
 2. **Days are unnamed.** Day 1 … Day 7 in a 7-day cycle, never Mon–Sun. (`ECHO_Training_Plans_McMillan.md`
    already does this — "Use Day 1, Day 2, Day 3 (not Mon/Tue/Wed) for flexibility" — so this
    confirms the source rather than overriding it.)
-3. **Max HR stays `220 − age`.** Ian was shown that Tanaka (2001) finds this the least accurate of
-   the common max-HR formulas (±10–12 bpm scatter) and chose to keep it anyway — an informed
-   decision, not an oversight. See `training-zones.md`.
+3. **Max HR stays `220 − age`, for adults.** Ian was shown that Tanaka (2001) finds this the least
+   accurate of the common max-HR formulas (±10–12 bpm scatter) and chose to keep it anyway for
+   age ≥ 18 — an informed decision, not an oversight. **Under-18 (2026-08-06):** the formula's
+   error is worse in youth specifically, and the definitive youth-running consensus prescribes no
+   HR-zone training regardless of formula — captain-approved policy suppresses `hrZone` entirely
+   below 18 and substitutes RPE. See `training-zones.md`.
 4. **Deload weeks reduce volume 35–45%** (2026-07-10, superseding an earlier 20–30% call the same
    day). Ian's own three worked examples in `workout_library.md` all land in this band, and his
    "Exception — Recovery Weeks" clause already permits it. See `plan-structure.md`. The 5K plan's

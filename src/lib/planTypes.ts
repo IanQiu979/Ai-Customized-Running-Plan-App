@@ -55,8 +55,15 @@ export const EFFORT_ORDINAL: Record<EffortLevel, number> = {
   interval: 4,
 };
 
-/** Zones 1–5, from `docs/reference/coaching/training-zones.md`. */
+/** Zones 1–5, from `docs/reference/coaching/training-zones.md`. Adults (age ≥ 18) only — see
+ * `RpeValue`. */
 export type HrZone = 1 | 2 | 3 | 4 | 5;
+
+/** 1–10, Borg-derived. `docs/reference/coaching/training-zones.md` § RPE scale, ported verbatim.
+ * Under-18 substitute for `HrZone` (captain-approved youth policy §6-A,
+ * `v22-youth-policy-research-s1` report, 2026-08-06) — self-reported effort, never computed from
+ * age, so it carries none of `estimateMaxHr`'s youth-inaccuracy problem. */
+export type RpeValue = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
 
 export type Phase = 'base' | 'build' | 'peak' | 'taper';
 
@@ -164,8 +171,12 @@ export interface Workout {
   effortDescription: string;
   /** Measured. Requires a recent performance to derive from; absent otherwise. */
   pace?: Pace;
-  /** Measured. Requires `age`. Paid tiers only. */
+  /** Measured. Requires `age`. Paid tiers only. Adults (age ≥ 18) only — under-18 plans populate
+   * `rpe` instead, never both. See `loadRules.ts`'s `isUnder18`. */
   hrZone?: HrZone;
+  /** Under-18 substitute for `hrZone`. Paid tiers only. Self-reported effort (1–10), never
+   * computed from age — captain-approved youth policy §6-A. */
+  rpe?: RpeValue;
   /** "1 km easy, 3 km steady, 1 km easy". */
   structure?: string;
   /** Coach's reasoning. Paid tiers only; a template genuinely has none. */

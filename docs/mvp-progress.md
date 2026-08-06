@@ -447,6 +447,11 @@ view to `buildTemplatePlan()` instead of the static fixture; intake and server w
       four test files, and five files under `docs/reference/coaching/`. Full account:
       `docs/change_log.md`'s 2026-07-12 entry. Issue #33's ruling was implemented in the engine on
       2026-08-03, and issue #22's clamp bug was fixed in the same build.
+- [x] **Youth (under-18) HR-zone policy shipped (2026-08-06).** `v22-youth-policy-research-s1`
+      researched under-18 training safety against sourced professional literature; captain
+      approved only §6-A (suppress `hrZone` under 18, substitute RPE) and §6-E (a youth
+      disclaimer), declining §6-B/C/D. See "Decided (2026-08-06)" below and
+      `docs/change_log.md`'s same-date entry.
 
 ---
 
@@ -668,6 +673,19 @@ reasoning, worked cases, and the type contract:
 **The client-facing warning landed 2026-08-05** — `GoalRealismNotice` on the plan screen, plus a
 live preview at both goal-entry points (Intake, Home), closing the gap between this ruling and what
 the runner actually saw. See `docs/change_log.md`'s 2026-08-05 entry.
+
+## Decided (2026-08-06) — youth (under-18) HR-zone policy, `v22-youth-policy-research-s1` §6-A/E
+
+Captain approved **only** item A of the research report's five youth proposals; B (rest-day
+floor/end-of-plan break), C (absolute volume ceilings), and D (race-distance gate) were
+explicitly declined — evidence judged too thin (C) or not this task's scope (B, D) — and remain
+unimplemented. Full report: `v22-youth-policy-research-s1/report.md` §6.
+
+| Item | Decision |
+|---|---|
+| §6-A — suppress `hrZone` under 18 | **Implemented.** Never emitted on any tier below age 18; substituted with RPE (`loadRules.ts`'s `rpeForZone`) using the coaching library's own already-ported RPE scale — no new content invented. See `docs/change_log.md`'s 2026-08-06 entry. |
+| §6-E — under-18 disclaimer | **Implemented**, captain's exact sign-off text (mid-task addition, same ruling round), appended to `Plan.disclaimers` whenever `age < 18`. |
+| §6-B/C/D | **Declined for now.** Not implemented; no code changed for these. |
 
 ## Decided (2026-08-03) — injury-handling task brief
 

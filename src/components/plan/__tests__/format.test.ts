@@ -158,4 +158,18 @@ describe('composeWorkoutLabel', () => {
     expect(label).not.toContain('–');
     expect(label).not.toContain('/km');
   });
+
+  it('speaks rpe as "perceived effort N out of 10" — the under-18 substitute for hrZone', () => {
+    const youthTempo: Workout = {
+      kind: 'run',
+      effort: 'tempo',
+      label: 'TR',
+      distanceKm: 8,
+      effortDescription: 'Comfortably hard, sustained effort.',
+      rpe: 7,
+    };
+    const label = composeWorkoutLabel(3, youthTempo);
+    expect(label).toContain('perceived effort 7 out of 10');
+    expect(label).not.toContain('heart rate zone');
+  });
 });

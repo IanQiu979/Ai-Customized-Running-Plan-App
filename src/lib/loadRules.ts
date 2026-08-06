@@ -11,7 +11,7 @@
  * Pure module — imported by the app and by the Deno edge functions. No runtime deps.
  */
 
-import type { ExperienceAnswer, ExperienceLevel, HrZone, InjuryFlag } from './planTypes';
+import type { ExperienceAnswer, ExperienceLevel, HrZone, InjuryFlag, RpeValue } from './planTypes';
 
 // ---------------------------------------------------------------------------
 // Rule 1 — weekly volume
@@ -93,6 +93,47 @@ export function hrZoneBpm(zone: HrZone, age: number): { low: number; high: numbe
   const maxHr = estimateMaxHr(age);
   const [lo, hi] = HR_ZONE_BOUNDS[zone];
   return { low: Math.round(maxHr * lo), high: Math.round(maxHr * hi) };
+}
+
+// ---------------------------------------------------------------------------
+// Youth (under-18) — RPE replaces HR zones
+// ---------------------------------------------------------------------------
+
+/**
+ * Age-predicted max-HR formulas (`estimateMaxHr`, `220 − age`) are unreliable in youth by a wider
+ * margin than in adults — Mahon et al. 2010 (n=52, ages 7–17): ±10±8 bpm error; Carli et al. 2023
+ * (systematic review + meta-analysis): "all equations were found to be unsatisfactory," r = 0.229
+ * for Fox's 220 − age specifically. The definitive youth-running consensus (Krabak et al. 2021,
+ * Br J Sports Med) prescribes zero HR-zone training of any kind. This also resolves the standing
+ * contradiction between `training-zones.md` (builds every zone on 220 − age) and
+ * `ECHO_Framework_CORRECTED.md:47` ("DO NOT use age-predicted zones") for the population where it
+ * matters most — Ian's own library already argued against this rule.
+ *
+ * Captain-approved policy (§6-A, `v22-youth-policy-research-s1` report, 2026-08-06): for
+ * `age < 18`, never emit `hrZone` on any tier. `rpeForZone` substitutes the RPE the coaching
+ * library already maps to the same zone (`training-zones.md` § RPE scale, ported verbatim from
+ * `training_zones.md`) — no new coaching content invented, and RPE needs no HR monitor, which a
+ * youth runner is less likely to have than an adult.
+ */
+export function isUnder18(age: number): boolean {
+  return age < 18;
+}
+
+/**
+ * `training-zones.md` § RPE scale, ported verbatim. Only the RPE values that map to exactly one
+ * zone (not a transitional "Z1–Z2" row) are usable as a single-number substitute; each zone the
+ * template engine actually prescribes today (1, 3, 4) has one.
+ */
+export const RPE_FOR_ZONE: Record<HrZone, RpeValue> = {
+  1: 3,
+  2: 5,
+  3: 7,
+  4: 8,
+  5: 10,
+};
+
+export function rpeForZone(zone: HrZone): RpeValue {
+  return RPE_FOR_ZONE[zone];
 }
 
 // ---------------------------------------------------------------------------

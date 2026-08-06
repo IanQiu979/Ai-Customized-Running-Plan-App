@@ -111,6 +111,13 @@ clean `typecheck && lint && test`. Never force-push without explicit user approv
   answer, but always asked), and injuries. Race date and goal time appear **only** once a target
   race is chosen. Max HR is estimated `220 − age`, so no HR zone is computable without age, and
   50+ forces a 3-week deload cadence.
+- **Under-18 runners never see HR zones.** Captain-approved youth policy (§6-A,
+  `v22-youth-policy-research-s1` report, 2026-08-06): `age < 18` suppresses `Workout.hrZone`
+  entirely and substitutes `Workout.rpe` instead (`loadRules.ts`'s `isUnder18`/`rpeForZone`, a
+  direct read of `training-zones.md`'s already-ported RPE scale — no new coaching content). Adult
+  plans are unaffected. The report's other under-18 proposals (a rest-day floor, an absolute
+  volume ceiling, a race-distance gate) were evaluated and explicitly declined — don't assume they
+  ship just because this one did.
 
 ## Testing
 

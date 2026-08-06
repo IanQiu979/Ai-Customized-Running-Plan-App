@@ -130,7 +130,9 @@ describe('Rule 10 injury disclaimer', () => {
   it('does not appear when injuries is ["none"]', () => {
     const plan = goldenPlanWithInjuries(['none']);
     expect(plan.disclaimers).not.toContain(RULE_10_INJURY_DISCLAIMER);
-    expect(plan.disclaimers.length).toBe(1);
+    // general + under-18 — BASE_INTAKE's age (16) is a real under-18 fixture, not incidental,
+    // so it now also carries the youth disclaimer (captain-approved youth policy §6-A/E).
+    expect(plan.disclaimers.length).toBe(2);
   });
 
   it('appears verbatim whenever injuries is not ["none"]', () => {
@@ -140,7 +142,7 @@ describe('Rule 10 injury disclaimer', () => {
 
   it('still carries the general disclaimer alongside the injury one', () => {
     const plan = goldenPlanWithInjuries(['lower_back']);
-    expect(plan.disclaimers.length).toBe(2);
+    expect(plan.disclaimers.length).toBe(3); // general + under-18 + injury
   });
 });
 
@@ -161,10 +163,13 @@ describe('red-flag injury (Ruling 1) — normal volume-adjusted plan, not a retu
   it('carries the strengthened professional-evaluation disclaimer in addition to the standard injury disclaimer', () => {
     const redFlag = goldenPlanWithInjuries(['ankle_achilles']);
     const ordinary = goldenPlanWithInjuries(['hip_glute']);
-    expect(redFlag.disclaimers.length).toBe(3); // general + injury + strengthened
-    expect(ordinary.disclaimers.length).toBe(2); // general + injury only
+    expect(redFlag.disclaimers.length).toBe(4); // general + under-18 + injury + strengthened
+    expect(ordinary.disclaimers.length).toBe(3); // general + under-18 + injury only
     const strengthened = redFlag.disclaimers.find(
-      (d) => d !== ordinary.disclaimers[0] && d !== ordinary.disclaimers[1],
+      (d) =>
+        d !== ordinary.disclaimers[0] &&
+        d !== ordinary.disclaimers[1] &&
+        d !== ordinary.disclaimers[2],
     );
     expect(strengthened).toBeDefined();
     expect(strengthened).toMatch(/professional|physiotherapist/i);
