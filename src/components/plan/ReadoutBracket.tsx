@@ -6,9 +6,10 @@ import { useTheme } from '@/hooks/use-theme';
 
 /**
  * Flanks a genuinely *measured* mono numeral in hairline brackets — a real pace, a real HR
- * zone. `frontend-design-brief.md` Part 2, "Readout brackets": reserved exclusively for numbers
- * that were actually measured; a qualitative description never earns this. Callers are
- * responsible for only rendering this around `pace`/`hrZone`, never around prose.
+ * zone, a self-reported RPE. `frontend-design-brief.md` Part 2, "Readout brackets": reserved
+ * exclusively for numbers that were actually measured; a qualitative description never earns
+ * this. Callers are responsible for only rendering this around `pace`/`hrZone`/`rpe`, never
+ * around prose.
  */
 export function ReadoutBracket({ children }: { children: ReactNode }) {
   const theme = useTheme();

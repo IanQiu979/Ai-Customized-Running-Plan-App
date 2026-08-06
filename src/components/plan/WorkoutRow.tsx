@@ -10,8 +10,10 @@ import { ReadoutBracket } from './ReadoutBracket';
 
 /**
  * One day inside an expanded week: label, structure line, effort description, and — only when
- * genuinely measured — a bracketed pace/HR-zone readout. Rest days are real slots, not
- * absences (`planTypes.ts` `RestDay`), and render their own row rather than a gap.
+ * genuinely measured — a bracketed pace/HR-zone/RPE readout. `hrZone` and `rpe` are mutually
+ * exclusive — under-18 plans populate `rpe` instead of `hrZone` (`loadRules.ts`'s `isUnder18`).
+ * Rest days are real slots, not absences (`planTypes.ts` `RestDay`), and render their own row
+ * rather than a gap.
  */
 export function WorkoutRow({ dayNumber, day }: { dayNumber: number; day: Day }) {
   const theme = useTheme();
@@ -29,7 +31,7 @@ export function WorkoutRow({ dayNumber, day }: { dayNumber: number; day: Day }) 
   }
 
   const measured = day.pace ? formatPace(day.pace) : undefined;
-  const zone = day.hrZone ? `Zone ${day.hrZone}` : undefined;
+  const zone = day.hrZone ? `Zone ${day.hrZone}` : day.rpe ? `RPE ${day.rpe}` : undefined;
   const hasBracket = Boolean(measured || zone);
 
   return (

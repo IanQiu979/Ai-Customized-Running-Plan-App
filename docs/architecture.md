@@ -333,7 +333,8 @@ owner.
    fixed structure; Claude personalizes **one representative week per phase**, not all 24–30
    weeks — a full plan does not fit a single model response (ported from Echo V1's token
    strategy: brevity mandate, forced tool call for guaranteed JSON, SSE streaming, truncation
-   detection). Pro gets paces (only if a recent time exists), HR zones, warm-ups/drills, and a
+   detection). Pro gets paces (only if a recent time exists), HR zones (adults only — under-18
+   substitutes RPE, `loadRules.ts`'s `rpeForZone`, captain-approved youth policy §6-A), warm-ups/drills, and a
    weekly "why". Elite gets the same, plus a per-workout "why" and the richest prompt (injury
    history, race context, periodization nuance) — **still inside the skeleton**. `engine: 'ai'`
    is never emitted in v1; every paid plan is skeleton-constrained `hybrid` (see `planTypes.ts`'s

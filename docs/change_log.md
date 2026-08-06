@@ -5,6 +5,34 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-08-06 — Under-18 plans substitute RPE for HR zones, plus a youth disclaimer (captain-approved, §6-A/E)
+
+Client-only, `src/lib/` + rendering only, nothing in `workers/`. Implements the one item the
+captain approved from `v22-youth-policy-research-s1`'s report (§6-A) — items B–D (rest-day floor,
+volume ceilings, race-distance gate) were explicitly declined and are **not** implemented here.
+
+- **`Workout.hrZone` is now adults-only (age ≥ 18).** `src/lib/loadRules.ts` adds `isUnder18(age)`
+  and `rpeForZone(zone)` — the latter a direct lookup into `training-zones.md`'s already-ported
+  RPE scale (zone 1 → RPE 3, zone 3 → RPE 7, zone 4 → RPE 8), so no new coaching content was
+  invented. `planTemplates.ts`'s `paidFields` picks `hrZone` or the new `Workout.rpe?: RpeValue`
+  field based on age, never both; `age` is now threaded through `easyRun`/`longRun`/`tempoRun`/
+  `intervalRun`/`shakeoutRun` alongside the existing `density` parameter. Rendering: `RPE N`
+  replaces `Zone N` in `WorkoutRow.tsx`'s bracket and "perceived effort N out of 10" replaces
+  "heart rate zone N" in `format.ts`'s spoken label, for under-18 plans only — adult plans are
+  provably unaffected (regression-tested).
+- **New disclaimer, captain's exact sign-off text, appended whenever `intake.age < 18`** — covers
+  pre-participation evaluation, growth-plate/bone-health awareness, and a parent/guardian's
+  awareness and right to stop the plan. Renders wherever `Plan.disclaimers` already renders
+  (`DisclaimerFooter.tsx`) — no separate PDF export exists in this repo to also update.
+- **Alternatives considered and rejected:** talk-test (would require inventing coaching content
+  the ported library doesn't have) and a "better" age formula like 208 − 0.7×age (the report
+  itself rejects this — still implies a precision the evidence doesn't support). Full reasoning:
+  `docs/superpowers/specs/2026-08-06-youth-hr-zone-replacement-design.md`.
+- New tests: `src/lib/__tests__/planTemplates.youth.test.ts`, plus additions to
+  `loadRules.test.ts` and `format.test.ts`. `planTemplates.injuries.test.ts`'s fixture (age 16,
+  pre-existing, unrelated to this change) now correctly picks up the new disclaimer — its
+  disclaimer-count assertions were updated, not its behavior.
+
 ## 2026-08-05 — Settings tab, dummy paywall, and goal-realism UI land; Intake's dead-end save fixed (closes issues #12, #15)
 
 Client-only batch, no `workers/` changes, nothing deployed. Closes GitHub issues #12 and #15,

@@ -61,6 +61,7 @@ export function composeWorkoutLabel(dayNumber: number, day: Workout): string {
   if (day.durationMin !== undefined) parts.push(`${day.durationMin} minutes`);
   if (day.pace) parts.push(speakPace(day.pace));
   if (day.hrZone) parts.push(`heart rate zone ${day.hrZone}`);
+  if (day.rpe) parts.push(`perceived effort ${day.rpe} out of 10`);
   parts.push(day.effortDescription);
   if (day.structure) parts.push(speakStructure(day.structure));
   return parts.join(', ');
