@@ -5,6 +5,40 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-08-06 — Plan-accuracy fix batch: red-flag throughout-plan reduction, 50+ golden deload weeks, age-floor unification
+
+Closes four captain-decided items from `workout-v22-plan-accuracy-s1`'s report and
+`v22-apple-kids-guidelines-research-s1`'s report. Full decision rationale:
+`docs/mvp-progress.md`'s "Decided (2026-08-06) — plan-accuracy fix batch" section.
+
+- **Red-flag injury volume reduction now applies throughout the plan, not just week 1.**
+  Supersedes the 2026-08-03 ruling that gave a red-flag declaration the same week-1-only,
+  per-flag-percentage mechanism as any other closed-set flag. `src/lib/loadRules.ts` adds
+  `RED_FLAG_VOLUME_REDUCTION_PCT` (15%) and `redFlagVolumeReductionPct()`;
+  `applyInjuryVolumeAdjustment()` in `planTemplates.ts` applies it to every week when a red-flag
+  injury (today, `ankle_achilles`) is declared, taking over from the ordinary per-flag mechanism
+  entirely rather than stacking with it. Still a normal plan shape — no return-to-running
+  protocol, no distinct `extras` section — only the reduction's magnitude and duration changed.
+- **50+ runners on the golden 12-week 5K path now deload at weeks 4, 8, and 12** — not the
+  generic every-3-weeks modulo the 2026-08-03 fix (`ae70d4a`) introduced, which lands on 3/6/9 and
+  drops off the plan by week 9. `buildCanonicalFiveKWeek()` in `planTemplates.ts` special-cases
+  `intake.age >= 50` to the explicit `[4, 8, 12]` set, which lines up with the natural volume dips
+  `FIVE_K_WEEKLY_LOAD` already carries at weeks 4 and 8. Week 12 — the race week — is now flagged
+  `isDeload: true` for 50+ runners in addition to its existing race-day structure. The generic
+  (non-golden) path's every-3-weeks-for-50+ cadence is unaffected.
+- **Confirmed `plantar_arch` is fully wired** (added in the 2026-08-03 batch): `InjuryFlag`,
+  `workers/src/routes.ts` intake validation, `src/app/intake.tsx`'s picker, and
+  `loadRules.ts`'s reduction table all already include it. No code change needed for this item.
+- **App Store declared age-rating floor unified with the backend intake validator at 13.** The
+  backend validator (`workers/src/routes.ts:210`) was already raised to `age < 13` by an earlier,
+  separate commit (`8acc27c`, 2026-08-03). This task's brief initially described that as a
+  declined decision the backend should not follow — the captain resolved that tension mid-task:
+  both the backend floor and the App Store Connect age-rating questionnaire answer are 13,
+  consistently. There is no in-repo App Store Connect config to point at — `eas init` has never
+  been run (`docs/apple-dev-blocked.md`) — so this is recorded here as the value for that
+  questionnaire once submission is set up; answering it is still a captain's-account action at
+  submission time, not something this repo can encode today.
+
 ## 2026-08-06 — Under-18 plans substitute RPE for HR zones, plus a youth disclaimer (captain-approved, §6-A/E)
 
 Client-only, `src/lib/` + rendering only, nothing in `workers/`. Implements the one item the

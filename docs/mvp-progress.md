@@ -700,6 +700,19 @@ Closes the plan-accuracy scout's Bug 1 and mandated finding B. Full rationale:
 | Which flag(s) count as "red-flag" for the disclaimer | **`ankle_achilles`, today** — an interpretive judgment call, not a literal source label (the source only ever labels the stress-fracture/bone-pain pattern and the female-athlete-triad pattern "RED FLAG"; neither has a closed-set equivalent). Achilles is the one covered pattern carrying the source's own "(HIGH PRIORITY)" label. Flagged for captain review in `src/lib/loadRules.ts`'s `RED_FLAG_INJURIES` and `load-rules.md`. |
 | Per-flag volume-reduction percentages for flags with no body-specific source figure (`ankle_achilles`, `it_band`, `hip_glute`, `lower_back`) | **Fall back to Rule 5's generic "Reduce Volume Triggers" tier, 20%** (`load_rules.md:185`) — the source's own number for a declared injury lacking its own pattern-specific figure, not an invented one. |
 
+## Decided (2026-08-06) — plan-accuracy fix batch
+
+Closes four decisions registered by the plan-accuracy scout
+(`/Users/Guestyyyyyyyy/firstmate/data/workout-v22-plan-accuracy-s1/report.md`) and the Apple/kids
+guidelines scout (`/Users/Guestyyyyyyyy/firstmate/data/v22-apple-kids-guidelines-research-s1/report.md`).
+
+| Item | Decision |
+|---|---|
+| `red-flag-injury-plan-shape` | **Superseded the 2026-08-03 ruling above.** A red-flag injury still produces a normal, volume-adjusted plan — never a separate return-to-running protocol — but its reduction is now a flat **15%, applied to every week of the plan**, not the ordinary flag's week-1-only per-flag percentage. Implementation: `src/lib/loadRules.ts`'s `RED_FLAG_VOLUME_REDUCTION_PCT` / `redFlagVolumeReductionPct()`, wired into `applyInjuryVolumeAdjustment()` in `planTemplates.ts`. Full rationale: `docs/reference/coaching/plan-structure.md`'s "Design rule" section. |
+| `plantar-arch-injury-flag` | **Already shipped** in the 2026-08-03 batch above — confirmed still wired through `planTypes.ts`, `workers/src/routes.ts` validation, `src/app/intake.tsx`'s picker, and `loadRules.ts`'s reduction table. No further change needed. |
+| `fifty-plus-golden-deload-weeks` | **Weeks 4, 8, and 12** are deload weeks for 50+ runners on the golden 12-week 5K path — not the generic every-3-weeks modulo (which would land on 3/6/9). This is a golden-path-only override; the generic path's every-3-weeks-for-50+ cadence is unchanged. Week 12 (the race week) is flagged `isDeload: true` in addition to its existing race-day structure. Implementation: `buildCanonicalFiveKWeek()` in `planTemplates.ts`. |
+| `age-floor` (App Store declared minimum age) | **13**, unified with the backend intake validator. The two were briefly treated as separate (the backend floor had been raised to 13 in an earlier, unrelated commit — `8acc27c` — while a prior ruling had separately declined touching it), but the captain resolved that tension mid-task: both the backend validator (`workers/src/routes.ts:210`, already `age < 13`) and the App Store Connect age-rating questionnaire answer are 13. There is no in-repo App Store Connect config to edit — `eas init` has never been run (`docs/apple-dev-blocked.md`) — so the declared floor is recorded here as the value to use once submission is set up; the questionnaire itself remains a captain's-account action at submission time. |
+
 ---
 
 ## Known debt and risks

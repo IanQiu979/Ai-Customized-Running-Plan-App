@@ -16,6 +16,7 @@ import {
   injuryVolumeReductionPct,
   isUnder18,
   MAX_SINGLE_RUN_KM,
+  redFlagVolumeReductionPct,
   rpeForZone,
   toExperienceLevel,
 } from './loadRules';
@@ -354,12 +355,20 @@ function targetVolumeKm(
  * runner exactly once, at intake, so "this week" is the plan's first generated week. Weeks after
  * it are unaffected here; they still ramp off week 1's own (reduced) volume through the existing
  * `lastLoadingWeekKm` growth-cap mechanism, so the cut isn't silently re-applied or erased.
+ *
+ * A red-flag injury (`loadRules.ts`'s `redFlagVolumeReductionPct`) is the exception: its cut
+ * applies to every week, not just the first — see that function's header. It takes over from the
+ * ordinary per-flag reduction entirely rather than stacking with it.
  */
 function applyInjuryVolumeAdjustment(
   desiredVolumeKm: number,
   weekNumber: number,
   injuryReductionPct: number,
+  redFlagReductionPct: number,
 ): number {
+  if (redFlagReductionPct > 0) {
+    return Math.max(1, Math.round(desiredVolumeKm * (1 - redFlagReductionPct)));
+  }
   if (weekNumber !== 1 || injuryReductionPct <= 0) return desiredVolumeKm;
   return Math.max(1, Math.round(desiredVolumeKm * (1 - injuryReductionPct)));
 }
@@ -513,6 +522,7 @@ function buildCanonicalFiveKWeek(args: {
   lastLoadingWeekKm: number;
   deloadCadence: number;
   injuryReductionPct: number;
+  redFlagReductionPct: number;
 }): Week {
   const {
     weekNumber,
@@ -530,14 +540,25 @@ function buildCanonicalFiveKWeek(args: {
     lastLoadingWeekKm,
     deloadCadence,
     injuryReductionPct,
+    redFlagReductionPct,
   } = args;
   const weekIndex = weekNumber - 1;
   const isRaceWeek = weekNumber === durationWeeks;
-  const isDeload = !isRaceWeek && phase !== 'taper' && weekNumber % deloadCadence === 0;
+  // 50+ runners on this golden 12-week 5K path get deload weeks 4, 8 and 12 specifically
+  // (captain ruling, `fifty-plus-golden-deload-weeks`, `workout-v22-plan-accuracy-s1` report) —
+  // not the generic every-`deloadCadence`-weeks modulo, which for a 3-week cadence would land on
+  // 3/6/9 instead and miss the natural volume dips `FIVE_K_WEEKLY_LOAD` already has at 4 and 8.
+  // Week 12 is also the race week; for 50+ it is flagged as a deload on top of that, not instead.
+  // This fully replaces the modulo cadence for 50+ on this path — weeks 3/6/9 (what a 3-week
+  // cadence would otherwise produce) are deliberately NOT deload here, only 4/8/12 are.
+  const isDeload = intake.age >= 50
+    ? [4, 8, 12].includes(weekNumber)
+    : !isRaceWeek && phase !== 'taper' && weekNumber % deloadCadence === 0;
   const desiredVolumeKm = applyInjuryVolumeAdjustment(
     targetVolumeKm(intake.weeklyKm, weekIndex, durationWeeks),
     weekNumber,
     injuryReductionPct,
+    redFlagReductionPct,
   );
 
   if (isRaceWeek) {
@@ -559,7 +580,7 @@ function buildCanonicalFiveKWeek(args: {
     ];
     const days: Week7<Day> = [workouts[0], REST, workouts[1], REST, workouts[2], REST, workouts[3]];
     const volumeKm = workouts.reduce((sum, workout) => sum + (workout.distanceKm ?? 0), 0);
-    return { weekNumber, totalWeeks: durationWeeks, phase, isDeload: false, volumeKm, days };
+    return { weekNumber, totalWeeks: durationWeeks, phase, isDeload, volumeKm, days };
   }
 
   const quality: Workout[] = [];
@@ -724,6 +745,7 @@ function buildGenericWeek(args: {
   level: ExperienceLevel;
   lastLoadingWeekKm: number;
   injuryReductionPct: number;
+  redFlagReductionPct: number;
 }): Week {
   const {
     weekNumber,
@@ -742,6 +764,7 @@ function buildGenericWeek(args: {
     level,
     lastLoadingWeekKm,
     injuryReductionPct,
+    redFlagReductionPct,
   } = args;
   const isRaceWeek = goalType === 'race' && weekNumber === durationWeeks;
   const isDeload = !isRaceWeek && phase !== 'taper' && weekNumber % deloadCadence === 0;
@@ -759,6 +782,7 @@ function buildGenericWeek(args: {
         ),
     weekNumber,
     injuryReductionPct,
+    redFlagReductionPct,
   );
 
   if (isRaceWeek) {
@@ -878,6 +902,7 @@ export function buildTemplatePlan(params: TemplatePlanParams): Plan {
   const maxSingleRunKm = MAX_SINGLE_RUN_KM[level];
   const deloadCadence = deloadEveryWeeks(level, params.intake.age);
   const injuryReductionPct = injuryVolumeReductionPct(params.intake.injuries);
+  const redFlagReductionPct = redFlagVolumeReductionPct(params.intake.injuries);
 
   const useGoldenFiveKShape =
     params.goalType === 'race' &&
@@ -904,6 +929,7 @@ export function buildTemplatePlan(params: TemplatePlanParams): Plan {
           lastLoadingWeekKm,
           deloadCadence,
           injuryReductionPct,
+          redFlagReductionPct,
         })
       : buildGenericWeek({
           weekNumber: index + 1,
@@ -922,6 +948,7 @@ export function buildTemplatePlan(params: TemplatePlanParams): Plan {
           level,
           lastLoadingWeekKm,
           injuryReductionPct,
+          redFlagReductionPct,
         });
     if (!week.isDeload) lastLoadingWeekKm = week.volumeKm;
     previousLongestKm = Math.max(
