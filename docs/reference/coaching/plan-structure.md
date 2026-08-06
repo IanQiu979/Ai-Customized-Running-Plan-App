@@ -105,20 +105,25 @@ the simpler one — **not** the return-to-running protocol generator described b
 deliberate simplification, not an oversight: do not "restore" the original text without a new
 ruling.
 
-**What ships instead:** a red-flag injury declaration produces a **normal plan with the flag's
-prescribed volume reduction applied — the same mechanism as any other closed-set `InjuryFlag`**
-(`load-rules.md`'s per-flag reduction table, `src/lib/loadRules.ts`'s
-`INJURY_VOLUME_REDUCTION_PCT`). There is no separate return-to-running protocol, no
-`extras` `PlanSection`, and no distinct plan shape — a red-flag plan and an ordinary injury plan
-differ only in their disclaimers, never in structure. "Still maintain professionalism" means the
-plan must not understate a genuine red-flag situation: it carries a **strengthened
-professional-evaluation disclaimer** on top of the standard Rule 10 injury disclaimer, adapted
-from the source's own language for the flag in question rather than inventing new copy (see
-`src/lib/planTemplates.ts`'s `RED_FLAG_INJURY_DISCLAIMER`). Today the closed set's one red-flag
-member is `ankle_achilles` — an interpretive judgment call (the source labels its pattern "(HIGH
-PRIORITY)", `injury_flags.md:107-109`, the only closed-set pattern carrying a priority label at
-all) documented and flagged for captain review in `src/lib/loadRules.ts`'s `RED_FLAG_INJURIES`
-comment, not a literal "RED FLAG" tag on the pattern itself.
+**What ships instead:** a red-flag injury declaration produces a **normal plan with a volume
+reduction applied throughout — never a separate return-to-running protocol, no `extras`
+`PlanSection`, and no distinct plan shape.** The reduction mechanism itself was superseded again,
+2026-08-06 (captain ruling `red-flag-injury-plan-shape`,
+`/Users/Guestyyyyyyyy/firstmate/data/workout-v22-plan-accuracy-s1/report.md`): a red-flag
+injury's cut is a flat **15%, applied to every week of the plan** (`src/lib/loadRules.ts`'s
+`RED_FLAG_VOLUME_REDUCTION_PCT` / `redFlagVolumeReductionPct`) — not the ordinary closed-set
+flag's week-1-only, per-flag-percentage cut (`INJURY_VOLUME_REDUCTION_PCT`), which still governs
+every non-red-flag injury unchanged. A red-flag plan and an ordinary injury plan differ in both
+their volume reduction and their disclaimers now, never in phase/week-count structure. "Still
+maintain professionalism" means the plan must not understate a genuine red-flag situation: it
+carries a **strengthened professional-evaluation disclaimer** on top of the standard Rule 10
+injury disclaimer, adapted from the source's own language for the flag in question rather than
+inventing new copy (see `src/lib/planTemplates.ts`'s `RED_FLAG_INJURY_DISCLAIMER`). Today the
+closed set's one red-flag member is `ankle_achilles` — an interpretive judgment call (the source
+labels its pattern "(HIGH PRIORITY)", `injury_flags.md:107-109`, the only closed-set pattern
+carrying a priority label at all) documented and flagged for captain review in
+`src/lib/loadRules.ts`'s `RED_FLAG_INJURIES` comment, not a literal "RED FLAG" tag on the pattern
+itself.
 
 The return-to-running protocol in `injury-rules.md` is **not deleted** — it remains documented,
 unused source content, the same status Rule 5's "Monitoring" tier already has (see

@@ -104,6 +104,14 @@ The 50+ row wins over every level: a 50+ runner of any experience gets the manda
 cadence. `deloadEveryWeeks()` in `src/lib/loadRules.ts` is the single implementation of this
 composition; `planTemplates.ts` calls through it.
 
+**Golden 12-week 5K path exception for 50+ (captain ruling, `fifty-plus-golden-deload-weeks`,
+2026-08-06):** on this one specific path (`buildCanonicalFiveKWeek` in `planTemplates.ts`), a
+50+ runner's deload weeks are **4, 8 and 12** — not the generic every-3-weeks modulo (which would
+land on 3, 6, 9 and drop off the plan by week 9). This aligns with the natural volume dips
+`FIVE_K_WEEKLY_LOAD` already carries at weeks 4 and 8, and additionally flags week 12 — the race
+week — as a deload for 50+ runners specifically, on top of its existing taper/race structure. The
+generic (non-golden) path is unaffected and still uses the every-3-weeks modulo above.
+
 **Reduction: 35–45% of volume** during a deload week — authoritative (Ian's decision, 2026-07-10,
 **superseding an earlier 20–30% call the same day**).
 
@@ -286,14 +294,18 @@ largest reduction, not additively — an engine-combination choice, not a source
 Implementation: `src/lib/loadRules.ts`'s `INJURY_VOLUME_REDUCTION_PCT`,
 `injuryVolumeReductionPct()`.
 
-**Red-flag disclaimer strengthening.** `ankle_achilles` is, today, the closed set's one member the
-2026-08-03 captain ruling treats as red-flag for disclaimer purposes (`src/lib/loadRules.ts`'s
-`RED_FLAG_INJURIES`) — an interpretive judgment call, since the source never literally labels a
-body-location pattern "RED FLAG" (that label appears only on the stress-fracture/bone-pain pattern
-and the female-athlete-triad pattern, neither of which the closed set has an equivalent flag for).
-Achilles is the one pattern here carrying the source's "(HIGH PRIORITY)" label and an explicit
-stop-and-rest branch (`injury_flags.md:107-109`). Flagged for captain review, not a settled
-taxonomy — see `plan-structure.md`'s "Design rule" section for the full ruling this implements.
+**Red-flag: strengthened disclaimer, and its own volume rule.** `ankle_achilles` is, today, the
+closed set's one member the 2026-08-03 captain ruling treats as red-flag for disclaimer purposes
+(`src/lib/loadRules.ts`'s `RED_FLAG_INJURIES`) — an interpretive judgment call, since the source
+never literally labels a body-location pattern "RED FLAG" (that label appears only on the
+stress-fracture/bone-pain pattern and the female-athlete-triad pattern, neither of which the
+closed set has an equivalent flag for). Achilles is the one pattern here carrying the source's
+"(HIGH PRIORITY)" label and an explicit stop-and-rest branch (`injury_flags.md:107-109`). Flagged
+for captain review, not a settled taxonomy — see `plan-structure.md`'s "Design rule" section for
+the full ruling this implements. **A red-flag declaration no longer uses the per-flag table
+above** for its volume cut: a superseding ruling (`red-flag-injury-plan-shape`, 2026-08-06) gives
+it its own flat 15% reduction applied to every week of the plan, not just the first — see
+`src/lib/loadRules.ts`'s `RED_FLAG_VOLUME_REDUCTION_PCT` and `plan-structure.md`.
 
 ## Rule 10: Non-Negotiable Disclaimers
 

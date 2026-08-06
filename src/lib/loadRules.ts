@@ -374,3 +374,19 @@ export function hasDeclaredInjury(injuries: readonly InjuryFlag[]): boolean {
 export function hasRedFlagInjury(injuries: readonly InjuryFlag[]): boolean {
   return injuries.some((flag) => RED_FLAG_INJURIES.has(flag));
 }
+
+/**
+ * A red-flag injury's volume cut applies for the whole plan, not just the first week — captain
+ * ruling (`red-flag-injury-plan-shape`, `workout-v22-plan-accuracy-s1` report): still a normal,
+ * volume-adjusted plan (Ruling 1, `plan-structure.md`), never a separate return-to-running
+ * protocol, but a pattern serious enough to be red-flagged needs the reduction to hold
+ * throughout rather than fade after week 1 like an ordinary declared flag. 15% matches the
+ * source's own knee/shin-splints figure (`injury_flags.md:29,49`, `INJURY_VOLUME_REDUCTION_PCT`
+ * above) rather than the generic 20% fallback tier the red-flag pattern (`ankle_achilles`) would
+ * otherwise use under Rule 5 — duration, not per-week magnitude, is the conservative axis here.
+ */
+export const RED_FLAG_VOLUME_REDUCTION_PCT = 0.15;
+
+export function redFlagVolumeReductionPct(injuries: readonly InjuryFlag[]): number {
+  return hasRedFlagInjury(injuries) ? RED_FLAG_VOLUME_REDUCTION_PCT : 0;
+}

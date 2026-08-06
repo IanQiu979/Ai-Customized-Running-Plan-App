@@ -557,16 +557,21 @@ describe('buildTemplatePlan — deload cadence on the golden 12-week/5K/4-day pa
       .filter((weekNumber) => weekNumber > 0);
   }
 
-  it('deloads a 55-year-old intermediate every 3 weeks (3, 6, 9) — matching the generic path for the same age', () => {
-    expect(deloadWeekNumbers(goldenFiveKPlanFor(55, 'regular'))).toEqual([3, 6, 9]);
+  // Superseding ruling (`fifty-plus-golden-deload-weeks`, `workout-v22-plan-accuracy-s1` report,
+  // 2026-08-06): on this specific golden 12-week 5K path, 50+ runners deload at weeks 4, 8 and
+  // 12 — not the generic every-3-weeks modulo (3, 6, 9), which misses the natural volume dips
+  // `FIVE_K_WEEKLY_LOAD` already has at 4 and 8, and drops off the plan entirely by week 9. This
+  // overrides deload cadence for the golden path only; the generic path (below) is unaffected.
+  it('deloads a 55-year-old intermediate at weeks 4, 8, 12 on the golden path', () => {
+    expect(deloadWeekNumbers(goldenFiveKPlanFor(55, 'regular'))).toEqual([4, 8, 12]);
   });
 
-  it('deloads a 50+ beginner every 3 weeks (3, 6, 9) — the age rule beats the beginner 4-week cadence', () => {
-    expect(deloadWeekNumbers(goldenFiveKPlanFor(55, 'new'))).toEqual([3, 6, 9]);
+  it('deloads a 50+ beginner at weeks 4, 8, 12 — the age rule beats the beginner 4-week cadence', () => {
+    expect(deloadWeekNumbers(goldenFiveKPlanFor(55, 'new'))).toEqual([4, 8, 12]);
   });
 
-  it('deloads a 50+ advanced runner every 3 weeks (3, 6, 9) — age and experience agree', () => {
-    expect(deloadWeekNumbers(goldenFiveKPlanFor(55, 'competitive'))).toEqual([3, 6, 9]);
+  it('deloads a 50+ advanced runner at weeks 4, 8, 12 — the golden-path override beats the generic 3-week cadence', () => {
+    expect(deloadWeekNumbers(goldenFiveKPlanFor(55, 'competitive'))).toEqual([4, 8, 12]);
   });
 
   it('deloads an under-50 advanced/competitive runner every 3 weeks (3, 6, 9) — the pro cadence', () => {

@@ -8,6 +8,11 @@
  * Ruling 1 — a red-flag injury produces a normal, volume-adjusted plan (same mechanism as any
  * other flag), not a separate return-to-running protocol. Ruling 2 — add a dedicated
  * `plantar_arch` flag.
+ *
+ * Superseding ruling (`red-flag-injury-plan-shape`, `workout-v22-plan-accuracy-s1` report,
+ * 2026-08-06): a red-flag injury's volume cut is 15%, applied throughout the whole plan — not
+ * the ordinary flag's week-1-only, per-flag-percentage cut. Still a normal plan shape, never a
+ * separate return-to-running protocol; only the reduction's magnitude and duration changed.
  */
 import { buildTemplatePlan } from '../planTemplates';
 import type { TemplatePlanParams } from '../planTemplates';
@@ -146,18 +151,54 @@ describe('Rule 10 injury disclaimer', () => {
   });
 });
 
-describe('red-flag injury (Ruling 1) — normal volume-adjusted plan, not a return-to-running protocol', () => {
-  it('produces the same plan shape (phases, deload cadence, week count) as a non-red-flag injury at the same reduction tier', () => {
-    // ankle_achilles and hip_glute share the same 20% fallback tier (loadRules.ts); only the
-    // disclaimer set should differ between them, never the plan's structure.
+describe('red-flag injury — normal volume-adjusted plan, not a return-to-running protocol', () => {
+  function reductionRatio(none: Plan, injured: Plan): number {
+    return 1 - injured.weeks[0].volumeKm / none.weeks[0].volumeKm;
+  }
+
+  it('produces the same plan shape (phases, week count) as a non-red-flag injury — structure never changes, only the reduction', () => {
     const redFlag = goldenPlanWithInjuries(['ankle_achilles']);
     const ordinary = goldenPlanWithInjuries(['hip_glute']);
     expect(redFlag.weeks.map((w) => w.phase)).toEqual(ordinary.weeks.map((w) => w.phase));
-    expect(redFlag.weeks.map((w) => w.isDeload)).toEqual(ordinary.weeks.map((w) => w.isDeload));
-    expect(redFlag.weeklyLoad).toEqual(ordinary.weeklyLoad);
     expect(redFlag.durationWeeks).toBe(ordinary.durationWeeks);
     expect(redFlag.engine).toBe('template');
     expect(redFlag.extras).toEqual([]);
+  });
+
+  it('cuts week-1 volume by ~15% (tight, no downstream floor interference yet)', () => {
+    const none = goldenPlanWithInjuries(['none']);
+    const redFlag = goldenPlanWithInjuries(['ankle_achilles']);
+    expect(reductionRatio(none, redFlag)).toBeCloseTo(0.15, 1);
+  });
+
+  it('keeps cutting volume every week, not just week 1 — every week is lower than the uninjured plan', () => {
+    const none = goldenPlanWithInjuries(['none']);
+    const redFlag = goldenPlanWithInjuries(['ankle_achilles']);
+    // Long-run share caps and quality-session floors mean the assembled per-week ratio isn't
+    // exactly 15% past week 1 (they partially resist the cut), so this checks the discriminating
+    // fact instead: every week is measurably reduced, not just the first — the old mechanism left
+    // weeks 2+ byte-identical to the uninjured plan.
+    for (let i = 0; i < redFlag.weeks.length - 1; i += 1) {
+      expect(redFlag.weeks[i].volumeKm).toBeLessThan(none.weeks[i].volumeKm);
+    }
+  });
+
+  it('reduces total plan volume far more than the ordinary week-1-only mechanism could', () => {
+    const none = goldenPlanWithInjuries(['none']);
+    const redFlag = goldenPlanWithInjuries(['ankle_achilles']);
+    const noneTotal = none.weeklyLoad.reduce((sum, km) => sum + km, 0);
+    const redFlagTotal = redFlag.weeklyLoad.reduce((sum, km) => sum + km, 0);
+    // A week-1-only 20% cut on a 12-week plan could reduce the total by roughly 20%/12 ≈ 1.7%.
+    // The throughout cut clears that by a wide margin.
+    expect(1 - redFlagTotal / noneTotal).toBeGreaterThan(0.05);
+  });
+
+  it('uses the flat 15% red-flag cut instead of the ordinary flag\'s 20% fallback tier', () => {
+    const none = goldenPlanWithInjuries(['none']);
+    const redFlag = goldenPlanWithInjuries(['ankle_achilles']);
+    const ordinary = goldenPlanWithInjuries(['hip_glute']); // same 20% fallback tier as achilles
+    expect(reductionRatio(none, redFlag)).toBeCloseTo(0.15, 1);
+    expect(reductionRatio(none, ordinary)).toBeCloseTo(0.2, 1);
   });
 
   it('carries the strengthened professional-evaluation disclaimer in addition to the standard injury disclaimer', () => {

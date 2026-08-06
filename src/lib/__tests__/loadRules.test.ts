@@ -12,6 +12,8 @@ import {
   isUnder18,
   isValidDeload,
   LONG_RUN_SHARE_CAP,
+  redFlagVolumeReductionPct,
+  RED_FLAG_VOLUME_REDUCTION_PCT,
   rpeForZone,
   RPE_FOR_ZONE,
   toExperienceLevel,
@@ -382,5 +384,14 @@ describe('declared-injury volume adjustment (scout report Bug 1 / mandated findi
     expect(hasRedFlagInjury(['knee'])).toBe(false);
     expect(hasRedFlagInjury(['plantar_arch'])).toBe(false);
     expect(hasRedFlagInjury(['none'])).toBe(false);
+  });
+
+  it('gives a red-flag injury its own flat 15% reduction, distinct from the per-flag table', () => {
+    expect(RED_FLAG_VOLUME_REDUCTION_PCT).toBe(0.15);
+    expect(redFlagVolumeReductionPct(['ankle_achilles'])).toBe(0.15);
+    expect(redFlagVolumeReductionPct(['ankle_achilles', 'knee'])).toBe(0.15);
+    expect(redFlagVolumeReductionPct(['knee'])).toBe(0);
+    expect(redFlagVolumeReductionPct(['none'])).toBe(0);
+    expect(redFlagVolumeReductionPct([])).toBe(0);
   });
 });
