@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { GoalRealismNotice } from '@/components/plan/GoalRealismNotice';
 import { FontFamily, FontSize, PressedOpacity, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { ApiError, generatePlan, getIntake, getQuotaStatus } from '@/lib/apiClient';
+import { API_BASE_URL, ApiError, describeError, generatePlan, getIntake, getQuotaStatus } from '@/lib/apiClient';
 import { mintIdempotencyKey } from '@/lib/idempotencyKey';
 import { assessGoalRealism } from '@/lib/paceDerivation';
 import { formatQuotaLine } from '@/lib/quotaDisplay';
@@ -145,7 +145,7 @@ export default function HomeScreen() {
           }
         } catch (fetchError) {
           if (!cancelled) {
-            setLoadError(fetchError instanceof ApiError ? fetchError.body.error : 'Could not load your intake.');
+            setLoadError(describeError(fetchError, 'Could not load your intake.', API_BASE_URL));
             setHasIntake(false);
           }
         } finally {
@@ -157,9 +157,7 @@ export default function HomeScreen() {
           if (!cancelled) setQuota(quotaStatus);
         } catch (quotaFetchError) {
           if (!cancelled) {
-            setQuotaError(
-              quotaFetchError instanceof ApiError ? quotaFetchError.body.error : 'Could not load your quota.'
-            );
+            setQuotaError(describeError(quotaFetchError, 'Could not load your quota.', API_BASE_URL));
           }
         }
       })();
@@ -218,7 +216,7 @@ export default function HomeScreen() {
           setGenerateError(generatePlanError.body.error);
         }
       } else {
-        setGenerateError('Something went wrong. Try again.');
+        setGenerateError(describeError(generatePlanError, 'Something went wrong. Try again.', API_BASE_URL));
       }
     } finally {
       setGenerating(false);

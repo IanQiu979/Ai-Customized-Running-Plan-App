@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { authClient } from '@/lib/apiClient';
+import { API_BASE_URL, authClient, describeError } from '@/lib/apiClient';
 import { FontFamily, FontSize, PressedOpacity, Radius, Spacing } from '@/constants/theme';
 import { markPostSignupRedirect } from '@/lib/postSignupRedirect';
 import { useTheme } from '@/hooks/use-theme';
@@ -18,38 +18,49 @@ export default function SignUpScreen() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  // See `sign-in.tsx` for why every `authClient` call needs a try/catch and not just an `error`
+  // check — an unreachable backend rejects rather than resolving to `{ error }`.
   async function handleSignUp() {
     setError(null);
     setSubmitting(true);
-    // `minPasswordLength: 8` (workers/src/auth.ts) is enforced server-side; this is not
-    // duplicated here so the server's message stays the one source of truth for the copy.
-    const { error: signUpError } = await authClient.signUp.email({ name, email, password });
-    setSubmitting(false);
-    if (signUpError) {
-      setError(signUpError.message ?? 'Sign-up failed. Try a different email or a longer password.');
-      return;
+    try {
+      // `minPasswordLength: 8` (workers/src/auth.ts) is enforced server-side; this is not
+      // duplicated here so the server's message stays the one source of truth for the copy.
+      const { error: signUpError } = await authClient.signUp.email({ name, email, password });
+      if (signUpError) {
+        setError(signUpError.message ?? 'Sign-up failed. Try a different email or a longer password.');
+        return;
+      }
+      // A brand-new account has no intake yet, so send it straight there instead of leaving Home's
+      // "complete your intake" prompt for the runner to notice and tap themselves. This screen
+      // cannot reliably do that navigation itself — see `postSignupRedirect.ts`'s header — so it
+      // only sets the flag; `_layout.tsx` performs the actual `router.replace` once `session` (and
+      // therefore the `intake` route) exists.
+      markPostSignupRedirect();
+    } catch (signUpError) {
+      setError(describeError(signUpError, 'Sign-up failed. Try again.', API_BASE_URL));
+    } finally {
+      setSubmitting(false);
     }
-    // A brand-new account has no intake yet, so send it straight there instead of leaving Home's
-    // "complete your intake" prompt for the runner to notice and tap themselves. This screen
-    // cannot reliably do that navigation itself — see `postSignupRedirect.ts`'s header — so it
-    // only sets the flag; `_layout.tsx` performs the actual `router.replace` once `session` (and
-    // therefore the `intake` route) exists.
-    markPostSignupRedirect();
   }
 
   async function handleGoogleSignIn() {
     setError(null);
-    const { error: socialError } = await authClient.signIn.social({ provider: 'google', callbackURL: '/' });
-    if (socialError) {
-      // better-auth returns { code: 'PROVIDER_NOT_FOUND', message: 'Provider not found' } when a
-      // provider isn't registered — the case here until the captain's Google OAuth credentials
-      // land (v22-google-oauth-creds). Show a plain, honest message instead of the raw backend
-      // string; keep the button visible either way.
-      if (socialError.code === 'PROVIDER_NOT_FOUND') {
-        setError("Google sign-in isn't available yet.");
-      } else {
-        setError(socialError.message ?? 'Google sign-in failed.');
+    try {
+      const { error: socialError } = await authClient.signIn.social({ provider: 'google', callbackURL: '/' });
+      if (socialError) {
+        // better-auth returns { code: 'PROVIDER_NOT_FOUND', message: 'Provider not found' } when a
+        // provider isn't registered — the case here until the captain's Google OAuth credentials
+        // land (v22-google-oauth-creds). Show a plain, honest message instead of the raw backend
+        // string; keep the button visible either way.
+        if (socialError.code === 'PROVIDER_NOT_FOUND') {
+          setError("Google sign-in isn't available yet.");
+        } else {
+          setError(socialError.message ?? 'Google sign-in failed.');
+        }
       }
+    } catch (socialError) {
+      setError(describeError(socialError, 'Google sign-in failed.', API_BASE_URL));
     }
   }
 

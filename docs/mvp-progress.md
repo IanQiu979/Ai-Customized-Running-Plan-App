@@ -6,7 +6,23 @@
 > Milestone definitions live in [`planning/02-product-requirements.md`](../planning/02-product-requirements.md).
 > Decision history lives in [`change_log.md`](change_log.md).
 
-**Last updated:** 2026-08-05 — a client-only batch lands the Settings tab, the dummy paywall, and
+**Last updated:** 2026-08-07 — phone testing over `expo start --tunnel` hit
+`TypeError: Network request failed` and could not get past sign-in. Root cause was environmental —
+`EXPO_PUBLIC_API_BASE_URL` pointed at `http://localhost:8788`, and a loopback address means *the
+device running the app*, so a phone can never reach a Worker on the developer's computer (tunnel
+mode forwards Metro, not the Worker); the port was drifted from `wrangler dev`'s 8787 as well. The
+code defects it exposed are fixed: the auth screens' four handlers had no `try`/`catch`, so a
+transport failure became an unhandled rejection *and* a spinner that never cleared (better-auth's
+`{ error }` return only covers responses that arrived — `@better-fetch/fetch` lets a transport
+rejection escape), and `apiFetch` let `fetch`'s bare `TypeError` through so an unreachable backend
+surfaced as "Could not load your plans." New pure `src/lib/apiErrors.ts` splits `ApiError` (the
+server refused) from `NetworkError` (nothing answered) and adds `describeError`, which all nine
+screen catch sites now use; when the base URL is loopback the message names that specifically.
+`.env.example` documents the per-device-type correct value. 318 tests pass (294 + 24 new),
+typecheck and lint clean; no `workers/` change. **Still captain-only:** which reachable backend a
+phone should point at — LAN against `wrangler dev`, or a deployed Worker. Full account:
+`docs/change_log.md`'s 2026-08-07 entry.
+Previous entry: 2026-08-05 — a client-only batch lands the Settings tab, the dummy paywall, and
 the goal-realism UI, and fixes Intake's dead-end save, closing GitHub issues #12 and #15, "Next"
 step 9 below (quota UI + dummy paywall), and a launch-readiness audit's "goal-realism UI half not
 built" doc-vs-code drift finding (external to this repo). `src/app/(tabs)/settings.tsx` is now the
@@ -590,6 +606,7 @@ to "Decided" below.
 | `wrangler secret put GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` (production) | Google sign-in in production (email/password works without it; the credentials are already provisioned and verified working in local dev, see the 2026-08-05 entry) | **Ian**, after login. Also recommend rotating the client secret in Google Cloud Console first — it was pasted in plaintext into a chat pane before landing in `workers/.dev.vars` |
 | `APP_SCHEME` = `paceblueprint://` | the OAuth return into the app | **Ian.** Renamed 2026-07-12 and never verified against a built app |
 | `wrangler deploy` | anything reachable from a phone | **Ian**, after all of the above |
+| **How a phone reaches the backend at all** — LAN (`EXPO_PUBLIC_API_BASE_URL=http://<LAN-IP>:8787` plus `wrangler dev -- --ip 0.0.0.0`, same Wi-Fi only) vs. deploying the Worker (works anywhere, needs every row above) | all on-device testing; caused the 2026-08-07 `Network request failed` report | **Ian.** A loopback base URL is unreachable from a phone by construction, tunnel or not — see `.env.example`. The app now reports this clearly instead of crashing, but cannot fix it |
 
 None of the above blocks local work: everything in `workers/` runs offline against `wrangler dev`'s
 Miniflare emulation with no account. The list is the exact Cloudflare counterpart of what the audit

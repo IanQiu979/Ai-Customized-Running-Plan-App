@@ -11,7 +11,7 @@ import { PlanNameplate } from '@/components/plan/PlanNameplate';
 import { WeekAccordion } from '@/components/plan/WeekAccordion';
 import { EffortOrder, FontFamily, FontSize, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { ApiError, getPlan } from '@/lib/apiClient';
+import { API_BASE_URL, describeError, getPlan } from '@/lib/apiClient';
 import { EXAMPLE_PLAN_ID, examplePlan } from '@/lib/fixtures/examplePlan';
 import type { Plan } from '@/lib/planTypes';
 
@@ -57,7 +57,7 @@ export default function PlanScreen() {
         if (!cancelled) setPlan(response.plan);
       } catch (fetchError) {
         if (!cancelled) {
-          setError(fetchError instanceof ApiError ? fetchError.body.error : 'Could not load this plan.');
+          setError(describeError(fetchError, 'Could not load this plan.', API_BASE_URL));
         }
       } finally {
         if (!cancelled) setLoading(false);

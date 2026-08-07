@@ -5,6 +5,44 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-08-07 — `TypeError: Network request failed` on a phone: the transport failure is now a first-class error, not an unhandled rejection
+
+Phone testing over `expo start --tunnel` produced `Uncaught (in promise, id: 1) TypeError: Network
+request failed` from inside `whatwg-fetch`, with no way to get past sign-in. Two separate defects,
+one environmental cause.
+
+- **Cause (environment, not code):** `EXPO_PUBLIC_API_BASE_URL` was `http://localhost:8788`. A
+  loopback address means *the device running the app*, so it reaches the developer's computer only
+  on web or a simulator; on a phone it is the phone, where no Worker is listening. Tunnel mode does
+  not change this — `--tunnel` forwards the Metro bundler, never the Worker. The port was also
+  drifted (`8788` vs `wrangler dev`'s `8787`, the value in `.env.example`, `workers/README.md`, and
+  `wrangler.toml`'s `BETTER_AUTH_URL`), which fails identically. `.env` is gitignored, so the fix
+  there is the captain's; `.env.example` now documents the trap and the per-device-type correct
+  value, including `wrangler dev -- --ip 0.0.0.0` for LAN testing.
+- **Defect 1 — the crash. Auth handlers had no `try`/`catch`.** `sign-in.tsx`/`sign-up.tsx` only
+  checked better-auth's `{ error }` return, which covers responses that *arrived*.
+  `@better-fetch/fetch` awaits `fetch` outside its own try/catch (`dist/index.js`), so a transport
+  failure escapes the `{ data, error }` contract as a raw rejection. In a `Pressable` handler
+  nobody awaits, that is an unhandled promise rejection **and** a `submitting` flag that never
+  clears — the button spins forever and sign-in becomes unreachable, which is why this blocked
+  testing entirely rather than merely showing a bad message. Both screens' four handlers now
+  `try`/`catch`/`finally`. `settings.tsx`'s `onPress={() => authClient.signOut()}` had the same
+  fire-and-forget shape and is now `handleSignOut`, which catches deliberately: the Expo plugin
+  clears the stored cookie and nulls `session.data` in its `onRequest` hook, *before* the request
+  goes out, so sign-out succeeds locally even offline and the screen is already unmounted.
+- **Defect 2 — the misdirection.** `apiFetch` let `fetch`'s `TypeError` through unwrapped, so it
+  failed every `instanceof ApiError` check and surfaced as the per-feature fallback — an
+  unreachable backend read as "Could not load your plans." New pure `src/lib/apiErrors.ts` holds
+  the error vocabulary (`ApiError` moved there unchanged, new `NetworkError`, `isNetworkFailure`,
+  `isLoopbackUrl`, `networkErrorMessage`, `describeError`); `apiFetch` converts transport failures
+  to `NetworkError`, and all nine screen `catch` sites now funnel through `describeError`. When the
+  base URL is loopback the message names that specifically, because the URL is the diagnosis.
+  `isNetworkFailure` matches the known per-engine messages rather than every `TypeError`, so a
+  genuine bug in our own code is not reported as an outage. 24 new tests; 318 pass overall.
+- **Still open, captain-only:** which reachable backend a phone should point at — a LAN address
+  against `wrangler dev`, or a deployed Worker. See `docs/mvp-progress.md`'s "Blocked / awaiting a
+  decision". No code change can settle it, and the app now says so clearly instead of crashing.
+
 ## 2026-08-06 — Plan-accuracy fix batch: red-flag throughout-plan reduction, 50+ golden deload weeks, age-floor unification
 
 Closes four captain-decided items from `workout-v22-plan-accuracy-s1`'s report and

@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { formatPlanDate } from '@/components/plan/format';
 import { FontFamily, FontSize, PressedOpacity, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { ApiError, listPlans } from '@/lib/apiClient';
+import { API_BASE_URL, describeError, listPlans } from '@/lib/apiClient';
 import type { PlanSummary } from '@/lib/apiClient';
 import { EXAMPLE_PLAN_ID } from '@/lib/fixtures/examplePlan';
 
@@ -39,7 +39,7 @@ export default function MyPlansScreen() {
           if (!cancelled) setPlans(response.plans);
         } catch (fetchError) {
           if (!cancelled) {
-            setError(fetchError instanceof ApiError ? fetchError.body.error : 'Could not load your plans.');
+            setError(describeError(fetchError, 'Could not load your plans.', API_BASE_URL));
           }
         } finally {
           if (!cancelled) setLoading(false);
