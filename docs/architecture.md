@@ -75,7 +75,13 @@ src/
     apiClient.ts             # the one module that talks to `workers/`: better-auth's Expo client
                               #  (`authClient` — sign-up/sign-in/sign-out/useSession, session
                               #  persisted via expo-secure-store) plus typed fetch wrappers for
-                              #  every other `/api/*` route
+                              #  every other `/api/*` route; re-exports apiErrors.ts's error
+                              #  vocabulary so screens keep one import site
+    apiErrors.ts              # pure error vocabulary for every `/api/*` call: `ApiError` (server
+                               #  answered and refused) vs `NetworkError` (nothing answered),
+                               #  `describeError()` for the user-facing message. Split out so it
+                               #  has no React/expo-secure-store/@better-auth dependency and can be
+                               #  unit-tested directly (2026-08-07, `Network request failed` fix)
     postSignupRedirect.ts    # one-shot module-level flag so a fresh signup lands on Intake — see
                               #  "Sign-up → Intake redirect" below
     planTypes.ts              # canonical — shared Plan/Week/Workout/Tier vocabulary
@@ -155,7 +161,14 @@ call directly — plus a small typed `apiFetch<T>()` wrapper and one function pe
 `listPlans`/`getPlan`, `generatePlan`). Those custom routes attach the stored session by reading
 `authClient.getCookie()` onto the request's `cookie` header, since better-auth's Expo plugin only
 replays the session automatically for calls made through `authClient` itself, not for plain
-`fetch`. `src/app/(auth)/sign-in.tsx` and `sign-up.tsx` are the two screens built against it —
+`fetch`. **As of 2026-08-07, the error vocabulary is its own pure module, `src/lib/apiErrors.ts`**
+(`ApiError` for a server refusal, `NetworkError` for a transport failure that never reached a
+server, `describeError()` to turn either into a message screens can show), re-exported from
+`apiClient.ts` so screens keep a single import site; every screen's `catch` funnels through
+`describeError` rather than checking `error instanceof ApiError` alone, since a bare fetch
+`TypeError` used to fall through that check into a generic, misleading fallback message — see
+`docs/change_log.md`'s 2026-08-07 entry for the full story. `src/app/(auth)/sign-in.tsx` and
+`sign-up.tsx` are the two screens built against it —
 email/password, plus a "Continue with Google" button. **Google OAuth credentials are provisioned
 and verified in local dev as of 2026-08-05**: `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` live in
 `workers/.dev.vars`, and `POST /api/auth/sign-in/social` (provider `google`) against `wrangler dev`
@@ -261,6 +274,8 @@ src/lib/
   supabase.ts            # exists today — LEGACY, unused
   apiClient.ts             # exists today — better-auth's Expo client (`authClient`) plus typed
                             #                fetch wrappers for the app's `/api/*` routes
+  apiErrors.ts              # exists today (2026-08-07) — pure `ApiError`/`NetworkError`/
+                             #                `describeError()`, re-exported from `apiClient.ts`
   planTypes.ts             # exists today — shared Plan/Week/Workout/Tier types, one source of
                             #                truth for the app and the Worker
   loadRules.ts              # exists today — deterministic safety arithmetic, 31 unit tests

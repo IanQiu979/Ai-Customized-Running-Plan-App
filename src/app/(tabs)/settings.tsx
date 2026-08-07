@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FontFamily, FontSize, PressedOpacity, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { ApiError, authClient, deleteAccount, getQuotaStatus } from '@/lib/apiClient';
+import { API_BASE_URL, authClient, deleteAccount, describeError, getQuotaStatus } from '@/lib/apiClient';
 import { formatQuotaLine } from '@/lib/quotaDisplay';
 import type { QuotaStatus } from '@/lib/planTypes';
 
@@ -40,7 +40,7 @@ export default function SettingsScreen() {
           if (!cancelled) setQuota(status);
         } catch (fetchError) {
           if (!cancelled) {
-            setError(fetchError instanceof ApiError ? fetchError.body.error : 'Could not load your account.');
+            setError(describeError(fetchError, 'Could not load your account.', API_BASE_URL));
           }
         } finally {
           if (!cancelled) setLoading(false);
@@ -64,6 +64,21 @@ export default function SettingsScreen() {
     );
   }
 
+  // `onPress={() => authClient.signOut()}` handed React Native a promise nobody awaited, so an
+  // unreachable backend surfaced as an unhandled rejection instead of anything the runner could
+  // read. Swallowing it is right here, and only here: `@better-auth/expo`'s `onRequest` hook clears
+  // the stored cookie and sets `session.data = null` *before* the request goes out (verified in its
+  // compiled `dist/client.js`), so by the time this rejects the local session is already gone,
+  // `Stack.Protected` has bounced to `(auth)`, and this screen is unmounted — there is no surface
+  // left to show an error on, and the runner got the sign-out they asked for either way.
+  async function handleSignOut() {
+    try {
+      await authClient.signOut();
+    } catch {
+      // Intentionally ignored — see above.
+    }
+  }
+
   async function handleDeleteAccount() {
     setDeleteError(null);
     setDeleting(true);
@@ -74,11 +89,7 @@ export default function SettingsScreen() {
       // Call `signOut()` to invalidate it locally so `Stack.Protected`'s `!!session` guard reacts.
       await authClient.signOut();
     } catch (deleteAccountError) {
-      setDeleteError(
-        deleteAccountError instanceof ApiError
-          ? deleteAccountError.body.error
-          : 'Something went wrong. Try again.'
-      );
+      setDeleteError(describeError(deleteAccountError, 'Something went wrong. Try again.', API_BASE_URL));
     } finally {
       setDeleting(false);
     }
@@ -126,7 +137,7 @@ export default function SettingsScreen() {
 
           <Pressable
             accessibilityRole="button"
-            onPress={() => authClient.signOut()}
+            onPress={handleSignOut}
             style={({ pressed }) => [
               styles.secondaryButton,
               { borderColor: theme.text.secondary },

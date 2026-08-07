@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FontFamily, FontSize, PressedOpacity, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { ApiError, purchaseTier } from '@/lib/apiClient';
+import { API_BASE_URL, describeError, purchaseTier } from '@/lib/apiClient';
 import { formatQuotaLine } from '@/lib/quotaDisplay';
 import type { QuotaStatus, Tier } from '@/lib/planTypes';
 
@@ -37,9 +37,7 @@ export default function PaywallScreen() {
         router.replace('/(tabs)');
       }
     } catch (purchaseError) {
-      setError(
-        purchaseError instanceof ApiError ? purchaseError.body.error : 'Something went wrong. Try again.'
-      );
+      setError(describeError(purchaseError, 'Something went wrong. Try again.', API_BASE_URL));
     } finally {
       setPurchasing(null);
     }

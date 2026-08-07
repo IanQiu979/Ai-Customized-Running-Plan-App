@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { authClient } from '@/lib/apiClient';
+import { API_BASE_URL, authClient, describeError } from '@/lib/apiClient';
 import { FontFamily, FontSize, PressedOpacity, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -20,29 +20,44 @@ export default function SignInScreen() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  // Every `authClient` call needs its own try/catch, not just an `error` check: better-auth's
+  // `{ data, error }` contract only covers responses it received. A request that never reached the
+  // Worker — the everyday case when the backend isn't running, or when EXPO_PUBLIC_API_BASE_URL
+  // points at localhost and the app is on a real phone — rejects instead. Uncaught in a `Pressable`
+  // handler that means an unhandled promise rejection *and* a `submitting` flag that never clears,
+  // so the button spins forever and sign-in is unreachable. See `apiErrors.ts`.
   async function handleSignIn() {
     setError(null);
     setSubmitting(true);
-    const { error: signInError } = await authClient.signIn.email({ email, password });
-    setSubmitting(false);
-    if (signInError) {
-      setError(signInError.message ?? 'Sign-in failed. Check your email and password.');
+    try {
+      const { error: signInError } = await authClient.signIn.email({ email, password });
+      if (signInError) {
+        setError(signInError.message ?? 'Sign-in failed. Check your email and password.');
+      }
+    } catch (signInError) {
+      setError(describeError(signInError, 'Sign-in failed. Try again.', API_BASE_URL));
+    } finally {
+      setSubmitting(false);
     }
   }
 
   async function handleGoogleSignIn() {
     setError(null);
-    const { error: socialError } = await authClient.signIn.social({ provider: 'google', callbackURL: '/' });
-    if (socialError) {
-      // better-auth returns { code: 'PROVIDER_NOT_FOUND', message: 'Provider not found' } when a
-      // provider isn't registered — the case here until the captain's Google OAuth credentials
-      // land (v22-google-oauth-creds). Show a plain, honest message instead of the raw backend
-      // string; keep the button visible either way.
-      if (socialError.code === 'PROVIDER_NOT_FOUND') {
-        setError("Google sign-in isn't available yet.");
-      } else {
-        setError(socialError.message ?? 'Google sign-in failed.');
+    try {
+      const { error: socialError } = await authClient.signIn.social({ provider: 'google', callbackURL: '/' });
+      if (socialError) {
+        // better-auth returns { code: 'PROVIDER_NOT_FOUND', message: 'Provider not found' } when a
+        // provider isn't registered — the case here until the captain's Google OAuth credentials
+        // land (v22-google-oauth-creds). Show a plain, honest message instead of the raw backend
+        // string; keep the button visible either way.
+        if (socialError.code === 'PROVIDER_NOT_FOUND') {
+          setError("Google sign-in isn't available yet.");
+        } else {
+          setError(socialError.message ?? 'Google sign-in failed.');
+        }
       }
+    } catch (socialError) {
+      setError(describeError(socialError, 'Google sign-in failed.', API_BASE_URL));
     }
   }
 

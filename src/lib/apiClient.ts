@@ -14,6 +14,10 @@
  * only wraps the ones this task and its declared follow-ups need. `generate-plan` is included even
  * though the intake/plan-generation screens are a separate task, because it is a trivial wrapper
  * over the same `apiFetch` and duplicating it later would just drift.
+ *
+ * FAILURE MODES: two, and screens must tell them apart. `ApiError` means the server answered and
+ * refused; `NetworkError` means nothing answered at all. Both are defined in `apiErrors.ts` and
+ * re-exported here, alongside `describeError`, which every screen's `catch` should funnel through.
  */
 
 import { expoClient } from '@better-auth/expo/client';
@@ -21,6 +25,8 @@ import type { BetterAuthClientPlugin } from 'better-auth/client';
 import { createAuthClient } from 'better-auth/react';
 import * as SecureStore from 'expo-secure-store';
 
+import { ApiError, NetworkError, isNetworkFailure } from './apiErrors';
+import type { ApiErrorBody } from './apiErrors';
 import type {
   GeneratePlanRequest,
   GeneratePlanResponse,
@@ -30,16 +36,29 @@ import type {
   Tier,
 } from './planTypes';
 
+// The error vocabulary lives in `apiErrors.ts` (pure, unit-tested); re-exported here so screens
+// keep a single import site for everything `/api/*`.
+export { ApiError, NetworkError, describeError, isNetworkFailure } from './apiErrors';
+export type { ApiErrorBody, ApiErrorCode } from './apiErrors';
+
 // Read with dot notation — Expo only inlines `process.env.EXPO_PUBLIC_*` this way (see
 // `src/lib/supabase.ts` for the same discipline).
-const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
+const configuredApiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
 
-if (!apiBaseUrl) {
+if (!configuredApiBaseUrl) {
   throw new Error(
     'Missing EXPO_PUBLIC_API_BASE_URL. Copy .env.example to .env and fill it in, then restart the ' +
       'dev server — Expo inlines this at build time, so a running server will not pick it up.'
   );
 }
+
+/**
+ * The origin every request here — and every `authClient` call — is aimed at. Exported so screens
+ * can name it in a "can't reach the server" message: the URL *is* the diagnosis when the failure
+ * is a loopback address on a physical device (`apiErrors.ts`). Re-declared rather than reusing
+ * `configuredApiBaseUrl` so the `undefined` narrowing above survives into the closures below.
+ */
+export const API_BASE_URL: string = configuredApiBaseUrl;
 
 /**
  * `@better-auth/expo`'s own `package.json` declares `"typescript": "^6.0.3"` as a peer — this
@@ -58,7 +77,7 @@ const expoAuthPlugin = expoClient({
 }) as unknown as BetterAuthClientPlugin;
 
 const baseAuthClient = createAuthClient({
-  baseURL: apiBaseUrl,
+  baseURL: API_BASE_URL,
   plugins: [expoAuthPlugin],
 });
 
@@ -69,46 +88,29 @@ export const authClient = baseAuthClient as typeof baseAuthClient & {
 
 export const { signIn, signUp, signOut, useSession } = authClient;
 
-/** The closed set of machine-readable failure codes the server may return — `workers/src/lib/http.ts`. */
-export type ApiErrorCode =
-  | 'unauthenticated'
-  | 'not_found'
-  | 'method_not_allowed'
-  | 'invalid_request'
-  | 'over_quota'
-  | 'intake_required'
-  | 'engine_unavailable'
-  | 'internal_error';
-
-export interface ApiErrorBody {
-  error: string;
-  code: ApiErrorCode;
-  quota?: { tier: Tier; used: number; limit: number; periodEnd: string | null };
-}
-
-/** Thrown by every `apiFetch` call on a non-2xx response. `body` is the server's `{ error, code }`. */
-export class ApiError extends Error {
-  readonly status: number;
-  readonly body: ApiErrorBody;
-
-  constructor(status: number, body: ApiErrorBody) {
-    super(body.error);
-    this.name = 'ApiError';
-    this.status = status;
-    this.body = body;
-  }
-}
-
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const cookie = authClient.getCookie();
-  const response = await fetch(`${apiBaseUrl}${path}`, {
-    ...init,
-    headers: {
-      'content-type': 'application/json',
-      ...(cookie ? { cookie } : {}),
-      ...init?.headers,
-    },
-  });
+
+  // `fetch` rejects with a bare `TypeError` when the request never reached a server — wrong host,
+  // refused connection, no route. Left unwrapped that `TypeError` fails every `instanceof ApiError`
+  // check downstream and surfaces as a generic per-feature message, which points at the wrong
+  // thing entirely. Convert it here, once, into an error that says what actually happened.
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...init,
+      headers: {
+        'content-type': 'application/json',
+        ...(cookie ? { cookie } : {}),
+        ...init?.headers,
+      },
+    });
+  } catch (fetchError) {
+    if (isNetworkFailure(fetchError)) {
+      throw new NetworkError(API_BASE_URL, { cause: fetchError });
+    }
+    throw fetchError;
+  }
 
   const body = (await response.json().catch(() => null)) as T | ApiErrorBody | null;
 

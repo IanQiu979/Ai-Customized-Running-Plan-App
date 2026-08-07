@@ -15,7 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { IntakeExitAction } from '@/components/intake/IntakeExitAction';
 import { FontFamily, FontSize, PressedOpacity, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { ApiError, getIntake, putIntake } from '@/lib/apiClient';
+import { API_BASE_URL, describeError, getIntake, putIntake } from '@/lib/apiClient';
 import { assessGoalRealism } from '@/lib/paceDerivation';
 import type { ExperienceAnswer, InjuryFlag, IntakeResponses, RaceDistance } from '@/lib/planTypes';
 
@@ -241,7 +241,7 @@ export default function IntakeScreen() {
       } catch (fetchError) {
         if (!cancelled) {
           setError(
-            fetchError instanceof ApiError ? fetchError.body.error : 'Could not load your intake.'
+            describeError(fetchError, 'Could not load your intake.', API_BASE_URL)
           );
         }
       } finally {
@@ -352,7 +352,7 @@ export default function IntakeScreen() {
       setSaved(true);
       router.replace('/(tabs)');
     } catch (saveError) {
-      setError(saveError instanceof ApiError ? saveError.body.error : 'Something went wrong. Try again.');
+      setError(describeError(saveError, 'Something went wrong. Try again.', API_BASE_URL));
     } finally {
       setSubmitting(false);
     }
