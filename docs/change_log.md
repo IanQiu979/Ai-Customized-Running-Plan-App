@@ -39,9 +39,13 @@ one environmental cause.
   base URL is loopback the message names that specifically, because the URL is the diagnosis.
   `isNetworkFailure` matches the known per-engine messages rather than every `TypeError`, so a
   genuine bug in our own code is not reported as an outage. 24 new tests; 318 pass overall.
-- **Still open, captain-only:** which reachable backend a phone should point at — a LAN address
-  against `wrangler dev`, or a deployed Worker. See `docs/mvp-progress.md`'s "Blocked / awaiting a
-  decision". No code change can settle it, and the app now says so clearly instead of crashing.
+- **Resolved the same day — deploy the Worker.** Which reachable backend a phone should point at
+  was the one thing no code change could settle. The captain ruled for `wrangler deploy` over a LAN
+  address against `wrangler dev`, so on-device testing waits on the existing deploy gate rather
+  than a same-Wi-Fi workaround, and `EXPO_PUBLIC_API_BASE_URL` becomes the deployed `https://` URL
+  once it lands. The deploy chain itself is captain-only and tracked in `docs/mvp-progress.md`'s
+  "Blocked / awaiting a decision"; this commit is only the error reporting that made the failure
+  legible in the first place.
 
 ## 2026-08-06 — Plan-accuracy fix batch: red-flag throughout-plan reduction, 50+ golden deload weeks, age-floor unification
 
