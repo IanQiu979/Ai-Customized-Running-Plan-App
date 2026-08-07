@@ -186,6 +186,14 @@ Built-ins also available: `Explore`, `Plan`, `general-purpose`. Plugin agents ar
 - **Never run `wrangler login`, `wrangler deploy`, `wrangler d1 create`, or `wrangler secret put`.**
   Those need the captain's own Cloudflare account. Everything is verifiable offline against
   `wrangler dev`'s local emulation.
+- **A loopback `EXPO_PUBLIC_API_BASE_URL` is unreachable from a phone, and `--tunnel` does not
+  change that** — it forwards Metro, never the Worker. This is the first thing to check on any
+  `TypeError: Network request failed` from device testing; `.env.example` has the correct value per
+  device type. Relatedly, an `authClient` call needs a real `try`/`catch`, not just an `{ error }`
+  check: better-auth's `{ data, error }` contract only covers responses that arrived, so a
+  transport failure rejects instead. `src/lib/apiErrors.ts` is where that distinction lives —
+  `ApiError` means the server refused, `NetworkError` means nothing answered, and every screen
+  `catch` goes through `describeError`.
 - **AI output validation is structural, not strict-content.** `ai-feature-builder` and
   `prompt-engineer` follow [`docs/reference/plan-generation.md`](docs/reference/plan-generation.md):
   validate shape, retry once, fall back to a template.
