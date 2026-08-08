@@ -791,9 +791,6 @@ guidelines scout (`/Users/Guestyyyyyyyy/firstmate/data/v22-apple-kids-guidelines
   for now — the sign-in link on that screen is the skip — but persisting a "has seen onboarding"
   flag is an open product decision, and there is precedent for the pattern (the wave's stroke-draw
   is gated on a persisted set of plan IDs).
-- 🟡 **The onboarding copy makes the product's first user-facing certification claim, pending
-  sign-off.** See the 2026-08-08 `change_log.md` entry — shipped, with a one-sentence fallback if
-  Ian declines.
 
 ### Standing
 

@@ -21,11 +21,9 @@ import { useTheme } from '@/hooks/use-theme';
  * not just a first install — a returning signed-out user lands here too. That is why the sign-in
  * link is a peer of the CTA rather than fine print: it is the skip.
  *
- * Copy is final (`ux-copywriter` pass, 2026-08-08). One line — "A McMillan-certified coach
- * designed the training." — is flagged for the captain's sign-off: it attributes the credential
- * to the coach who authored the app's coaching content (per `CLAUDE.md`'s "Coaching domain"
- * section), not an endorsement, partnership, or accreditation of the app by McMillan Running as
- * a company. See the `ux-copywriter` report for the full reasoning.
+ * Copy is final (`ux-copywriter` pass, 2026-08-08). A proposed line attributing the training to
+ * a "McMillan-certified coach" was reviewed and deliberately dropped by captain's ruling on
+ * 2026-08-08, leaving only claims grounded in `planning/02-product-requirements.md`.
  */
 export default function OnboardingScreen() {
   const theme = useTheme();
@@ -60,8 +58,7 @@ export default function OnboardingScreen() {
               Your training plan, built around you.
             </Text>
             <Text style={[styles.supporting, { color: theme.text.secondary }]}>
-              A McMillan-certified coach designed the training. No monthly coaching fees, no
-              bloated app — just your plan, week by week.
+              No monthly coaching fees, no bloated app — just your plan, week by week.
             </Text>
           </View>
 

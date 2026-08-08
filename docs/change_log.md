@@ -69,16 +69,16 @@ Two independent defects on the same screens, plus a new screen in front of them.
   (scoped: opacity only, all bars in phase, amplitude capped). And `AmbientPulseFloor`
   (`{ light: 0.999, dark: 0.7 }`) — see below.
 
-- **Copy decision, SHIPPED PENDING THE CAPTAIN'S SIGN-OFF.** The onboarding supporting line reads
-  *"A McMillan-certified coach designed the training. No monthly coaching fees, no bloated app —
-  just your plan, week by week."* The second sentence is near-verbatim from
-  `planning/02-product-requirements.md`. The first is **not** — no user-facing copy anywhere in the
-  product has previously made a certification claim. It is grounded in `CLAUDE.md`'s "Coaching
-  domain" section (the owner is a McMillan-certified coach; the coaching content is a port of his
-  own library) and is worded to attribute the credential to the coach who authored the content, not
-  to imply endorsement, partnership, or accreditation by McMillan Running as a company. Both
-  `ui-designer` and `ux-copywriter` flagged it for explicit sign-off. Fallback if declined: drop
-  that first sentence, leaving two fully PRD-grounded claims and no sign-off needed.
+- **Copy decision, RULED.** A proposed onboarding supporting line read *"A McMillan-certified coach
+  designed the training. No monthly coaching fees, no bloated app — just your plan, week by week."*
+  The second sentence is near-verbatim from `planning/02-product-requirements.md`. The first was
+  **not** — no user-facing copy anywhere in the product had previously made a certification claim.
+  It was grounded in `CLAUDE.md`'s "Coaching domain" section (the owner is a McMillan-certified
+  coach; the coaching content is a port of his own library) and worded to attribute the credential
+  to the coach who authored the content, not to imply endorsement, partnership, or accreditation by
+  McMillan Running as a company. Both `ui-designer` and `ux-copywriter` flagged it for explicit
+  sign-off. **The captain ruled against the claim on 2026-08-08**; the fallback shipped instead —
+  the supporting line is now just the PRD-grounded second sentence, with no certification claim.
 
 - **Known limitation, needs a ruling.** `AmbientPulseFloor` is `0.999` in light mode, which makes
   the ambient shimmer **effectively invisible there**; dark mode pulses normally at 0.7. This is not
