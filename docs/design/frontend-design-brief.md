@@ -402,8 +402,15 @@ with no pulse at all, so `easy` binds the floor at alpha ≥ 0.9988 and the ligh
 consequently near-imperceptible. Dark mode has more room and pulses normally at 0.7 — **except**
 `interval` (#C6402F on #14171C), which is 3.57:1 at full opacity and **2.32:1 at 0.7**. Both are
 pre-existing properties of the hexes, not of the animation. A visible light-mode pulse, and a safe
-dark floor, both need these effort values revisited for headroom; until then this is recorded, not
-solved.
+dark floor, both need these effort values revisited for headroom — **tracked as issue #70**, and
+scoped there rather than here because any change to the effort scale ripples into plan view, its
+primary consumer.
+
+**The onboarding hero's own behaviour is settled, not pending:** the captain ruled on 2026-08-08
+that its shimmer is **dark-mode-only and final**, with the contrast floor left untouched. The
+alternative — weakening the 3:1 rule so light mode could pulse — was considered and declined. Read
+the numbers above as a constraint that has already been ruled on, not an open question about that
+screen.
 
 **Curves.** `easeOut` for anything arriving. `easeIn` for anything leaving. `linear` for progress
 hairlines and quota fills **only** — a progress bar that eases is lying about pace. `springSnappy`

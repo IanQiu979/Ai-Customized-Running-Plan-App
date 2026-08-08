@@ -216,8 +216,9 @@ the pre-account onboarding hero, and only in a shape that cannot become decorati
 every cell in phase off one shared value (a travelling sweep is loading-skeleton vocabulary), and
 amplitude floored by `AmbientPulseFloor` so it never fully dims. Every other screen still obeys the
 rule as written. See `frontend-design-brief.md` Part 4 for the contrast limit that forced
-`AmbientPulseFloor` to be per-scheme — and for the honest note that the light-mode pulse is
-near-imperceptible as a result.
+`AmbientPulseFloor` to be per-scheme, and for the numbers behind it. The consequence — the shimmer
+reads in dark mode and is effectively invisible in light mode — was **ruled final by the captain on
+2026-08-08**, with the contrast floor left untouched; the underlying palette headroom is issue #70.
 
 **Curves.** `easeOut` (arriving) · `easeIn` (leaving) · `linear` (literal proportion only — the
 intake hairline, the quota fill; *a progress bar that eases is lying about pace*) · `springSnappy`

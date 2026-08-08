@@ -779,13 +779,16 @@ guidelines scout (`/Users/Guestyyyyyyyy/firstmate/data/v22-apple-kids-guidelines
   they background and foreground the app. Not exploitable — every server read is refused — but an
   incident response ("revoke this user now") would trip over it. Pre-existing; flagged by
   `security-auditor` during the 2026-08-08 review.
-- 🟠 **The ambient pulse is effectively invisible in light mode, and dark mode's floor is unsafe.**
-  `AmbientPulseFloor` is `0.999` in light mode because four of the five light effort hexes already
-  sit barely above the brief's 3:1 floor *at full opacity* (`easy` is 3.0045:1) — there is no
-  headroom for an opacity dip. Separately, dark `interval` (#C6402F on #14171C) is 3.57:1 at full
-  opacity and **2.32:1 at the 0.7 dark floor**, so dark mode is not actually safe either. Both want
-  `design-system` to revisit the effort hexes for contrast headroom; neither was introduced by the
-  2026-08-08 change.
+- 🟠 **The effort hexes have no contrast headroom — tracked as [issue #70](https://github.com/IanQiu979/WorkoutGenerationv2.2/issues/70).**
+  Four of the five light effort hexes sit barely above the brief's 3:1 floor *at full opacity*
+  (`easy` is 3.0045:1), so there is no headroom for an opacity dip; and dark `interval` (#C6402F on
+  #14171C) is 3.57:1 at full opacity and **2.32:1 at the 0.7 dark floor**, so the dark floor is not
+  justified by the numbers either. Both want `design-system` to revisit the effort scale, which
+  ripples into plan view (`WeekAccordion.tsx`, the scale's primary consumer) — hence its own issue
+  rather than a bullet here. Neither was introduced by the 2026-08-08 change.
+  **Not open for the onboarding hero:** the captain ruled 2026-08-08 that its shimmer is
+  dark-mode-only and final, with the contrast floor untouched. That behaviour is settled; only the
+  palette question above is outstanding.
 - 🟡 **Onboarding replays on every signed-out session, not just first install.** `(auth)/index.tsx`
   is the anchor for all of them, so a returning user who signed out sees the hero again. Deliberate
   for now — the sign-in link on that screen is the skip — but persisting a "has seen onboarding"

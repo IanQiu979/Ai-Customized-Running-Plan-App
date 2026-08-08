@@ -80,15 +80,19 @@ Two independent defects on the same screens, plus a new screen in front of them.
   sign-off. **The captain ruled against the claim on 2026-08-08**; the fallback shipped instead —
   the supporting line is now just the PRD-grounded second sentence, with no certification claim.
 
-- **Known limitation, needs a ruling.** `AmbientPulseFloor` is `0.999` in light mode, which makes
-  the ambient shimmer **effectively invisible there**; dark mode pulses normally at 0.7. This is not
-  a tuning choice — four of the five light-mode effort hexes already sit barely above the brief's
-  3:1 floor at full opacity (`easy` is 3.0045:1), so there is essentially no headroom for a shared
-  opacity dip, and 0.999 is the largest amplitude that keeps all five at 3:1. A genuinely visible
-  light-mode pulse needs `design-system` to revisit the light effort hexes for headroom — out of
-  scope here. Separately, `accessibility-implementer` computed that **dark** `interval` (#C6402F on
-  #14171C) is 3.57:1 at full opacity and 2.32:1 at 0.7, i.e. dark mode's floor is not safe either;
-  pre-existing and not worsened by this change, but it belongs in the same follow-up.
+- **Ambient shimmer is dark-mode-only. RULED 2026-08-08 — final, not a pending limitation.**
+  `AmbientPulseFloor` is `0.999` in light mode, which makes the shimmer effectively invisible there;
+  dark mode pulses normally at 0.7. This was never a tuning choice — four of the five light-mode
+  effort hexes already sit barely above the brief's 3:1 floor at full opacity (`easy` is 3.0045:1),
+  so there is no headroom for a shared opacity dip, and 0.999 is the largest amplitude that keeps
+  all five compliant. The alternatives were to weaken the contrast rule or to re-pick the light
+  effort hexes; **the captain ruled to do neither here** — dark-mode-only shimmer is the final
+  behaviour for this screen and the contrast floor stays untouched.
+  The palette question is tracked separately as **issue #70**, which also carries a second finding
+  from the same measurement pass: **dark** `interval` (#C6402F on #14171C) is 3.57:1 at full opacity
+  and **2.32:1 at the 0.7 dark floor**, so the dark floor is not actually justified by the numbers
+  either. Both are pre-existing properties of the hexes — neither was introduced or worsened by this
+  change — and both belong to that issue, not to this one.
 
 ## 2026-08-07 — `TypeError: Network request failed` on a phone: the transport failure is now a first-class error, not an unhandled rejection
 
