@@ -1,6 +1,16 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { API_BASE_URL, authClient, describeError } from '@/lib/apiClient';
@@ -64,69 +74,86 @@ export default function SignInScreen() {
   return (
     <View style={[styles.container, { backgroundColor: theme.surface.base }]}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right', 'bottom']}>
-        <Text style={[styles.title, { color: theme.text.primary }]}>Sign in</Text>
-
-        <TextInput
-          value={email}
-          onChangeText={setEmail}
-          placeholder="Email"
-          placeholderTextColor={theme.text.secondary}
-          autoCapitalize="none"
-          autoComplete="email"
-          keyboardType="email-address"
-          style={[styles.input, { color: theme.text.primary, borderColor: theme.hairline, backgroundColor: theme.surface.raised }]}
-        />
-        <TextInput
-          value={password}
-          onChangeText={setPassword}
-          placeholder="Password"
-          placeholderTextColor={theme.text.secondary}
-          autoCapitalize="none"
-          autoComplete="password"
-          secureTextEntry
-          style={[styles.input, { color: theme.text.primary, borderColor: theme.hairline, backgroundColor: theme.surface.raised }]}
-        />
-
-        {error && <Text style={[styles.error, { color: theme.status.error }]}>{error}</Text>}
-
-        <Pressable
-          accessibilityRole="button"
-          disabled={submitting || !email || !password}
-          onPress={handleSignIn}
-          style={({ pressed }) => [
-            styles.primaryButton,
-            { backgroundColor: theme.accent.hivis },
-            (pressed || submitting) && styles.pressed,
-          ]}
+        {/*
+          Centred content overflows off *both* edges once the container is shorter than the
+          content, which is exactly what a keyboard does (Android resizes the window, iOS covers
+          the bottom) — and an error message only makes the content taller. Without a scroll
+          container the title, or the Sign in button, becomes unreachable. `flexGrow: 1` keeps
+          today's centred look on a tall screen and lets the content scroll when it doesn't fit.
+        */}
+        <KeyboardAvoidingView
+          style={styles.keyboardAvoider}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-          {submitting ? (
-            <ActivityIndicator color={theme.accent.onAccent} />
-          ) : (
-            <Text style={[styles.primaryButtonText, { color: theme.accent.onAccent }]}>Sign in</Text>
-          )}
-        </Pressable>
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+          >
+            <Text style={[styles.title, { color: theme.text.primary }]}>Sign in</Text>
 
-        <Pressable
-          accessibilityRole="button"
-          onPress={handleGoogleSignIn}
-          style={({ pressed }) => [
-            styles.secondaryButton,
-            { borderColor: theme.text.primary },
-            pressed && styles.pressed,
-          ]}
-        >
-          <Text style={[styles.secondaryButtonText, { color: theme.text.primary }]}>Continue with Google</Text>
-        </Pressable>
+            <TextInput
+              value={email}
+              onChangeText={setEmail}
+              placeholder="Email"
+              placeholderTextColor={theme.text.secondary}
+              autoCapitalize="none"
+              autoComplete="email"
+              keyboardType="email-address"
+              style={[styles.input, { color: theme.text.primary, borderColor: theme.hairline, backgroundColor: theme.surface.raised }]}
+            />
+            <TextInput
+              value={password}
+              onChangeText={setPassword}
+              placeholder="Password"
+              placeholderTextColor={theme.text.secondary}
+              autoCapitalize="none"
+              autoComplete="password"
+              secureTextEntry
+              style={[styles.input, { color: theme.text.primary, borderColor: theme.hairline, backgroundColor: theme.surface.raised }]}
+            />
 
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.push('/(auth)/sign-up')}
-          style={styles.linkButton}
-        >
-          <Text style={[styles.linkText, { color: theme.text.secondary }]}>
-            No account? <Text style={{ color: theme.text.primary }}>Sign up</Text>
-          </Text>
-        </Pressable>
+            {error && <Text style={[styles.error, { color: theme.status.error }]}>{error}</Text>}
+
+            <Pressable
+              accessibilityRole="button"
+              disabled={submitting || !email || !password}
+              onPress={handleSignIn}
+              style={({ pressed }) => [
+                styles.primaryButton,
+                { backgroundColor: theme.accent.hivis },
+                (pressed || submitting) && styles.pressed,
+              ]}
+            >
+              {submitting ? (
+                <ActivityIndicator color={theme.accent.onAccent} />
+              ) : (
+                <Text style={[styles.primaryButtonText, { color: theme.accent.onAccent }]}>Sign in</Text>
+              )}
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              onPress={handleGoogleSignIn}
+              style={({ pressed }) => [
+                styles.secondaryButton,
+                { borderColor: theme.text.primary },
+                pressed && styles.pressed,
+              ]}
+            >
+              <Text style={[styles.secondaryButtonText, { color: theme.text.primary }]}>Continue with Google</Text>
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push('/(auth)/sign-up')}
+              style={styles.linkButton}
+            >
+              <Text style={[styles.linkText, { color: theme.text.secondary }]}>
+                No account? <Text style={{ color: theme.text.primary }}>Sign up</Text>
+              </Text>
+            </Pressable>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
   );
@@ -134,8 +161,10 @@ export default function SignInScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  safeArea: {
-    flex: 1,
+  safeArea: { flex: 1 },
+  keyboardAvoider: { flex: 1 },
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
     paddingHorizontal: Spacing.four,
     gap: Spacing.three,

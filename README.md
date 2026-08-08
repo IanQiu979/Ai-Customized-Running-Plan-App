@@ -102,6 +102,8 @@ src/
   app/
     _layout.tsx
     (auth)/
+      index.tsx            # redirect anchor -> onboarding
+      onboarding.tsx        # animated week-ribbon hero, then "Get started" -> sign-up
       sign-in.tsx, sign-up.tsx  # email/password; "Continue with Google" verified in local dev,
                                  #   production pending (see docs/mvp-progress.md)
     (tabs)/
@@ -116,6 +118,7 @@ src/
                             #  golden-fixture example
   components/
     plan/                  # plan-view UI: nameplate, effort chip, workout row, week accordion, ...
+    onboarding/            # HeroRibbon — the week-ribbon motif at hero scale, reduced-motion aware
   constants/
     theme.ts                # "Instrument & Matter" design tokens
   hooks/

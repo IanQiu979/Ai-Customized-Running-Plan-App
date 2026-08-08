@@ -123,7 +123,7 @@ from 82. Issue #22 remains open.)
 | M3 — Plan engine (3 tiers produce valid plans) | **In progress.** Pure template/pace engine now wired into the Worker's `generate-plan` route and the client's generate-plan action; the plan view renders a real generated plan (via `GET /api/plans/:id`) alongside the permanent static golden fixture |
 | M4 — Tiers & quotas (server-side, unbypassable) | **In progress.** The quota ledger, atomic gate, fallback exemption, `quota-status` and `purchase-tier` are built and tested server-side; a Settings tab now displays tier/quota and a dummy paywall now lets a runner call `purchase-tier` (2026-08-05) |
 | M5 — My Plans (history) | **In progress.** A My Plans tab lists plans off `GET /api/plans` |
-| M6 — Polish & TestFlight | Not started |
+| M6 — Polish & TestFlight | **In progress.** First real onboarding screen landed 2026-08-08 (`(auth)/onboarding.tsx` + an animated week-ribbon hero), alongside a fix for the sign-up form blanking itself mid-typing |
 
 **The honest summary:** planning, design, and domain research are done to an unusual depth, and
 Phase 0's paper-reconciliation pass is now done too. **As of 2026-08-02 there is also a real
@@ -186,6 +186,16 @@ the literal previous week) and issue #33 (goal-realism handling).
   captain — provisioned and verified in local dev 2026-08-05 (see that entry below).
 
 ### Code
+- [x] **Sign-up no longer blanks itself mid-typing, and onboarding exists (2026-08-08).** Two
+      defects on the auth screens plus a new screen in front of them — full account in
+      `docs/change_log.md`'s 2026-08-08 entry. In short: `_layout.tsx` gated render on better-auth's
+      `isPending`, which is re-raised on every background session refetch *while signed out*, so the
+      `return null` unmounted the whole tree and wiped the form (fixed by the latch in
+      `src/lib/sessionGate.ts`, regression-tested); and both auth screens centred their content with
+      no scroll container, so a keyboard could push the title or the submit button permanently off
+      screen (fixed with `KeyboardAvoidingView` + `ScrollView`). New: `(auth)/onboarding.tsx` and
+      `src/components/onboarding/HeroRibbon.tsx`, an animated build of the app's own week-ribbon
+      motif, reduced-motion aware, built entirely from existing `theme.ts` tokens
 - [x] Expo SDK 54 scaffold — TypeScript strict, expo-router, `@/*` path alias
 - [x] **`workers/` — the Cloudflare backend spine (2026-08-02).** better-auth on D1 (email/password,
       Bearer sessions), `migrations/` for both better-auth's tables and the app's, the quota ledger
@@ -735,6 +745,57 @@ guidelines scout (`/Users/Guestyyyyyyyy/firstmate/data/v22-apple-kids-guidelines
 ---
 
 ## Known debt and risks
+
+### Found 2026-08-08 while fixing the sign-up form, deliberately NOT fixed on that branch
+
+- 🔴 **The Worker emits no CORS headers, so a browser can never reach the backend cross-origin.**
+  `workers/src/index.ts` has no `OPTIONS` branch and sets no `Access-Control-Allow-Origin`;
+  better-auth's handler does not do CORS itself (that is normally the framework's middleware). Web
+  sign-in and sign-up therefore fail 100% of the time with `net::ERR_FAILED` and a preflight error
+  in the console. Native is unaffected — there is no CORS there — which is why this went unnoticed.
+  Confirmed by curl: an `OPTIONS` to `/api/auth/sign-up/email` with an `Origin` header 404s with
+  zero CORS headers, and the same request with the headers shimmed in at the browser succeeds.
+  Fix needs an explicit origin allowlist (never `*`, which is invalid with credentials) and must
+  fail closed on an unknown origin while still allowing native's absent `Origin`. HIGH tier — it
+  touches `workers/`, so it needs its own branch, `security-auditor`, and a PR.
+- 🔴 **`expo-secure-store` has no web implementation, so every `/api/*` call dies on web.**
+  `node_modules/expo-secure-store/build/ExpoSecureStore.web.js` is `export default {}`, so
+  `SecureStore.getItem` throws. `src/lib/apiClient.ts` calls `authClient.getCookie()` *outside* its
+  own `try`, so the `TypeError` escapes the `NetworkError` conversion entirely and no request is
+  ever sent. Visible as "Could not load your intake." / "Could not load your account." on web even
+  with a valid session. Fix: move the call inside the `try`, and give the Expo plugin a
+  platform-aware storage — on web the browser sends the cookie itself, so `getCookie()` should
+  return `''` rather than throw. Separate change from the CORS one; different file, different
+  failure.
+- 🟠 **`apiErrors.ts`'s network message misdiagnoses a CORS block on web.** A CORS rejection and an
+  unreachable host are both `TypeError: Failed to fetch`, and `describeError` sees a loopback base
+  URL and prints the phone/tunnel explanation — on a desktop browser, with the server up on the
+  same machine. This is why the 2026-08-08 report pointed at the wrong thing. Low severity, but do
+  it after the CORS fix, which removes most occurrences.
+- 🟠 **A server-revoked session is never mapped back to a local sign-out.** The Worker 403s
+  anonymous `/api/*`, but no screen maps a 403 to `authClient.signOut()`, and session polling is off
+  (`refetchInterval` defaults to 0, and `createAuthClient` passes no `sessionOptions`). A user whose
+  session is revoked server-side, sitting in the foreground, stays on the authenticated shell until
+  they background and foreground the app. Not exploitable — every server read is refused — but an
+  incident response ("revoke this user now") would trip over it. Pre-existing; flagged by
+  `security-auditor` during the 2026-08-08 review.
+- 🟠 **The effort hexes have no contrast headroom — tracked as [issue #70](https://github.com/IanQiu979/WorkoutGenerationv2.2/issues/70).**
+  Four of the five light effort hexes sit barely above the brief's 3:1 floor *at full opacity*
+  (`easy` is 3.0045:1), so there is no headroom for an opacity dip; and dark `interval` (#C6402F on
+  #14171C) is 3.57:1 at full opacity and **2.32:1 at the 0.7 dark floor**, so the dark floor is not
+  justified by the numbers either. Both want `design-system` to revisit the effort scale, which
+  ripples into plan view (`WeekAccordion.tsx`, the scale's primary consumer) — hence its own issue
+  rather than a bullet here. Neither was introduced by the 2026-08-08 change.
+  **Not open for the onboarding hero:** the captain ruled 2026-08-08 that its shimmer is
+  dark-mode-only and final, with the contrast floor untouched. That behaviour is settled; only the
+  palette question above is outstanding.
+- 🟡 **Onboarding replays on every signed-out session, not just first install.** `(auth)/index.tsx`
+  is the anchor for all of them, so a returning user who signed out sees the hero again. Deliberate
+  for now — the sign-in link on that screen is the skip — but persisting a "has seen onboarding"
+  flag is an open product decision, and there is precedent for the pattern (the wave's stroke-draw
+  is gated on a persisted set of plan IDs).
+
+### Standing
 
 - 🔴 **`wrangler secret put ANTHROPIC_API_KEY` has never been run** (nor its Supabase predecessor).
   Nothing anywhere has an Anthropic key. This is not currently *breaking* anything — with no key the

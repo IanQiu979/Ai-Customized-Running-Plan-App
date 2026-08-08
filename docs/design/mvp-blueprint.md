@@ -202,12 +202,23 @@ to a runner silhouette. **Not a particle simulation** — no per-grain state, no
 
 ## Part 5 — The motion system
 
-Eight values you reach for constantly, plus one reserved duration that must never be borrowed —
-borrowing it is how a reserved moment stops feeling special.
+Eight values you reach for constantly, plus **two** reserved durations that must never be borrowed —
+borrowing one is how a reserved moment stops feeling special.
 
 **Durations.** `instant` 100ms (press feedback) · `quick` 180ms (state crossfades, toggles) ·
 `standard` 250ms (the default; entrances) · `slow` 350ms (full-screen pushes) · **reserved:**
-`reveal` 650ms (the wave's one-time stroke-draw, nowhere else).
+`reveal` 650ms (the wave's one-time stroke-draw, nowhere else) and `ambient` 2800ms (the onboarding
+hero ribbon's settled opacity pulse, nowhere else — added 2026-08-08).
+
+**`ambient` is the single sanctioned exception to Part 1's manifesto** ("if nothing is happening,
+nothing moves"; no idle floating, ambient looping, or breathing gradients). It is granted only to
+the pre-account onboarding hero, and only in a shape that cannot become decoration: opacity only,
+every cell in phase off one shared value (a travelling sweep is loading-skeleton vocabulary), and
+amplitude floored by `AmbientPulseFloor` so it never fully dims. Every other screen still obeys the
+rule as written. See `frontend-design-brief.md` Part 4 for the contrast limit that forced
+`AmbientPulseFloor` to be per-scheme, and for the numbers behind it. The consequence — the shimmer
+reads in dark mode and is effectively invisible in light mode — was **ruled final by the captain on
+2026-08-08**, with the contrast floor left untouched; the underlying palette headroom is issue #70.
 
 **Curves.** `easeOut` (arriving) · `easeIn` (leaving) · `linear` (literal proportion only — the
 intake hairline, the quota fill; *a progress bar that eases is lying about pace*) · `springSnappy`

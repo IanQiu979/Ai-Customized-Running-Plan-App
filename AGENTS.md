@@ -194,6 +194,12 @@ Built-ins also available: `Explore`, `Plan`, `general-purpose`. Plugin agents ar
   transport failure rejects instead. `src/lib/apiErrors.ts` is where that distinction lives —
   `ApiError` means the server refused, `NetworkError` means nothing answered, and every screen
   `catch` goes through `describeError`.
+- **better-auth's `isPending` is not "first load in flight", and never gate a render on it.** It is
+  re-raised on every background session refetch while signed out — i.e. for exactly the users on the
+  auth screens. Gating `src/app/_layout.tsx`'s `return null` on it unmounted the whole tree and wiped
+  the half-typed sign-up form (2026-08-08). `src/lib/sessionGate.ts` holds the latch and the full
+  explanation; read its header before touching that gate, and note it is splash sequencing, never an
+  authorization signal.
 - **AI output validation is structural, not strict-content.** `ai-feature-builder` and
   `prompt-engineer` follow [`docs/reference/plan-generation.md`](docs/reference/plan-generation.md):
   validate shape, retry once, fall back to a template.

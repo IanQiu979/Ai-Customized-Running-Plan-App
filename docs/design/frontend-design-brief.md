@@ -377,12 +377,40 @@ the empty states, and the paywall hero. It never sits behind dense data — plan
 
 ## Part 4 — Motion
 
-Ten values total. If a screen seems to need an eleventh, it is reaching for the wrong one of these.
+Eleven values total (ten until 2026-08-08 — see `ambient` below). If a screen seems to need a
+twelfth, it is reaching for the wrong one of these.
 
 **Durations.** `instant` 100ms (press feedback) · `quick` 180ms (state crossfades) · `standard`
 250ms (the default; entrances) · `slow` 350ms (full-screen pushes) · `reveal` 650ms (**reserved
 exclusively** for the wave's one-time stroke-draw; if it gets reused, the reveal is losing its
-specialness).
+specialness) · `ambient` 2800ms (**reserved exclusively** for the onboarding hero ribbon's settled
+opacity pulse — added 2026-08-08).
+
+**`ambient` is the one sanctioned exception to the manifesto's ban on "idle floating", "ambient
+looping" and "breathing gradients".** It exists because every other duration here is a sub-350ms
+response to an event, and a loop period is a different kind of quantity. The exception is scoped so
+it cannot spread: opacity only — never hue, position or scale; all cells driven by one shared value
+so the pulse is strictly **in phase** (a travelling sweep is loading-skeleton vocabulary); and the
+amplitude capped by `AmbientPulseFloor`, never reaching zero. It belongs to the onboarding hero and
+nothing else.
+
+**`AmbientPulseFloor` — and an honest contrast limit it exposed.** The pulse's trough is
+`{ light: 0.999, dark: 0.7 }`, not one number, because the effort fills have almost no contrast
+headroom in light mode. Measured against `surface.base` at full opacity: `easy` 3.0045:1,
+`recovery` 3.031:1, `tempo` 3.035:1, `steady` 3.062:1 — four of five are *barely* over the 3:1 floor
+with no pulse at all, so `easy` binds the floor at alpha ≥ 0.9988 and the light-mode pulse is
+consequently near-imperceptible. Dark mode has more room and pulses normally at 0.7 — **except**
+`interval` (#C6402F on #14171C), which is 3.57:1 at full opacity and **2.32:1 at 0.7**. Both are
+pre-existing properties of the hexes, not of the animation. A visible light-mode pulse, and a safe
+dark floor, both need these effort values revisited for headroom — **tracked as issue #70**, and
+scoped there rather than here because any change to the effort scale ripples into plan view, its
+primary consumer.
+
+**The onboarding hero's own behaviour is settled, not pending:** the captain ruled on 2026-08-08
+that its shimmer is **dark-mode-only and final**, with the contrast floor left untouched. The
+alternative — weakening the 3:1 rule so light mode could pulse — was considered and declined. Read
+the numbers above as a constraint that has already been ruled on, not an open question about that
+screen.
 
 **Curves.** `easeOut` for anything arriving. `easeIn` for anything leaving. `linear` for progress
 hairlines and quota fills **only** — a progress bar that eases is lying about pace. `springSnappy`
