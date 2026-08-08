@@ -19,7 +19,7 @@ against `wrangler dev` locally — auth, the quota ledger, `quota-status`, `purc
 engine (`src/lib/planTemplates.ts`) — but **nothing is deployed**, and the Pro/Elite AI-generation
 path is not yet built. On the client side, `src/lib/apiClient.ts`
 (better-auth's Expo client plus typed fetch wrappers for the other `/api/*` routes),
-`src/app/(auth)/sign-in.tsx`/`sign-up.tsx`, the intake screen, the generate-plan action, the plan
+`src/app/(auth)/onboarding.tsx`, `sign-in.tsx`/`sign-up.tsx`, the intake screen, the generate-plan action, the plan
 view (real plans plus the permanent example-plan fixture), and the My Plans list all exist, and
 `src/app/_layout.tsx` gates the whole app behind a session — email/password works, and Google
 sign-in's credentials are provisioned and verified in local dev (2026-08-05; production still
