@@ -78,8 +78,10 @@ clean `typecheck && lint && test`. Never force-push without explicit user approv
 
 - TypeScript strict everywhere (already on in `tsconfig.json`).
 - Theme tokens only — no hardcoded colors or spacing in components; use
-  `src/constants/theme.ts`. It currently holds the stock Expo template palette; the proposed
-  PACE palette is recorded in `docs/architecture.md` but not yet implemented.
+  `src/constants/theme.ts`. It holds the **"Instrument & Matter"** token system — live since
+  commit `145d7e0`, contrast-verified, and documented in `docs/design/frontend-design-brief.md`
+  (the source of truth for every value) and `docs/architecture.md`'s "Current — visual direction".
+  Never edit a hex there without re-verifying contrast and updating the brief.
 - No business rules in the client. Tier, quota, and plan generation are server-only (`workers/`);
   the client may display tier state but is never the authority for it. **D1 has no row-level
   security**, so every D1 statement must bind a `userId` from the verified session — see

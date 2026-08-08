@@ -29,10 +29,16 @@ src/
                           #                authClient.useSession() (no anonymous browsing)
     (auth)/
       _layout.tsx          # stack layout for the signed-out route group
-      index.tsx             # redirect anchor -> sign-up (returning-user link reaches sign-in)
+      index.tsx             # redirect anchor -> onboarding (2026-08-08; was sign-up). Note this is
+                            #   the anchor for EVERY signed-out session, not just first install
+      onboarding.tsx        # 2026-08-08 — the signed-out landing screen. Animated week-ribbon hero
+                            #   (components/onboarding/), the pitch, then "Get started" -> sign-up.
+                            #   No form; the CTA is disabled until the hero settles
       sign-in.tsx            # email/password sign-in + a "Continue with Google" button, verified
                               #   working against local dev (2026-08-05); production pending
       sign-up.tsx            # email/password sign-up + the same Google button
+                            #   both auth screens scroll (KeyboardAvoidingView + ScrollView) as of
+                            #   2026-08-08 — centred content used to be unreachable under a keyboard
     (tabs)/
       _layout.tsx          # tab bar — all four tabs today: Home, Glossary, My Plans, Settings
                             #           (Settings added 2026-08-05)
@@ -63,6 +69,9 @@ src/
     plan/                   # WeekAccordion, WorkoutRow, EffortChip, ReadoutBracket,
                              # PlanNameplate, DisclaimerFooter, FallbackNotice, GoalRealismNotice
                              # (new 2026-08-05 — renders Plan.goalRealism), format.ts
+    onboarding/             # HeroRibbon (new 2026-08-08) — the week-ribbon motif at 2x hero scale,
+                             # building itself cell by cell then settling into an ambient pulse.
+                             # Reduced-motion aware; illustration only, never the user's data
   constants/
     theme.ts                # "Instrument & Matter" token system — current, see below
     navigation-theme.ts      # bridges theme.ts's tokens into @react-navigation/native's `Theme`

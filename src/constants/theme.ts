@@ -232,8 +232,8 @@ export const Radius = {
 } as const;
 
 // ---------------------------------------------------------------------------------------------
-// Motion — brief Part 4 / mvp-blueprint Part 5. Ten values total; `reveal` is reserved
-// exclusively for the wave's one-time stroke-draw and must never be reused elsewhere.
+// Motion — brief Part 4 / mvp-blueprint Part 5. Eleven values total; `reveal` and `ambient` are
+// each reserved to their one named use and must never be reused elsewhere.
 // Springs are recorded as the design-specified damping ratio (0 = undamped, 1 = critically
 // damped) rather than a platform spring config — the motion implementation translates this into
 // Reanimated's `withSpring` parameters when it lands (Phase 6).
@@ -246,6 +246,19 @@ export const Motion = {
     standard: 250, // the default; entrances
     slow: 350, // full-screen pushes
     reveal: 650, // RESERVED — the wave's one-time stroke-draw only
+    // RESERVED — the one-way period of the onboarding hero ribbon's settled ambient opacity
+    // pulse (yoyo cycle), the same way `reveal` above is reserved to the wave's stroke-draw: it
+    // must never become a generic "make it feel alive" duration elsewhere. A genuine addition,
+    // not a reuse — every duration above is a sub-350ms response to an event; this is a loop
+    // period, a different kind of quantity, and none of the other nine fit it without either
+    // making the shimmer frantic or silently redefining what that token means.
+    // This is also the single sanctioned exception to mvp-blueprint.md Part 1's manifesto, which
+    // bans "idle floating", "ambient looping", and "breathing gradients" ("if nothing is
+    // happening, nothing moves"). The exception is scoped tightly: opacity only, all cells in
+    // phase (never a travelling sweep — that's loading-skeleton vocabulary), amplitude capped
+    // per color scheme — see `AmbientPulseFloor` below, which is where the actual floor values
+    // and the contrast math behind them live.
+    ambient: 2800,
   },
   curve: {
     /** Anything arriving. Cubic-bezier control points. */
@@ -271,6 +284,29 @@ export const Motion = {
 // ---------------------------------------------------------------------------------------------
 
 export const PressedOpacity = 0.7;
+
+// ---------------------------------------------------------------------------------------------
+// Ambient pulse floor — accessibility-reviewer finding 1 (onboarding hero ribbon, 2026-08-08).
+// `PressedOpacity` (0.7) is safe as the settled ambient pulse's trough in dark mode — worst case
+// there is dark `recovery` at 4.04:1 against `Colors.dark.surface.base`, still clear of the
+// brief's 3:1 floor for this channel — but it is NOT safe in light mode. Verified with the
+// standard WCAG relative-luminance formula against the actual hexes (`Effort[level].light`,
+// alpha-blended toward `Colors.light.surface.base`, vs. that same base):
+//   recovery 3.03:1 full -> 2.10:1 at .7   easy   3.00:1 full -> 2.10:1 at .7
+//   steady   3.06:1 full -> 2.11:1 at .7   tempo  3.03:1 full -> 2.15:1 at .7
+//   interval 4.69:1 full -> 2.94:1 at .7
+// Four of the five light-mode efforts are already only barely above 3:1 AT FULL OPACITY (`easy`
+// the tightest, 3.0045:1 with zero pulse at all) — there is essentially no contrast headroom
+// left for a shared opacity dip. `easy` needs alpha >= 0.9988 to hold 3:1; 0.999 is the smallest
+// floor that clears every light-mode effort with a hair of margin (0.999 -> easy 3.001:1,
+// recovery 3.027:1, steady 3.059:1, tempo 3.031:1, interval 4.679:1). The resulting light-mode
+// pulse is barely perceptible by design — that thinness is inherent to how close these five
+// hexes already sit to the floor, not something this token can fix. A genuinely visible light-
+// mode pulse would need `design-system` to revisit the light effort hexes for more headroom.
+export const AmbientPulseFloor = {
+  light: 0.999,
+  dark: PressedOpacity,
+} as const;
 
 // ---------------------------------------------------------------------------------------------
 // Layout constants.

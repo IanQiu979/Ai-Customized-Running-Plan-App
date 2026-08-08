@@ -5,6 +5,91 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-08-08 — the sign-up form went blank while being filled in; onboarding screen added ahead of it
+
+Captain's report, verbatim: *"very difficult to sign in, if u input everything it will just
+disappear."* Reproduced live in a browser against local `wrangler dev` before anything was changed.
+Two independent defects on the same screens, plus a new screen in front of them.
+
+- **Defect 1 — the whole app unmounted on every background session refetch, wiping the form.**
+  `src/app/_layout.tsx` computed `ready = fontsLoaded && !sessionPending` and returned `null` when
+  it was false. That `return null` unmounts `<Stack>`, the `(auth)` group, and the sign-up screen's
+  `useState` with it. The trap is that better-auth's `isPending` is **not** a one-shot "first load
+  in flight" flag: `node_modules/better-auth/dist/client/session-atom.mjs`, inside `fetchSession`,
+  sets `isPending: current.data === null`, so it is re-raised on *every* refetch — but only while
+  signed out, which is exactly the state a runner filling in the form is in. Refetches are frequent
+  and invisible (`refetchOnWindowFocus` defaults to true, plus online / broadcast / signal events);
+  on web the trigger is `visibilitychange`, on native it is AppState. Real-world repro: switch to a
+  password manager, come back, everything you typed is gone. A 5-second rate limit on the focus
+  path is the only reason it read as intermittent rather than constant.
+  **Fix:** new pure module `src/lib/sessionGate.ts` (`hasSessionSettled`) latches readiness so it
+  can only go false→true once; `_layout.tsx` holds that in state. The first-load gate — and its
+  original anti-flash reasoning — is preserved; only the *re*-closing is removed. Regression test
+  `src/lib/__tests__/sessionGate.test.ts` (6 cases), confirmed to fail against the old logic.
+  `security-auditor` traced the change and found no widened authorization window: because
+  `isPending === true` implies `data === null`, the old gate could never have fired for a signed-in
+  user, so the behavioural delta is confined to signed-out users, who now correctly see the `(auth)`
+  group instead of a blank frame. `sessionGate.ts` is splash-screen sequencing, **not** an
+  authorization signal, and its header now says so.
+
+- **Defect 2 — auth content could be pushed off the top of the screen with no way to scroll.**
+  `sign-up.tsx` / `sign-in.tsx` centred their content in a `flex: 1` container with no scroll view.
+  Measured at 390pt wide: at a 380pt viewport the "Create account" title sat at top −49 (clipped);
+  at 300pt the Name input was at −19. Content centred in a container shorter than itself overflows
+  off **both** edges, and with nothing scrollable it is unreachable. A keyboard produces exactly
+  this — Android resizes the window (`softwareKeyboardLayoutMode` defaults to `"resize"`, verified
+  against the pinned Expo SDK 54 docs), iOS instead covers the Sign up button — and an error
+  message makes it worse by growing the content.
+  **Fix:** both screens wrapped in `KeyboardAvoidingView` + `ScrollView` with
+  `contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}` and
+  `keyboardShouldPersistTaps="handled"`. Identical look on a tall screen; scrollable when it does
+  not fit. No token or visual change. Verified at a 280pt viewport: scrolling to the top reaches
+  the title, scrolling to the end puts the Sign up button fully in view.
+
+- **New — an onboarding screen ahead of the create-account form.** `src/app/(auth)/onboarding.tsx`;
+  `(auth)/index.tsx`'s `Redirect` moved from `/(auth)/sign-up` to `/(auth)/onboarding`. The hero
+  (`src/components/onboarding/HeroRibbon.tsx`) animates the app's **own** week-ribbon motif — the
+  same instrument as `WeekAccordion`, at 2× geometry with the week-number gutter dropped so no text
+  glyph ever sits near an effort-coloured bar. Seven cells build left to right on a
+  `Motion.duration.instant` stagger, each a bottom-anchored `scaleY` spring (`Motion.spring.snappy`)
+  that hard-swaps from `progress.disabled` to its effort colour at the frame it locks in, with a
+  per-cell pop/glow fading over `Motion.duration.quick`; then the ribbon settles into a slow ambient
+  opacity pulse. The seven days are a real microcycle, not a sorted colour ramp: the two hard days
+  sit three days apart with a recovery day and the rest day between them, and the week closes on the
+  long run. The CTA is genuinely disabled until the build completes, with a token-derived timeout
+  ceiling so it can never strand the user; the sign-in link is deliberately never gated.
+  Reduced motion is respected (`useReducedMotion()`): no stagger, no spring, no glow, no ambient
+  loop — one simultaneous 250ms crossfade to the finished week, then static.
+  Built entirely from existing `theme.ts` tokens, from a `ui-designer` pass over
+  `frontend-design-brief.md` / `mvp-blueprint.md`.
+
+- **Two new tokens in `theme.ts`.** `Motion.duration.ambient` (2800) — the pulse's one-way period,
+  RESERVED to this one use exactly as `reveal` is, and the single sanctioned exception to
+  `mvp-blueprint.md` Part 1's ban on "idle floating / ambient looping / breathing gradients"
+  (scoped: opacity only, all bars in phase, amplitude capped). And `AmbientPulseFloor`
+  (`{ light: 0.999, dark: 0.7 }`) — see below.
+
+- **Copy decision, SHIPPED PENDING THE CAPTAIN'S SIGN-OFF.** The onboarding supporting line reads
+  *"A McMillan-certified coach designed the training. No monthly coaching fees, no bloated app —
+  just your plan, week by week."* The second sentence is near-verbatim from
+  `planning/02-product-requirements.md`. The first is **not** — no user-facing copy anywhere in the
+  product has previously made a certification claim. It is grounded in `CLAUDE.md`'s "Coaching
+  domain" section (the owner is a McMillan-certified coach; the coaching content is a port of his
+  own library) and is worded to attribute the credential to the coach who authored the content, not
+  to imply endorsement, partnership, or accreditation by McMillan Running as a company. Both
+  `ui-designer` and `ux-copywriter` flagged it for explicit sign-off. Fallback if declined: drop
+  that first sentence, leaving two fully PRD-grounded claims and no sign-off needed.
+
+- **Known limitation, needs a ruling.** `AmbientPulseFloor` is `0.999` in light mode, which makes
+  the ambient shimmer **effectively invisible there**; dark mode pulses normally at 0.7. This is not
+  a tuning choice — four of the five light-mode effort hexes already sit barely above the brief's
+  3:1 floor at full opacity (`easy` is 3.0045:1), so there is essentially no headroom for a shared
+  opacity dip, and 0.999 is the largest amplitude that keeps all five at 3:1. A genuinely visible
+  light-mode pulse needs `design-system` to revisit the light effort hexes for headroom — out of
+  scope here. Separately, `accessibility-implementer` computed that **dark** `interval` (#C6402F on
+  #14171C) is 3.57:1 at full opacity and 2.32:1 at 0.7, i.e. dark mode's floor is not safe either;
+  pre-existing and not worsened by this change, but it belongs in the same follow-up.
+
 ## 2026-08-07 — `TypeError: Network request failed` on a phone: the transport failure is now a first-class error, not an unhandled rejection
 
 Phone testing over `expo start --tunnel` produced `Uncaught (in promise, id: 1) TypeError: Network
