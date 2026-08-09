@@ -24,8 +24,9 @@ mismatch, wrong client id for the build) are indistinguishable from the source.
   returns `403 unauthenticated` (so the route table and session gate are live). Not a
   `redirect_uri_mismatch` and not a revoked/flagged credential: the request never reaches Google,
   because no credential is deployed to send. The leaked-secret backlog item
-  (`v22-launch-audit-r1-decision-google-secret-rotation`) is therefore **not** the cause — but it is
-  still live, and rotating now is free precisely because nothing is deployed with it.
+  (`v22-launch-audit-r1-decision-google-secret-rotation`) is therefore **not** the cause — but it
+  was still open, and rotating was free precisely because nothing was deployed with it. The captain
+  did rotate before deploying (see the resolution below), so the exposed value was never live.
 - **Not fixable here, and deliberately not worked around.** `wrangler secret put` needs the
   captain's own Cloudflare login, which `AGENTS.md` forbids agents from running. Escalated with the
   exact commands; see `docs/mvp-progress.md`'s "Blocked / awaiting a decision".
@@ -67,8 +68,9 @@ against the pre-fix code, not just to pass against the new. `workers/README.md` 
 that distinguishes "secrets missing" from every other OAuth failure. 324 root tests and 93
 `workers/` tests pass; typecheck and lint clean on both projects.
 
-**RESOLVED the same day.** The captain added the production redirect URI in Google Cloud Console
-and set both secrets with `wrangler secret put --env production` — the first attempt failed with
+**RESOLVED the same day.** The captain rotated the client secret in Google Cloud Console (closing
+`v22-launch-audit-r1-decision-google-secret-rotation` — the leaked value was never deployed), added
+the production redirect URI, and set both secrets with `wrangler secret put --env production` — the first attempt failed with
 `Required Worker name missing` / `no environment named "production"`, which is what wrangler prints
 when it finds **no config file at all**: it was run from the repo root rather than `workers/`, where
 `wrangler.toml` lives. Both misleading errors come from an empty config, not a malformed one.
@@ -83,7 +85,9 @@ has the redirect URI registered against it.
 
 **Two things remain unproven by that check, by construction.** (1) The client *secret* is only ever
 exercised at the token exchange, which needs a real human login — a wrong secret would surface as
-`invalid_client` at the very end of the round trip, not here. (2) If the OAuth consent screen is in
+`invalid_client` at the very end of the round trip, not here. That risk is slightly raised by the
+rotation, not lowered: the value in production is a freshly minted secret that has never completed
+a single exchange. (2) If the OAuth consent screen is in
 **Testing** publishing status, only listed test users can complete sign-in; everyone else gets
 `access_denied` after entering their password. Both are settled by one real sign-in from the app.
 
