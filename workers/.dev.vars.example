@@ -29,8 +29,20 @@ ANTHROPIC_API_KEY=
 
 # Google OAuth (optional — email/password works without it).
 # Google Cloud Console -> APIs & Services -> Credentials -> OAuth 2.0 Client ID,
-# type "Web application", authorized redirect URI:
-#   http://localhost:8787/api/auth/callback/google
-# Leave both empty and better-auth simply does not register the provider.
+# type "Web application". BOTH of these must be listed as authorized redirect
+# URIs on that one client, or whichever is missing fails the round trip with
+# `redirect_uri_mismatch`:
+#
+#   http://localhost:8787/api/auth/callback/google                                    (wrangler dev)
+#   https://pace-blueprint-production.i78979848.workers.dev/api/auth/callback/google   (production)
+#
+# Leave both values empty and better-auth simply does not register the provider:
+# `POST /api/auth/sign-in/social` answers `PROVIDER_NOT_FOUND` and the app shows
+# "Google sign-in isn't available yet." A value that is only whitespace counts as
+# empty too — see workers/src/auth.ts's buildSocialProviders.
+#
+# Production does NOT read this file. These same two names go to the deployed
+# Worker with `wrangler secret put GOOGLE_CLIENT_ID --env production` (the flag is
+# not optional; without it the secret lands on a different Worker).
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=

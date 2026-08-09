@@ -5,6 +5,92 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-08-09 — Google sign-in is broken in production; root cause is a missing secret, not code
+
+Captain's report: cannot log in with Google at all. Diagnosed against the live deployed Worker
+rather than by reading code, because three of the candidate causes (revoked secret, redirect URI
+mismatch, wrong client id for the build) are indistinguishable from the source.
+
+- **Root cause — `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` are not set on the deployed Worker.**
+  `POST /api/auth/sign-in/social {"provider":"google"}` against
+  `https://pace-blueprint-production.i78979848.workers.dev` returns
+  `{"message":"Provider not found","code":"PROVIDER_NOT_FOUND"}` (HTTP 404). `buildSocialProviders()`
+  in `workers/src/auth.ts` returns `{}` when either credential is missing, so better-auth never
+  registers Google, and `src/app/(auth)/sign-in.tsx` renders that as "Google sign-in isn't available
+  yet." The message is honest but reads exactly like a bug, which is why the state went unnoticed.
+- **What it is *not*, each ruled out by evidence, not by reasoning.** Not a code regression and not
+  a broken auth stack: on the same origin, email/password returns `401 INVALID_EMAIL_OR_PASSWORD`
+  for bogus credentials (so D1 and `BETTER_AUTH_SECRET` are both live) and `/api/quota-status`
+  returns `403 unauthenticated` (so the route table and session gate are live). Not a
+  `redirect_uri_mismatch` and not a revoked/flagged credential: the request never reaches Google,
+  because no credential is deployed to send. The leaked-secret backlog item
+  (`v22-launch-audit-r1-decision-google-secret-rotation`) is therefore **not** the cause — but it
+  was still open, and rotating was free precisely because nothing was deployed with it. The captain
+  did rotate before deploying (see the resolution below), so the exposed value was never live.
+- **Not fixable here, and deliberately not worked around.** `wrangler secret put` needs the
+  captain's own Cloudflare login, which `AGENTS.md` forbids agents from running. Escalated with the
+  exact commands; see `docs/mvp-progress.md`'s "Blocked / awaiting a decision".
+
+Three real defects *were* found and fixed, each of which would have broken Google sign-in again
+immediately after the secrets landed:
+
+- **`workers/wrangler.toml`'s production config was wrong in two ways.**
+  `[env.production.vars] BETTER_AUTH_URL` read `https://pace-blueprint.workers.dev`, which is not
+  the deployed origin (`[env.production]` appends `-production` to the top-level `name`, and the
+  account subdomain was missing entirely). better-auth derives the OAuth `redirect_uri` it hands
+  Google from that var, so a redeploy from a clean clone would have failed `redirect_uri_mismatch`
+  — the exact "confusing state mismatch, not a clear error" the file's own comment warns about.
+  Separately, `[env.production]` declared no D1 binding: **a named wrangler environment does not
+  inherit top-level bindings**, so that deploy would have had no `env.DB` and 500'd on every
+  authenticated route. Both fixed, along with the now-real `database_id` (an identifier, not a
+  credential). The live deploy only works today because the captain has these values as an
+  uncommitted local edit; committing them is what stops the next clean clone from regressing.
+- **The test suite was reading OAuth config from an untracked file.** Wrangler layers `.dev.vars`
+  over `wrangler.toml [vars]`, and `.dev.vars` is gitignored — so `env.BETTER_AUTH_URL` and
+  `env.APP_SCHEME` inside `vitest` were whatever each developer happened to have locally. Caught
+  because a worktree carrying stale values (`APP_SCHEME=http://localhost:8090`) failed the new
+  deep-link test against a config no committed file describes; the same hole would have let a
+  genuinely broken `trustedOrigins` pass elsewhere. Both are now pinned in `vitest.config.ts`.
+- **Credentials are trimmed, and blank counts as absent.** `wrangler secret put` reads stdin, so a
+  pasted value routinely carries a trailing newline. Untrimmed, `"<id>\n"` is truthy: the provider
+  registers and then fails at the token exchange with `invalid_client`, which reads like a revoked
+  credential rather than a stray byte. Trimming collapses that into the one diagnosis the code
+  already reports clearly.
+
+Coverage: new `workers/test/social-auth.test.ts`, 7 cases — provider absent → `PROVIDER_NOT_FOUND`;
+provider registered → a real `accounts.google.com` authorization URL, asserting the exact
+`client_id` and the `redirect_uri` derived from `BETTER_AUTH_URL`; one-of-two credentials;
+blank and whitespace-only; whitespace stripped; and both directions of the `trustedOrigins` check
+(`paceblueprint:///` accepted, `https://evil.example/steal` rejected with 403). Verified to fail
+against the pre-fix code, not just to pass against the new. `workers/README.md` and
+`.dev.vars.example` now document both required redirect URIs, the mandatory `--env production` flag
+(a `put` without it succeeds while writing to a Worker nothing talks to), and the one-line `curl`
+that distinguishes "secrets missing" from every other OAuth failure. 324 root tests and 93
+`workers/` tests pass; typecheck and lint clean on both projects.
+
+**RESOLVED the same day.** The captain rotated the client secret in Google Cloud Console (closing
+`v22-launch-audit-r1-decision-google-secret-rotation` — the leaked value was never deployed), added
+the production redirect URI, and set both secrets with `wrangler secret put --env production` — the first attempt failed with
+`Required Worker name missing` / `no environment named "production"`, which is what wrangler prints
+when it finds **no config file at all**: it was run from the repo root rather than `workers/`, where
+`wrangler.toml` lives. Both misleading errors come from an empty config, not a malformed one.
+
+Verified live, in two stages rather than by trusting the first green:
+`POST /api/auth/sign-in/social` now returns HTTP 200 with a real `accounts.google.com`
+authorization URL carrying the right `client_id` and a `redirect_uri` of
+`https://pace-blueprint-production.i78979848.workers.dev/api/auth/callback/google`; following that
+URL, Google itself serves `<title>Sign in - Google Accounts</title>` with no `invalid_client`, no
+`redirect_uri_mismatch` and no "Access blocked", which proves Google recognises the client id *and*
+has the redirect URI registered against it.
+
+**Two things remain unproven by that check, by construction.** (1) The client *secret* is only ever
+exercised at the token exchange, which needs a real human login — a wrong secret would surface as
+`invalid_client` at the very end of the round trip, not here. That risk is slightly raised by the
+rotation, not lowered: the value in production is a freshly minted secret that has never completed
+a single exchange. (2) If the OAuth consent screen is in
+**Testing** publishing status, only listed test users can complete sign-in; everyone else gets
+`access_denied` after entering their password. Both are settled by one real sign-in from the app.
+
 ## 2026-08-09 — comprehensive frontend/backend audit and temporary unlimited access
 
 - Audited every reachable app screen and every Worker route/D1 statement. Fixed web CORS and web

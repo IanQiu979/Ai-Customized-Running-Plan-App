@@ -186,6 +186,18 @@ Built-ins also available: `Explore`, `Plan`, `general-purpose`. Plugin agents ar
 - **Never run `wrangler login`, `wrangler deploy`, `wrangler d1 create`, or `wrangler secret put`.**
   Those need the captain's own Cloudflare account. Everything is verifiable offline against
   `wrangler dev`'s local emulation.
+- **The Worker IS deployed, as the named `production` environment, and that name is a trap.**
+  `[env.production]` makes the live Worker `pace-blueprint-production`, not `pace-blueprint`, so
+  every `wrangler secret put` / `deploy` aimed at it needs `--env production` — without the flag the
+  command succeeds while targeting a different Worker that nothing talks to. A named environment
+  also inherits **no bindings**, which is why `[[env.production.d1_databases]]` is duplicated in
+  `wrangler.toml` on purpose. Diagnose the deployed backend by `curl`ing it before theorising about
+  the code; `workers/README.md`'s "Google OAuth, specifically" has the one-line probe that
+  separates "secret missing" from every other OAuth failure. Google sign-in was broken in
+  production for exactly that reason until 2026-08-09. Note the failure mode of getting the
+  directory wrong: run from the repo root instead of `workers/`, wrangler finds no config and
+  reports `Required Worker name missing` **and** `no environment named "production"` — two errors
+  that both read as "your config is wrong" when the config was simply never loaded.
 - **A loopback `EXPO_PUBLIC_API_BASE_URL` is unreachable from a phone, and `--tunnel` does not
   change that** — it forwards Metro, never the Worker. This is the first thing to check on any
   `TypeError: Network request failed` from device testing; `.env.example` has the correct value per

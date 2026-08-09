@@ -1,9 +1,15 @@
 # Cloudflare Workers config for Pace Blueprint's backend.
 #
-# NOTHING HERE IS DEPLOYED. `database_id` below is a placeholder — see the comment on it. Every
-# command that touches a real Cloudflare account (`wrangler login`, `wrangler d1 create`,
-# `wrangler secret put`, `wrangler deploy`) is the captain's to run; this repo is verified against
-# `wrangler dev`'s local Miniflare emulation, which needs no account and no network.
+# THE `production` ENVIRONMENT IS DEPLOYED (confirmed live 2026-08-09 at the origin named under
+# `[env.production.vars]`). Local work still needs no Cloudflare account: `wrangler dev` and
+# `vitest` run against Miniflare's local emulation and read only the top-level blocks. Every
+# command that touches the real account (`wrangler login`, `wrangler d1 create`,
+# `wrangler secret put`, `wrangler deploy`) remains the captain's to run.
+#
+# `[env.production]` INHERITS NOTHING BUT `[vars]`-adjacent top-level keys — bindings are NOT
+# inherited by a named environment, so `[[env.production.d1_databases]]` below is required and
+# duplicating it is correct, not redundant. A production deploy without it has no `env.DB` and
+# every authenticated route 500s.
 
 name = "pace-blueprint"
 main = "src/index.ts"
@@ -18,12 +24,12 @@ enabled = true
 [[d1_databases]]
 binding = "DB"
 database_name = "pace-blueprint"
-# PLACEHOLDER. `wrangler dev --local` and `vitest` ignore this value entirely (Miniflare creates a
-# local SQLite file under `.wrangler/state/`), so local work needs no account. Before anything
-# remote, the captain runs `wrangler login && wrangler d1 create pace-blueprint` and pastes the
-# real uuid it prints here. Committing a real database id is harmless — it is not a secret — but
-# fabricating one is not, so this stays obviously fake until a real one exists.
-database_id = "00000000-0000-0000-0000-000000000000"
+# The real id, from the captain's `wrangler d1 create pace-blueprint`. A D1 database id is an
+# identifier, not a credential — it grants nothing without an authenticated Cloudflare account —
+# so committing it is safe and is what keeps `db:migrate:remote` working from a fresh clone.
+# `wrangler dev --local` and `vitest` ignore it entirely (Miniflare creates a local SQLite file
+# under `.wrangler/state/`), so local work still needs no account.
+database_id = "08eec309-2ecd-4791-bf47-381983032572"
 migrations_dir = "migrations"
 
 [vars]
@@ -49,10 +55,29 @@ CORS_ALLOWED_ORIGINS = "http://localhost:8081,http://localhost:19006,http://loca
 ALL_USERS_UNLIMITED_ACCESS = "true"
 
 [env.production.vars]
-BETTER_AUTH_URL = "https://pace-blueprint.workers.dev"
+# THE DEPLOYED ORIGIN, EXACTLY. This is not cosmetic: better-auth derives the OAuth `redirect_uri`
+# it hands Google from this value, so it must match, character for character, both the Worker's
+# real hostname AND an "Authorized redirect URI" on the Google OAuth client:
+#
+#   https://pace-blueprint-production.i78979848.workers.dev/api/auth/callback/google
+#
+# A stale value here does not fail loudly — Google rejects the round trip with `redirect_uri_
+# mismatch`, or better-auth rejects the return with a "state mismatch", and neither names this
+# line. `[env.production]` appends `-production` to the top-level `name`, which is why the
+# hostname is `pace-blueprint-production` and not `pace-blueprint`.
+BETTER_AUTH_URL = "https://pace-blueprint-production.i78979848.workers.dev"
 APP_SCHEME = "paceblueprint://"
-# Replace/add the deployed Expo web origin before web production testing.
-CORS_ALLOWED_ORIGINS = "https://pace-blueprint.workers.dev"
+# The deployed origin, exactly — see the note above BETTER_AUTH_URL. `[env.production]` appends
+# `-production` to the top-level `name`, so the real origin is pace-blueprint-production, not
+# pace-blueprint; a stale value here silently blocks the deployed web origin's own requests.
+CORS_ALLOWED_ORIGINS = "https://pace-blueprint-production.i78979848.workers.dev"
 # Deliberately temporary; DO NOT flip to "true" until the captain explicitly re-enables it for a
 # production test window, then flip back to "false" immediately after.
 ALL_USERS_UNLIMITED_ACCESS = "false"
+
+# Required — see the header: a named environment does not inherit top-level bindings.
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "pace-blueprint"
+database_id = "08eec309-2ecd-4791-bf47-381983032572"
+migrations_dir = "migrations"

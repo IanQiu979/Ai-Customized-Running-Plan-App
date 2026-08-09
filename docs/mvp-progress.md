@@ -6,7 +6,35 @@
 > Milestone definitions live in [`planning/02-product-requirements.md`](../planning/02-product-requirements.md).
 > Decision history lives in [`change_log.md`](change_log.md).
 
-**Last updated:** 2026-08-07 — phone testing over `expo start --tunnel` hit
+**Last updated:** 2026-08-09 — Google sign-in was reported dead in the app; diagnosed against the
+**live deployed Worker**, not by reading code. `POST /api/auth/sign-in/social` on
+`https://pace-blueprint-production.i78979848.workers.dev` answers
+`{"message":"Provider not found","code":"PROVIDER_NOT_FOUND"}` (HTTP 404), while email/password on
+the same origin correctly answers `401 INVALID_EMAIL_OR_PASSWORD` and `/api/quota-status` answers
+`403 unauthenticated` — so the Worker, D1, and `BETTER_AUTH_SECRET` are all live and only the Google
+provider is missing. **Root cause: `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` were never set on the
+deployed Worker**, so `buildSocialProviders()` returns `{}` and better-auth never registers the
+provider. It is not a code regression, not a redirect-URI mismatch, and not the leaked secret being
+revoked (a leaked-but-unrevoked secret would still authenticate — and none is in play, because none
+is deployed). **Captain-only to fix** — see "Blocked / awaiting a decision". Two things did get
+fixed in code, both of which would have broken Google sign-in *again* immediately after the secrets
+landed: (1) the committed `[env.production.vars] BETTER_AUTH_URL` still read
+`https://pace-blueprint.workers.dev`, which is not the deployed origin — better-auth derives the
+OAuth `redirect_uri` from it, so any redeploy from a clean clone would have failed with
+`redirect_uri_mismatch`; `[env.production]` also had no D1 binding at all (named environments do
+not inherit top-level bindings), so such a deploy would have had no database. **Fixed the same day:**
+the captain added the redirect URI and set both secrets, and `sign-in/social` now returns a real
+`accounts.google.com` URL that Google answers with a live sign-in page — see the change-log entry
+for what that check does and does not prove. (2)
+`workers/vitest.config.ts` let `BETTER_AUTH_URL`/`APP_SCHEME` come from a developer's gitignored
+`.dev.vars`, so the OAuth-origin tests were asserting against whatever untracked values happened to
+be on that machine; both are now pinned in the config. Credentials are also trimmed now, so a
+`wrangler secret put` newline can't register a provider that then fails as `invalid_client`. New
+`workers/test/social-auth.test.ts` (7 cases) covers provider-absent, provider-registered (asserting
+the exact `client_id` and `redirect_uri` handed to Google), one-of-two, blank/whitespace, and the
+`paceblueprint://` deep-link `trustedOrigins` round trip; verified to fail against the old code.
+324 root tests and 93 `workers/` tests pass. Full account: `docs/change_log.md`'s 2026-08-09 entry.
+Previous entry: 2026-08-07 — phone testing over `expo start --tunnel` hit
 `TypeError: Network request failed` and could not get past sign-in. Root cause was environmental —
 `EXPO_PUBLIC_API_BASE_URL` pointed at `http://localhost:8788`, and a loopback address means *the
 device running the app*, so a phone can never reach a Worker on the developer's computer (tunnel
@@ -118,7 +146,7 @@ from 82. Issue #22 remains open.)
 
 | Milestone | State |
 |---|---|
-| M1 — Foundation (account → empty Home) | **In progress.** Server (auth + schema + account routes) works locally on Cloudflare (`workers/`); client-side email/password auth now exists (`src/app/(auth)/`, `src/lib/apiClient.ts`) and gates the app behind a session — Google OAuth credentials are now provisioned and verified working in local dev (2026-08-05); only the production `wrangler secret put` step remains, and nothing is deployed |
+| M1 — Foundation (account → empty Home) | **In progress.** Server (auth + schema + account routes) is deployed on Cloudflare (`workers/`, live `production` environment); client-side email/password and Google OAuth both work in production (Google since 2026-08-09) |
 | M2 — Intake (questionnaire persists) | **In progress.** Intake screen now exists, wired to `GET`/`PUT /api/intake` |
 | M3 — Plan engine (3 tiers produce valid plans) | **In progress.** Pure template/pace engine now wired into the Worker's `generate-plan` route and the client's generate-plan action; the plan view renders a real generated plan (via `GET /api/plans/:id`) alongside the permanent static golden fixture |
 | M4 — Tiers & quotas (server-side, unbypassable) | **In progress.** The quota ledger, atomic gate, fallback exemption, `quota-status` and `purchase-tier` are built and tested server-side; a Settings tab now displays tier/quota and a dummy paywall now lets a runner call `purchase-tier` (2026-08-05) |
@@ -612,12 +640,13 @@ to "Decided" below.
 
 | Item | Blocks | Who decides |
 |---|---|---|
-| `wrangler login` (interactive) | every remote Cloudflare action below | **Ian.** Opens a browser; nothing else can run first |
-| `wrangler d1 create pace-blueprint` | a real remote database; `wrangler.toml`'s `database_id` is a deliberately fake placeholder until its uuid is pasted in | **Ian**, after login |
-| `wrangler secret put BETTER_AUTH_SECRET` / `ANTHROPIC_API_KEY` | production auth; any real model call | **Ian.** The exact analogue of `supabase secrets set`. Generate the auth secret with `openssl rand -base64 32` |
-| `wrangler secret put GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` (production) | Google sign-in in production (email/password works without it; the credentials are already provisioned and verified working in local dev, see the 2026-08-05 entry) | **Ian**, after login. Also recommend rotating the client secret in Google Cloud Console first — it was pasted in plaintext into a chat pane before landing in `workers/.dev.vars` |
-| `APP_SCHEME` = `paceblueprint://` | the OAuth return into the app | **Ian.** Renamed 2026-07-12 and never verified against a built app |
-| `wrangler deploy` | anything reachable from a phone | **Ian**, after all of the above |
+| ~~`wrangler login`~~ | — | **Done.** Everything below it has since run |
+| ~~`wrangler d1 create pace-blueprint`~~ | — | **Done.** The real `database_id` is now committed in `wrangler.toml` (an identifier, not a credential) |
+| ~~`wrangler secret put BETTER_AUTH_SECRET`~~ / `ANTHROPIC_API_KEY` | any real model call | **Auth secret done** — proven live: production email sign-in returns a proper `401 INVALID_EMAIL_OR_PASSWORD` rather than the 500 a missing secret would cause. `ANTHROPIC_API_KEY` still open |
+| ~~`wrangler secret put GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` (production)~~ | — | **Done 2026-08-09**, along with the production redirect URI. `sign-in/social` returns a real Google authorization URL and Google serves a live sign-in page against it. **Two open riders:** the client secret is only exercised at the token exchange, so one real sign-in from the app is still needed to prove it; and if the OAuth consent screen is in **Testing** status, only listed test users can complete sign-in (everyone else gets `access_denied` after entering their password). The secret was rotated first, so the deployed value is a fresh one |
+| ~~Rotate the Google client secret~~ (`v22-launch-audit-r1-decision-google-secret-rotation`) | — | **Done 2026-08-09**, before the secret was deployed. The original was pasted in plaintext into a chat pane twice during provisioning; it was rotated in Google Cloud Console and only the new value was ever pushed to production, so the exposed credential was never live. Backlog item can be closed |
+| `APP_SCHEME` = `paceblueprint://` | the OAuth return into the app | **Ian.** Matches `app.json`'s `scheme` and the `expoClient({ scheme })` call, and `trustedOrigins` acceptance of `paceblueprint:///` is now covered by `workers/test/social-auth.test.ts` — but still never verified against a real built app |
+| ~~`wrangler deploy`~~ | — | **Done.** `https://pace-blueprint-production.i78979848.workers.dev` is live and answering |
 | **Decided 2026-08-07: deploy the Worker.** How a phone reaches the backend — LAN against `wrangler dev` was the alternative and was declined; on-device testing waits on `wrangler deploy` (the row above) rather than a same-Wi-Fi workaround | all on-device testing; caused the 2026-08-07 `Network request failed` report | **Ian — ruled.** A loopback base URL is unreachable from a phone by construction, tunnel or not (see `.env.example`); once deployed, `EXPO_PUBLIC_API_BASE_URL` becomes the Worker's `https://` URL. The app now reports the unreachable case clearly instead of crashing, but cannot fix it |
 
 None of the above blocks local work: everything in `workers/` runs offline against `wrangler dev`'s
@@ -818,9 +847,9 @@ intact underneath.
   Program membership (App ID + Services ID + key) that Ian does not hold yet. Carved out of issue
   #7 on 2026-07-12 and recorded in [`apple-dev-blocked.md`](apple-dev-blocked.md); issue #7's
   remaining scope (email/password, Google OAuth, session routing) is unaffected and still workable
-  today — Google OAuth itself is now verified working in local dev (2026-08-05), with production
-  still pending the captain's `wrangler secret put`. The Apple requirement binds only at App Store
-  submission, i.e. once Google is actually deployed, not before.
+  today. **Google sign-in is now live in production (2026-08-09, see `change_log.md`), so the Apple
+  requirement is active, not theoretical** — it binds at App Store submission, which is now the
+  actual blocker rather than a future one.
 - 🟡 **Suspected pre-existing bug: Home's demo link may render with no border, no 48pt tap target,
   and no pressed state (found while tracing the Link for issue #31, filed as issue #51).**
   expo-router's `Link asChild` (`src/app/(tabs)/index.tsx`) uses a Radix Slot whose `mergeProps`
