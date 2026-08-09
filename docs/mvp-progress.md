@@ -146,7 +146,7 @@ from 82. Issue #22 remains open.)
 
 | Milestone | State |
 |---|---|
-| M1 — Foundation (account → empty Home) | **In progress.** Server (auth + schema + account routes) works locally on Cloudflare (`workers/`); client-side email/password auth now exists (`src/app/(auth)/`, `src/lib/apiClient.ts`) and gates the app behind a session — Google OAuth credentials are now provisioned and verified working in local dev (2026-08-05); only the production `wrangler secret put` step remains, and nothing is deployed |
+| M1 — Foundation (account → empty Home) | **In progress.** Server (auth + schema + account routes) is deployed on Cloudflare (`workers/`, live `production` environment); client-side email/password and Google OAuth both work in production (Google since 2026-08-09) |
 | M2 — Intake (questionnaire persists) | **In progress.** Intake screen now exists, wired to `GET`/`PUT /api/intake` |
 | M3 — Plan engine (3 tiers produce valid plans) | **In progress.** Pure template/pace engine now wired into the Worker's `generate-plan` route and the client's generate-plan action; the plan view renders a real generated plan (via `GET /api/plans/:id`) alongside the permanent static golden fixture |
 | M4 — Tiers & quotas (server-side, unbypassable) | **In progress.** The quota ledger, atomic gate, fallback exemption, `quota-status` and `purchase-tier` are built and tested server-side; a Settings tab now displays tier/quota and a dummy paywall now lets a runner call `purchase-tier` (2026-08-05) |
@@ -847,9 +847,9 @@ intact underneath.
   Program membership (App ID + Services ID + key) that Ian does not hold yet. Carved out of issue
   #7 on 2026-07-12 and recorded in [`apple-dev-blocked.md`](apple-dev-blocked.md); issue #7's
   remaining scope (email/password, Google OAuth, session routing) is unaffected and still workable
-  today — Google OAuth itself is now verified working in local dev (2026-08-05), with production
-  still pending the captain's `wrangler secret put`. The Apple requirement binds only at App Store
-  submission, i.e. once Google is actually deployed, not before.
+  today. **Google sign-in is now live in production (2026-08-09, see `change_log.md`), so the Apple
+  requirement is active, not theoretical** — it binds at App Store submission, which is now the
+  actual blocker rather than a future one.
 - 🟡 **Suspected pre-existing bug: Home's demo link may render with no border, no 48pt tap target,
   and no pressed state (found while tracing the Link for issue #31, filed as issue #51).**
   expo-router's `Link asChild` (`src/app/(tabs)/index.tsx`) uses a Radix Slot whose `mergeProps`

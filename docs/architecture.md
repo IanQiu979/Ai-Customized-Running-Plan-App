@@ -192,15 +192,16 @@ server, `describeError()` to turn either into a message screens can show), re-ex
 `TypeError` used to fall through that check into a generic, misleading fallback message — see
 `docs/change_log.md`'s 2026-08-07 entry for the full story. `src/app/(auth)/sign-in.tsx` and
 `sign-up.tsx` are the two screens built against it —
-email/password, plus a "Continue with Google" button. **Google OAuth credentials are provisioned
-and verified in local dev as of 2026-08-05**: `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` live in
-`workers/.dev.vars`, and `POST /api/auth/sign-in/social` (provider `google`) against `wrangler dev`
-returns a real `accounts.google.com` authorization URL that Google's server accepts (a real
-sign-in page, not `invalid_client`/`redirect_uri_mismatch`). Production is not done —
-`wrangler secret put GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` still needs the captain's own
-Cloudflare login (`workers/src/auth.ts`'s TODO), and the client secret should be rotated in Google
-Cloud Console before that, since it was pasted in plaintext into a chat pane earlier the same
-session. The root layout (`src/app/_layout.tsx`) reads `authClient.useSession()` and gates the entire route tree
+email/password, plus a "Continue with Google" button. **Google OAuth works in production as of
+2026-08-09**: `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` are set on the deployed Worker
+(`wrangler secret put … --env production`), and `POST /api/auth/sign-in/social` against
+`https://pace-blueprint-production.i78979848.workers.dev` returns a real `accounts.google.com`
+authorization URL that Google's server accepts (a real sign-in page, not
+`invalid_client`/`redirect_uri_mismatch`). It was broken until then because those secrets had never
+been set on the deployed Worker — see `docs/change_log.md`'s 2026-08-09 entry and
+`workers/src/auth.ts`'s `buildSocialProviders`. Still unproven: the client secret is only exercised
+at the token exchange, and the OAuth consent screen's publishing status, both needing one real
+in-app sign-in — see `docs/mvp-progress.md`'s "Blocked / awaiting a decision". The root layout (`src/app/_layout.tsx`) reads `authClient.useSession()` and gates the entire route tree
 on it with Expo Router's `Stack.Protected` — there is no anonymous browsing at all, matching every
 `/api/*` route already 403ing anonymously.
 
@@ -421,7 +422,7 @@ it `getSession()` ignores the header and every route 403s a user who just signed
 
 | Method / Route | Auth | Body | Returns | Notes |
 |---|---|---|---|---|
-| `ANY /api/auth/*` | — | better-auth's own | better-auth's own | Sign-up, sign-in, sign-out, session, OAuth callbacks. Email/password works today; Google is provisioned and verified in local dev (2026-08-05) — production still needs the captain to run `wrangler secret put GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` (`workers/src/auth.ts`'s TODO). |
+| `ANY /api/auth/*` | — | better-auth's own | better-auth's own | Sign-up, sign-in, sign-out, session, OAuth callbacks. Email/password and Google both work in production (Google since 2026-08-09 — see `docs/change_log.md`). |
 | `GET /health` | none | — | `{ ok: true }` | Liveness. Touches no database. |
 | `POST /api/generate-plan` | session | `{ goalType: "race"\|"duration", raceDistance?, raceDate?, durationWeeks?, notes?, idempotencyKey }` | `{ plan, planId, isFallback, quotaConsumed }`, or `402` over-quota / `403` anon / `409` intake-required | Enforces tier + quota server-side, branches by tier, validates, persists. A duplicate `idempotencyKey` returns the existing plan instead of generating twice. As of 2026-08-04, Free gets the template plan and Pro/Elite fall back to the same template (`isFallback: true`, quota-exempt) pending the Pro/Elite personalization prompt — see "Current — `generate-plan`" above. `quotaConsumed` tells the client whether this fallback counted against the tier limit, so `FallbackNotice` can pick `counted` vs `exempt`. |
 | `GET /api/quota-status` | session | — | `{ tier, used, limit, periodEnd }` | Drives Home's and Settings' "N of M plans used" line (`src/lib/quotaDisplay.ts`'s `formatQuotaLine()`, consumed by both since 2026-08-05). `used` counts **non-fallback** plans in the current purchase-anchored period, server-side, never a client counter. `periodEnd` is `null` for Free (lifetime allowance) and also `null` while the temporary `ALL_USERS_UNLIMITED_ACCESS` override is on (see below) — the UI must not render a countdown for either. |

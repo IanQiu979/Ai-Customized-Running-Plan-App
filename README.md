@@ -9,8 +9,8 @@ deliberately narrow — it builds plans, it is not a training log.
 **Backend spine built; the first end-to-end user loop (sign-up → intake → generate a plan → view
 it → My Plans) works client-side too.** The Cloudflare backend in [`workers/`](workers/README.md)
 works end to end against local emulation — auth, the quota ledger, `quota-status`, `purchase-tier`,
-`delete-account`, intake, plan reads, and `generate-plan`'s free-tier template engine — but nothing
-is deployed, and the Pro/Elite AI-generation path is not yet built. On the client, auth screens,
+`delete-account`, intake, plan reads, and `generate-plan`'s free-tier template engine — and it is
+deployed as the `production` environment; the Pro/Elite AI-generation path is not yet built. On the client, auth screens,
 the intake screen, the generate-plan action, a plan view (real plans plus the permanent
 golden-fixture example), a My Plans list, a Settings tab (tier/quota display, sign-out, delete
 account), and a dummy paywall all exist. Everything described below that is marked *planned* is
