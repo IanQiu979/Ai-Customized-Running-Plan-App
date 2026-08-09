@@ -87,8 +87,8 @@ export function createAuth(env: Env) {
      * `exp://` origin, rewrites the `origin` header from `expo-origin` (native fetch does not
      * send a browser `Origin` header better-auth's default check can read), and redirects an
      * OAuth callback into the app's own deep-link scheme instead of a browser location. A no-op
-     * for the email/password path; required for Google OAuth, provisioned in local dev and
-     * pending the captain's production `wrangler secret put` (see `buildSocialProviders` below).
+     * for the email/password path; required for Google OAuth, which as of 2026-08-09 is still
+     * pending the captain's `wrangler secret put --env production` (see `buildSocialProviders`).
      */
     plugins: [bearer(), expo()],
 
@@ -101,27 +101,40 @@ export function createAuth(env: Env) {
 }
 
 /**
- * Google OAuth, if and only if both halves of the credential are present.
+ * Google OAuth, if and only if both halves of the credential are present and non-blank.
  *
- * TODO (captain): Google sign-in is provisioned and verified in local dev (2026-08-05) —
- * `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` are in `workers/.dev.vars`, and `APP_SCHEME` has been
- * confirmed to match the app's real scheme. Production is not done: only the captain can run
- * `wrangler secret put GOOGLE_CLIENT_ID` and `wrangler secret put GOOGLE_CLIENT_SECRET` (needs
- * their own Cloudflare login). See `docs/change_log.md`'s 2026-08-05 entry for the full account,
- * including a recommendation to rotate the client secret before shipping.
+ * WHY THIS RETURNS `{}` RATHER THAN THROWING: an absent Google credential is a degraded sign-in
+ * screen, not a broken Worker — email/password still works, so refusing to boot would turn a
+ * partial outage into a total one. The cost is that the failure is quiet, and it has already been
+ * paid once: on 2026-08-09 the deployed Worker answered every `POST /api/auth/sign-in/social` with
+ * `{"code":"PROVIDER_NOT_FOUND"}` because `wrangler secret put GOOGLE_CLIENT_ID --env production`
+ * had never been run. The app renders that as "Google sign-in isn't available yet." (see
+ * `src/app/(auth)/sign-in.tsx`), which is honest but looks identical to a bug. If Google sign-in
+ * is reported broken, `curl -X POST <origin>/api/auth/sign-in/social -d '{"provider":"google"}'`
+ * is the one-command test: `PROVIDER_NOT_FOUND` means the secrets are missing on *that* Worker.
  *
- * Until the production secrets are set this returns `{}` and only email/password is available.
- * That is a working sign-in path, not a broken one, which is why it is safe to ship in this state.
+ * WHY `.trim()`, AND WHY BLANK COUNTS AS ABSENT: `wrangler secret put` reads from stdin, and a
+ * pasted value routinely carries a trailing newline; `.dev.vars` just as routinely carries a
+ * `KEY=` line with nothing after it. Untrimmed, `"<id>\n"` is truthy, so the provider registers
+ * and *then* fails much later and much less legibly — Google answers the token exchange with
+ * `invalid_client`, which reads like a revoked credential rather than a stray byte. Trimming
+ * turns both cases into the one diagnosis this function already reports clearly.
+ *
+ * The redirect URI registered on the Google OAuth client must match the Worker's origin exactly:
+ * `http://localhost:8787/api/auth/callback/google` for `wrangler dev`, and the
+ * `[env.production.vars] BETTER_AUTH_URL` origin + `/api/auth/callback/google` for production.
+ * Both have to be listed on the same client, or whichever is missing fails with
+ * `redirect_uri_mismatch`. See `workers/README.md`'s "What the captain has to do".
  */
 function buildSocialProviders(env: Env) {
-  if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
+  const clientId = env.GOOGLE_CLIENT_ID?.trim();
+  const clientSecret = env.GOOGLE_CLIENT_SECRET?.trim();
+
+  if (!clientId || !clientSecret) {
     return {};
   }
 
   return {
-    google: {
-      clientId: env.GOOGLE_CLIENT_ID,
-      clientSecret: env.GOOGLE_CLIENT_SECRET,
-    },
+    google: { clientId, clientSecret },
   };
 }

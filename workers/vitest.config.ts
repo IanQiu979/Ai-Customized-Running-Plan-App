@@ -41,6 +41,20 @@ export default defineConfig({
           // Most existing quota tests assert the permanent entitlement rules. Individual tests
           // instantiate the store with the override enabled when exercising temporary test mode.
           ALL_USERS_UNLIMITED_ACCESS: 'false',
+
+          /**
+           * PINNED ON PURPOSE, and this is a correctness fix rather than tidiness. Wrangler loads
+           * `.dev.vars` on top of `wrangler.toml [vars]`, and `.dev.vars` is gitignored — so before
+           * this block, `env.BETTER_AUTH_URL` and `env.APP_SCHEME` inside the test runtime were
+           * whatever the individual developer happened to have in an untracked file. Caught on
+           * 2026-08-09: a worktree carrying stale values (`APP_SCHEME=http://localhost:8090`) made
+           * `test/social-auth.test.ts` fail against a config no committed file describes, and would
+           * equally have let a genuinely broken `trustedOrigins` pass on someone else's machine.
+           * These two are non-secret by definition (they live in the committed `[vars]`), so
+           * restating them here costs nothing and makes the suite say the same thing everywhere.
+           */
+          BETTER_AUTH_URL: 'http://localhost:8787',
+          APP_SCHEME: 'paceblueprint://',
         },
       },
     })),

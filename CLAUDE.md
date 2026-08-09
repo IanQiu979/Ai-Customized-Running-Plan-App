@@ -16,14 +16,17 @@ better-auth, in [`workers/`](workers/README.md)** (captain's decision, 2026-08-0
 only from the `generate-plan` route, never from the client. The backend spine works end to end
 against `wrangler dev` locally — auth, the quota ledger, `quota-status`, `purchase-tier`,
 `delete-account`, intake, plan reads, and `generate-plan`'s free-tier deterministic template
-engine (`src/lib/planTemplates.ts`) — but **nothing is deployed**, and the Pro/Elite AI-generation
-path is not yet built. On the client side, `src/lib/apiClient.ts`
+engine (`src/lib/planTemplates.ts`) — and **it is deployed** as wrangler's named `production`
+environment, live at `https://pace-blueprint-production.i78979848.workers.dev` (confirmed by
+`curl` 2026-08-09). The Pro/Elite AI-generation path is not yet built. On the client side, `src/lib/apiClient.ts`
 (better-auth's Expo client plus typed fetch wrappers for the other `/api/*` routes),
 `src/app/(auth)/onboarding.tsx`, `sign-in.tsx`/`sign-up.tsx`, the intake screen, the generate-plan action, the plan
 view (real plans plus the permanent example-plan fixture), and the My Plans list all exist, and
-`src/app/_layout.tsx` gates the whole app behind a session — email/password works, and Google
-sign-in's credentials are provisioned and verified in local dev (2026-08-05; production still
-needs the captain's `wrangler secret put`, see `docs/mvp-progress.md`). Route tree, `lib/` layout, the
+`src/app/_layout.tsx` gates the whole app behind a session — email/password works in production,
+but **Google sign-in does not**: `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` were never set on the
+deployed Worker, so `sign-in/social` answers `PROVIDER_NOT_FOUND` (diagnosed 2026-08-09). Only the
+captain can fix it, with `wrangler secret put … --env production`; see `docs/mvp-progress.md`'s
+"Blocked / awaiting a decision" and `AGENTS.md`'s guardrail on the `production` environment name. Route tree, `lib/` layout, the
 `generate-plan` flow, the API table, the D1 schema, and the proposed visual direction all live in
 [`docs/architecture.md`](docs/architecture.md).
 

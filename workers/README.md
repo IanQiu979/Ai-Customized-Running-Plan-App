@@ -82,20 +82,51 @@ production client and served nothing but dead ends for weeks.
 
 ## What the captain has to do (nobody else can)
 
-Everything above is local. These need accounts:
+Everything above is local. These need accounts — and **every one of them needs `--env production`**,
+because the deployed Worker is the named `production` environment (`pace-blueprint-production`), not
+the bare `pace-blueprint`. A `wrangler secret put` without the flag succeeds, prints a cheerful
+confirmation, and writes the secret onto a *different* Worker that nothing talks to. That is not
+hypothetical: it is one of the two ways Google sign-in can present as `PROVIDER_NOT_FOUND` on a
+Worker whose secrets you are certain you set.
 
 | Step | Command | Why only you |
 |---|---|---|
 | Cloudflare login | `wrangler login` | Interactive, opens a browser |
-| Create the database | `wrangler d1 create pace-blueprint` | Then paste the id into `wrangler.toml`'s `database_id`, which is a placeholder today |
+| Create the database | `wrangler d1 create pace-blueprint` | Done — the id is committed in `wrangler.toml` |
 | Apply migrations remotely | `npm --prefix workers run db:migrate:remote` | Needs the above |
-| Auth secret | `wrangler secret put BETTER_AUTH_SECRET` | Generate with `openssl rand -base64 32` |
-| Anthropic key | `wrangler secret put ANTHROPIC_API_KEY` | Your account, your billing |
-| Google OAuth | `wrangler secret put GOOGLE_CLIENT_ID` / `..._SECRET` | Your Google Cloud project — see `src/auth.ts`'s TODO for the exact console steps |
-| Deploy | `wrangler deploy` | Needs all of the above |
+| Auth secret | `wrangler secret put BETTER_AUTH_SECRET --env production` | Generate with `openssl rand -base64 32`. Done |
+| Anthropic key | `wrangler secret put ANTHROPIC_API_KEY --env production` | Your account, your billing |
+| Google OAuth | `wrangler secret put GOOGLE_CLIENT_ID --env production` / `..._SECRET --env production` | **Not done — this is why Google sign-in is broken.** Your Google Cloud project; see below |
+| Deploy | `wrangler deploy --env production` | Needs all of the above |
 
 This mirrors the Supabase path exactly: `wrangler login` is `supabase login`, and
 `wrangler secret put` is `supabase secrets set`.
+
+### Google OAuth, specifically
+
+Google Cloud Console → APIs & Services → Credentials → the OAuth 2.0 Client ID of type
+**Web application**. Both of these must be listed under "Authorized redirect URIs" on the *same*
+client, or whichever is missing fails the round trip with `redirect_uri_mismatch`:
+
+```
+http://localhost:8787/api/auth/callback/google                                      # wrangler dev
+https://pace-blueprint-production.i78979848.workers.dev/api/auth/callback/google    # production
+```
+
+The production URI is `[env.production.vars] BETTER_AUTH_URL` + `/api/auth/callback/google`;
+better-auth derives it from that var, so the two can never be allowed to drift apart.
+
+To check which state a Worker is in, without a device or a browser:
+
+```sh
+curl -X POST https://<origin>/api/auth/sign-in/social \
+  -H 'content-type: application/json' -d '{"provider":"google","callbackURL":"/"}'
+```
+
+`{"code":"PROVIDER_NOT_FOUND"}` means the two secrets are absent (or blank, or on the wrong
+Worker — see the `--env production` note above). A JSON body containing a
+`https://accounts.google.com/...` `url` means the provider is registered and the failure, if any,
+is further down the round trip.
 
 ## Secrets
 
