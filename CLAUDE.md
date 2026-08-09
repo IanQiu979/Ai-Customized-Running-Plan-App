@@ -23,10 +23,13 @@ environment, live at `https://pace-blueprint-production.i78979848.workers.dev` (
 `src/app/(auth)/onboarding.tsx`, `sign-in.tsx`/`sign-up.tsx`, the intake screen, the generate-plan action, the plan
 view (real plans plus the permanent example-plan fixture), and the My Plans list all exist, and
 `src/app/_layout.tsx` gates the whole app behind a session — email/password works in production,
-but **Google sign-in does not**: `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` were never set on the
-deployed Worker, so `sign-in/social` answers `PROVIDER_NOT_FOUND` (diagnosed 2026-08-09). Only the
-captain can fix it, with `wrangler secret put … --env production`; see `docs/mvp-progress.md`'s
-"Blocked / awaiting a decision" and `AGENTS.md`'s guardrail on the `production` environment name. Route tree, `lib/` layout, the
+and Google sign-in works too as of 2026-08-09 — it was dead until then because
+`GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` were never set on the deployed Worker
+(`sign-in/social` answered `PROVIDER_NOT_FOUND`); the captain set both with
+`wrangler secret put … --env production`. Still unproven: the client secret itself, which is only
+exercised at the token exchange, and the OAuth consent screen's publishing status. See
+`docs/mvp-progress.md`'s "Blocked / awaiting a decision" and `AGENTS.md`'s guardrail on the
+`production` environment name. Route tree, `lib/` layout, the
 `generate-plan` flow, the API table, the D1 schema, and the proposed visual direction all live in
 [`docs/architecture.md`](docs/architecture.md).
 

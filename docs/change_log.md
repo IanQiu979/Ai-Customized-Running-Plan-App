@@ -67,8 +67,25 @@ against the pre-fix code, not just to pass against the new. `workers/README.md` 
 that distinguishes "secrets missing" from every other OAuth failure. 324 root tests and 93
 `workers/` tests pass; typecheck and lint clean on both projects.
 
-**Still broken until the captain acts.** Google sign-in does not work in production, and no code
-change in this repo can make it work.
+**RESOLVED the same day.** The captain added the production redirect URI in Google Cloud Console
+and set both secrets with `wrangler secret put --env production` — the first attempt failed with
+`Required Worker name missing` / `no environment named "production"`, which is what wrangler prints
+when it finds **no config file at all**: it was run from the repo root rather than `workers/`, where
+`wrangler.toml` lives. Both misleading errors come from an empty config, not a malformed one.
+
+Verified live, in two stages rather than by trusting the first green:
+`POST /api/auth/sign-in/social` now returns HTTP 200 with a real `accounts.google.com`
+authorization URL carrying the right `client_id` and a `redirect_uri` of
+`https://pace-blueprint-production.i78979848.workers.dev/api/auth/callback/google`; following that
+URL, Google itself serves `<title>Sign in - Google Accounts</title>` with no `invalid_client`, no
+`redirect_uri_mismatch` and no "Access blocked", which proves Google recognises the client id *and*
+has the redirect URI registered against it.
+
+**Two things remain unproven by that check, by construction.** (1) The client *secret* is only ever
+exercised at the token exchange, which needs a real human login — a wrong secret would surface as
+`invalid_client` at the very end of the round trip, not here. (2) If the OAuth consent screen is in
+**Testing** publishing status, only listed test users can complete sign-in; everyone else gets
+`access_denied` after entering their password. Both are settled by one real sign-in from the app.
 
 ## 2026-08-09 — comprehensive frontend/backend audit and temporary unlimited access
 
