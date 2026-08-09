@@ -744,41 +744,30 @@ guidelines scout (`/Users/Guestyyyyyyyy/firstmate/data/v22-apple-kids-guidelines
 
 ---
 
+## Latest — 2026-08-09 comprehensive audit and captain test mode
+
+The full frontend/Worker audit receipt is [`audit-2026-08-09.md`](audit-2026-08-09.md). Web CORS and
+web cookie storage now work, stale route types no longer break clean typechecks, request/intake
+validation is aligned across client/Worker/D1, fallback quota messaging is accurate per plan, and
+Expo Doctor is clean. `ALL_USERS_UNLIMITED_ACCESS = "true"` is intentionally enabled in
+`workers/wrangler.toml`: all authenticated accounts are temporarily Elite with unlimited plans for
+the captain's test pass. Set it to `"false"` before real users arrive; normal entitlements remain
+intact underneath.
+
 ## Known debt and risks
 
 ### Found 2026-08-08 while fixing the sign-up form, deliberately NOT fixed on that branch
 
-- 🔴 **The Worker emits no CORS headers, so a browser can never reach the backend cross-origin.**
-  `workers/src/index.ts` has no `OPTIONS` branch and sets no `Access-Control-Allow-Origin`;
-  better-auth's handler does not do CORS itself (that is normally the framework's middleware). Web
-  sign-in and sign-up therefore fail 100% of the time with `net::ERR_FAILED` and a preflight error
-  in the console. Native is unaffected — there is no CORS there — which is why this went unnoticed.
-  Confirmed by curl: an `OPTIONS` to `/api/auth/sign-up/email` with an `Origin` header 404s with
-  zero CORS headers, and the same request with the headers shimmed in at the browser succeeds.
-  Fix needs an explicit origin allowlist (never `*`, which is invalid with credentials) and must
-  fail closed on an unknown origin while still allowing native's absent `Origin`. HIGH tier — it
-  touches `workers/`, so it needs its own branch, `security-auditor`, and a PR.
-- 🔴 **`expo-secure-store` has no web implementation, so every `/api/*` call dies on web.**
-  `node_modules/expo-secure-store/build/ExpoSecureStore.web.js` is `export default {}`, so
-  `SecureStore.getItem` throws. `src/lib/apiClient.ts` calls `authClient.getCookie()` *outside* its
-  own `try`, so the `TypeError` escapes the `NetworkError` conversion entirely and no request is
-  ever sent. Visible as "Could not load your intake." / "Could not load your account." on web even
-  with a valid session. Fix: move the call inside the `try`, and give the Expo plugin a
-  platform-aware storage — on web the browser sends the cookie itself, so `getCookie()` should
-  return `''` rather than throw. Separate change from the CORS one; different file, different
-  failure.
-- 🟠 **`apiErrors.ts`'s network message misdiagnoses a CORS block on web.** A CORS rejection and an
-  unreachable host are both `TypeError: Failed to fetch`, and `describeError` sees a loopback base
-  URL and prints the phone/tunnel explanation — on a desktop browser, with the server up on the
-  same machine. This is why the 2026-08-08 report pointed at the wrong thing. Low severity, but do
-  it after the CORS fix, which removes most occurrences.
-- 🟠 **A server-revoked session is never mapped back to a local sign-out.** The Worker 403s
-  anonymous `/api/*`, but no screen maps a 403 to `authClient.signOut()`, and session polling is off
-  (`refetchInterval` defaults to 0, and `createAuthClient` passes no `sessionOptions`). A user whose
-  session is revoked server-side, sitting in the foreground, stays on the authenticated shell until
-  they background and foreground the app. Not exploitable — every server read is refused — but an
-  incident response ("revoke this user now") would trip over it. Pre-existing; flagged by
-  `security-auditor` during the 2026-08-08 review.
+- 🟢 **Resolved 2026-08-09: browser access to the Worker.** `workers/src/cors.ts` now answers
+  credentialed preflights from an exact origin allowlist and adds CORS headers to auth/API
+  responses, while unknown origins fail closed and native requests without `Origin` stay
+  unaffected. `src/lib/apiClient.ts` now uses a no-op Expo-plugin storage adapter on web and lets
+  the browser send its HttpOnly cookie with `credentials: include`; native keeps SecureStore.
+  The old CORS-specific network-message misdiagnosis no longer occurs in the supported local flow.
+- 🟢 **Resolved 2026-08-09: server-revoked sessions clear the local authenticated shell.**
+  `src/lib/apiClient.ts` maps an authoritative `403 unauthenticated` response to a best-effort
+  `authClient.signOut()` before returning the original `ApiError`, so a foregrounded app no longer
+  remains visually signed in after server revocation.
 - 🟠 **The effort hexes have no contrast headroom — tracked as [issue #70](https://github.com/IanQiu979/WorkoutGenerationv2.2/issues/70).**
   Four of the five light effort hexes sit barely above the brief's 3:1 floor *at full opacity*
   (`easy` is 3.0045:1), so there is no headroom for an opacity dip; and dark `interval` (#C6402F on
@@ -865,14 +854,9 @@ guidelines scout (`/Users/Guestyyyyyyyy/firstmate/data/v22-apple-kids-guidelines
   only, which contradicts `mvp-build-prompt.md:332` and leaves the goal-realism warning's second
   home unspecified. The warning must appear at *both* goal-entry points, so the modal needs a
   goal-time control and its advisory copy. Resolve when M4's configure modal is built (issue #13).
-- 🟡 **Plan screen can't yet derive the correct `FallbackNotice` variant — GitHub issue #45.**
-  `Plan.isFallback` (`src/lib/planTypes.ts:218`) is a bare boolean; only the server knows whether
-  a given fallback landed inside the 3-per-period quota-exempt cap or past it (R-B addendum,
-  `docs/reference/plan-generation.md:112-118`). `src/app/plan/[id].tsx` hardcodes
-  `variant="exempt"` — correct for the Phase 1 fixture and the common case, wrong for a runner
-  past the cap. Needs `generate-plan` to return whether the fallback consumed quota (e.g.
-  `quotaConsumed: boolean` alongside `isFallback`) so the plan screen can derive `variant` from it;
-  blocked on `generate-plan` existing (Phase 4, issue #9's API contract).
+- 🟢 **Resolved 2026-08-09: plan fallback quota copy is accurate.** Plan reads and generation now
+  return `quotaConsumed`; `src/app/plan/[id].tsx` maps it to `FallbackNotice`'s required
+  `counted|exempt` variant instead of hardcoding the common case.
 - 🟡 `220 − age` is retained for max HR by Ian's informed decision, against Tanaka 2001 (±10–12 bpm).
   Recorded so a future session does not "fix" it.
 - 🟡 **`BottomTabInset` stays deliberately uncalled (issue #32 finding 8, 2026-07-12).** It models a

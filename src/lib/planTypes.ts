@@ -280,12 +280,17 @@ export interface GeneratePlanResponse {
   plan: Plan;
   planId: string;
   isFallback: boolean;
+  /** Whether this specific plan consumed a quota slot. False in unlimited-access test mode. */
+  quotaConsumed: boolean;
 }
 
 export interface QuotaStatus {
   tier: Tier;
   used: number;
-  limit: number;
-  /** ISO date. Anchored to the purchase day, not the calendar month. */
-  periodEnd: string;
+  /** `null` means quota enforcement is temporarily bypassed for all users. */
+  limit: number | null;
+  /** ISO date for paid windows; null for lifetime or unlimited access. */
+  periodEnd: string | null;
+  /** True only for the temporary captain-requested all-users test override. */
+  unlimited: boolean;
 }

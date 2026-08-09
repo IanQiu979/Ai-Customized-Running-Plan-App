@@ -32,6 +32,7 @@ import type {
   Tier,
 } from '../../../src/lib/planTypes';
 import { currentPeriod } from '../../../src/lib/quotaPeriod';
+import { UNLIMITED_ACCESS_TIER } from '../access';
 import {
   DEFAULT_TIER,
   FALLBACK_EXEMPTION_CAP,
@@ -62,7 +63,8 @@ export interface SubscriptionRow {
 /** The window quota is counted over. `lifetime` is Free's — see `FREE_IS_LIFETIME`. */
 export interface QuotaWindow {
   tier: Tier;
-  limit: number;
+  /** `null` means the temporary all-users override bypasses quota enforcement. */
+  limit: number | null;
   lifetime: boolean;
   /** `null` for a lifetime window; there is no period boundary to report. */
   periodStart: string | null;
@@ -79,6 +81,7 @@ export interface PlanRow {
   plan: Plan | null;
   idempotencyKey: string;
   createdAt: string;
+  quotaConsumed: boolean;
 }
 
 export interface ReserveInput {
@@ -137,6 +140,7 @@ interface RawPlanRow {
   plan: string | null;
   idempotency_key: string;
   created_at: string;
+  counts_against_quota: number;
 }
 
 function toPlanRow(raw: RawPlanRow): PlanRow {
@@ -152,12 +156,13 @@ function toPlanRow(raw: RawPlanRow): PlanRow {
     plan: raw.plan === null ? null : (JSON.parse(raw.plan) as Plan),
     idempotencyKey: raw.idempotency_key,
     createdAt: raw.created_at,
+    quotaConsumed: raw.counts_against_quota === 1,
   };
 }
 
 /** The columns every plan read selects. One list, so a mapper change cannot miss a call site. */
 const PLAN_COLUMNS =
-  'id, user_id, status, tier_at_generation, engine, is_fallback, plan, idempotency_key, created_at';
+  'id, user_id, status, tier_at_generation, engine, is_fallback, plan, idempotency_key, created_at, counts_against_quota';
 
 interface RawIntakeRow {
   goal: string;
@@ -200,7 +205,10 @@ function toIntakeResponses(raw: RawIntakeRow): IntakeResponses {
 // ---------------------------------------------------------------------------------------------
 
 export class D1PlanStore implements PlanStore {
-  constructor(private readonly db: D1Database) {}
+  constructor(
+    private readonly db: D1Database,
+    private readonly allUsersUnlimitedAccess = false
+  ) {}
 
   async getSubscription(userId: string): Promise<SubscriptionRow | null> {
     const row = await this.db
@@ -225,6 +233,16 @@ export class D1PlanStore implements PlanStore {
    * tier value (see the `subscriptions` comment in `0002_app_schema.sql`).
    */
   async quotaWindow(userId: string, now: string): Promise<QuotaWindow> {
+    if (this.allUsersUnlimitedAccess) {
+      return {
+        tier: UNLIMITED_ACCESS_TIER,
+        limit: null,
+        lifetime: true,
+        periodStart: null,
+        periodEnd: null,
+      };
+    }
+
     const subscription = await this.getSubscription(userId);
     const tier: Tier = subscription?.tier ?? DEFAULT_TIER;
     const limit = TIER_PLAN_LIMITS[tier];
@@ -251,6 +269,8 @@ export class D1PlanStore implements PlanStore {
    * lifecycle expressed as one predicate.
    */
   async countUsed(userId: string, window: QuotaWindow, now: string): Promise<number> {
+    if (window.limit === null) return 0;
+
     const staleCutoff = new Date(new Date(now).getTime() - RESERVATION_TTL_MS).toISOString();
 
     const row = await this.db
@@ -309,39 +329,63 @@ export class D1PlanStore implements PlanStore {
 
     let result: D1Result;
     try {
-      result = await this.db
-        .prepare(
-          `INSERT INTO plans (
-             id, user_id, tier_at_generation, goal_type, race_distance, race_date,
-             duration_weeks, idempotency_key, status, counts_against_quota, created_at
-           )
-           SELECT ?, ?, ?, ?, ?, ?, ?, ?, 'reserved', 1, ?
-            WHERE (
-              SELECT COUNT(*) FROM plans p
-               WHERE p.user_id = ?
-                 AND p.counts_against_quota = 1
-                 AND (p.status = 'settled' OR (p.status = 'reserved' AND p.created_at > ?))
-                 AND (? = 1 OR (p.created_at >= ? AND p.created_at < ?))
-            ) < ?`
-        )
-        .bind(
-          planId,
-          input.userId,
-          input.tier,
-          input.goalType,
-          input.raceDistance ?? null,
-          input.raceDate ?? null,
-          input.durationWeeks ?? null,
-          input.idempotencyKey,
-          input.now,
-          input.userId,
-          staleCutoff,
-          window.lifetime ? 1 : 0,
-          window.periodStart ?? '',
-          window.periodEnd ?? '',
-          window.limit
-        )
-        .run();
+      if (window.limit === null) {
+        // Temporary all-users test mode: keep the same immutable ledger/idempotency path, but do
+        // not let the quota count refuse a request or count the resulting row against a limit.
+        result = await this.db
+          .prepare(
+            `INSERT INTO plans (
+               id, user_id, tier_at_generation, goal_type, race_distance, race_date,
+               duration_weeks, idempotency_key, status, counts_against_quota, created_at
+             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'reserved', 0, ?)`
+          )
+          .bind(
+            planId,
+            input.userId,
+            input.tier,
+            input.goalType,
+            input.raceDistance ?? null,
+            input.raceDate ?? null,
+            input.durationWeeks ?? null,
+            input.idempotencyKey,
+            input.now
+          )
+          .run();
+      } else {
+        result = await this.db
+          .prepare(
+            `INSERT INTO plans (
+               id, user_id, tier_at_generation, goal_type, race_distance, race_date,
+               duration_weeks, idempotency_key, status, counts_against_quota, created_at
+             )
+             SELECT ?, ?, ?, ?, ?, ?, ?, ?, 'reserved', 1, ?
+              WHERE (
+                SELECT COUNT(*) FROM plans p
+                 WHERE p.user_id = ?
+                   AND p.counts_against_quota = 1
+                   AND (p.status = 'settled' OR (p.status = 'reserved' AND p.created_at > ?))
+                   AND (? = 1 OR (p.created_at >= ? AND p.created_at < ?))
+              ) < ?`
+          )
+          .bind(
+            planId,
+            input.userId,
+            input.tier,
+            input.goalType,
+            input.raceDistance ?? null,
+            input.raceDate ?? null,
+            input.durationWeeks ?? null,
+            input.idempotencyKey,
+            input.now,
+            input.userId,
+            staleCutoff,
+            window.lifetime ? 1 : 0,
+            window.periodStart ?? '',
+            window.periodEnd ?? '',
+            window.limit
+          )
+          .run();
+      }
     } catch (error) {
       // The `UNIQUE (user_id, idempotency_key)` backstop firing means a concurrent request for
       // the same key won the race between our lookup above and this insert. That is a replay, not
@@ -375,6 +419,26 @@ export class D1PlanStore implements PlanStore {
    */
   async settle(input: SettleInput): Promise<void> {
     const window = await this.quotaWindow(input.userId, input.now);
+
+    if (window.limit === null) {
+      await this.db
+        .prepare(
+          `UPDATE plans
+              SET status = 'settled', plan = ?, engine = ?, is_fallback = ?, settled_at = ?,
+                  counts_against_quota = 0
+            WHERE id = ? AND user_id = ? AND status = 'reserved'`
+        )
+        .bind(
+          JSON.stringify(input.plan),
+          input.engine,
+          input.isFallback ? 1 : 0,
+          input.now,
+          input.planId,
+          input.userId
+        )
+        .run();
+      return;
+    }
 
     await this.db
       .prepare(

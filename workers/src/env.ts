@@ -19,6 +19,13 @@ export interface Env {
   BETTER_AUTH_URL: string;
   /** The Expo app's deep-link scheme, e.g. `paceblueprint://`. A trusted OAuth return target. */
   APP_SCHEME: string;
+  /** Comma-separated exact origins allowed to make credentialed browser requests. */
+  CORS_ALLOWED_ORIGINS: string;
+  /**
+   * TEMPORARY TEST OVERRIDE. `"true"` grants every authenticated user Elite access and bypasses
+   * the quota gate. Remove or set to `"false"` before real users arrive.
+   */
+  ALL_USERS_UNLIMITED_ACCESS?: string;
 
   // --- secrets, from `.dev.vars` / `wrangler secret put` ---------------------------------------
 

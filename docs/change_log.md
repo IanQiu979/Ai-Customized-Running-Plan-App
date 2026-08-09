@@ -5,6 +5,20 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-08-09 — comprehensive frontend/backend audit and temporary unlimited access
+
+- Audited every reachable app screen and every Worker route/D1 statement. Fixed web CORS and web
+  session-storage failures, stale typed routes, malformed date/time/intake acceptance, terminal
+  idempotency retries, fallback quota-copy accuracy, missing dynamic plan IDs, and the stale D1
+  age floor. Full concrete receipt: [`audit-2026-08-09.md`](audit-2026-08-09.md).
+- Added the reversible `ALL_USERS_UNLIMITED_ACCESS` Worker override (`workers/src/access.ts`): while
+  true, every authenticated account is Elite with no quota limit. The underlying subscriptions,
+  purchase route, quota ledger, and normal limits are preserved for a one-variable rollback.
+- Updated Expo within SDK 54 to 54.0.36, made typecheck regenerate Expo Router declarations, and
+  applied non-breaking dependency audit fixes. Expo Doctor is clean; Worker production audit is
+  clean. Remaining root advisories require a breaking Expo 57 upgrade and are documented in the
+  audit receipt rather than force-applied.
+
 ## 2026-08-08 — the sign-up form went blank while being filled in; onboarding screen added ahead of it
 
 Captain's report, verbatim: *"very difficult to sign in, if u input everything it will just

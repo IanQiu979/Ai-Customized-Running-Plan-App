@@ -30,7 +30,14 @@ export interface GeneratePlanDeps {
 }
 
 export type GeneratePlanOutcome =
-  | { kind: 'ok'; plan: Plan; planId: string; isFallback: boolean; replayed: boolean }
+  | {
+      kind: 'ok';
+      plan: Plan;
+      planId: string;
+      isFallback: boolean;
+      replayed: boolean;
+      quotaConsumed: boolean;
+    }
   | { kind: 'invalid_request'; message: string }
   | { kind: 'intake_required'; message: string }
   | { kind: 'over_quota'; tier: Tier; used: number; limit: number; periodEnd: string | null }
@@ -77,6 +84,11 @@ export async function generatePlan(
   });
 
   if (reservation.outcome === 'over_quota') {
+    // An unlimited window has no refusal path; guard the type and fail closed if a future store
+    // implementation ever violates that contract.
+    if (window.limit === null) {
+      return { kind: 'internal_error', message: 'Unlimited access quota state was inconsistent.' };
+    }
     return {
       kind: 'over_quota',
       tier: window.tier,
@@ -90,7 +102,14 @@ export async function generatePlan(
     const { row } = reservation;
     // A settled row replays as itself — this is what makes a network-timeout retry safe.
     if (row.status === 'settled' && row.plan) {
-      return { kind: 'ok', plan: row.plan, planId: row.id, isFallback: row.isFallback, replayed: true };
+      return {
+        kind: 'ok',
+        plan: row.plan,
+        planId: row.id,
+        isFallback: row.isFallback,
+        replayed: true,
+        quotaConsumed: row.quotaConsumed,
+      };
     }
     // A live reservation for the same key means the first request is still generating. Returning
     // an error here is correct: two generations for one key must not run concurrently, and the
@@ -138,7 +157,14 @@ export async function generatePlan(
     if (window.tier === 'free') {
       const plan = stamp(skeleton.plan, window.tier, 'template', false);
       await deps.store.settle({ planId, userId, plan, engine: 'template', isFallback: false, now });
-      return { kind: 'ok', plan, planId, isFallback: false, replayed: false };
+      return {
+        kind: 'ok',
+        plan,
+        planId,
+        isFallback: false,
+        replayed: false,
+        quotaConsumed: window.limit !== null,
+      };
     }
 
     // --- step 7 + 10: one Claude call, structurally validated, retried once, then fall back ----
@@ -152,7 +178,14 @@ export async function generatePlan(
     if (personalized.ok) {
       const plan = stamp(personalized.plan, window.tier, personalized.engine, false);
       await deps.store.settle({ planId, userId, plan, engine: personalized.engine, isFallback: false, now });
-      return { kind: 'ok', plan, planId, isFallback: false, replayed: false };
+      return {
+        kind: 'ok',
+        plan,
+        planId,
+        isFallback: false,
+        replayed: false,
+        quotaConsumed: window.limit !== null,
+      };
     }
 
     // Fall back to the pure template plan, rendered at Free density — "a template has no 'why';
@@ -160,7 +193,17 @@ export async function generatePlan(
     // gets a real, coach-authored plan; `store.settle` decides whether it costs them a slot.
     const fallback = stamp(skeleton.plan, window.tier, 'template', true);
     await deps.store.settle({ planId, userId, plan: fallback, engine: 'template', isFallback: true, now });
-    return { kind: 'ok', plan: fallback, planId, isFallback: true, replayed: false };
+    return {
+      kind: 'ok',
+      plan: fallback,
+      planId,
+      isFallback: true,
+      replayed: false,
+      // The first fallback exemptions are decided atomically inside `settle`; read the stored row
+      // so the client never has to guess which copy is true.
+      quotaConsumed:
+        (await deps.store.findByIdempotencyKey(userId, request.idempotencyKey))?.quotaConsumed ?? false,
+    };
   } catch (error) {
     // The invariant. Any unexpected throw still hands the slot back before the error surfaces.
     await deps.store
@@ -191,26 +234,40 @@ function validateRequest(request: GeneratePlanRequest): string | null {
   if (!request || typeof request !== 'object') {
     return 'Request body must be a JSON object.';
   }
-  if (typeof request.idempotencyKey !== 'string' || request.idempotencyKey.trim().length === 0) {
-    return 'idempotencyKey is required.';
+  if (
+    typeof request.idempotencyKey !== 'string' ||
+    request.idempotencyKey.trim().length === 0 ||
+    request.idempotencyKey.length > 200
+  ) {
+    return 'idempotencyKey must be between 1 and 200 characters.';
   }
   if (request.goalType !== 'race' && request.goalType !== 'duration') {
     return 'goalType must be "race" or "duration".';
   }
   if (request.goalType === 'race') {
     if (!request.raceDistance) return 'raceDistance is required when goalType is "race".';
+    if (!['5k', '10k', 'half', 'marathon'].includes(request.raceDistance)) {
+      return 'raceDistance must be one of 5k|10k|half|marathon.';
+    }
     if (!request.raceDate) return 'raceDate is required when goalType is "race".';
-    if (Number.isNaN(Date.parse(request.raceDate))) return 'raceDate must be an ISO date.';
+    if (!isIsoCalendarDate(request.raceDate)) return 'raceDate must be a valid YYYY-MM-DD calendar date.';
   }
   if (request.goalType === 'duration') {
-    if (typeof request.durationWeeks !== 'number' || request.durationWeeks <= 0) {
-      return 'durationWeeks must be a positive number when goalType is "duration".';
+    if (
+      typeof request.durationWeeks !== 'number' ||
+      !Number.isInteger(request.durationWeeks) ||
+      request.durationWeeks <= 0
+    ) {
+      return 'durationWeeks must be a positive whole number when goalType is "duration".';
     }
   }
   // Checked regardless of goalType: a "race" request may still carry an explicit `durationWeeks`
   // (the client shouldn't, but nothing stops it), and that value would otherwise bypass
   // `weeksUntilRace`'s own clamp (`planEngine.ts`) entirely — the two must share one ceiling.
-  if (request.durationWeeks !== undefined && request.durationWeeks > MAX_PLAN_DURATION_WEEKS) {
+  if (
+    typeof request.durationWeeks === 'number' &&
+    request.durationWeeks > MAX_PLAN_DURATION_WEEKS
+  ) {
     return `durationWeeks must be ${MAX_PLAN_DURATION_WEEKS} or fewer.`;
   }
   if (request.notes !== undefined) {
@@ -220,4 +277,15 @@ function validateRequest(request: GeneratePlanRequest): string | null {
     }
   }
   return null;
+}
+
+function isIsoCalendarDate(value: unknown): value is string {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [year, month, day] = value.split('-').map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  return (
+    parsed.getUTCFullYear() === year &&
+    parsed.getUTCMonth() === month - 1 &&
+    parsed.getUTCDate() === day
+  );
 }

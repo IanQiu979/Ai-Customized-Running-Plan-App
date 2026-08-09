@@ -104,8 +104,9 @@ function parseQuotaParam(raw: string | undefined): QuotaStatus | null {
     if (
       typeof parsed.tier === 'string' &&
       typeof parsed.used === 'number' &&
-      typeof parsed.limit === 'number' &&
-      (parsed.periodEnd === null || typeof parsed.periodEnd === 'string')
+      (parsed.limit === null || typeof parsed.limit === 'number') &&
+      (parsed.periodEnd === null || typeof parsed.periodEnd === 'string') &&
+      typeof parsed.unlimited === 'boolean'
     ) {
       return parsed as QuotaStatus;
     }

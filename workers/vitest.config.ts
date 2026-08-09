@@ -37,6 +37,10 @@ export default defineConfig({
           // Length matters only to better-auth's own entropy warning; it is not a real secret and
           // never leaves this file.
           BETTER_AUTH_SECRET: 'test-only-secret-0123456789abcdefghijklmnop',
+          CORS_ALLOWED_ORIGINS: 'http://localhost:8081',
+          // Most existing quota tests assert the permanent entitlement rules. Individual tests
+          // instantiate the store with the override enabled when exercising temporary test mode.
+          ALL_USERS_UNLIMITED_ACCESS: 'false',
         },
       },
     })),

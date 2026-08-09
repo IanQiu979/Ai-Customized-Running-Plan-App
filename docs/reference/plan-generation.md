@@ -107,9 +107,12 @@ is unit-tested with no network and no Anthropic spend:
     density** — a template has no "why"; fabricating one would lie.
 11. **Settle** the `plans` row reserved at step 3 (immutable once settled — enforced by a database
     trigger, since SQLite has no per-operation grants — carrying `tier_at_generation`, `engine`,
-    `is_fallback`, `idempotency_key`) and return `{ plan, planId, isFallback }`. A reservation is
-    settled or released on **every** exit path, including an unexpected throw: a quota slot held by
-    a crashed generation is a bug the user can neither see nor work around.
+    `is_fallback`, `idempotency_key`) and return `{ plan, planId, isFallback, quotaConsumed }` —
+    `quotaConsumed` tells the client whether this fallback counted against the tier limit or landed
+    inside the quota-exempt cap, so `FallbackNotice` can pick `counted` vs `exempt` instead of
+    hardcoding one variant. A reservation is settled or released on **every** exit path, including
+    an unexpected throw: a quota slot held by a crashed generation is a bug the user can neither see
+    nor work around.
 
 ## Quotas
 

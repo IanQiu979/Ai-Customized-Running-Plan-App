@@ -39,6 +39,20 @@ BETTER_AUTH_URL = "http://localhost:8787"
 # or an OAuth return into the app is rejected as an untrusted redirect.
 APP_SCHEME = "paceblueprint://"
 
+# Exact browser origins allowed to send credentialed requests. Native requests have no Origin and
+# are unaffected. Keep this explicit — wildcard CORS is invalid with session cookies.
+CORS_ALLOWED_ORIGINS = "http://localhost:8081,http://localhost:19006,http://localhost:8787"
+
+# TEMPORARY CAPTAIN-REQUESTED TEST MODE. Every authenticated account is treated as Elite and the
+# quota gate is bypassed. Set to "false" before any real-user release; normal entitlement and
+# purchase records remain intact underneath it.
+ALL_USERS_UNLIMITED_ACCESS = "true"
+
 [env.production.vars]
 BETTER_AUTH_URL = "https://pace-blueprint.workers.dev"
 APP_SCHEME = "paceblueprint://"
+# Replace/add the deployed Expo web origin before web production testing.
+CORS_ALLOWED_ORIGINS = "https://pace-blueprint.workers.dev"
+# Deliberately temporary; DO NOT flip to "true" until the captain explicitly re-enables it for a
+# production test window, then flip back to "false" immediately after.
+ALL_USERS_UNLIMITED_ACCESS = "false"

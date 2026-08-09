@@ -66,13 +66,17 @@ function clockToSec(text: string): number | null {
   const parts = trimmed.split(':');
   if (parts.length !== 2 && parts.length !== 3) return null;
   const numbers = parts.map(Number);
-  if (numbers.some((n) => Number.isNaN(n) || n < 0)) return null;
+  if (numbers.some((n) => !Number.isInteger(n) || n < 0)) return null;
   if (numbers.length === 2) {
     const [m, s] = numbers;
-    return m * 60 + s;
+    if (s > 59) return null;
+    const total = m * 60 + s;
+    return total > 0 ? total : null;
   }
   const [h, m, s] = numbers;
-  return h * 3600 + m * 60 + s;
+  if (m > 59 || s > 59) return null;
+  const total = h * 3600 + m * 60 + s;
+  return total > 0 ? total : null;
 }
 
 /** As-you-type mask for a `YYYY-MM-DD` field: strips non-digits, caps at 8 digits, and inserts
@@ -275,8 +279,8 @@ export default function IntakeScreen() {
       return;
     }
     const ageNum = Number(age);
-    if (!age.trim() || Number.isNaN(ageNum)) {
-      setError('Age is required.');
+    if (!age.trim() || !Number.isInteger(ageNum) || ageNum < 13 || ageNum > 100) {
+      setError('Age must be a whole number between 13 and 100.');
       return;
     }
     if (!experience) {
@@ -288,8 +292,8 @@ export default function IntakeScreen() {
       return;
     }
     const weeklyKmNum = Number(weeklyKm);
-    if (!weeklyKm.trim() || Number.isNaN(weeklyKmNum)) {
-      setError('Weekly distance is required.');
+    if (!weeklyKm.trim() || !Number.isFinite(weeklyKmNum) || weeklyKmNum < 0) {
+      setError('Weekly distance must be 0 km or more.');
       return;
     }
 
@@ -376,6 +380,7 @@ export default function IntakeScreen() {
             <TextInput
               value={goal}
               onChangeText={setGoal}
+              maxLength={500}
               placeholder="e.g. Finish my first 10K"
               placeholderTextColor={theme.text.secondary}
               style={[styles.input, inputThemeStyle(theme)]}
@@ -554,6 +559,7 @@ export default function IntakeScreen() {
             <TextInput
               value={injuryNotes}
               onChangeText={setInjuryNotes}
+              maxLength={2000}
               placeholder="Anything else worth knowing"
               placeholderTextColor={theme.text.secondary}
               multiline

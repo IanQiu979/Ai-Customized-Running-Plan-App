@@ -67,6 +67,56 @@ describe('the authentication gate', () => {
   });
 });
 
+describe('CORS', () => {
+  it('answers an allowed credentialed browser preflight', async () => {
+    const response = await SELF.fetch('https://example.test/api/quota-status', {
+      method: 'OPTIONS',
+      headers: {
+        origin: 'http://localhost:8081',
+        'access-control-request-method': 'GET',
+      },
+    });
+
+    expect(response.status).toBe(204);
+    expect(response.headers.get('access-control-allow-origin')).toBe('http://localhost:8081');
+    expect(response.headers.get('access-control-allow-credentials')).toBe('true');
+  });
+
+  it('fails closed for an origin outside the allowlist', async () => {
+    const response = await SELF.fetch('https://example.test/api/quota-status', {
+      method: 'OPTIONS',
+      headers: { origin: 'https://evil.example' },
+    });
+
+    expect(response.status).toBe(403);
+    expect(response.headers.get('access-control-allow-origin')).toBeNull();
+  });
+
+  it('allows an auth POST from an allowlisted Expo web origin', async () => {
+    const response = await SELF.fetch('https://example.test/api/auth/sign-up/email', {
+      method: 'POST',
+      headers: { origin: 'http://localhost:8081', 'content-type': 'application/json' },
+      body: JSON.stringify({
+        email: 'cors-web@example.test',
+        password: 'a-long-enough-password',
+        name: 'Web Runner',
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('access-control-allow-origin')).toBe('http://localhost:8081');
+  });
+
+  it('adds CORS headers to ordinary allowed-origin responses', async () => {
+    const response = await SELF.fetch('https://example.test/health', {
+      headers: { origin: 'http://localhost:8081' },
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('access-control-allow-origin')).toBe('http://localhost:8081');
+  });
+});
+
 describe('the route table', () => {
   it('serves an unauthenticated health check', async () => {
     const response = await SELF.fetch('https://example.test/health');
@@ -117,6 +167,7 @@ describe('better-auth on D1', () => {
       tier: 'free',
       used: 0,
       limit: 1,
+      unlimited: false,
       // Free's allowance is lifetime, so there is no countdown to render.
       periodEnd: null,
     });
@@ -207,6 +258,33 @@ describe('PUT /api/intake', () => {
     const body = await response.text();
     expect(response.status, body).toBe(200);
     expect(JSON.parse(body)).toEqual({ saved: true });
+  });
+
+  it('rejects "none" combined with a real injury instead of persisting contradictory state', async () => {
+    const token = await signUp('contradictory-injury@example.test');
+
+    const response = await putIntake(token, intakeBody(['none', 'knee']));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ code: 'invalid_request' });
+  });
+
+  it('rejects fractional ages before they reach D1', async () => {
+    const token = await signUp('fractional-age@example.test');
+
+    const response = await putIntake(token, { ...intakeBody(['none']), age: 17.5 });
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ code: 'invalid_request' });
+  });
+
+  it('rejects impossible race dates before they reach D1', async () => {
+    const token = await signUp('bad-date@example.test');
+
+    const response = await putIntake(token, { ...intakeBody(['none']), raceDate: '2026-02-30' });
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ code: 'invalid_request' });
   });
 
   it('still rejects a flag outside the closed set with 400 invalid_request', async () => {

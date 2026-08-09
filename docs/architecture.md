@@ -121,6 +121,13 @@ directly. That is deliberate: `planning/03-engineering-requirements.md` names `t
 requires one shared `currentPeriod()` specifically so `quota-status` can never promise a slot that
 `generate-plan` then refuses, and so the Echo V1 "KEEP IN SYNC" drift cannot recur.
 
+**Temporary captain test override (2026-08-09).** `workers/src/access.ts` interprets the non-secret
+`ALL_USERS_UNLIMITED_ACCESS` Worker variable. While it is `"true"`, `D1PlanStore.quotaWindow()`
+returns Elite with `limit: null`, reservation/settlement preserve the immutable ledger but never
+refuse or count a slot, and the client labels the state as unlimited. This is one reversible
+short-circuit over the entitlement system, not a replacement for it; set the variable to `"false"`
+before real users arrive.
+
 ## Current — the backend, in `workers/`
 
 ```
@@ -170,7 +177,14 @@ call directly — plus a small typed `apiFetch<T>()` wrapper and one function pe
 `listPlans`/`getPlan`, `generatePlan`). Those custom routes attach the stored session by reading
 `authClient.getCookie()` onto the request's `cookie` header, since better-auth's Expo plugin only
 replays the session automatically for calls made through `authClient` itself, not for plain
-`fetch`. **As of 2026-08-07, the error vocabulary is its own pure module, `src/lib/apiErrors.ts`**
+`fetch`. **As of 2026-08-09, this is native-only**: on web, `expo-secure-store` has no
+implementation, so the Expo plugin is given a no-op storage adapter and `getCookie()` intentionally
+returns `''`; `apiFetch` instead sends `credentials: 'include'` and lets the browser attach the
+HttpOnly session cookie itself, which also requires `workers/src/cors.ts`'s exact-origin allowlist
+(`CORS_ALLOWED_ORIGINS`) to answer credentialed preflights. A `403 unauthenticated` response also
+triggers a best-effort `authClient.signOut()` before the original error is thrown, so a
+server-revoked session clears the local authenticated shell instead of leaving the app looking
+signed in. **As of 2026-08-07, the error vocabulary is its own pure module, `src/lib/apiErrors.ts`**
 (`ApiError` for a server refusal, `NetworkError` for a transport failure that never reached a
 server, `describeError()` to turn either into a message screens can show), re-exported from
 `apiClient.ts` so screens keep a single import site; every screen's `catch` funnels through
@@ -371,7 +385,7 @@ owner.
 10. **Validate structurally, loosely** — shape only. Fail → retry once. Fail again → fall back to
     the pure template plan, `is_fallback: true`, rendered at Free density.
 11. **Settle** the reserved `plans` row (immutable plan JSON, `tier_at_generation`, `engine`,
-    `is_fallback`, `idempotency_key`) and return `{ plan, planId, isFallback }`.
+    `is_fallback`, `idempotency_key`) and return `{ plan, planId, isFallback, quotaConsumed }`.
 
     Because the quota slot is *reserved* at step 3 and the plan document only arrives at step 11,
     every row has a lifecycle: `reserved` → `settled` or `released`. **A reservation is settled or
@@ -409,14 +423,14 @@ it `getSession()` ignores the header and every route 403s a user who just signed
 |---|---|---|---|---|
 | `ANY /api/auth/*` | — | better-auth's own | better-auth's own | Sign-up, sign-in, sign-out, session, OAuth callbacks. Email/password works today; Google is provisioned and verified in local dev (2026-08-05) — production still needs the captain to run `wrangler secret put GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` (`workers/src/auth.ts`'s TODO). |
 | `GET /health` | none | — | `{ ok: true }` | Liveness. Touches no database. |
-| `POST /api/generate-plan` | session | `{ goalType: "race"\|"duration", raceDistance?, raceDate?, durationWeeks?, notes?, idempotencyKey }` | `{ plan, planId, isFallback }`, or `402` over-quota / `403` anon / `409` intake-required | Enforces tier + quota server-side, branches by tier, validates, persists. A duplicate `idempotencyKey` returns the existing plan instead of generating twice. As of 2026-08-04, Free gets the template plan and Pro/Elite fall back to the same template (`isFallback: true`, quota-exempt) pending the Pro/Elite personalization prompt — see "Current — `generate-plan`" above. |
-| `GET /api/quota-status` | session | — | `{ tier, used, limit, periodEnd }` | Drives Home's and Settings' "N of M plans used" line (`src/lib/quotaDisplay.ts`'s `formatQuotaLine()`, consumed by both since 2026-08-05). `used` counts **non-fallback** plans in the current purchase-anchored period, server-side, never a client counter. `periodEnd` is `null` for Free, whose allowance is lifetime — the UI must not render a countdown for it. |
-| `POST /api/purchase-tier` | session | `{ tier: "pro"\|"elite", source: "dummy" }` | `{ tier, periodStart, periodEnd }` | v1 dummy flow, called from `src/app/paywall.tsx` (new 2026-08-05) with honest "test upgrade, no payment required" copy. v2 swaps `source` to `"revenuecat"` and verifies the receipt — same route, same table write. `source: "revenuecat"` is refused in v1 rather than trusted. |
+| `POST /api/generate-plan` | session | `{ goalType: "race"\|"duration", raceDistance?, raceDate?, durationWeeks?, notes?, idempotencyKey }` | `{ plan, planId, isFallback, quotaConsumed }`, or `402` over-quota / `403` anon / `409` intake-required | Enforces tier + quota server-side, branches by tier, validates, persists. A duplicate `idempotencyKey` returns the existing plan instead of generating twice. As of 2026-08-04, Free gets the template plan and Pro/Elite fall back to the same template (`isFallback: true`, quota-exempt) pending the Pro/Elite personalization prompt — see "Current — `generate-plan`" above. `quotaConsumed` tells the client whether this fallback counted against the tier limit, so `FallbackNotice` can pick `counted` vs `exempt`. |
+| `GET /api/quota-status` | session | — | `{ tier, used, limit, periodEnd }` | Drives Home's and Settings' "N of M plans used" line (`src/lib/quotaDisplay.ts`'s `formatQuotaLine()`, consumed by both since 2026-08-05). `used` counts **non-fallback** plans in the current purchase-anchored period, server-side, never a client counter. `periodEnd` is `null` for Free (lifetime allowance) and also `null` while the temporary `ALL_USERS_UNLIMITED_ACCESS` override is on (see below) — the UI must not render a countdown for either. |
+| `POST /api/purchase-tier` | session | `{ tier: "pro"\|"elite", source: "dummy" }` | `{ tier, periodStart: string \| null, periodEnd: string \| null }` | v1 dummy flow, called from `src/app/paywall.tsx` (new 2026-08-05) with honest "test upgrade, no payment required" copy. v2 swaps `source` to `"revenuecat"` and verifies the receipt — same route, same table write. `source: "revenuecat"` is refused in v1 rather than trusted. |
 | `POST /api/delete-account` | session | — | `{ deleted: true }` | Really deletes; no soft-delete flag, because the app's own copy promises erasure. The only route that deletes a plan. Called from Settings' Delete Account flow (new 2026-08-05), followed client-side by `authClient.signOut()` to invalidate the local session store. |
 | `GET /api/intake` | session | — | `{ intake }` or `{ intake: null }` | Was a direct client read under Supabase. |
 | `PUT /api/intake` | session | `IntakeResponses` | `{ saved: true }` | Was a direct client upsert under Supabase. |
 | `GET /api/plans` | session | — | `{ plans: [summary] }` | My Plans. Summaries only — full documents would be megabytes for a heavy user. |
-| `GET /api/plans/:id` | session | — | `{ plan, planId, isFallback }` or `404` | Someone else's plan id is a `404`, not a `403`: it does not exist to you. |
+| `GET /api/plans/:id` | session | — | `{ plan, planId, isFallback, quotaConsumed }` or `404` | Someone else's plan id is a `404`, not a `403`: it does not exist to you. |
 
 There is deliberately **no `DELETE /api/plans/:id`**. Count-based quota depends on plans being
 undeletable — a delete route would let a user reset their own count.

@@ -11,7 +11,7 @@
     "@react-native-async-storage/async-storage": "2.2.0",
     "@supabase/supabase-js": "^2.110.2",
     "better-auth": "^1.6.25",
-    "expo": "~54.0.0",
+    "expo": "~54.0.36",
     "expo-constants": "~18.0.13",
     "expo-device": "~8.0.10",
     "expo-font": "~14.0.12",
@@ -52,7 +52,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "typecheck": "tsc --noEmit",
+    "routes:generate": "EXPO_ROUTER_APP_ROOT=src/app node scripts/generate-router-types.js",
+    "typecheck": "npm run routes:generate && tsc --noEmit",
     "test": "jest"
   },
   "private": true

@@ -72,11 +72,17 @@ describe('isNetworkFailure', () => {
 });
 
 describe('networkErrorMessage', () => {
-  it('names the loopback trap, because that is the fix', () => {
-    const message = networkErrorMessage('http://localhost:8787');
+  it('names the loopback trap on native, because that is the fix', () => {
+    const message = networkErrorMessage('http://localhost:8787', 'native');
     expect(message).toContain('http://localhost:8787');
     expect(message).toContain('EXPO_PUBLIC_API_BASE_URL');
     expect(message).toMatch(/phone/i);
+  });
+
+  it('does not give phone-specific loopback advice to a web browser', () => {
+    const message = networkErrorMessage('http://localhost:8787', 'web');
+    expect(message).not.toMatch(/phone/i);
+    expect(message).not.toContain('EXPO_PUBLIC_API_BASE_URL');
   });
 
   it('stays generic for a reachable-looking host', () => {

@@ -70,6 +70,10 @@ describe('request validation', () => {
     ['a race goal with no date', { goalType: 'race', raceDistance: '5k', idempotencyKey: 'k' }],
     ['a duration goal with no weeks', { goalType: 'duration', idempotencyKey: 'k' }],
     ['over-long notes', { ...VALID_REQUEST, notes: 'x'.repeat(1001) }],
+    ['an over-long idempotency key', { ...VALID_REQUEST, idempotencyKey: 'x'.repeat(201) }],
+    ['a fractional duration', { ...VALID_REQUEST, durationWeeks: 8.5 }],
+    ['an impossible race date', { goalType: 'race', raceDistance: '5k', raceDate: '2026-02-30', idempotencyKey: 'k' }],
+    ['an unknown race distance', { goalType: 'race', raceDistance: 'ultra' as never, raceDate: '2026-10-01', idempotencyKey: 'k' }],
     ['an absurd explicit durationWeeks', { ...VALID_REQUEST, durationWeeks: 999_999 }],
     // A "race" request has no business carrying `durationWeeks` at all, but nothing stops a
     // client from sending one anyway — it must share the same ceiling `weeksUntilRace`
@@ -145,6 +149,7 @@ describe('idempotency replay', () => {
             plan: existing,
             idempotencyKey: 'key-1',
             createdAt: NOW,
+            quotaConsumed: true,
           },
         },
       },
@@ -172,6 +177,7 @@ describe('idempotency replay', () => {
             plan: null,
             idempotencyKey: 'key-1',
             createdAt: NOW,
+            quotaConsumed: true,
           },
         },
       },
@@ -244,7 +250,7 @@ describe('tier branching', () => {
     const outcome = await generatePlan(USER, VALID_REQUEST, deps);
 
     // The runner still gets a real, coach-authored plan. What they lose is the "why".
-    expect(outcome).toMatchObject({ kind: 'ok', isFallback: true });
+    expect(outcome).toMatchObject({ kind: 'ok', isFallback: true, quotaConsumed: false });
     expect(store.settled[0]).toMatchObject({ engine: 'template', isFallback: true });
     expect(store.released).toHaveLength(0);
   });

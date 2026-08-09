@@ -19,6 +19,7 @@
  * Neither swap needs anything else in this project to change.
  */
 
+import { isAllUsersUnlimitedAccessEnabled } from './access';
 import type { Env } from './env';
 import type { GeneratePlanDeps } from './lib/generate-plan-flow';
 import { createPlanPersonalizer, createTemplateSkeletonBuilder } from './lib/planEngine';
@@ -31,7 +32,10 @@ export interface Deps {
 }
 
 export function createDeps(env: Env): Deps {
-  const store = new D1PlanStore(env.DB);
+  const store = new D1PlanStore(
+    env.DB,
+    isAllUsersUnlimitedAccessEnabled(env.ALL_USERS_UNLIMITED_ACCESS)
+  );
 
   // `ANTHROPIC_API_KEY` is read here and in no other file. Absent → `createUnconfiguredModelCaller`,
   // which fails honestly instead of fabricating a plan. See `lib/model.ts`.

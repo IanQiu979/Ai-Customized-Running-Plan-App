@@ -16,6 +16,7 @@ function makeStatus(overrides: Partial<QuotaStatus>): QuotaStatus {
     used: 0,
     limit: 1,
     periodEnd: '2026-09-01T00:00:00.000Z',
+    unlimited: false,
     ...overrides,
   };
 }
@@ -55,5 +56,11 @@ describe('formatQuotaLine', () => {
     const status = makeStatus({ tier: 'elite', used: 10, limit: 10 });
 
     expect(formatQuotaLine(status)).toBe('10 of 10 plans used this period');
+  });
+
+  it('states the temporary unlimited-access override without inventing a numeric limit', () => {
+    const status = makeStatus({ tier: 'elite', used: 0, limit: null, periodEnd: null, unlimited: true });
+
+    expect(formatQuotaLine(status)).toBe('Unlimited plans during the test pass');
   });
 });

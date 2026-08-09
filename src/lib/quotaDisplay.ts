@@ -12,7 +12,9 @@ import type { QuotaStatus } from './planTypes';
  * this period" for period-scoped tiers (Pro/Elite).
  */
 export function formatQuotaLine(status: QuotaStatus): string {
-  const { tier, used, limit } = status;
+  const { tier, used, limit, unlimited } = status;
+  if (unlimited || limit === null) return 'Unlimited plans during the test pass';
+
   const isLifetime = tier === 'free' && FREE_IS_LIFETIME;
   return isLifetime
     ? `${used} of ${limit} plans used`

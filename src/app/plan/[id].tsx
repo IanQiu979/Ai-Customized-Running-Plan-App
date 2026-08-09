@@ -32,10 +32,12 @@ import type { Plan } from '@/lib/planTypes';
 export default function PlanScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const isExample = id === EXAMPLE_PLAN_ID;
+  const { id } = useLocalSearchParams<{ id?: string | string[] }>();
+  const planId = Array.isArray(id) ? id[0] : id;
+  const isExample = planId === EXAMPLE_PLAN_ID;
 
   const [plan, setPlan] = useState<Plan | null>(isExample ? examplePlan : null);
+  const [quotaConsumed, setQuotaConsumed] = useState(false);
   const [loading, setLoading] = useState(!isExample);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,14 +49,24 @@ export default function PlanScreen() {
       return;
     }
 
+    if (!planId) {
+      setPlan(null);
+      setLoading(false);
+      setError('This plan could not be found.');
+      return;
+    }
+
     let cancelled = false;
     setLoading(true);
     setError(null);
 
     (async () => {
       try {
-        const response = await getPlan(id);
-        if (!cancelled) setPlan(response.plan);
+        const response = await getPlan(planId);
+        if (!cancelled) {
+          setPlan(response.plan);
+          setQuotaConsumed(response.quotaConsumed);
+        }
       } catch (fetchError) {
         if (!cancelled) {
           setError(describeError(fetchError, 'Could not load this plan.', API_BASE_URL));
@@ -67,7 +79,7 @@ export default function PlanScreen() {
     return () => {
       cancelled = true;
     };
-  }, [id, isExample]);
+  }, [planId, isExample]);
 
   if (loading) {
     return (
@@ -131,13 +143,9 @@ export default function PlanScreen() {
             </View>
           ))}
         </View>
-        {/*
-          `variant` is hardcoded because `Plan` carries no signal for it: `isFallback` is a bare
-          boolean, and only the server knows whether this fallback landed inside the 3-per-period
-          exemption or past it. `exempt` is correct for the fixture and for the common case;
-          rendering the true variant needs `generate-plan` to return it (issue #45).
-        */}
-        {plan.isFallback ? <FallbackNotice variant="exempt" /> : null}
+        {/* The server owns whether this immutable plan consumed quota; never infer it from the
+          current account state, which may have changed since generation. */}
+        {plan.isFallback ? <FallbackNotice variant={quotaConsumed ? 'counted' : 'exempt'} /> : null}
         <View style={styles.ribbon}>
           {plan.weeks.map((week) => (
             <WeekAccordion key={week.weekNumber} week={week} />

@@ -115,7 +115,7 @@ export default function SettingsScreen() {
                   <Text style={[styles.body, { color: theme.text.secondary }]}>
                     {formatQuotaLine(quota)}
                   </Text>
-                  {quota.tier === 'free' && (
+                  {!quota.unlimited && quota.tier === 'free' && (
                     <Pressable
                       accessibilityRole="button"
                       onPress={() => router.push('/paywall')}
