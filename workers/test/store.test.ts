@@ -107,6 +107,18 @@ beforeEach(async () => {
 });
 
 describe('quotaWindow', () => {
+  it('can temporarily grant every account Elite access with no quota limit', async () => {
+    const window = await new D1PlanStore(env.DB, true).quotaWindow(USER, NOW);
+
+    expect(window).toEqual({
+      tier: 'elite',
+      limit: null,
+      lifetime: true,
+      periodStart: null,
+      periodEnd: null,
+    });
+  });
+
   it('defaults to free, lifetime, with no period end when there is no subscription row', async () => {
     // "A user with no `subscriptions` row is `free`" — and Free's single plan is a lifetime
     // allowance, so reporting a period end would put a countdown on the UI that means nothing.
@@ -146,6 +158,36 @@ describe('quotaWindow', () => {
 });
 
 describe('reserve', () => {
+  it('never refuses or counts plans while the temporary unlimited override is enabled', async () => {
+    const s = new D1PlanStore(env.DB, true);
+
+    for (let i = 0; i < 12; i += 1) {
+      const result = await s.reserve({
+        userId: USER,
+        tier: 'elite',
+        idempotencyKey: `unlimited-${i}`,
+        goalType: 'duration',
+        durationWeeks: 8,
+        now: NOW,
+      });
+      expect(result.outcome).toBe('reserved');
+      if (result.outcome === 'reserved') {
+        await s.settle({
+          planId: result.planId,
+          userId: USER,
+          plan: { ...fakePlan(`unlimited-${i}`), tierAtGeneration: 'elite' },
+          engine: 'template',
+          isFallback: false,
+          now: NOW,
+        });
+      }
+    }
+
+    const window = await s.quotaWindow(USER, NOW);
+    expect(await s.countUsed(USER, window, NOW)).toBe(0);
+    expect((await s.listPlans(USER)).every((plan) => !plan.quotaConsumed)).toBe(true);
+  });
+
   it('reserves while under the limit and refuses at it', async () => {
     const s = store();
 

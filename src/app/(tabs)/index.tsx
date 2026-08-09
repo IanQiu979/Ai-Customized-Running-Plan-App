@@ -186,8 +186,8 @@ export default function HomeScreen() {
       }
     } else {
       const weeksNum = Number(durationWeeks);
-      if (!durationWeeks.trim() || Number.isNaN(weeksNum) || weeksNum <= 0) {
-        setGenerateError('Duration must be a number of weeks greater than 0.');
+      if (!durationWeeks.trim() || !Number.isInteger(weeksNum) || weeksNum <= 0) {
+        setGenerateError('Duration must be a whole number of weeks greater than 0.');
         return;
       }
     }
@@ -214,6 +214,15 @@ export default function HomeScreen() {
           });
         } else {
           setGenerateError(generatePlanError.body.error);
+          // A released idempotency key can never succeed on another retry. Mint a fresh key after
+          // the server says the previous attempt is terminal; transport failures keep the key so
+          // a lost successful response still replays safely.
+          if (
+            generatePlanError.body.code === 'invalid_request' &&
+            generatePlanError.body.error.includes('previously failed')
+          ) {
+            setIdempotencyKey(mintIdempotencyKey());
+          }
         }
       } else {
         setGenerateError(describeError(generatePlanError, 'Something went wrong. Try again.', API_BASE_URL));

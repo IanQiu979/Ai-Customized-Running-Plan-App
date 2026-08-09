@@ -55,9 +55,16 @@ workers/
   test/                  # vitest, inside real workerd + real D1 (Miniflare). No network.
 ```
 
+## Temporary captain test mode
+
+`workers/wrangler.toml` currently sets `ALL_USERS_UNLIMITED_ACCESS = "true"`. The single control
+point is `src/access.ts`: every authenticated account is evaluated as Elite and quota refusal is
+bypassed, while subscriptions, purchases, and the normal quota ledger stay intact underneath.
+Set the variable to `"false"` in both Wrangler environments before real users arrive.
+
 ## What works today, and what does not
 
-Working end to end, verified against `wrangler dev` and by 86 tests:
+Working end to end, verified against `wrangler dev` and the Worker test suite:
 
 - email/password sign-up and sign-in, sessions, Bearer-token auth for the React Native client
 - the quota ledger: reserve → settle/release, atomic gate, idempotency replay, fallback exemption

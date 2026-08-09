@@ -24,6 +24,7 @@ import { expoClient } from '@better-auth/expo/client';
 import type { BetterAuthClientPlugin } from 'better-auth/client';
 import { createAuthClient } from 'better-auth/react';
 import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 
 import { ApiError, NetworkError, isNetworkFailure } from './apiErrors';
 import type { ApiErrorBody } from './apiErrors';
@@ -70,10 +71,18 @@ export const API_BASE_URL: string = configuredApiBaseUrl;
  * `@better-auth/expo`'s compiled `dist/client.js`) so the second cast below just restores the one
  * type the mismatch above erased.
  */
+const webStorage = {
+  // The Expo plugin intentionally does nothing with its storage on web; the browser owns the
+  // HttpOnly session cookie. Supplying a no-op adapter avoids calling SecureStore's absent web
+  // implementation while preserving the documented native adapter unchanged.
+  getItem: (_key: string) => null,
+  setItem: (_key: string, _value: string) => undefined,
+};
+
 const expoAuthPlugin = expoClient({
   scheme: 'paceblueprint',
   storagePrefix: 'paceblueprint',
-  storage: SecureStore,
+  storage: Platform.OS === 'web' ? webStorage : SecureStore,
 }) as unknown as BetterAuthClientPlugin;
 
 const baseAuthClient = createAuthClient({
@@ -89,16 +98,18 @@ export const authClient = baseAuthClient as typeof baseAuthClient & {
 export const { signIn, signUp, signOut, useSession } = authClient;
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const cookie = authClient.getCookie();
-
   // `fetch` rejects with a bare `TypeError` when the request never reached a server — wrong host,
   // refused connection, no route. Left unwrapped that `TypeError` fails every `instanceof ApiError`
   // check downstream and surfaces as a generic per-feature message, which points at the wrong
   // thing entirely. Convert it here, once, into an error that says what actually happened.
   let response: Response;
   try {
+    // Native must replay the Expo plugin's stored cookie manually. On web the browser sends its
+    // HttpOnly cookie with `credentials: include`, and `getCookie()` intentionally returns ''.
+    const cookie = Platform.OS === 'web' ? '' : authClient.getCookie();
     response = await fetch(`${API_BASE_URL}${path}`, {
       ...init,
+      credentials: 'include',
       headers: {
         'content-type': 'application/json',
         ...(cookie ? { cookie } : {}),
@@ -115,6 +126,13 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const body = (await response.json().catch(() => null)) as T | ApiErrorBody | null;
 
   if (!response.ok) {
+    if (response.status === 403 && (body as ApiErrorBody | null)?.code === 'unauthenticated') {
+      // The server is authoritative. If a session was revoked while the app stayed foregrounded,
+      // clear better-auth's local cache immediately instead of leaving the user trapped inside an
+      // authenticated shell whose every request fails. Sign-out is best effort; the original 403
+      // remains the error returned to this call.
+      await authClient.signOut().catch(() => undefined);
+    }
     throw new ApiError(
       response.status,
       (body as ApiErrorBody | null) ?? {
@@ -135,7 +153,11 @@ export function getQuotaStatus(): Promise<QuotaStatus> {
   return apiFetch<QuotaStatus>('/api/quota-status');
 }
 
-export function purchaseTier(tier: 'pro' | 'elite'): Promise<{ tier: Tier; periodStart: string; periodEnd: string }> {
+export function purchaseTier(tier: 'pro' | 'elite'): Promise<{
+  tier: Tier;
+  periodStart: string | null;
+  periodEnd: string | null;
+}> {
   return apiFetch('/api/purchase-tier', {
     method: 'POST',
     body: JSON.stringify({ tier, source: 'dummy' }),
@@ -167,7 +189,12 @@ export function listPlans(): Promise<{ plans: PlanSummary[] }> {
   return apiFetch('/api/plans');
 }
 
-export function getPlan(planId: string): Promise<{ plan: Plan; planId: string; isFallback: boolean }> {
+export function getPlan(planId: string): Promise<{
+  plan: Plan;
+  planId: string;
+  isFallback: boolean;
+  quotaConsumed: boolean;
+}> {
   return apiFetch(`/api/plans/${encodeURIComponent(planId)}`);
 }
 

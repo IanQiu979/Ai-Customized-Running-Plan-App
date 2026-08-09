@@ -106,8 +106,8 @@ export function isNetworkFailure(error: unknown): boolean {
   return NETWORK_FAILURE_MESSAGES.some((known) => message.includes(known));
 }
 
-export function networkErrorMessage(baseUrl: string): string {
-  if (isLoopbackUrl(baseUrl)) {
+export function networkErrorMessage(baseUrl: string, platform = runtimePlatform()): string {
+  if (isLoopbackUrl(baseUrl) && platform !== 'web') {
     return (
       `Can't reach the server at ${baseUrl}. That address means "this device", so it only works ` +
       'on web or a simulator — a phone can never reach a backend running on your computer, ' +
@@ -115,7 +115,11 @@ export function networkErrorMessage(baseUrl: string): string {
       'deployed Worker, then restart the dev server (Expo inlines this at build time).'
     );
   }
-  return `Can't reach the server at ${baseUrl}. Check your connection, then try again.`;
+  return `Can't reach the server at ${baseUrl}. Check your connection and server configuration, then try again.`;
+}
+
+function runtimePlatform(): 'web' | 'native' {
+  return typeof navigator !== 'undefined' && navigator.product === 'ReactNative' ? 'native' : 'web';
 }
 
 /**

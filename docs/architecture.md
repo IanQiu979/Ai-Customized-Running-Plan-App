@@ -121,6 +121,13 @@ directly. That is deliberate: `planning/03-engineering-requirements.md` names `t
 requires one shared `currentPeriod()` specifically so `quota-status` can never promise a slot that
 `generate-plan` then refuses, and so the Echo V1 "KEEP IN SYNC" drift cannot recur.
 
+**Temporary captain test override (2026-08-09).** `workers/src/access.ts` interprets the non-secret
+`ALL_USERS_UNLIMITED_ACCESS` Worker variable. While it is `"true"`, `D1PlanStore.quotaWindow()`
+returns Elite with `limit: null`, reservation/settlement preserve the immutable ledger but never
+refuse or count a slot, and the client labels the state as unlimited. This is one reversible
+short-circuit over the entitlement system, not a replacement for it; set the variable to `"false"`
+before real users arrive.
+
 ## Current — the backend, in `workers/`
 
 ```

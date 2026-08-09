@@ -82,7 +82,7 @@ CREATE TABLE IF NOT EXISTS profiles (
 CREATE TABLE IF NOT EXISTS intake_responses (
   user_id              TEXT PRIMARY KEY NOT NULL REFERENCES user (id) ON DELETE CASCADE,
   goal                 TEXT    NOT NULL,
-  age                  INTEGER NOT NULL CHECK (age >= 10 AND age <= 100),
+  age                  INTEGER NOT NULL CHECK (age >= 13 AND age <= 100),
   experience           TEXT    NOT NULL CHECK (
                          experience IN ('new', 'some', 'regular', 'experienced', 'competitive')
                        ),
