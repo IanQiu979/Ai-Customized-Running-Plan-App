@@ -53,5 +53,6 @@ BETTER_AUTH_URL = "https://pace-blueprint.workers.dev"
 APP_SCHEME = "paceblueprint://"
 # Replace/add the deployed Expo web origin before web production testing.
 CORS_ALLOWED_ORIGINS = "https://pace-blueprint.workers.dev"
-# Deliberately temporary; turn off before inviting real users.
-ALL_USERS_UNLIMITED_ACCESS = "true"
+# Deliberately temporary; DO NOT flip to "true" until the captain explicitly re-enables it for a
+# production test window, then flip back to "false" immediately after.
+ALL_USERS_UNLIMITED_ACCESS = "false"
