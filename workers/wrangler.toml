@@ -70,7 +70,17 @@ APP_SCHEME = "paceblueprint://"
 # The deployed origin, exactly — see the note above BETTER_AUTH_URL. `[env.production]` appends
 # `-production` to the top-level `name`, so the real origin is pace-blueprint-production, not
 # pace-blueprint; a stale value here silently blocks the deployed web origin's own requests.
-CORS_ALLOWED_ORIGINS = "https://pace-blueprint-production.i78979848.workers.dev"
+#
+# ALSO includes the local web dev origins (`npm run web`'s `http://localhost:8081`/`19006`), same
+# as the top-level `[vars]` block above. This is not a mistake: `.env`'s `EXPO_PUBLIC_API_BASE_URL`
+# points straight at this deployed Worker (no separately hosted production web build exists), so
+# `npm run web` talking to production is a real, currently-used workflow, not a hypothetical one.
+# Reproduced 2026-08-10: a real `Origin: http://localhost:8081` POST to `sign-up/email` against the
+# deployed Worker failed `INVALID_ORIGIN` because this list omitted it, dropped in the 2026-08-09
+# fix that replaced the placeholder value (`git show 685b67b -- workers/wrangler.toml`). Auth only
+# trusts a `Bearer` token, not a cookie (`auth.ts`'s `advanced` block), which is what makes trusting
+# these origins here an acceptable trade-off rather than a session-hijack surface.
+CORS_ALLOWED_ORIGINS = "https://pace-blueprint-production.i78979848.workers.dev,http://localhost:8081,http://localhost:19006"
 # Deliberately temporary; DO NOT flip to "true" until the captain explicitly re-enables it for a
 # production test window, then flip back to "false" immediately after.
 ALL_USERS_UNLIMITED_ACCESS = "false"

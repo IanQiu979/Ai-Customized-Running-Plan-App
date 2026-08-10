@@ -137,6 +137,38 @@ describe('the OAuth return path into the app', () => {
     expect(response.status).toBe(200);
   });
 
+  it("trusts an exp:// callbackURL — Expo Go's own scheme, not the app's registered paceblueprint:// — unconditionally, not only in dev", async () => {
+    // Root cause of the reported "invalid callback URL" Google sign-in failure: Expo Go is the only
+    // way to run this app on a device today (no EAS dev client exists, see
+    // `docs/mvp-progress.md`), and inside Expo Go, `expo-linking`'s `resolveScheme()` ignores the
+    // `scheme: 'paceblueprint'` option entirely and falls back to the fixed `'exp'` scheme — so the
+    // OAuth `callbackURL` `@better-auth/expo/client` builds via `Linking.createURL('/')` is an
+    // `exp://<lan-ip>:<port>/--/` URL, never `paceblueprint://...`.
+    //
+    // `@better-auth/expo`'s own server plugin (`node_modules/@better-auth/expo/dist/index.js`)
+    // already adds `'exp://'` to `trustedOrigins` automatically — but only
+    // `if (process.env.NODE_ENV === 'development')`, and Wrangler's esbuild bundling bakes that
+    // literal to `'production'` for `wrangler deploy` (only `'development'` for `wrangler dev`), so
+    // the plugin's own fallback is silently absent from every deployed Worker. `auth.ts` now adds
+    // `'exp://'` to `trustedOrigins` itself, unconditionally, closing that gap regardless of which
+    // Wrangler command built the bundle.
+    const response = await createAuth(
+      withEnv({ GOOGLE_CLIENT_ID: FAKE_CLIENT_ID, GOOGLE_CLIENT_SECRET: FAKE_CLIENT_SECRET })
+    ).handler(
+      new Request('https://example.test/api/auth/sign-in/social', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'google',
+          callbackURL: 'exp://192.168.1.23:8081/--/',
+        }),
+      })
+    );
+
+    const body = await response.text();
+    expect(response.status, body).toBe(200);
+  });
+
   it('still rejects a callbackURL that is neither the app scheme nor the Worker origin', async () => {
     const response = await createAuth(
       withEnv({ GOOGLE_CLIENT_ID: FAKE_CLIENT_ID, GOOGLE_CLIENT_SECRET: FAKE_CLIENT_SECRET })

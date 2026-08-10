@@ -55,9 +55,45 @@ export function createAuth(env: Env) {
 
     /**
      * The Expo app returns from an OAuth round trip through its own deep-link scheme, which is not
-     * an http origin better-auth would trust by default.
+     * an http origin better-auth would trust by default. `CORS_ALLOWED_ORIGINS` is folded in here
+     * too: until 2026-08-10 this list and better-auth's own `trustedOrigins` had silently drifted
+     * apart — a browser origin could clear the CORS allowlist in `cors.ts` and still be rejected by
+     * better-auth's *own* origin/CSRF check (`INVALID_ORIGIN`), because that check never read
+     * `CORS_ALLOWED_ORIGINS` at all. Reproduced against production 2026-08-10 by sending a real
+     * `Origin` header on `sign-up/email`. One list, not two, going forward.
+     *
+     * NOTE this fold is necessary but was, by itself, NOT SUFFICIENT to fix the production repro:
+     * `index.ts`'s `fetch()` runs `normalizeAllowedBrowserOrigin()` (`cors.ts`) ahead of dispatch,
+     * which rewrites any browser `Origin` already inside `CORS_ALLOWED_ORIGINS` to `BETTER_AUTH_URL`
+     * before better-auth ever sees it — so for a request that reaches better-auth through the normal
+     * Worker entry point, this fold only matters for an origin `normalizeAllowedBrowserOrigin` did
+     * NOT rewrite, i.e. one that was never in `CORS_ALLOWED_ORIGINS` to begin with. The actual
+     * production repro (`http://localhost:8081`, from `npm run web` against the deployed Worker per
+     * the client's `.env`) was failing because `[env.production.vars] CORS_ALLOWED_ORIGINS` in
+     * `wrangler.toml` listed only the deployed origin itself, not the local web dev origins — fixed
+     * there, alongside this fold, in the same change.
+     *
+     * `'exp://'` is trusted unconditionally, not just in dev: `@better-auth/expo`'s own `expo()`
+     * plugin (`node_modules/@better-auth/expo/dist/index.js`) already adds it automatically, but
+     * only `if (process.env.NODE_ENV === 'development')` — and Wrangler's esbuild bundling replaces
+     * that literal with `'production'` for `wrangler deploy` (`'development'` only for `wrangler
+     * dev`), so the plugin's own exp:// trust is silently absent from every deployed Worker. Expo Go
+     * (the only way to run this app on a device today — no EAS dev client exists yet, see
+     * `docs/mvp-progress.md`) never uses the registered `paceblueprint://` scheme; `expo-linking`'s
+     * `resolveScheme()` falls back to the fixed `'exp'` scheme inside Expo Go's "store client"
+     * environment regardless of the `scheme` option passed to `createURL()`. Without this, Google
+     * sign-in's OAuth `callbackURL` (built via `Linking.createURL('/')` in
+     * `@better-auth/expo/client`) is an `exp://<lan-ip>:<port>/--/` URL that was never in
+     * `trustedOrigins`, and better-auth answers `403 INVALID_CALLBACK_URL` — reproduced by reading
+     * `expo-linking`'s `resolveScheme()`/`createURL()` and the plugin's `init` hook, not by device;
+     * see `docs/change_log.md` 2026-08-10 for the trace.
      */
-    trustedOrigins: [env.BETTER_AUTH_URL, env.APP_SCHEME].filter(Boolean),
+    trustedOrigins: [
+      env.BETTER_AUTH_URL,
+      env.APP_SCHEME,
+      'exp://',
+      ...env.CORS_ALLOWED_ORIGINS.split(',').map((origin) => origin.trim()),
+    ].filter(Boolean),
 
     emailAndPassword: {
       enabled: true,

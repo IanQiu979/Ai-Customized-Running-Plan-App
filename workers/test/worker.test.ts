@@ -10,6 +10,10 @@
 import { env, SELF } from 'cloudflare:test';
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import { createAuth } from '../src/auth';
+import { normalizeAllowedBrowserOrigin } from '../src/cors';
+import type { Env } from '../src/env';
+
 const APP_ROUTES: [string, string][] = [
   ['POST', '/api/generate-plan'],
   ['GET', '/api/quota-status'],
@@ -93,6 +97,19 @@ describe('CORS', () => {
   });
 
   it('allows an auth POST from an allowlisted Expo web origin', async () => {
+    // NOTE on what this test does and does not prove: `env.CORS_ALLOWED_ORIGINS` (pinned in
+    // `vitest.config.ts`) already contains `http://localhost:8081`, so `index.ts`'s
+    // `normalizeAllowedBrowserOrigin()` rewrites this request's `origin` header to
+    // `env.BETTER_AUTH_URL` *before* better-auth ever sees it — `BETTER_AUTH_URL` is unconditionally
+    // trusted, with or without `auth.ts`'s `trustedOrigins`/`CORS_ALLOWED_ORIGINS` fold. This test
+    // therefore only pins that a CORS-allowlisted origin round-trips successfully through the full
+    // Worker entry point; it does NOT exercise the fold itself (see
+    // `'better-auth trusts an origin CORS allows even when the CORS rewrite does not run'` below,
+    // and `test/social-auth.test.ts`'s callback-URL suite), and it would keep passing even if the
+    // fold were reverted. The real 2026-08-10 production bug — `INVALID_ORIGIN` for
+    // `http://localhost:8081` — could not reproduce here for exactly this reason: production's
+    // `CORS_ALLOWED_ORIGINS` did not contain that origin, so no rewrite happened there, while this
+    // suite's pinned env always does contain it.
     const response = await SELF.fetch('https://example.test/api/auth/sign-up/email', {
       method: 'POST',
       headers: { origin: 'http://localhost:8081', 'content-type': 'application/json' },
@@ -114,6 +131,106 @@ describe('CORS', () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get('access-control-allow-origin')).toBe('http://localhost:8081');
+  });
+
+  describe('the 2026-08-10 production INVALID_ORIGIN bug', () => {
+    // Reproduces the exact request that failed against the live deployed Worker
+    // (`curl -X POST https://pace-blueprint-production.i78979848.workers.dev/api/auth/sign-up/email
+    // -H 'Origin: http://localhost:8081'` -> `{"code":"INVALID_ORIGIN"}`), by driving the same
+    // pipeline `index.ts`'s `fetch()` uses (`normalizeAllowedBrowserOrigin()` then
+    // `createAuth(env).handler()`) against production-shaped env vars, instead of `SELF.fetch`'s
+    // fixed `vitest.config.ts` bindings — this is the harness gap the previous test above cannot
+    // cover, because `env.CORS_ALLOWED_ORIGINS` there is pinned to already contain the origin under
+    // test.
+    function withEnv(overrides: Partial<Env>): Env {
+      return { ...(env as unknown as Env), ...overrides };
+    }
+
+    async function signUpThroughFullPipeline(authEnv: Env, origin: string) {
+      const request = new Request('https://example.test/api/auth/sign-up/email', {
+        method: 'POST',
+        headers: { origin, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          email: `prod-shaped-${origin.replace(/[^a-z0-9]/gi, '')}@example.test`,
+          password: 'a-long-enough-password',
+          name: 'Prod Shaped',
+        }),
+      });
+      return createAuth(authEnv).handler(normalizeAllowedBrowserOrigin(request, authEnv));
+    }
+
+    it('fails INVALID_ORIGIN for a web origin absent from CORS_ALLOWED_ORIGINS, matching the pre-fix production repro', async () => {
+      // The exact env shape production had *before* this fix: CORS_ALLOWED_ORIGINS lists only the
+      // deployed origin itself, so localhost:8081 is neither CORS-rewritten nor directly trusted.
+      const prodShapedBeforeFix = withEnv({
+        BETTER_AUTH_URL: 'https://pace-blueprint-production.i78979848.workers.dev',
+        APP_SCHEME: 'paceblueprint://',
+        CORS_ALLOWED_ORIGINS: 'https://pace-blueprint-production.i78979848.workers.dev',
+      });
+
+      const response = await signUpThroughFullPipeline(prodShapedBeforeFix, 'http://localhost:8081');
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toMatchObject({ code: 'INVALID_ORIGIN' });
+    });
+
+    it('succeeds for the same origin once CORS_ALLOWED_ORIGINS includes it, matching the fixed wrangler.toml', async () => {
+      // The env shape production has *after* this fix (`[env.production.vars] CORS_ALLOWED_ORIGINS`
+      // in `wrangler.toml`) — same BETTER_AUTH_URL, localhost:8081 added to CORS_ALLOWED_ORIGINS.
+      const prodShapedAfterFix = withEnv({
+        BETTER_AUTH_URL: 'https://pace-blueprint-production.i78979848.workers.dev',
+        APP_SCHEME: 'paceblueprint://',
+        CORS_ALLOWED_ORIGINS:
+          'https://pace-blueprint-production.i78979848.workers.dev,http://localhost:8081,http://localhost:19006',
+      });
+
+      const response = await signUpThroughFullPipeline(prodShapedAfterFix, 'http://localhost:8081');
+
+      const body = await response.text();
+      expect(response.status, body).toBe(200);
+    });
+
+    it('better-auth trusts an origin CORS allows even when the CORS rewrite does not run — pins the auth.ts fold itself', async () => {
+      // Isolates `auth.ts`'s `trustedOrigins` fold from `normalizeAllowedBrowserOrigin()`'s masking
+      // effect by calling `createAuth().handler()` directly (bypassing `index.ts`'s `fetch()`
+      // entirely, so no rewrite can happen) with an origin that is in `CORS_ALLOWED_ORIGINS` but is
+      // neither `BETTER_AUTH_URL` nor `APP_SCHEME`. Fails pre-fix (trustedOrigins ignored
+      // CORS_ALLOWED_ORIGINS); passes post-fix.
+      const authEnv = withEnv({
+        BETTER_AUTH_URL: 'https://distinct-from-cors-origin.example',
+        APP_SCHEME: 'paceblueprint://',
+        CORS_ALLOWED_ORIGINS: 'http://localhost:8081',
+      });
+
+      const response = await createAuth(authEnv).handler(
+        new Request('https://example.test/api/auth/sign-up/email', {
+          method: 'POST',
+          headers: { origin: 'http://localhost:8081', 'content-type': 'application/json' },
+          body: JSON.stringify({
+            email: 'fold-proof@example.test',
+            password: 'a-long-enough-password',
+            name: 'Fold Proof',
+          }),
+        })
+      );
+
+      const body = await response.text();
+      expect(response.status, body).toBe(200);
+    });
+
+    it('still fails closed for an origin CORS never allowed, proving the fix did not over-broaden trust', async () => {
+      const prodShapedAfterFix = withEnv({
+        BETTER_AUTH_URL: 'https://pace-blueprint-production.i78979848.workers.dev',
+        APP_SCHEME: 'paceblueprint://',
+        CORS_ALLOWED_ORIGINS:
+          'https://pace-blueprint-production.i78979848.workers.dev,http://localhost:8081,http://localhost:19006',
+      });
+
+      const response = await signUpThroughFullPipeline(prodShapedAfterFix, 'https://evil.example');
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toMatchObject({ code: 'INVALID_ORIGIN' });
+    });
   });
 });
 

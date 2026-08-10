@@ -6,7 +6,53 @@
 > Milestone definitions live in [`planning/02-product-requirements.md`](../planning/02-product-requirements.md).
 > Decision history lives in [`change_log.md`](change_log.md).
 
-**Last updated:** 2026-08-10 — `deps.ts`'s second swap (the Pro/Elite personalization prompt) is
+**Last updated:** 2026-08-10 (later) — Ian reported two production sign-in bugs blocking him from
+using the deployed app: email sign-up failed `"Invalid origin"`, and Google sign-in failed
+`"Invalid callback URL"`. Both reproduced against the **live deployed Worker**, not the local test
+suite (see "the harness gap" below), and both are now fixed in `workers/src/auth.ts` and
+`workers/wrangler.toml` — **still needs `wrangler deploy --env production` from the captain's own
+machine to take effect; nothing is fixed in production until that deploy happens.**
+
+- **Bug 1 — email sign-up `INVALID_ORIGIN`.** Root cause has two parts, and the fix needs both:
+  (1) better-auth's own `trustedOrigins` never read `CORS_ALLOWED_ORIGINS` — a browser origin could
+  clear the CORS allowlist in `cors.ts` and still be rejected by better-auth's separate origin/CSRF
+  check. Fixed by folding `CORS_ALLOWED_ORIGINS` into `trustedOrigins` in `auth.ts`. (2) That fold
+  alone does not fix the reported failure: `index.ts`'s `normalizeAllowedBrowserOrigin()` already
+  rewrites any origin *already in* `CORS_ALLOWED_ORIGINS` to `BETTER_AUTH_URL` before better-auth
+  ever sees it, so the fold only matters for an origin CORS never allowed in the first place — and
+  `[env.production.vars] CORS_ALLOWED_ORIGINS` in `wrangler.toml` listed only the deployed origin
+  itself, not `http://localhost:8081`/`19006` (the origins `npm run web` actually uses, since
+  `.env`'s `EXPO_PUBLIC_API_BASE_URL` points straight at the deployed Worker — there is no
+  separately hosted production web build). Those origins were dropped from the production list in
+  the 2026-08-09 Google-sign-in fix and never restored; now added back.
+- **Bug 2 — Google sign-in `INVALID_CALLBACK_URL`.** Root cause, found entirely by reading code
+  (`@better-auth/expo`'s and `expo-linking`'s source, not from device testing): Expo Go — the only
+  way to run this app on a device today, since no EAS dev client exists — ignores the app's
+  registered `paceblueprint://` scheme and always builds deep links with the fixed `exp://` scheme,
+  so the OAuth `callbackURL` better-auth receives is `exp://<lan-ip>:<port>/--/`. `@better-auth/expo`
+  already auto-trusts `exp://`, but only `if (process.env.NODE_ENV === 'development')`, and
+  Wrangler's esbuild bundling bakes that literal to `'production'` for `wrangler deploy` (only
+  `'development'` for `wrangler dev`) — so the plugin's own fallback is silently absent from every
+  deployed Worker, dev or not. Fixed by adding `'exp://'` to `auth.ts`'s `trustedOrigins`
+  unconditionally, rather than relying on the plugin's env-gated default.
+- **The harness gap.** `workers/test/worker.test.ts`'s pre-existing "allows an auth POST from an
+  allowlisted Expo web origin" test could not have caught either regression: `vitest.config.ts`
+  pins `CORS_ALLOWED_ORIGINS` to already contain the one origin the test uses, so
+  `normalizeAllowedBrowserOrigin()` always neutralizes it before better-auth is reached — the test
+  passed identically with or without the `trustedOrigins` fold, and never touched
+  production-shaped config at all. Its comment now says so explicitly. Four new tests in
+  `worker.test.ts` (a new `describe('the 2026-08-10 production INVALID_ORIGIN bug')` block) drive
+  `createAuth()` and `normalizeAllowedBrowserOrigin()` directly against production-shaped env vars —
+  proven to fail against the pre-fix code (both `wrangler.toml`'s old value and `auth.ts`'s old
+  `trustedOrigins`) and pass against the new. One new test in `social-auth.test.ts` does the same
+  for the `exp://` callback fix. 130 `workers/` tests pass (125 existing + 5 new); 326 root tests
+  pass; typecheck and lint clean on both sides.
+- **What's still not provable from here:** whether the OAuth consent screen's publishing status
+  (Testing vs. production) or the client secret itself (only exercised at the token exchange) are
+  also blocking Google sign-in remains open — see "Blocked / awaiting a decision" below. Neither
+  was ruled out or in by this pass; both need one real device sign-in after the deploy.
+
+Previous entry: 2026-08-10 — `deps.ts`'s second swap (the Pro/Elite personalization prompt) is
 now bound: `workers/src/lib/planPersonalizationPrompt.ts` is the real `PromptBuilder`, replacing
 the typed-`null` placeholder. **Deliberately narrower than `docs/reference/plan-generation.md`'s
 original "one representative week per phase + deterministic expander" sketch** — see that file's
@@ -685,6 +731,8 @@ to "Decided" below.
 | `APP_SCHEME` = `paceblueprint://` | the OAuth return into the app | **Ian.** Matches `app.json`'s `scheme` and the `expoClient({ scheme })` call, and `trustedOrigins` acceptance of `paceblueprint:///` is now covered by `workers/test/social-auth.test.ts` — but still never verified against a real built app |
 | ~~`wrangler deploy`~~ | — | **Done.** `https://pace-blueprint-production.i78979848.workers.dev` is live and answering |
 | **Decided 2026-08-07: deploy the Worker.** How a phone reaches the backend — LAN against `wrangler dev` was the alternative and was declined; on-device testing waits on `wrangler deploy` (the row above) rather than a same-Wi-Fi workaround | all on-device testing; caused the 2026-08-07 `Network request failed` report | **Ian — ruled.** A loopback base URL is unreachable from a phone by construction, tunnel or not (see `.env.example`); once deployed, `EXPO_PUBLIC_API_BASE_URL` becomes the Worker's `https://` URL. The app now reports the unreachable case clearly instead of crashing, but cannot fix it |
+| `wrangler deploy --env production` for the 2026-08-10 (later) `INVALID_ORIGIN`/`INVALID_CALLBACK_URL` fix | email sign-up and Google sign-in against the deployed Worker | **Ian.** The fix (`workers/src/auth.ts`, `workers/wrangler.toml`) is merged and tested but not live until redeployed — see the "Last updated" entry above |
+| Google OAuth consent screen publishing status (Testing vs. production) — does it block real users, not just listed test accounts | Google sign-in for anyone other than a listed test user | **Ian**, in Google Cloud Console → OAuth consent screen. Not checkable or changeable by an agent |
 
 None of the above blocks local work: everything in `workers/` runs offline against `wrangler dev`'s
 Miniflare emulation with no account. The list is the exact Cloudflare counterpart of what the audit
