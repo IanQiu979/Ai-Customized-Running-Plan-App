@@ -156,8 +156,10 @@ it is — lives in [`workers/README.md`](../workers/README.md).
 Bearer sessions, the quota ledger (reserve → settle/release, atomic gate, idempotency replay,
 fallback exemption), `quota-status`, `purchase-tier`, `delete-account`, intake read/write, and plan
 reads. **`generate-plan` now returns a real plan**, as of the 2026-08-04 skeleton binding — Free
-and, as a template fallback, Pro/Elite. The Pro/Elite personalization prompt is the one remaining
-unbound seam; see "generate-plan" below.
+and, as a template fallback, Pro/Elite. **As of 2026-08-10 the Pro/Elite personalization prompt is
+bound too** (`workers/src/lib/planPersonalizationPrompt.ts`) — see "generate-plan" below. The one
+remaining gap is `ANTHROPIC_API_KEY`, unset everywhere, so Pro/Elite generation still serves the
+template plan as a quota-exempt fallback until the captain provisions it.
 
 `src/lib/supabase.ts` and `supabase/functions/.env.example` are **legacy**. Nothing imports the
 Supabase client any more and no Supabase project is used. Both are kept rather than deleted so the
@@ -333,16 +335,16 @@ The core of the app. Full tier/quota/validation detail:
 implemented in `workers/src/lib/generate-plan-flow.ts`, with each dependency injected so every
 branch is unit-testable without a network or a cent of Anthropic spend.
 
-**One step has no implementation behind it yet, deliberately.** Steps 4/5/8/9 (the deterministic
-skeleton, built from `src/lib/planTemplates.ts` and `src/lib/paceDerivation.ts`) were bound in
-`workers/src/deps.ts` on 2026-08-04 via `createTemplateSkeletonBuilder()`, so `generate-plan` now
-returns a real plan instead of `503`. **Step 7's Pro/Elite personalization prompt is still
-unbound** — coaching-sensitive work of its own — so Pro/Elite generation currently falls back to
-the same template every tier gets. It stays bound to a typed *unavailable* implementation rather
-than a mock, so the endpoint would answer a structured `503` and release its quota reservation
-rather than serve a plausible-looking personalized plan from nowhere, if that path were ever
-reached. It is one binding in `workers/src/deps.ts`, which names it explicitly so the swap has an
-owner.
+**Both former unbound seams are now bound.** Steps 4/5/8/9 (the deterministic skeleton, built from
+`src/lib/planTemplates.ts` and `src/lib/paceDerivation.ts`) were bound in `workers/src/deps.ts` on
+2026-08-04 via `createTemplateSkeletonBuilder()`, so `generate-plan` now returns a real plan
+instead of `503`. **Step 7's Pro/Elite personalization prompt was bound on 2026-08-10**
+(`workers/src/lib/planPersonalizationPrompt.ts`) — see the corrected step 7 below for what
+actually shipped, which is narrower than the original "one representative week + expander" sketch
+this section used to describe. The remaining gap is not code: `ANTHROPIC_API_KEY` is unset
+everywhere, so `resolveModelCaller` still binds `createUnconfiguredModelCaller` and Pro/Elite
+generation still falls back to the same template every tier gets, honestly marked
+`isFallback: true` and quota-exempt, until the captain provisions the key.
 
 1. **Auth** — verify the session, reject anonymous requests. Happens once in
    `workers/src/index.ts`, ahead of dispatch, so no handler can be reached anonymously.
@@ -368,18 +370,26 @@ owner.
    never removed.** What scales across tiers is how much of the runner the plan reasons about and
    how much it explains, never how much of the coach's judgment is taken away.
 6. **Free tier stops here.** Template + effort descriptions only. No AI call, ever.
-7. **Pro/Elite — one Claude call** (`claude-sonnet-5`). The skeleton goes into the prompt as the
-   fixed structure; Claude personalizes **one representative week per phase**, not all 24–30
-   weeks — a full plan does not fit a single model response (ported from Echo V1's token
-   strategy: brevity mandate, forced tool call for guaranteed JSON, SSE streaming, truncation
-   detection). Pro gets paces (only if a recent time exists), HR zones (adults only — under-18
-   substitutes RPE, `loadRules.ts`'s `rpeForZone`, captain-approved youth policy §6-A), warm-ups/drills, and a
-   weekly "why". Elite gets the same, plus a per-workout "why" and the richest prompt (injury
-   history, race context, periodization nuance) — **still inside the skeleton**. `engine: 'ai'`
-   is never emitted in v1; every paid plan is skeleton-constrained `hybrid` (see `planTypes.ts`'s
-   `Engine` comment).
-8. **Deterministic expander** — typed code materializes every calendar week from the
-   representative weeks, scaling distances along the phase's load curve.
+7. **Pro/Elite — one Claude call** (`claude-sonnet-5`). **Shipped 2026-08-10, narrower than
+   originally sketched here.** Pace, HR zone/RPE, and every distance are already final by this
+   point — the skeleton (step 5) is built at `density: 'paid'` for both Pro and Elite, so
+   `loadRules.ts`/`paceDerivation.ts` have already computed and clamped every number the coaching
+   library calls "personalization." The model is asked for exactly one thing the skeleton cannot
+   supply: prose. A forced tool call (`submit_plan_personalization`) whose schema has no numeric
+   field returns a `coachIntro`, a weekly "why" (Pro and Elite), and — Elite only — a per-workout
+   "why". `mergePersonalization()` (`workers/src/lib/planPersonalizationPrompt.ts`) copies only
+   those strings onto the skeleton, matched by `weekNumber`/`dayIndex`; every other field is
+   copied unchanged, so there is no code path by which the model's answer can carry a number.
+   `engine: 'ai'` is never emitted in v1; every paid plan is skeleton-constrained `hybrid` (see
+   `planTypes.ts`'s `Engine` comment). **Not implemented, and no longer planned as originally
+   written:** the "one representative week per phase" + step-8 expander below, and SSE streaming —
+   both existed to fit a whole week's *structure* into one response cheaply, which a prose-only
+   response doesn't need; `computeMaxTokens()` scales the token ceiling with plan length instead.
+8. **Deterministic expander — NOT BUILT, and not needed by what shipped in step 7.** This step
+   stays documented as the design's original intent (materializing every calendar week from a
+   handful of AI-personalized representative weeks), in case a future revision of step 7 goes back
+   to emitting structure. The shipped step 7 above never produces partial-plan structure that would
+   need expanding — every week already exists, from the skeleton — so this step is a no-op today.
 9. **Clamp** — `loadRules.ts` re-checks every week (weekly increase cap, deload band 35–45%,
    long-run share/spike/time caps) identically across all three tiers. A model cannot emit an
    unsafe week because this code rejects the number before the user sees it.
@@ -424,7 +434,7 @@ it `getSession()` ignores the header and every route 403s a user who just signed
 |---|---|---|---|---|
 | `ANY /api/auth/*` | — | better-auth's own | better-auth's own | Sign-up, sign-in, sign-out, session, OAuth callbacks. Email/password and Google both work in production (Google since 2026-08-09 — see `docs/change_log.md`). |
 | `GET /health` | none | — | `{ ok: true }` | Liveness. Touches no database. |
-| `POST /api/generate-plan` | session | `{ goalType: "race"\|"duration", raceDistance?, raceDate?, durationWeeks?, notes?, idempotencyKey }` | `{ plan, planId, isFallback, quotaConsumed }`, or `402` over-quota / `403` anon / `409` intake-required | Enforces tier + quota server-side, branches by tier, validates, persists. A duplicate `idempotencyKey` returns the existing plan instead of generating twice. As of 2026-08-04, Free gets the template plan and Pro/Elite fall back to the same template (`isFallback: true`, quota-exempt) pending the Pro/Elite personalization prompt — see "Current — `generate-plan`" above. `quotaConsumed` tells the client whether this fallback counted against the tier limit, so `FallbackNotice` can pick `counted` vs `exempt`. |
+| `POST /api/generate-plan` | session | `{ goalType: "race"\|"duration", raceDistance?, raceDate?, durationWeeks?, notes?, idempotencyKey }` | `{ plan, planId, isFallback, quotaConsumed }`, or `402` over-quota / `403` anon / `409` intake-required | Enforces tier + quota server-side, branches by tier, validates, persists. A duplicate `idempotencyKey` returns the existing plan instead of generating twice. Free gets the template plan (since 2026-08-04). Pro/Elite call the personalization prompt (bound since 2026-08-10) but, with no `ANTHROPIC_API_KEY` configured anywhere yet, still fall back to the same template today (`isFallback: true`, quota-exempt) — see "Current — `generate-plan`" above. `quotaConsumed` tells the client whether this fallback counted against the tier limit, so `FallbackNotice` can pick `counted` vs `exempt`. |
 | `GET /api/quota-status` | session | — | `{ tier, used, limit, periodEnd }` | Drives Home's and Settings' "N of M plans used" line (`src/lib/quotaDisplay.ts`'s `formatQuotaLine()`, consumed by both since 2026-08-05). `used` counts **non-fallback** plans in the current purchase-anchored period, server-side, never a client counter. `periodEnd` is `null` for Free (lifetime allowance) and also `null` while the temporary `ALL_USERS_UNLIMITED_ACCESS` override is on (see below) — the UI must not render a countdown for either. |
 | `POST /api/purchase-tier` | session | `{ tier: "pro"\|"elite", source: "dummy" }` | `{ tier, periodStart: string \| null, periodEnd: string \| null }` | v1 dummy flow, called from `src/app/paywall.tsx` (new 2026-08-05) with honest "test upgrade, no payment required" copy. v2 swaps `source` to `"revenuecat"` and verifies the receipt — same route, same table write. `source: "revenuecat"` is refused in v1 rather than trusted. |
 | `POST /api/delete-account` | session | — | `{ deleted: true }` | Really deletes; no soft-delete flag, because the app's own copy promises erasure. The only route that deletes a plan. Called from Settings' Delete Account flow (new 2026-08-05), followed client-side by `authClient.signOut()` to invalidate the local session store. |

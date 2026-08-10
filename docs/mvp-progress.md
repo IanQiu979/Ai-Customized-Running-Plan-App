@@ -6,7 +6,43 @@
 > Milestone definitions live in [`planning/02-product-requirements.md`](../planning/02-product-requirements.md).
 > Decision history lives in [`change_log.md`](change_log.md).
 
-**Last updated:** 2026-08-09 — Google sign-in was reported dead in the app; diagnosed against the
+**Last updated:** 2026-08-10 — `deps.ts`'s second swap (the Pro/Elite personalization prompt) is
+now bound: `workers/src/lib/planPersonalizationPrompt.ts` is the real `PromptBuilder`, replacing
+the typed-`null` placeholder. **Deliberately narrower than `docs/reference/plan-generation.md`'s
+original "one representative week per phase + deterministic expander" sketch** — see that file's
+updated status note and the new module's own header for the reasoning. In short: the template
+skeleton (`createTemplateSkeletonBuilder()`) already computes every week's distances, phase, and —
+at `density: 'paid'`, which both Pro and Elite use — every workout's pace and HR zone/RPE from
+`loadRules.ts`/`paceDerivation.ts`, safety-clamped, before this file is ever reached. What Pro/Elite
+still lack is the coach's-reasoning prose (`Plan.coachIntro`, `Week.why`, and — Elite only —
+`Workout.why`), so that is the *only* thing the new prompt asks the model for: a forced tool call
+(`submit_plan_personalization`) whose schema has no numeric field at all, just `weekNumber`/
+`dayIndex` (to find the matching skeleton slot) and `why` strings. `mergePersonalization()` then
+copies exactly those strings onto the skeleton and nothing else — there is no code path by which a
+model answer can change a distance, a pace, an HR zone, an RPE, a phase, or a deload flag. Wired
+into `generate-plan`'s existing tier branch with no other change: Free still never calls the model
+(`generate-plan-flow.ts` step 6); Pro/Elite call `createPlanPersonalizer(modelCaller,
+planPersonalizationPromptBuilder)`, which already had its validate → retry-once → fall-back-to-
+template control flow built and tested (`planEngine.test.ts`). **Still blocked on the same thing as
+before: `ANTHROPIC_API_KEY` is not set anywhere** (`wrangler secret put` needs the captain's own
+Cloudflare login — "Blocked / awaiting a decision" below), so `resolveModelCaller` still binds
+`createUnconfiguredModelCaller` and every Pro/Elite generation today still serves the honest,
+quota-exempt template fallback — the prompt is correct and tested, but has never made a live call
+and cannot until the key exists. New `workers/test/planPersonalizationPrompt.test.ts` (19 cases):
+request shape (forced tool call, `claude-sonnet-5`, no `temperature`/`top_p`/`top_k`, no numeric
+field sent to the model at all), structural extraction, and — the case that matters most —
+`mergePersonalization` proven never to touch a structural/numeric field, never to mutate the
+skeleton, and to truncate an oversized response rather than store it unbounded. 125 `workers/`
+tests pass (106 existing + 19 new); 326 root tests pass, typecheck and lint clean on both. **Decided
+and deliberately out of scope in this pass:** `GeneratePlanRequest`'s missing `goalTimeSec` field
+(flagged below and in "Known debt and risks") does not block this feature — the personalizer reads
+`intake.goalTimeSec`, the value already stored at intake time and already consumed by
+`buildTemplatePlan()` to build the skeleton this prompt personalizes, so the prompt sees a correct
+goal time in every case that reaches it today. The *per-generation* override the flagged gap is
+about (letting one generation declare a different goal time than intake's saved default) is a
+separate, narrower fix left for its own pass. Payments/IAP, the App Store pipeline, branding, and
+Apple Sign-In were not touched, per standing scope.
+Previous entry: 2026-08-09 — Google sign-in was reported dead in the app; diagnosed against the
 **live deployed Worker**, not by reading code. `POST /api/auth/sign-in/social` on
 `https://pace-blueprint-production.i78979848.workers.dev` answers
 `{"message":"Provider not found","code":"PROVIDER_NOT_FOUND"}` (HTTP 404), while email/password on
@@ -599,8 +635,9 @@ with **no backend at all**.
        /api/generate-plan` calls through to `src/lib/planTemplates.ts` via
        `workers/src/deps.ts`'s `createTemplateSkeletonBuilder()` and returns a real plan. The
        client action calling it, and the plan view rendering the result, landed the same pass (step
-       4 above). The Pro/Elite personalization prompt (`workers/src/deps.ts`'s second swap) is
-       still unbound — see "Known debt and risks" below.
+       4 above). **The Pro/Elite personalization prompt (`workers/src/deps.ts`'s second swap) is
+       now bound too, as of 2026-08-10** (`workers/src/lib/planPersonalizationPrompt.ts`) — see
+       "Known debt and risks" below for what still blocks it from making a live call.
 9. [x] **Quota UI + dummy paywall — done 2026-08-05.** `src/app/(tabs)/settings.tsx` (the new
        fourth tab) shows tier + a quota line off `GET /api/quota-status` (new pure
        `src/lib/quotaDisplay.ts`) and a Free-tier "Upgrade" entry point; `src/app/paywall.tsx` (a
@@ -818,7 +855,13 @@ intact underneath.
 - 🔴 **`wrangler secret put ANTHROPIC_API_KEY` has never been run** (nor its Supabase predecessor).
   Nothing anywhere has an Anthropic key. This is not currently *breaking* anything — with no key the
   model caller returns a typed `not_configured` and the pipeline serves the template plan as a
-  quota-exempt fallback — but it is a hard blocker on paid tiers ever being paid-tier.
+  quota-exempt fallback — but it is now the **only** remaining blocker on paid tiers ever being
+  paid-tier: as of 2026-08-10 the Pro/Elite personalization prompt itself is built, bound, and
+  tested (`workers/src/lib/planPersonalizationPrompt.ts`, `deps.ts`'s second swap) — it has simply
+  never made a real network call, because there is no key for it to call with. The moment the
+  captain runs `wrangler secret put ANTHROPIC_API_KEY --env production` (and the local `.dev.vars`
+  equivalent for `wrangler dev`), Pro/Elite generation starts calling Claude for real with no other
+  code change.
 - 🔴 **No Cloudflare account resources exist.** `wrangler login` is interactive and unrun, so
   `wrangler d1 create`, `wrangler secret put`, and `wrangler deploy` are all unrun too, and
   `wrangler.toml`'s `database_id` is a deliberately fake placeholder. Local work is unaffected —
@@ -828,10 +871,18 @@ intact underneath.
   skeleton binding (`workers/src/deps.ts` → `createTemplateSkeletonBuilder()` →
   `src/lib/planTemplates.ts`) landed, so the route, quota gate, idempotency, validation, and
   fallback that were already built and tested now serve a real plan instead of `503
-  engine_unavailable`. **What's left of this gap:** the Pro/Elite personalization prompt is still
-  bound to a typed *unavailable* in `deps.ts` — on purpose, matching the sibling repo's issue #128
-  lesson against shipping a mock as a production client — so Pro/Elite generation still falls back
-  to the template rather than getting a personalized prompt.
+  engine_unavailable`.
+- 🟢 **Resolved 2026-08-10: the Pro/Elite personalization prompt is written, bound, and tested.**
+  `workers/src/lib/planPersonalizationPrompt.ts` is `deps.ts`'s second swap — `planEngine.ts`'s
+  `createPlanPersonalizer` now receives a real `PromptBuilder` instead of `null`. It never re-emits
+  a number: the model is asked only for `Plan.coachIntro`/`Week.why`/(Elite) `Workout.why` prose via
+  a forced tool call, and `mergePersonalization()` copies those strings onto the already-clamped
+  skeleton with no path for anything else to change. **What's left:** no `ANTHROPIC_API_KEY` exists
+  anywhere (see the 🔴 item above), so `resolveModelCaller` still binds
+  `createUnconfiguredModelCaller` and every call today answers `not_configured` — Pro/Elite
+  generation still falls back to the honest, quota-exempt template plan, exactly as designed for
+  "the backend not being finished," but the remaining gap is now purely the missing secret, not
+  missing code.
 - 🟢 **Resolved 2026-08-03: the client can now talk to `workers/`.** `src/lib/apiClient.ts` and
   `src/app/(auth)/` (email/password sign-in/sign-up, `Stack.Protected` session gate) landed in
   `06b1f89`. **Google OAuth resolved in local dev 2026-08-05** — credentials provisioned and

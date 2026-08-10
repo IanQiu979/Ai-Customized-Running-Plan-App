@@ -5,6 +5,55 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-08-10 — the Pro/Elite personalization prompt lands (`deps.ts`'s second swap)
+
+`workers/src/deps.ts` had two documented swaps to make the AI path real: the skeleton builder
+(bound 2026-08-04) and the Pro/Elite prompt (still `null` until today). This lands the second one.
+
+- **New `workers/src/lib/planPersonalizationPrompt.ts`.** The `PromptBuilder` `createPlanPersonalizer`
+  was already built to accept (`planEngine.ts`, tested since before this prompt existed). Deliberately
+  narrower than `docs/reference/plan-generation.md`'s original "one representative week per phase +
+  deterministic expander" design: the template skeleton (`createTemplateSkeletonBuilder()`) already
+  computes every week's structure and, at `density: 'paid'` (both Pro and Elite), every workout's
+  pace and HR zone/RPE — safety-clamped by `loadRules.ts`/`paceDerivation.ts` — before this file is
+  reached. The only thing Pro/Elite still lacked was the coach's-reasoning prose
+  (`Plan.coachIntro`, `Week.why`, and — Elite only — `Workout.why`), so that prose is the *only*
+  thing the prompt asks the model for.
+- **The output contract has no numeric field.** A forced tool call (`submit_plan_personalization`)
+  whose schema is `{ coachIntro: string, weeks: [{weekNumber, why}], workouts?: [{weekNumber,
+  dayIndex, why}] }` (Elite only). `weekNumber`/`dayIndex` exist only to locate the matching
+  skeleton slot; nothing in the schema can carry a distance, a pace, an HR zone, an RPE, a phase, or
+  a deload flag. `mergePersonalization()` reads exactly those two integers plus one string per entry
+  and copies everything else from the skeleton, byte-for-byte — the enforcement is structural, not
+  just a prompt instruction, matching `CLAUDE.md`'s "a model must not be able to prescribe an unsafe
+  week."
+- **Model, request shape:** `claude-sonnet-5`, no `temperature`/`top_p`/`top_k` (this model 400s on
+  any non-default value of them, per the sibling repo's `analyze-form-prompt.ts` finding), explicit
+  `thinking: {type: 'adaptive'}`, `max_tokens` scaled by plan length and tier
+  (`computeMaxTokens()`). Both `why` and `coachIntro` are length-truncated on the way in
+  (`MAX_WHY_LENGTH`/`MAX_COACH_INTRO_LENGTH`) — an arithmetic bound, same category as
+  `MAX_PLAN_DURATION_WEEKS`, not content validation.
+- **Wired in `deps.ts`:** `createPlanPersonalizer(modelCaller, planPersonalizationPromptBuilder)`
+  replaces `createPlanPersonalizer(modelCaller, null)`. No other file changed — `generate-plan-flow.ts`
+  already had the validate → retry-once → fall-back-to-template control flow built and tested.
+- **Still blocked on `ANTHROPIC_API_KEY`.** No key exists anywhere (local `.dev.vars` or production
+  `wrangler secret put`), so `resolveModelCaller` still binds `createUnconfiguredModelCaller` and
+  every Pro/Elite generation still serves the template plan, marked `isFallback: true`
+  (quota-exempt) — exactly the designed degradation for "the backend not being finished." The
+  remaining gap to real personalized plans is now purely the missing secret, which needs the
+  captain's own Anthropic account and `wrangler login`.
+- **`GeneratePlanRequest`'s missing `goalTimeSec` field (`docs/mvp-progress.md`'s 🟠 item) does not
+  block this feature and was deliberately left alone.** The personalizer reads `intake.goalTimeSec`
+  — already stored at intake time and already what `buildTemplatePlan()` uses to build the skeleton
+  this prompt personalizes — so every plan this prompt sees already carries a correct goal time.
+  The flagged gap is about a *per-generation* override of that stored default, a separate and
+  narrower fix.
+- **Tests:** new `workers/test/planPersonalizationPrompt.test.ts` (19 cases) — request shape (forced
+  tool call, no numeric field sent to the model, no rejected sampling params), structural
+  extraction, and `mergePersonalization` proven never to touch a structural field, never to mutate
+  its input, and to truncate an oversized response. 125 `workers/` tests pass (106 existing + 19
+  new); 326 root tests pass; typecheck and lint clean on both sides.
+
 ## 2026-08-09 — Google sign-in is broken in production; root cause is a missing secret, not code
 
 Captain's report: cannot log in with Google at all. Diagnosed against the live deployed Worker

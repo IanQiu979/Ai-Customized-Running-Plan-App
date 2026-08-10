@@ -8,10 +8,14 @@
 > and the quota, idempotency, validation, and fallback rules on this page are live. As of
 > 2026-08-04, `workers/src/deps.ts` binds the skeleton builder to that plan engine
 > (`createTemplateSkeletonBuilder()`), so the endpoint returns a real plan for Free (and, as a
-> template fallback, Pro/Elite). What it does **not** have yet is the Pro/Elite personalization
-> prompt (step 7) — `deps.ts` still binds it to a typed *unavailable*, so that path would answer a
-> structured `503` and release its quota reservation rather than inventing a plan, if it were ever
-> reached. This document describes the design in
+> template fallback, Pro/Elite). **As of 2026-08-10, the Pro/Elite personalization prompt (step 7)
+> is also bound** — `workers/src/lib/planPersonalizationPrompt.ts`, wired into `deps.ts`'s second
+> swap — but it is deliberately narrower than the "one representative week per phase + deterministic
+> expander" design this section originally sketched; see "The generation pipeline" step 7 below for
+> what actually shipped and why. It has never made a live Anthropic call: no `ANTHROPIC_API_KEY`
+> exists anywhere yet (`docs/mvp-progress.md`'s "Blocked / awaiting a decision"), so every Pro/Elite
+> generation today still serves the template plan as a quota-exempt fallback, exactly as designed
+> for "the backend not being finished." This document describes the design in
 > [`planning/02-product-requirements.md`](../../planning/02-product-requirements.md) and
 > [`planning/03-engineering-requirements.md`](../../planning/03-engineering-requirements.md).
 > See [`docs/architecture.md`](../architecture.md) for how it fits the rest of the system and
@@ -86,17 +90,37 @@ is unit-tested with no network and no Anthropic spend:
    phases, deload cadence, weekly volumes under `loadRules.ts` caps, workout primitives from
    `workout-library.md`, Day 1–7 slots with real rest days.
 6. **Free tier stops here.** Template + effort descriptions. No AI call, ever.
-7. **Pro/Elite — one Claude call** (`claude-sonnet-5`, verified live 2026-07-10). The skeleton
-   goes into the prompt as the fixed structure; Claude personalizes **one representative week per
-   phase**, not all 24–30 weeks — a full plan does not fit a single model response. Ported from
-   Echo V1's token strategy: a brevity mandate, a `max_tokens` ceiling, a **forced tool call** for
-   guaranteed JSON, streaming so the server isn't CPU-killed mid-response, and
-   truncation detection. Personalization is paces (**only if a recent time exists — otherwise no
-   numeric pace is emitted at any tier**), HR zones (from age — **adults only; under-18 gets RPE
-   instead, `loadRules.ts`'s `rpeForZone`, captain-approved youth policy §6-A, 2026-08-06**),
-   warm-ups/drills, a weekly "why" (Pro) or per-workout "why" (Elite). When this route is built,
-   model output carrying `hrZone` for an under-18 runner must be stripped/converted, not just
-   clamped — see "AI output validation is structural" in `CLAUDE.md`.
+7. **Pro/Elite — one Claude call** (`claude-sonnet-5`, verified live 2026-07-10). **SHIPPED
+   2026-08-10, in a deliberately narrower shape than the paragraph below originally sketched** —
+   read the correction first, then the original design intent it replaces.
+
+   **What actually shipped** (`workers/src/lib/planPersonalizationPrompt.ts`): the skeleton
+   already carries every number for Pro/Elite. `createTemplateSkeletonBuilder()` builds it at
+   `density: 'paid'` for both tiers, which means paces (only if a recent time exists — otherwise no
+   numeric pace at any tier), HR zones (adults) or RPE (under-18, `loadRules.ts`'s `rpeForZone`,
+   §6-A), and every distance are already computed and already clamped by `loadRules.ts` before the
+   model is ever called. So the model is asked for exactly one thing — prose — via a forced tool
+   call whose schema contains no numeric field: a `coachIntro`, a `why` per week, and (Elite only) a
+   `why` per workout. `mergePersonalization()` then copies only those strings onto the skeleton,
+   matched by `weekNumber`/`dayIndex`; every structural and numeric field is copied unchanged. This
+   makes the safety property stronger than "the model's numbers get clamped after the fact" — there
+   is no code path by which the model's answer can carry a number at all, clamped or not.
+
+   **What this replaces — the original sketch, not implemented:** "Claude personalizes one
+   representative week per phase, not all 24–30 weeks... a brevity mandate, a `max_tokens` ceiling,
+   a forced tool call, streaming so the server isn't CPU-killed mid-response, truncation detection,"
+   with a deterministic expander (step 8, below) materializing every calendar week from the
+   representative ones. That design existed to fit a whole week's *structure* into one response
+   cheaply. Because the shipped design never asks the model for structure at all — only text — the
+   token-budget problem that motivated "one representative week + expander" mostly does not arise
+   here (`computeMaxTokens()` scales with `durationWeeks` and stays well under a normal ceiling even
+   for a full-length plan), so the extra machinery of an expander was not built. Streaming was not
+   added either, for the same reason: a prose-only response is far smaller than a fully
+   restructured plan.
+
+   Model output carrying `hrZone` for an under-18 runner cannot occur under the shipped design — the
+   schema has no `hrZone` field for the model to emit in the first place, which is a stronger
+   guarantee than the strip/convert step this paragraph originally called for.
 8. **Deterministic expander** — typed code materializes every calendar week from the
    representative weeks, scaling distances along the phase's load curve (Echo V1's expander is
    the reference).

@@ -8,15 +8,20 @@
  * a key, and real Anthropic spend.
  *
  * ============================================================================================
- * THE TWO BINDINGS A FOLLOW-UP TASK CHANGES — this list exists so no swap is left ownerless the
- * way the sibling repo's issue #128 was.
+ * THE TWO BINDINGS — this list exists so no swap is left ownerless the way the sibling repo's
+ * issue #128 was.
  * ============================================================================================
  *   1. `skeleton:` — DONE. `createTemplateSkeletonBuilder()` wires `src/lib/planTemplates.ts` +
  *      `src/lib/paceDerivation.ts`, now that the plan-engine task has landed them.
- *   2. `promptBuilder` (the second argument to `createPlanPersonalizer`) — still `null`, swap it
- *      for the real Pro/Elite prompt once that work lands. Until then paid tiers fall back to the
- *      template plan, marked `isFallback: true`, which is quota-exempt.
- * Neither swap needs anything else in this project to change.
+ *   2. `promptBuilder` — DONE. `planPersonalizationPromptBuilder` (`lib/planPersonalizationPrompt.ts`)
+ *      is the real Pro/Elite prompt: it never re-emits a number, only the coaching "why" text, and
+ *      is merged onto the already-clamped skeleton (see that file's header for why this is a
+ *      narrower, safer design than the original "one representative week + expander" sketch).
+ *      With no `ANTHROPIC_API_KEY` configured (still true everywhere today — see `lib/model.ts`),
+ *      `resolveModelCaller` binds `createUnconfiguredModelCaller`, so this prompt is built but the
+ *      call always answers `not_configured` and paid tiers fall back to the template plan, marked
+ *      `isFallback: true` (quota-exempt), until the captain pushes the key.
+ * Both swaps are bound; only the key is still missing.
  */
 
 import { isAllUsersUnlimitedAccessEnabled } from './access';
@@ -24,6 +29,7 @@ import type { Env } from './env';
 import type { GeneratePlanDeps } from './lib/generate-plan-flow';
 import { createPlanPersonalizer, createTemplateSkeletonBuilder } from './lib/planEngine';
 import { resolveModelCaller } from './lib/model';
+import { planPersonalizationPromptBuilder } from './lib/planPersonalizationPrompt';
 import { D1PlanStore } from './lib/store';
 
 export interface Deps {
@@ -46,7 +52,7 @@ export function createDeps(env: Env): Deps {
     generatePlan: {
       store,
       skeleton: createTemplateSkeletonBuilder(), // swap 1 — see the header
-      personalizer: createPlanPersonalizer(modelCaller, null), // swap 2 — see the header
+      personalizer: createPlanPersonalizer(modelCaller, planPersonalizationPromptBuilder), // swap 2 — see the header
       loadIntake: (userId) => store.getIntake(userId),
       now: () => new Date().toISOString(),
     },
