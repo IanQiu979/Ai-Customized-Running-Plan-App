@@ -5,6 +5,69 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-08-10 (later) — email sign-up and Google sign-in fixed against the deployed Worker
+
+Captain's report: email sign-up fails `"Invalid origin"`, Google sign-in fails `"Invalid callback
+URL"`. Both diagnosed against the **live deployed Worker**
+(`https://pace-blueprint-production.i78979848.workers.dev`) via `curl`, then root-caused by reading
+`better-auth`'s and `@better-auth/expo`'s installed source directly rather than guessing.
+
+- **Bug 1 — `INVALID_ORIGIN` on `sign-up/email`.** Reproduced: `curl -X POST .../sign-up/email -H
+  'Origin: http://localhost:8081'` returns `{"code":"INVALID_ORIGIN"}` against production; without
+  that header it succeeds. Two compounding defects, both fixed:
+  1. `workers/src/auth.ts`'s `trustedOrigins` never read `CORS_ALLOWED_ORIGINS` — a browser origin
+     could clear `cors.ts`'s CORS allowlist and still be rejected by better-auth's own, separately
+     maintained origin/CSRF check. Fixed by folding `CORS_ALLOWED_ORIGINS` into `trustedOrigins`.
+  2. That fold, checked in isolation, does not fix the reported failure: `index.ts`'s
+     `normalizeAllowedBrowserOrigin()` (`cors.ts`) already rewrites any origin *already present in*
+     `CORS_ALLOWED_ORIGINS` to `BETTER_AUTH_URL` before better-auth ever sees it, so for a request
+     through the normal Worker entry point the fold only matters for an origin CORS never allowed to
+     begin with. `[env.production.vars] CORS_ALLOWED_ORIGINS` in `wrangler.toml` listed only the
+     deployed origin itself — `http://localhost:8081`/`19006` (what `npm run web` actually sends,
+     since `.env`'s `EXPO_PUBLIC_API_BASE_URL` points straight at the deployed Worker; no separate
+     production web build is hosted anywhere) were dropped from the production list in the
+     2026-08-09 Google-sign-in fix (`git show 685b67b -- workers/wrangler.toml`) and never restored.
+     Added back, with a comment recording why trusting them in production is an acceptable
+     trade-off: auth here is Bearer-token-only, not cookie-session-based (`auth.ts`'s `advanced`
+     block), so this isn't a session-hijack surface.
+- **Bug 2 — `INVALID_CALLBACK_URL` on Google sign-in.** Could not reproduce via `curl` (both a
+  relative `callbackURL: '/'` and a deep-link `callbackURL: 'paceblueprint:///'` returned a valid
+  Google authorization URL). Root cause found by reading `node_modules/@better-auth/expo/dist/
+  client.js` and `node_modules/expo-linking/build/{createURL,Schemes}.js`: **Expo Go is the only way
+  to run this app on a device today** (`docs/mvp-progress.md`: no EAS dev client exists), and inside
+  Expo Go, `expo-linking`'s `resolveScheme()` ignores the `scheme: 'paceblueprint'` option passed to
+  `expoClient()` entirely and always falls back to the fixed `'exp'` scheme — so the OAuth
+  `callbackURL` `@better-auth/expo/client` builds via `Linking.createURL('/')` is an
+  `exp://<lan-ip>:<port>/--/` URL, never `paceblueprint://...`. `@better-auth/expo`'s own server
+  plugin (`node_modules/@better-auth/expo/dist/index.js`) already auto-adds `'exp://'` to
+  `trustedOrigins` — but only `if (process.env.NODE_ENV === 'development')`, and Wrangler's esbuild
+  bundling replaces that literal with `'production'` for `wrangler deploy` (`'development'` only for
+  `wrangler dev`, confirmed by reading `wrangler`'s own bundler source), so the plugin's own fallback
+  is silently absent from every deployed Worker. Fixed by adding `'exp://'` to `auth.ts`'s
+  `trustedOrigins` unconditionally, independent of `NODE_ENV`.
+- **The test harness had a real blind spot, now closed.** `workers/test/worker.test.ts`'s
+  pre-existing "allows an auth POST from an allowlisted Expo web origin" test could not have caught
+  either regression: `vitest.config.ts` pins `env.CORS_ALLOWED_ORIGINS` to already contain the one
+  origin that test uses, so `normalizeAllowedBrowserOrigin()` always neutralizes it before
+  better-auth is reached — the test passed identically with or without the `trustedOrigins` fold,
+  and never exercised production-shaped config. Its comment now says so explicitly, pointing at the
+  tests that do. New coverage: a `describe('the 2026-08-10 production INVALID_ORIGIN bug')` block in
+  `worker.test.ts` (4 cases) drives `createAuth()` and `normalizeAllowedBrowserOrigin()` directly
+  against production-shaped env vars — one pins the pre-fix production repro (fails `INVALID_ORIGIN`
+  with the old `wrangler.toml` value), one pins the post-fix success, one isolates the `auth.ts`
+  fold from CORS normalization entirely, and one proves the fix did not over-broaden trust to an
+  origin CORS never allowed. One new case in `social-auth.test.ts` does the same for the `exp://`
+  callback fix. All five verified to fail against the pre-fix code (`git stash` the two source files,
+  re-run, confirmed both new proof tests fail with the exact production error codes; `git stash pop`
+  to restore). 130 `workers/` tests pass (125 existing + 5 new); 326 root tests pass; typecheck and
+  lint clean on both sides.
+- **Not fixed here, not fixable here:** the fix is merged but not live — `wrangler deploy --env
+  production` still needs the captain's own Cloudflare login. Separately, two things about Google
+  sign-in specifically remain unproven and are not ruled out by this pass: the OAuth consent
+  screen's publishing status (Testing vs. production — only listed test users could complete sign-in
+  if it's still in Testing) and the client secret itself (only exercised at the token exchange, needs
+  one real device sign-in). See `docs/mvp-progress.md`'s "Blocked / awaiting a decision".
+
 ## 2026-08-10 — the Pro/Elite personalization prompt lands (`deps.ts`'s second swap)
 
 `workers/src/deps.ts` had two documented swaps to make the AI path real: the skeleton builder
