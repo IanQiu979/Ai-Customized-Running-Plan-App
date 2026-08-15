@@ -60,8 +60,8 @@ src/
                               # also router.replace('/(tabs)')s there instead of staying put
     plan/[id].tsx            # plan view — `[id]` now selects: renders a real generated plan via
                               #  GET /api/plans/:id, or the permanent static golden fixture for the
-                              #  example-plan id; as of 2026-08-05 shows GoalRealismNotice when
-                              #  goalRealism.realism is 'implausible'
+                              #  example-plan id; shows GoalRealismNotice for both warned realism
+                              #  outcomes ('ambitious' honoured, 'implausible' capped)
     paywall.tsx              # dummy paywall (new 2026-08-05) — a Stack route, reached from
                               #  Settings or from Home's generate-plan 402 over_quota catch;
                               #  calls POST /api/purchase-tier, honest "test upgrade" copy
