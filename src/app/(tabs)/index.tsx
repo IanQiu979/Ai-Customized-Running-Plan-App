@@ -75,11 +75,16 @@ export default function HomeScreen() {
   // computed client-side from the runner's already-saved intake. Both the goal time and the
   // distance it was entered against come from that one saved record now, so the mismatch the old
   // independently-editable distance chip could create is gone.
+  //
+  // Gated on a *race* target specifically, not merely on a saved distance. A distance with no race
+  // date generates a `duration` plan, which carries no `goalRealism`, no `racePaceTarget` and no
+  // race-pace sessions — warning that a goal is ambitious when the plan does not target or assess
+  // that goal is the same dishonest copy PR #75 removed.
   const goalRealismPreview =
-    intake?.raceDistance && intake.goalTimeSec !== undefined && intake.recentPerformance
+    target.kind === 'race' && intake?.goalTimeSec !== undefined && intake.recentPerformance
       ? assessGoalRealism({
           goalTimeSec: intake.goalTimeSec,
-          raceDistance: intake.raceDistance,
+          raceDistance: target.raceDistance,
           recent: intake.recentPerformance,
         })
       : undefined;
@@ -134,6 +139,7 @@ export default function HomeScreen() {
       planLengthWeeks,
       notes,
       idempotencyKey,
+      now: new Date(),
     });
     if (!built.ok) {
       setGenerateError(built.error);

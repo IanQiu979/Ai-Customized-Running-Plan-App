@@ -6,7 +6,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { digitsOnly } from '@/lib/fieldInput';
 
 export interface Segment {
-  /** Stable key, also the accessibility label ("Hours", "Year", …). */
+  /** Stable key, and the tail of the box's accessibility label ("Hours", "Year", …). */
   label: string;
   value: string;
   /** Digits this box holds. Also its auto-advance threshold. */
@@ -42,6 +42,11 @@ export function SegmentedField({
   /** Drawn between boxes — `:` for a clock, `-` for a date. Never typed. */
   separator: string;
   invalid?: boolean;
+  /**
+   * The field's name ("Race date", "Goal time"). Prefixed onto each box's own label, because a
+   * label on the `accessible={false}` wrapper is dropped by both platforms — a screen reader would
+   * otherwise announce a bare "Year" with no clue which field it belongs to.
+   */
   accessibilityLabel?: string;
 }) {
   const theme = useTheme();
@@ -50,7 +55,6 @@ export function SegmentedField({
   return (
     <View
       accessible={false}
-      accessibilityLabel={accessibilityLabel}
       style={[
         styles.row,
         {
@@ -68,7 +72,11 @@ export function SegmentedField({
             ref={(node) => {
               refs.current[index] = node;
             }}
-            accessibilityLabel={segment.label}
+            accessibilityLabel={
+              accessibilityLabel
+                ? `${accessibilityLabel} ${segment.label.toLowerCase()}`
+                : segment.label
+            }
             value={segment.value}
             onChangeText={(text) => {
               const next = digitsOnly(text, segment.length);

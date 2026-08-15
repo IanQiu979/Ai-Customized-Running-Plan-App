@@ -2,9 +2,11 @@ import {
   buildGeneratePlanRequest,
   DEFAULT_PLAN_WEEKS,
   describePlanTarget,
+  isRaceDatePast,
   MAX_PLAN_WEEKS,
   needsPlanLength,
   planTargetFromIntake,
+  RACE_DATE_PASSED_MESSAGE,
 } from '../planRequest';
 import type { IntakeResponses } from '../planTypes';
 
@@ -17,12 +19,16 @@ const BASE_INTAKE: IntakeResponses = {
   injuries: ['none'],
 };
 
+/** Fixed so every race date below is unambiguously in the future or the past. */
+const NOW = new Date(2026, 7, 15);
+
 function request(overrides: Partial<Parameters<typeof buildGeneratePlanRequest>[0]> = {}) {
   return buildGeneratePlanRequest({
     target: planTargetFromIntake(BASE_INTAKE),
     planLengthWeeks: String(DEFAULT_PLAN_WEEKS),
     notes: '',
     idempotencyKey: 'key-1',
+    now: NOW,
     ...overrides,
   });
 }
@@ -163,6 +169,59 @@ describe('buildGeneratePlanRequest — a plan generates with no race specified',
       error: `Plan length must be ${MAX_PLAN_WEEKS} weeks or fewer.`,
     });
     expect(request({ planLengthWeeks: String(MAX_PLAN_WEEKS) }).ok).toBe(true);
+  });
+});
+
+describe('a saved race date that has already passed', () => {
+  // Home shows the target read-only now, so a runner returning after their race would have sent a
+  // stale date verbatim. `weeksUntilRace` floors at one week and the quota slot is reserved before
+  // the skeleton is built, so that request charges a generation for a degenerate one-week plan.
+  // Refused here, client-side, before anything is sent; the server-side floor is untouched.
+  const passed = { kind: 'race', raceDistance: 'half', raceDate: '2026-08-01' } as const;
+
+  it('refuses the request and points at the Change affordance', () => {
+    expect(request({ target: passed })).toEqual({ ok: false, error: RACE_DATE_PASSED_MESSAGE });
+  });
+
+  it('produces no request at all, so no quota slot can be charged', () => {
+    const result = request({ target: passed });
+    expect(result.ok).toBe(false);
+    expect('request' in result).toBe(false);
+  });
+
+  it('leaves a future race date alone', () => {
+    const result = request({
+      target: { kind: 'race', raceDistance: 'half', raceDate: '2026-09-26' },
+    });
+    expect(result).toEqual({
+      ok: true,
+      request: {
+        goalType: 'race',
+        raceDistance: 'half',
+        raceDate: '2026-09-26',
+        idempotencyKey: 'key-1',
+      },
+    });
+  });
+
+  it('treats race day itself as still generatable', () => {
+    expect(isRaceDatePast('2026-08-15', NOW)).toBe(false);
+    expect(request({ target: { kind: 'race', raceDistance: '5k', raceDate: '2026-08-15' } }).ok).toBe(
+      true,
+    );
+  });
+
+  it('compares calendar days, not clock instants', () => {
+    expect(isRaceDatePast('2026-08-14', NOW)).toBe(true);
+    expect(isRaceDatePast('2026-08-16', NOW)).toBe(false);
+    // Year and month boundaries, where a naive string comparison of unpadded parts would slip.
+    expect(isRaceDatePast('2025-12-31', new Date(2026, 0, 1))).toBe(true);
+    expect(isRaceDatePast('2026-01-02', new Date(2026, 0, 1))).toBe(false);
+  });
+
+  it('does not block a dateless distance or a general target', () => {
+    expect(request({ target: { kind: 'distance', raceDistance: '10k' } }).ok).toBe(true);
+    expect(request({ target: { kind: 'general' } }).ok).toBe(true);
   });
 });
 

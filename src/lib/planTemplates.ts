@@ -285,13 +285,23 @@ function raceDayWorkout(distance: RaceDistance): Workout {
  * base×4/build×4/peak×2/taper×2.
  */
 function racePhaseWeights(raceDistance: RaceDistance): number[] {
-  return raceDistance === '5k'
-    ? [4, 4, 2, 2]
-    : raceDistance === '10k'
-      ? [5, 5, 4, 2]
-      : raceDistance === 'half'
-        ? [6, 6, 4, 2]
-        : [9, 9, 8, 4];
+  switch (raceDistance) {
+    case '5k':
+      return [4, 4, 2, 2];
+    case '10k':
+      return [5, 5, 4, 2];
+    case 'half':
+      return [6, 6, 4, 2];
+    case 'marathon':
+      return [9, 9, 8, 4];
+    default: {
+      // Exhaustive by type. Reached only if an unvalidated value gets this far, which used to fall
+      // through a chained ternary and hand out marathon periodization silently; both boundaries
+      // (`validateRequest` and `validateIntake` in `workers/`) reject it before here.
+      const unreachable: never = raceDistance;
+      throw new Error(`Unknown race distance: ${String(unreachable)}`);
+    }
+  }
 }
 
 /**
@@ -838,7 +848,17 @@ function buildGenericWeek(args: {
     redFlagReductionPct,
   } = args;
   const isRaceWeek = isRacePlan && raceDistance !== undefined && weekNumber === durationWeeks;
-  const isDeload = !isRaceWeek && phase !== 'taper' && weekNumber % deloadCadence === 0;
+  // A no-race plan must never end on a deload (captain ruling, 2026-08-15, as a McMillan-certified
+  // coach): its last week is the last week the runner sees, and finishing on a recovery week leaves
+  // them at or below the volume they started at — the visible symptom behind the original report.
+  // The every-`deloadCadence`-weeks rule yields to that for the final week only; nothing else about
+  // the cadence changes, and a race plan's final week is race week or taper, so it is untouched.
+  const endsOnForcedLoadingWeek = !isRacePlan && weekNumber === durationWeeks;
+  const isDeload =
+    !isRaceWeek &&
+    !endsOnForcedLoadingWeek &&
+    phase !== 'taper' &&
+    weekNumber % deloadCadence === 0;
   const rawVolumeKm = targetVolumeKm(intake.weeklyKm, weekNumber - 1, durationWeeks, isRacePlan);
   const desiredVolumeKm = applyInjuryVolumeAdjustment(
     isDeload

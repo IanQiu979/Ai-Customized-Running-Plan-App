@@ -78,9 +78,41 @@ export type BuildRequestResult =
   | { ok: false; error: string };
 
 /**
- * Assembles the request. The only failure it can report is a bad plan length — which is the only
- * thing the runner types on this screen. A missing race can never be an error here: `general` and
- * `distance` both produce a valid `duration` request.
+ * What Home says when the saved race date is behind us. It names the fix and the control that
+ * performs it — "Change" is the link next to the target, and it goes to `/intake`.
+ */
+export const RACE_DATE_PASSED_MESSAGE =
+  'That race date has already passed. Tap Change to set a new target in your intake.';
+
+function isoDay(date: Date): string {
+  const year = String(date.getFullYear()).padStart(4, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Whether a saved race date is in the past. Race day itself is not past — a plan can still be
+ * generated on the morning of the race. `YYYY-MM-DD` sorts lexicographically, so this is a string
+ * comparison, and `now` is a parameter rather than a clock read so the decision is deterministic.
+ */
+export function isRaceDatePast(raceDate: string, now: Date): boolean {
+  return raceDate < isoDay(now);
+}
+
+/**
+ * Assembles the request.
+ *
+ * Two failures are possible. One is a bad plan length — the only thing the runner types on this
+ * screen. The other is a race date that has already passed: intake owns the target, so Home shows
+ * it read-only, and a runner coming back after their race would otherwise have a stale date sent
+ * verbatim. `weeksUntilRace` (`workers/src/lib/planEngine.ts`) floors at one week, and the quota
+ * slot is reserved before the skeleton is built, so that request would charge a generation for a
+ * degenerate one-week plan. It is refused here instead, before anything is sent. The server-side
+ * floor is deliberate behaviour for other callers and is untouched.
+ *
+ * A missing race can never be an error here: `general` and `distance` both produce a valid
+ * `duration` request.
  *
  * `distance` deliberately still sends `raceDistance`. The server's `validateIntake` only *requires*
  * it for a race goal type, and `buildTemplatePlan` uses it to shape the periodization, so a runner
@@ -93,11 +125,16 @@ export function buildGeneratePlanRequest(input: {
   planLengthWeeks: string;
   notes: string;
   idempotencyKey: string;
+  /** Injected, never read from the clock in here, so the guard below is testable. */
+  now: Date;
 }): BuildRequestResult {
   const notes = input.notes.trim();
   const withNotes = notes ? { notes } : {};
 
   if (input.target.kind === 'race') {
+    if (isRaceDatePast(input.target.raceDate, input.now)) {
+      return { ok: false, error: RACE_DATE_PASSED_MESSAGE };
+    }
     return {
       ok: true,
       request: {

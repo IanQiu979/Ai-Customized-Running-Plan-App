@@ -87,13 +87,50 @@ describe('a plan generates with no race specified', () => {
     // The phase labels were only half of it. Every plan's volume is interpolated from
     // `FIVE_K_WEEKLY_LOAD`, whose last two entries ARE the 5K taper — so before the fix a no-race
     // plan finished at 24 km off a 35 km baseline, *below* the 34 km it opened with, and its last
-    // loading week had already dropped to 40. The last week the runner actually trains through
-    // must now be at or above where they started. (A scheduled deload landing last is a planned
-    // recovery week, not a taper, so loading weeks are what this compares.)
+    // loading week had already dropped to 40.
+    //
+    // This asserts the FINAL week, not merely the last loading week. Comparing loading weeks hid
+    // the symptom the captain actually reported: with a 12-week plan on a 4-week cadence the last
+    // week was itself a deload, so the last week he *saw* still finished below where he started.
     const plan = buildNoRace();
-    const loadingWeeks = plan.weeks.filter((week) => !week.isDeload);
-    const lastLoading = loadingWeeks[loadingWeeks.length - 1];
-    expect(lastLoading.volumeKm).toBeGreaterThanOrEqual(plan.weeklyLoad[0]);
+    const finalWeek = plan.weeks[plan.weeks.length - 1];
+    expect(finalWeek.isDeload).toBe(false);
+    expect(finalWeek.volumeKm).toBeGreaterThanOrEqual(plan.weeklyLoad[0]);
+  });
+
+  it.each([1, 2, 3, 4, 5, 8, 12, 16, 26])(
+    'never ends a %i-week no-race plan on a deload',
+    (durationWeeks) => {
+      // Captain's ruling (2026-08-15, as a McMillan-certified coach): a no-race plan must never end
+      // on a deload. The every-N-weeks cadence deliberately yields for the last week only.
+      expect(buildNoRace({ durationWeeks }).weeks[durationWeeks - 1].isDeload).toBe(false);
+    },
+  );
+
+  it.each([1, 2, 3, 5, 8, 12, 16, 26])(
+    'finishes a %i-week no-race plan at or above the volume it opened with',
+    (durationWeeks) => {
+      const plan = buildNoRace({ durationWeeks });
+      expect(plan.weeklyLoad[durationWeeks - 1]).toBeGreaterThanOrEqual(plan.weeklyLoad[0]);
+    },
+  );
+
+  it('is still held back at four weeks by the ramp cap, not by a deload', () => {
+    // The one duration that finishes below its opening week, and it is not the deload rule doing
+    // it: week 4 is a loading week now. The canonical curve's own dip at index 3 lands on week 2 of
+    // so short a plan, and `clampWeeklyVolume`'s week-on-week growth ceiling cannot climb back in
+    // the two weeks left. That ceiling is a safety rule, not something to bend for a nicer number.
+    const plan = buildNoRace({ durationWeeks: 4 });
+    expect(plan.weeks[3].isDeload).toBe(false);
+    expect(plan.weeklyLoad[3]).toBeGreaterThan(plan.weeklyLoad[2]);
+  });
+
+  it('bends the cadence for the last week only, leaving earlier deloads in place', () => {
+    const plan = buildNoRace({ durationWeeks: 12 });
+    const deloadWeeks = plan.weeks.filter((week) => week.isDeload).map((week) => week.weekNumber);
+    expect(deloadWeeks).toContain(4);
+    expect(deloadWeeks).toContain(8);
+    expect(deloadWeeks).not.toContain(12);
   });
 
   it('peaks at the end rather than partway through', () => {

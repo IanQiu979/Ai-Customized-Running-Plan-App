@@ -244,11 +244,18 @@ function validateRequest(request: GeneratePlanRequest): string | null {
   if (request.goalType !== 'race' && request.goalType !== 'duration') {
     return 'goalType must be "race" or "duration".';
   }
+  // Checked regardless of goalType: a "duration" request legitimately carries `raceDistance` when
+  // the runner named a target distance with no date (`src/lib/planRequest.ts`), and that value
+  // shapes the periodization in `buildTemplatePlan` exactly as a race goal's does. Validating it
+  // only inside the "race" branch left that path with no value check at all.
+  if (
+    request.raceDistance !== undefined &&
+    !['5k', '10k', 'half', 'marathon'].includes(request.raceDistance)
+  ) {
+    return 'raceDistance must be one of 5k|10k|half|marathon.';
+  }
   if (request.goalType === 'race') {
     if (!request.raceDistance) return 'raceDistance is required when goalType is "race".';
-    if (!['5k', '10k', 'half', 'marathon'].includes(request.raceDistance)) {
-      return 'raceDistance must be one of 5k|10k|half|marathon.';
-    }
     if (!request.raceDate) return 'raceDate is required when goalType is "race".';
     if (!isIsoCalendarDate(request.raceDate)) return 'raceDate must be a valid YYYY-MM-DD calendar date.';
   }
