@@ -21,6 +21,18 @@ for the full account.
   removed, and a plan with no race no longer emits a `taper` phase or interpolates the taper tail of
   the canonical load curve (it used to finish *below* the volume it started at). Race plans are
   unchanged, golden fixture included.
+- **A past race date is refused on both screens.** Home does not send the request (so no quota slot
+  is charged for the one-week plan `weeksUntilRace`'s floor would otherwise produce) and intake does
+  not save the date; each says why and names the control that fixes it. Race day itself, and a blank
+  date, are both still valid. `src/lib/planRequest.ts` owns the decision and both messages.
+- **A no-race plan never ends on a deload** — captain's coaching ruling; the every-N-weeks cadence
+  yields for the final week only, and only for `isRacePlan === false`. Known limitation, pinned by a
+  documenting test: a 4-week no-race plan still finishes below its opening volume, because at that
+  length the canonical curve's own dip lands on week 2 and `clampWeeklyVolume`'s growth ceiling — a
+  safety rule, deliberately not bent — cannot recover it.
+- **`raceDistance` is validated whenever present, on any goal type**, since the client now sends it
+  with `goalType: 'duration'` too; `racePhaseWeights` is exhaustive rather than silently falling
+  through to the marathon weights.
 - **Numeric inputs are structured.** New `src/components/inputs/` splits dates into `YYYY - MM - DD`
   and times into `H : MM : SS` with the separators printed rather than typed, and filters every
   keystroke via `src/lib/fieldInput.ts` — `keyboardType` alone restricts nothing, which is how the

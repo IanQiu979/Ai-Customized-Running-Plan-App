@@ -48,6 +48,30 @@ the dashes." All three reproduced on an iOS 26.5 simulator before anything was c
   typed**, filter every keystroke through `src/lib/fieldInput.ts`, and auto-advance between boxes.
   Verified on device: age → `number-pad`, weekly distance → `decimal-pad`, race date and both time
   fields → digit boxes with a `number-pad`.
+- **A stale race date is refused on both screens, and charges nothing.** Home shows the target
+  read-only now, so a runner returning after their race would have had that date sent verbatim:
+  `weeksUntilRace` floors at one week and the quota slot is reserved before the skeleton is built,
+  so the request would have charged a generation for a degenerate one-week plan. Home refuses
+  before sending, and intake refuses to save a past date, each saying so and naming the control
+  that fixes it (`RACE_DATE_PASSED_MESSAGE` / `INTAKE_RACE_DATE_PASSED_MESSAGE` in
+  `src/lib/planRequest.ts`). Race day itself still generates and still saves; a blank date is still
+  valid, because the race is optional. The server-side floor is deliberate behaviour for other
+  callers and was not changed.
+- **A no-race plan never ends on a deload.** Captain's ruling as a McMillan-certified coach: the
+  last week of a plan is the last week the runner sees, and finishing on a recovery week leaves
+  them at or below where they started — the visible symptom behind the original report. The final
+  week of a plan with `isRacePlan === false` is forced to be a loading week, deliberately bending
+  the every-N-weeks deload cadence for that week alone. The cadence, `deloadVolume`, and race plans
+  (whose final week is race week or taper) are untouched. Known limitation, pinned by its own
+  documenting test: a **4-week** no-race plan still finishes below its opening volume — at that
+  length the canonical curve's own dip lands on week 2, and `clampWeeklyVolume`'s week-on-week
+  growth ceiling cannot recover it in the two weeks left. That ceiling is a safety rule and was
+  deliberately not bent.
+- **`raceDistance` is validated on any goal type.** The client now deliberately sends it alongside
+  `goalType: 'duration'` for a target-distance-with-no-date runner, so the value check in
+  `workers/src/lib/generate-plan-flow.ts` was hoisted out of the `race` branch and runs whenever the
+  field is present. `racePhaseWeights` is now an exhaustive `switch` rather than a chained ternary
+  that silently handed an unrecognised value the marathon weights.
 - 392 root tests (was 332) and 133 `workers/` tests (was 130) pass; typecheck and lint clean on both
   sides. Not verified: Android — no Android SDK on this machine. Billing, tiers, entitlement, auth
   and the paywall were not touched.

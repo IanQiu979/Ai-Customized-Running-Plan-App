@@ -327,7 +327,12 @@ src/lib/
                             #          5K case. Free's 12-week/5K limit is a UI/quota gate applied
                             #          on top of this engine, not a limit of the engine itself — a
                             #          Pro/Elite fallback still needs, say, a 26-week marathon
-                            #          template.
+                            #          template. Since 2026-08-15 a plan with no race is a first
+                            #          class shape, not a 5K in disguise: no invented distance, no
+                            #          taper phase, the loading block of the curve only, and a final
+                            #          week forced to be a loading week so it never ends on a deload
+                            #          (captain's coaching ruling — the cadence yields for that week
+                            #          alone). Race plans, golden fixture included, are unchanged.
   paceDerivation.ts        # exists — Riegel cross-distance equivalency, source-relative training
                             #          bands, and the ruled goal-realism/race-pace cap (decision
                             #          13, 2026-07-10)
@@ -335,7 +340,13 @@ src/lib/
                             #          Home never re-asks it: `planTargetFromIntake()`,
                             #          `needsPlanLength()`, `buildGeneratePlanRequest()`. Pure, so
                             #          the "asked exactly once" and "no race needed" guarantees are
-                            #          unit-tested without rendering a screen.
+                            #          unit-tested without rendering a screen. Also owns the
+                            #          stale-race-date guard both screens share — `isRaceDatePast()`
+                            #          (`now` is injected, never read from the clock in here),
+                            #          `intakeRaceDateError()` and the two messages. Home sends no
+                            #          request and intake saves nothing when the date has passed, so
+                            #          no quota slot is charged for the one-week plan the server's
+                            #          `weeksUntilRace` floor would otherwise produce.
   fieldInput.ts            # exists (2026-08-15) — digit/decimal filters and the clock/date part
                             #          parsers behind `src/components/inputs/`. Its header records
                             #          why `keyboardType` alone is not enough (it restricts nothing;
@@ -452,7 +463,7 @@ it `getSession()` ignores the header and every route 403s a user who just signed
 |---|---|---|---|---|
 | `ANY /api/auth/*` | — | better-auth's own | better-auth's own | Sign-up, sign-in, sign-out, session, OAuth callbacks. Email/password and Google both work in production (Google since 2026-08-09 — see `docs/change_log.md`). |
 | `GET /health` | none | — | `{ ok: true }` | Liveness. Touches no database. |
-| `POST /api/generate-plan` | session | `{ goalType: "race"\|"duration", raceDistance?, raceDate?, durationWeeks?, notes?, idempotencyKey }` | `{ plan, planId, isFallback, quotaConsumed }`, or `402` over-quota / `403` anon / `409` intake-required | Enforces tier + quota server-side, branches by tier, validates, persists. A duplicate `idempotencyKey` returns the existing plan instead of generating twice. Free gets the template plan (since 2026-08-04). Pro/Elite call the personalization prompt (bound since 2026-08-10) but, with no `ANTHROPIC_API_KEY` configured anywhere yet, still fall back to the same template today (`isFallback: true`, quota-exempt) — see "Current — `generate-plan`" above. `quotaConsumed` tells the client whether this fallback counted against the tier limit, so `FallbackNotice` can pick `counted` vs `exempt`. |
+| `POST /api/generate-plan` | session | `{ goalType: "race"\|"duration", raceDistance?, raceDate?, durationWeeks?, notes?, idempotencyKey }` | `{ plan, planId, isFallback, quotaConsumed }`, or `402` over-quota / `403` anon / `409` intake-required | Enforces tier + quota server-side, branches by tier, validates, persists. `raceDistance` is validated whenever it is present, on either goal type — a `duration` request legitimately carries one for a runner with a target distance and no date. A duplicate `idempotencyKey` returns the existing plan instead of generating twice. Free gets the template plan (since 2026-08-04). Pro/Elite call the personalization prompt (bound since 2026-08-10) but, with no `ANTHROPIC_API_KEY` configured anywhere yet, still fall back to the same template today (`isFallback: true`, quota-exempt) — see "Current — `generate-plan`" above. `quotaConsumed` tells the client whether this fallback counted against the tier limit, so `FallbackNotice` can pick `counted` vs `exempt`. |
 | `GET /api/quota-status` | session | — | `{ tier, used, limit, periodEnd }` | Drives Home's and Settings' "N of M plans used" line (`src/lib/quotaDisplay.ts`'s `formatQuotaLine()`, consumed by both since 2026-08-05). `used` counts **non-fallback** plans in the current purchase-anchored period, server-side, never a client counter. `periodEnd` is `null` for Free (lifetime allowance) and also `null` while the temporary `ALL_USERS_UNLIMITED_ACCESS` override is on (see below) — the UI must not render a countdown for either. |
 | `POST /api/purchase-tier` | session | `{ tier: "pro"\|"elite", source: "dummy" }` | `{ tier, periodStart: string \| null, periodEnd: string \| null }` | v1 dummy flow, called from `src/app/paywall.tsx` (new 2026-08-05) with honest "test upgrade, no payment required" copy. v2 swaps `source` to `"revenuecat"` and verifies the receipt — same route, same table write. `source: "revenuecat"` is refused in v1 rather than trusted. |
 | `POST /api/delete-account` | session | — | `{ deleted: true }` | Really deletes; no soft-delete flag, because the app's own copy promises erasure. The only route that deletes a plan. Called from Settings' Delete Account flow (new 2026-08-05), followed client-side by `authClient.signOut()` to invalidate the local session store. |

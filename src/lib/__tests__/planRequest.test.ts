@@ -2,6 +2,8 @@ import {
   buildGeneratePlanRequest,
   DEFAULT_PLAN_WEEKS,
   describePlanTarget,
+  INTAKE_RACE_DATE_PASSED_MESSAGE,
+  intakeRaceDateError,
   isRaceDatePast,
   MAX_PLAN_WEEKS,
   needsPlanLength,
@@ -222,6 +224,34 @@ describe('a saved race date that has already passed', () => {
   it('does not block a dateless distance or a general target', () => {
     expect(request({ target: { kind: 'distance', raceDistance: '10k' } }).ok).toBe(true);
     expect(request({ target: { kind: 'general' } }).ok).toBe(true);
+  });
+});
+
+describe('intakeRaceDateError — the way out of the refusal', () => {
+  // Home refusing to generate against a stale date while intake still happily saves that same date
+  // would be a closed loop: tap Change, see the same date, save clean, get refused again. Intake
+  // refuses too, and says what to do about it.
+  it('refuses a past race date and gives the runner both ways out', () => {
+    expect(intakeRaceDateError('2026-08-14', NOW)).toBe(INTAKE_RACE_DATE_PASSED_MESSAGE);
+    expect(INTAKE_RACE_DATE_PASSED_MESSAGE).toContain('future date');
+    expect(INTAKE_RACE_DATE_PASSED_MESSAGE).toContain('clear your target race');
+  });
+
+  it('tells the same story as Home about the same condition', () => {
+    expect(INTAKE_RACE_DATE_PASSED_MESSAGE).toContain('That race date has already passed.');
+    expect(RACE_DATE_PASSED_MESSAGE).toContain('That race date has already passed.');
+  });
+
+  it('accepts race day itself, matching Home, where race day still generates', () => {
+    expect(intakeRaceDateError('2026-08-15', NOW)).toBeNull();
+  });
+
+  it('accepts a future race date', () => {
+    expect(intakeRaceDateError('2026-09-26', NOW)).toBeNull();
+  });
+
+  it('accepts a blank date, because the race and its date are both optional', () => {
+    expect(intakeRaceDateError(undefined, NOW)).toBeNull();
   });
 });
 

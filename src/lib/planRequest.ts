@@ -78,11 +78,16 @@ export type BuildRequestResult =
   | { ok: false; error: string };
 
 /**
- * What Home says when the saved race date is behind us. It names the fix and the control that
- * performs it — "Change" is the link next to the target, and it goes to `/intake`.
+ * One condition, told the same way on both screens: the first sentence is shared, and each screen
+ * names the control it actually has. Home's is the "Change" link beside the read-only target;
+ * intake's is the race-date field itself, where clearing the target race is a legitimate answer
+ * because the race is optional.
  */
-export const RACE_DATE_PASSED_MESSAGE =
-  'That race date has already passed. Tap Change to set a new target in your intake.';
+const RACE_DATE_PASSED = 'That race date has already passed.';
+
+export const RACE_DATE_PASSED_MESSAGE = `${RACE_DATE_PASSED} Tap Change to set a new target in your intake.`;
+
+export const INTAKE_RACE_DATE_PASSED_MESSAGE = `${RACE_DATE_PASSED} Enter a future date, or clear your target race — a race is optional.`;
 
 function isoDay(date: Date): string {
   const year = String(date.getFullYear()).padStart(4, '0');
@@ -98,6 +103,18 @@ function isoDay(date: Date): string {
  */
 export function isRaceDatePast(raceDate: string, now: Date): boolean {
   return raceDate < isoDay(now);
+}
+
+/**
+ * Intake's half of the same guard, kept here rather than in the screen so all four cases are
+ * unit-testable. Refusing to *generate* against a stale date while still letting intake *save* it
+ * would trap a runner in a loop: tap Change, see the same date, save clean, get refused again.
+ *
+ * A blank date is not an error — both the target race and its date are optional.
+ */
+export function intakeRaceDateError(raceDate: string | undefined, now: Date): string | null {
+  if (!raceDate) return null;
+  return isRaceDatePast(raceDate, now) ? INTAKE_RACE_DATE_PASSED_MESSAGE : null;
 }
 
 /**

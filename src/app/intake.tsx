@@ -35,6 +35,7 @@ import {
 } from '@/lib/fieldInput';
 import { getGoalRealismIntakeCopy } from '@/lib/goalRealismDisclosure';
 import { assessGoalRealism } from '@/lib/paceDerivation';
+import { intakeRaceDateError } from '@/lib/planRequest';
 import type { ExperienceAnswer, InjuryFlag, IntakeResponses, RaceDistance } from '@/lib/planTypes';
 
 const EXPERIENCE_OPTIONS: { value: ExperienceAnswer; label: string }[] = [
@@ -247,6 +248,11 @@ export default function IntakeScreen() {
         return;
       }
       raceDateIso = parsed;
+    }
+    const staleRaceDateError = intakeRaceDateError(raceDateIso, new Date());
+    if (staleRaceDateError) {
+      setError(staleRaceDateError);
+      return;
     }
 
     let goalTimeSec: number | undefined;

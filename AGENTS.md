@@ -221,6 +221,17 @@ Built-ins also available: `Explore`, `Plan`, `general-purpose`. Plugin agents ar
   `raceDistance?: RaceDistance` with no fallback; race week, the taper phase and the taper tail of
   the load curve are all gated on `isRacePlan`. Re-introducing a `?? '5k'` silently gives a
   general-fitness runner a race plan — see `src/lib/planTemplates.ts` and its `noRace` test suite.
+  Two rules ride with it, both in that file and pinned by that suite: **a no-race plan never ends on
+  a deload** (captain's coaching ruling, 2026-08-15 — the cadence yields for the final week only,
+  and only when `isRacePlan` is false), and `raceDistance` is validated **whenever it is present on
+  any goal type**, not only on `goalType: 'race'` — see `validateRequest` in
+  `workers/src/lib/generate-plan-flow.ts`, since the client sends it with `duration` too.
+- **A race date that has already passed is refused, never generated against.** It would otherwise
+  reach `weeksUntilRace`'s `Math.max(1, …)` floor and charge a quota slot for a one-week plan. Both
+  screens refuse and both say why; the decision and both messages are pure and testable in
+  `src/lib/planRequest.ts` (`isRaceDatePast`, `intakeRaceDateError`). Race day itself is still
+  valid, and so is a blank date. Do not re-implement the comparison in a screen, and do not change
+  the server floor — it is deliberate for other callers.
 - **`keyboardType` restricts nothing — it only picks which keyboard is offered.** A hardware
   keyboard, paste, dictation or autofill puts letters into a "number" field (verified on device).
   Every numeric input goes through `src/components/inputs/`, which filters keystrokes via
