@@ -5,6 +5,17 @@ export interface GoalRealismNoticeCopy {
   body: string;
 }
 
+/** 'plan' speaks about a generated plan; 'preview' speaks about one the runner hasn't made yet. */
+export type GoalRealismNoticeVariant = 'plan' | 'preview';
+
+/** "an 8% / an 11% / an 18%" but "a 20%" — spoken form, so it keys off the leading digits. */
+function articleForPercent(value: number): 'a' | 'an' {
+  const digits = String(Math.abs(value));
+  if (digits.startsWith('8')) return 'an';
+  if (digits === '11' || digits === '18') return 'an';
+  return 'a';
+}
+
 /** Realistic goals stay silent; both warned outcomes must explain themselves on the plan. */
 export function shouldShowGoalRealismNotice(
   assessment: GoalRealismAssessment | undefined
@@ -12,27 +23,42 @@ export function shouldShowGoalRealismNotice(
   return assessment !== undefined && assessment.realism !== 'realistic';
 }
 
-/** Copy for the immutable plan's realism disclosure. */
+/**
+ * Copy for the realism disclosure. `'plan'` describes a plan that exists; `'preview'` is for the
+ * pre-generation goal panel, where the same state can only be spoken about in the future tense.
+ */
 export function getGoalRealismNoticeCopy(
-  assessment: GoalRealismAssessment
+  assessment: GoalRealismAssessment,
+  variant: GoalRealismNoticeVariant = 'plan'
 ): GoalRealismNoticeCopy | null {
   const improvementPct = Math.round(assessment.impliedImprovementPct);
+  const article = articleForPercent(improvementPct);
 
   if (assessment.realism === 'realistic') {
     return null;
   }
 
   if (assessment.realism === 'implausible') {
-    return {
-      title: 'Your goal pace was adjusted.',
-      body: `Based on your recent performance, a ${improvementPct}% improvement isn't realistic to build a plan around — this plan targets a more sustainable finish time instead.`,
-    };
+    return variant === 'preview'
+      ? {
+          title: 'Your goal pace will be adjusted.',
+          body: `Based on your recent performance, ${article} ${improvementPct}% improvement isn't realistic to build a plan around — your plan will target a more sustainable finish time instead.`,
+        }
+      : {
+          title: 'Your goal pace was adjusted.',
+          body: `Based on your recent performance, ${article} ${improvementPct}% improvement isn't realistic to build a plan around — this plan targets a more sustainable finish time instead.`,
+        };
   }
 
-  return {
-    title: 'Your goal is ambitious.',
-    body: `Based on your recent performance, that's roughly a ${improvementPct}% improvement — an ambitious target. This plan keeps the goal pace you entered; it has not been capped.`,
-  };
+  return variant === 'preview'
+    ? {
+        title: 'Your goal is ambitious.',
+        body: `Based on your recent performance, that's roughly ${article} ${improvementPct}% improvement — an ambitious target. Your plan will keep the goal pace you entered; it won't be capped.`,
+      }
+    : {
+        title: 'Your goal is ambitious.',
+        body: `Based on your recent performance, that's roughly ${article} ${improvementPct}% improvement — an ambitious target. This plan keeps the goal pace you entered; it has not been capped.`,
+      };
 }
 
 /** Short advisory copy shown beside goal entry before the runner spends a generation. */

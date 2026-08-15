@@ -323,7 +323,7 @@ export default function HomeScreen() {
                     </Text>
                   )}
                   {goalRealismPreview && goalRealismPreview.realism !== 'realistic' ? (
-                    <GoalRealismNotice assessment={goalRealismPreview} />
+                    <GoalRealismNotice assessment={goalRealismPreview} variant="preview" />
                   ) : null}
                 </>
               ) : (

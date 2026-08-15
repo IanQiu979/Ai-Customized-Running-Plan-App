@@ -35,7 +35,7 @@ describe('goal-realism disclosure', () => {
     expect(shouldShowGoalRealismNotice(ambitious)).toBe(true);
     expect(getGoalRealismNoticeCopy(ambitious)).toEqual({
       title: 'Your goal is ambitious.',
-      body: "Based on your recent performance, that's roughly a 11% improvement — an ambitious target. This plan keeps the goal pace you entered; it has not been capped.",
+      body: "Based on your recent performance, that's roughly an 11% improvement — an ambitious target. This plan keeps the goal pace you entered; it has not been capped.",
     });
     expect(getGoalRealismIntakeCopy(ambitious)).toBe(
       'Based on your recent performance, that goal is ambitious — the plan will keep your goal pace as entered, but it will be a stretch.'
@@ -51,6 +51,29 @@ describe('goal-realism disclosure', () => {
     expect(getGoalRealismIntakeCopy(implausible)).toBe(
       'Based on your recent performance, that goal is implausible — the plan will target a more sustainable pace.'
     );
+  });
+
+  it('speaks in the future tense before a plan exists', () => {
+    expect(getGoalRealismNoticeCopy(ambitious, 'preview')).toEqual({
+      title: 'Your goal is ambitious.',
+      body: "Based on your recent performance, that's roughly an 11% improvement — an ambitious target. Your plan will keep the goal pace you entered; it won't be capped.",
+    });
+    expect(getGoalRealismNoticeCopy(implausible, 'preview')).toEqual({
+      title: 'Your goal pace will be adjusted.',
+      body: "Based on your recent performance, a 20% improvement isn't realistic to build a plan around — your plan will target a more sustainable finish time instead.",
+    });
+    expect(getGoalRealismNoticeCopy(realistic, 'preview')).toBeNull();
+  });
+
+  it('picks the indefinite article by how the percentage is spoken', () => {
+    const withPct = (pct: number): string =>
+      getGoalRealismNoticeCopy({ ...ambitious, impliedImprovementPct: pct })?.body ?? '';
+
+    expect(withPct(8.2)).toContain('roughly an 8% improvement');
+    expect(withPct(11.4)).toContain('roughly an 11% improvement');
+    expect(withPct(18.4)).toContain('roughly an 18% improvement');
+    expect(withPct(12.4)).toContain('roughly a 12% improvement');
+    expect(withPct(15.4)).toContain('roughly a 15% improvement');
   });
 
   it('does not disclose absent realism data', () => {

@@ -3,10 +3,12 @@ import { StyleSheet, Text, View } from 'react-native';
 import { FontFamily, FontSize, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { getGoalRealismNoticeCopy } from '@/lib/goalRealismDisclosure';
+import type { GoalRealismNoticeVariant } from '@/lib/goalRealismDisclosure';
 import type { GoalRealismAssessment } from '@/lib/planTypes';
 
 interface GoalRealismNoticeProps {
   assessment: GoalRealismAssessment;
+  variant?: GoalRealismNoticeVariant;
 }
 
 /**
@@ -14,11 +16,12 @@ interface GoalRealismNoticeProps {
  * hairline-border treatment as `FallbackNotice`, never `status.error`: this is a coaching judgment
  * call, not a failure. `'implausible'` (a capped race-pace anchor, `cappedTimeSec` set) gets the
  * "was adjusted" copy; `'ambitious'` still anchors race-pace reps at the declared goal, so it gets
- * a softer heads-up instead — callers must not claim an adjustment that didn't happen.
+ * a softer heads-up instead — callers must not claim an adjustment that didn't happen. Call sites
+ * that render this before a plan exists pass `variant="preview"` for the future-tense wording.
  */
-export function GoalRealismNotice({ assessment }: GoalRealismNoticeProps) {
+export function GoalRealismNotice({ assessment, variant = 'plan' }: GoalRealismNoticeProps) {
   const theme = useTheme();
-  const copy = getGoalRealismNoticeCopy(assessment);
+  const copy = getGoalRealismNoticeCopy(assessment, variant);
 
   if (!copy) {
     return null;
