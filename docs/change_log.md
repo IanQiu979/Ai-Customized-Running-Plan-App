@@ -5,6 +5,53 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-08-15 (later) — intake asked once, race target optional, structured numeric inputs
+
+Captain's phone test: "the homepage is very very confusing… after you've done [the intake] once,
+you have to do it once more… the race stage should be optional… the keyboard is missing the colons,
+the dashes." All three reproduced on an iOS 26.5 simulator before anything was changed.
+
+- **Intake is asked exactly once.** There is one intake *screen* but there were two intake
+  *surfaces*: `/intake`, which asks for a target race and race date, and Home's generate panel,
+  which asked for a goal type, a race distance and a race date all over again — and, unlike intake,
+  refused to proceed without them. Home no longer asks any question intake has answered. It reads
+  the target back from the saved intake ("YOUR TARGET — Half Marathon on 2026-09-26 / General
+  fitness — no target race") with a **Change** link to `/intake`, and asks only for a plan length,
+  and only when there is no race date to derive one from. New pure module `src/lib/planRequest.ts`
+  holds that decision so it is unit-testable. A return visit generates another plan with no
+  re-answering at all.
+- **A race target is optional end to end.** Home's "Select a race distance." wall is gone; a runner
+  with no race gets a general-fitness plan. Two engine defects behind that were fixed in
+  `src/lib/planTemplates.ts`:
+  1. `buildTemplatePlan` ended with `params.raceDistance ?? params.intake.raceDistance ?? '5k'`, so
+     a runner who named no race silently got 5K periodization. The `?? '5k'` is gone; `raceDistance`
+     stays `undefined` and every race-specific branch is gated on a new `isRacePlan`. This is the
+     same rule PR #75 established for a *stated* goal, applied to one deliberately left blank.
+  2. A no-race plan still ran out through a `taper` — a wind-down into a race day that did not
+     exist, and (because every quality branch is gated on base/build/peak or on a race goal type) a
+     final stretch with no quality work at all. No-race plans now allocate base/build/peak only. The
+     volume curve had the same problem independently: `FIVE_K_WEEKLY_LOAD`'s last two entries *are*
+     the 5K taper, so a 12-week general plan finished at 24 km off a 35 km baseline, below where it
+     started. A no-race plan now interpolates the loading block of the same approved curve.
+     **No number was invented** — see `generalPhaseWeights` and `taperAwareCurve` for the
+     derivation from `plan-structure.md`. Race plans are byte-identical to before, golden 5K fixture
+     included.
+- **Numeric fields are structured, not masked free text.** The captain's "missing the colons, the
+  dashes" was accurate twice over. (a) `number-pad` genuinely has no `:` or `-`; the old screens hid
+  that behind an as-you-type mask, so the field's own label demanded punctuation the keyboard could
+  not produce and the digits regrouped under the thumb while typing (`1` → `14` → `1:45`). (b)
+  `keyboardType` restricts nothing — a hardware keyboard, paste, dictation or autofill puts letters
+  straight into a "number" field; verified on the simulator, where the letter `v` landed in the
+  intake AGE field and produced "Age must be a whole number between 13 and 100." New
+  `src/components/inputs/` — `NumberField`, `SegmentedField`, `DateField`, `ClockField` — split
+  dates into `YYYY - MM - DD` and times into `H : MM : SS` with the separators **printed, never
+  typed**, filter every keystroke through `src/lib/fieldInput.ts`, and auto-advance between boxes.
+  Verified on device: age → `number-pad`, weekly distance → `decimal-pad`, race date and both time
+  fields → digit boxes with a `number-pad`.
+- 392 root tests (was 332) and 133 `workers/` tests (was 130) pass; typecheck and lint clean on both
+  sides. Not verified: Android — no Android SDK on this machine. Billing, tiers, entitlement, auth
+  and the paywall were not touched.
+
 ## 2026-08-15 — complete goal-realism disclosure and correct ambitious-goal copy
 
 - The immutable plan screen now renders `GoalRealismNotice` for both warned outcomes, not only

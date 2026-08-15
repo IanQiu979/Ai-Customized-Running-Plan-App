@@ -42,11 +42,13 @@ src/
     (tabs)/
       _layout.tsx          # tab bar — all four tabs today: Home, Glossary, My Plans, Settings
                             #           (Settings added 2026-08-05)
-      index.tsx             # Home placeholder shell + a temporary demo link to the fixture plan;
-                             #  as of 2026-08-05 also prefills raceDistance/raceDate from saved
-                             #  intake (once per mount) and shows GET /api/quota-status inline.
-                             #  The temporary "Sign out" button that lived here is gone — moved to
-                             #  settings.tsx.
+      index.tsx             # Home — quota line, the runner's target READ BACK from saved intake
+                             #  (never re-asked), and Generate plan. As of 2026-08-15 it no longer
+                             #  carries its own goal-type / race-distance / race-date panel: that
+                             #  duplicated intake and blocked a runner with no race. The only field
+                             #  left is a plan length, shown only when there is no race date to
+                             #  derive one from; "Change" routes to /intake. Decision logic lives in
+                             #  src/lib/planRequest.ts, not here.
       settings.tsx           # Settings tab (new 2026-08-05) — tier + quota (GET
                               #  /api/quota-status, src/lib/quotaDisplay.ts), sign-out (moved off
                               #  Home), a Free-tier "Upgrade" entry point to /paywall, and Delete
@@ -54,7 +56,10 @@ src/
       glossary.tsx           # abbreviations glossary — sourced from notation.ts, nothing hardcoded
       my-plans.tsx           # My Plans — lists plans off GET /api/plans, refetched on every tab
                               #            focus (useFocusEffect), not just on mount
-    intake.tsx               # onboarding questionnaire, against GET/PUT /api/intake; its
+    intake.tsx               # onboarding questionnaire — THE ONLY place a target race is asked
+                              # for (2026-08-15). Numeric answers use src/components/inputs/
+                              # (segmented YYYY-MM-DD and H:MM:SS boxes, digit-filtered).
+                              # Against GET/PUT /api/intake; its
                               # exit-header action replaces to Home ("Done" once intake exists,
                               # "Skip for now" otherwise), and as of 2026-08-05 a successful save
                               # also router.replace('/(tabs)')s there instead of staying put
@@ -326,6 +331,15 @@ src/lib/
   paceDerivation.ts        # exists — Riegel cross-distance equivalency, source-relative training
                             #          bands, and the ruled goal-realism/race-pace cap (decision
                             #          13, 2026-07-10)
+  planRequest.ts           # exists (2026-08-15) — the rule that intake owns the runner's target and
+                            #          Home never re-asks it: `planTargetFromIntake()`,
+                            #          `needsPlanLength()`, `buildGeneratePlanRequest()`. Pure, so
+                            #          the "asked exactly once" and "no race needed" guarantees are
+                            #          unit-tested without rendering a screen.
+  fieldInput.ts            # exists (2026-08-15) — digit/decimal filters and the clock/date part
+                            #          parsers behind `src/components/inputs/`. Its header records
+                            #          why `keyboardType` alone is not enough (it restricts nothing;
+                            #          a letter reached a number-pad field on device).
   quotaDisplay.ts          # exists (2026-08-05) — `formatQuotaLine()`, pure display phrasing for
                             #          `QuotaStatus`. There is no separate `subscription.ts`; the
                             #          tier-read/dummy-purchase ground it would have covered is

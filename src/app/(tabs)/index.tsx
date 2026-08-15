@@ -1,92 +1,61 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { NumberField } from '@/components/inputs/NumberField';
 import { GoalRealismNotice } from '@/components/plan/GoalRealismNotice';
 import { FontFamily, FontSize, PressedOpacity, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { API_BASE_URL, ApiError, describeError, generatePlan, getIntake, getQuotaStatus } from '@/lib/apiClient';
 import { mintIdempotencyKey } from '@/lib/idempotencyKey';
 import { assessGoalRealism } from '@/lib/paceDerivation';
+import {
+  buildGeneratePlanRequest,
+  DEFAULT_PLAN_WEEKS,
+  describePlanTarget,
+  needsPlanLength,
+  planTargetFromIntake,
+} from '@/lib/planRequest';
 import { formatQuotaLine } from '@/lib/quotaDisplay';
-import type { GoalType, IntakeResponses, QuotaStatus, RaceDistance } from '@/lib/planTypes';
-
-const RACE_DISTANCE_OPTIONS: { value: RaceDistance; label: string }[] = [
-  { value: '5k', label: '5K' },
-  { value: '10k', label: '10K' },
-  { value: 'half', label: 'Half Marathon' },
-  { value: 'marathon', label: 'Marathon' },
-];
+import type { IntakeResponses, QuotaStatus } from '@/lib/planTypes';
 
 /** `generate-plan-flow.ts`'s own cap on free-text `notes` — mirrored here only so the field
  * stops accepting keystrokes rather than the runner discovering the limit from a server error. */
 const MAX_NOTES_LENGTH = 1000;
 
-/** As-you-type mask for a `YYYY-MM-DD` field: strips non-digits, caps at 8 digits, and inserts
- * the two `-` separators as they're reached. No native date picker here — see the routing note
- * in AGENTS.md on new dependencies; this is the deliberate text-input fallback. Mirrors
- * `intake.tsx`'s identical helper — kept local rather than shared per this fix's file scope. */
-function formatDateInput(text: string): string {
-  const digits = text.replace(/\D/g, '').slice(0, 8);
-  let out = digits.slice(0, 4);
-  if (digits.length > 4) out += `-${digits.slice(4, 6)}`;
-  if (digits.length > 6) out += `-${digits.slice(6, 8)}`;
-  return out;
-}
-
-/** Inline, complete-but-invalid check for a `YYYY-MM-DD` field. Returns `null` while the runner
- * is still typing (fewer than 8 digits) so the message doesn't flash on every keystroke — only
- * once all 8 digits are in does an out-of-range month/day or non-existent calendar date surface. */
-function dateFieldError(text: string): string | null {
-  const digits = text.replace(/\D/g, '');
-  if (digits.length < 8) return null;
-  const year = Number(text.slice(0, 4));
-  const month = Number(text.slice(5, 7));
-  const day = Number(text.slice(8, 10));
-  if (month < 1 || month > 12) return 'Enter a valid month (01-12).';
-  if (day < 1 || day > 31) return 'Enter a valid day (01-31).';
-  const parsed = new Date(Date.UTC(year, month - 1, day));
-  if (
-    parsed.getUTCFullYear() !== year ||
-    parsed.getUTCMonth() !== month - 1 ||
-    parsed.getUTCDate() !== day
-  ) {
-    return 'Enter a valid calendar date.';
-  }
-  return null;
-}
-
 /**
- * Home. On mount, checks whether the signed-in runner has completed intake (`getIntake()`). No
- * intake yet: a prompt links to `/intake`. Intake done: a compact generate-configuration panel —
- * goal type, then either a race distance + date or a duration in weeks, plus optional notes —
- * that calls `generatePlan()` and pushes straight to the real plan view on success. The one-time
- * static-fixture demo link this screen used to carry has moved to the "My Plans" tab, where it
- * now sits permanently pinned above real, backend-fetched plans.
+ * Home. Checks whether the signed-in runner has completed intake (`getIntake()`). No intake yet: a
+ * prompt links to `/intake`. Intake done: their target, read back from what they already answered,
+ * and a single "Generate plan".
+ *
+ * **This screen asks no question intake has already asked.** It used to carry its own goal
+ * type / race distance / race date panel, which the captain met as a second run through the same
+ * survey and which blocked him outright when he had no race (2026-08-15). The target now comes
+ * from `planTargetFromIntake`; the only field left is a plan length, and only when there is no
+ * race date to derive one from. "Change target" goes back to `/intake` — one place, one answer.
  */
 export default function HomeScreen() {
   const theme = useTheme();
   const router = useRouter();
 
   const [checkingIntake, setCheckingIntake] = useState(true);
-  const [hasIntake, setHasIntake] = useState(false);
   const [intake, setIntake] = useState<IntakeResponses | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [quota, setQuota] = useState<QuotaStatus | null>(null);
   const [quotaError, setQuotaError] = useState<string | null>(null);
 
-  const [goalType, setGoalType] = useState<GoalType>('race');
-  const [raceDistance, setRaceDistance] = useState<RaceDistance | undefined>(undefined);
-  const [raceDate, setRaceDate] = useState('');
-  const [durationWeeks, setDurationWeeks] = useState('');
+  const [planLengthWeeks, setPlanLengthWeeks] = useState(String(DEFAULT_PLAN_WEEKS));
   const [notes, setNotes] = useState('');
-
-  // Prefill the panel's race distance/date from the runner's saved intake exactly once per
-  // mount — refiring on every refocus would clobber an in-progress edit the moment the runner
-  // tabs away and back.
-  const hasPrefilled = useRef(false);
 
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
@@ -98,24 +67,19 @@ export default function HomeScreen() {
   // (`generate-plan-flow.ts`'s replay path matches on this key alone, not on the request body).
   const [idempotencyKey, setIdempotencyKey] = useState(() => mintIdempotencyKey());
 
-  // Inline, as-you-type feedback for the masked race-date field — derived from the current text
-  // on every render, only while it's the active goal type.
-  const raceDateError = goalType === 'race' ? dateFieldError(raceDate) : null;
+  const hasIntake = intake !== null;
+  const target = planTargetFromIntake(intake);
+  const askPlanLength = needsPlanLength(target);
 
   // Read-only preview of the same `assessGoalRealism()` the server runs — no new request field,
-  // computed client-side from the runner's already-saved intake. The saved `goalTimeSec` was
-  // entered against `intake.raceDistance` specifically, and this panel's own `raceDistance` chip
-  // is independently editable, so the preview is only meaningful while the two still agree —
-  // otherwise it'd silently judge a goal time against a distance it was never set for.
+  // computed client-side from the runner's already-saved intake. Both the goal time and the
+  // distance it was entered against come from that one saved record now, so the mismatch the old
+  // independently-editable distance chip could create is gone.
   const goalRealismPreview =
-    goalType === 'race' &&
-    raceDistance &&
-    intake?.raceDistance === raceDistance &&
-    intake?.goalTimeSec !== undefined &&
-    intake?.recentPerformance
+    intake?.raceDistance && intake.goalTimeSec !== undefined && intake.recentPerformance
       ? assessGoalRealism({
           goalTimeSec: intake.goalTimeSec,
-          raceDistance,
+          raceDistance: intake.raceDistance,
           recent: intake.recentPerformance,
         })
       : undefined;
@@ -123,7 +87,8 @@ export default function HomeScreen() {
   // `useFocusEffect` (not a plain mount-only `useEffect`) because Expo Router keeps tab screens
   // mounted across navigation — leaving Home for Intake and coming back is a focus event, not a
   // remount, so a mount-only effect would keep showing "complete your intake" forever after the
-  // runner had just done exactly that.
+  // runner had just done exactly that. It is also what makes a target edited in `/intake` show up
+  // here the moment the runner returns.
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
@@ -135,18 +100,11 @@ export default function HomeScreen() {
         try {
           const { intake: fetchedIntake } = await getIntake();
           if (cancelled) return;
-          setHasIntake(!!fetchedIntake);
           setIntake(fetchedIntake);
-
-          if (!hasPrefilled.current && fetchedIntake) {
-            if (fetchedIntake.raceDistance) setRaceDistance(fetchedIntake.raceDistance);
-            if (fetchedIntake.raceDate) setRaceDate(fetchedIntake.raceDate);
-            hasPrefilled.current = true;
-          }
         } catch (fetchError) {
           if (!cancelled) {
             setLoadError(describeError(fetchError, 'Could not load your intake.', API_BASE_URL));
-            setHasIntake(false);
+            setIntake(null);
           }
         } finally {
           if (!cancelled) setCheckingIntake(false);
@@ -171,42 +129,26 @@ export default function HomeScreen() {
   async function handleGenerate() {
     setGenerateError(null);
 
-    if (goalType === 'race') {
-      if (!raceDistance) {
-        setGenerateError('Select a race distance.');
-        return;
-      }
-      if (!raceDate.trim()) {
-        setGenerateError('Race date is required.');
-        return;
-      }
-      if (raceDate.replace(/\D/g, '').length < 8 || dateFieldError(raceDate)) {
-        setGenerateError('Race date must be a valid YYYY-MM-DD date.');
-        return;
-      }
-    } else {
-      const weeksNum = Number(durationWeeks);
-      if (!durationWeeks.trim() || !Number.isInteger(weeksNum) || weeksNum <= 0) {
-        setGenerateError('Duration must be a whole number of weeks greater than 0.');
-        return;
-      }
+    const built = buildGeneratePlanRequest({
+      target,
+      planLengthWeeks,
+      notes,
+      idempotencyKey,
+    });
+    if (!built.ok) {
+      setGenerateError(built.error);
+      return;
     }
 
     setGenerating(true);
     try {
-      const response = await generatePlan({
-        goalType,
-        ...(goalType === 'race' ? { raceDistance, raceDate: raceDate.trim() } : {}),
-        ...(goalType === 'duration' ? { durationWeeks: Number(durationWeeks) } : {}),
-        ...(notes.trim() ? { notes: notes.trim() } : {}),
-        idempotencyKey,
-      });
+      const response = await generatePlan(built.request);
       setIdempotencyKey(mintIdempotencyKey());
       router.push({ pathname: '/plan/[id]', params: { id: response.planId } });
     } catch (generatePlanError) {
       if (generatePlanError instanceof ApiError) {
         if (generatePlanError.body.code === 'intake_required') {
-          setHasIntake(false);
+          setIntake(null);
         } else if (generatePlanError.body.code === 'over_quota') {
           router.push({
             pathname: '/paywall',
@@ -235,7 +177,11 @@ export default function HomeScreen() {
   return (
     <View style={[styles.container, { backgroundColor: theme.surface.base }]}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+        >
           <Text style={[styles.title, { color: theme.text.primary }]}>Pace Blueprint</Text>
 
           {checkingIntake ? (
@@ -244,7 +190,8 @@ export default function HomeScreen() {
             <View style={styles.section}>
               {loadError && <Text style={[styles.error, { color: theme.status.error }]}>{loadError}</Text>}
               <Text style={[styles.body, { color: theme.text.secondary }]}>
-                Complete your intake to generate a plan.
+                Answer a few questions about your running and we&apos;ll build your plan. You only
+                do this once.
               </Text>
               <Pressable
                 accessibilityRole="button"
@@ -256,7 +203,7 @@ export default function HomeScreen() {
                 ]}
               >
                 <Text style={[styles.primaryButtonText, { color: theme.accent.onAccent }]}>
-                  Complete intake
+                  Start intake
                 </Text>
               </Pressable>
             </View>
@@ -267,78 +214,37 @@ export default function HomeScreen() {
                 <Text style={[styles.body, { color: theme.text.secondary }]}>{formatQuotaLine(quota)}</Text>
               )}
 
-              <Text style={[styles.fieldLabel, { color: theme.text.secondary }]}>GOAL TYPE</Text>
-              <View style={styles.chipRow}>
-                <Chip
-                  label="Race"
-                  selected={goalType === 'race'}
-                  onPress={() => setGoalType('race')}
-                  theme={theme}
-                />
-                <Chip
-                  label="Duration"
-                  selected={goalType === 'duration'}
-                  onPress={() => setGoalType('duration')}
-                  theme={theme}
-                />
+              <Text style={[styles.fieldLabel, { color: theme.text.secondary }]}>YOUR TARGET</Text>
+              <View style={styles.targetRow}>
+                <Text style={[styles.targetText, { color: theme.text.primary }]}>
+                  {describePlanTarget(target)}
+                </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Change target"
+                  hitSlop={Spacing.two}
+                  onPress={() => router.push('/intake')}
+                  style={({ pressed }) => pressed && styles.pressed}
+                >
+                  <Text style={[styles.changeLink, { color: theme.text.primary }]}>Change</Text>
+                </Pressable>
               </View>
 
-              {goalType === 'race' ? (
+              {goalRealismPreview && goalRealismPreview.realism !== 'realistic' ? (
+                <GoalRealismNotice assessment={goalRealismPreview} variant="preview" />
+              ) : null}
+
+              {askPlanLength && (
                 <>
-                  <Text style={[styles.fieldLabel, { color: theme.text.secondary }]}>RACE DISTANCE</Text>
-                  <View style={styles.chipRow}>
-                    {RACE_DISTANCE_OPTIONS.map((option) => (
-                      <Chip
-                        key={option.value}
-                        label={option.label}
-                        selected={raceDistance === option.value}
-                        onPress={() => setRaceDistance(option.value)}
-                        theme={theme}
-                      />
-                    ))}
-                  </View>
                   <Text style={[styles.fieldLabel, { color: theme.text.secondary }]}>
-                    RACE DATE (YYYY-MM-DD)
+                    PLAN LENGTH (WEEKS)
                   </Text>
-                  <TextInput
-                    value={raceDate}
-                    onChangeText={(text) => setRaceDate(formatDateInput(text))}
-                    placeholder="2026-09-26"
-                    placeholderTextColor={theme.text.secondary}
-                    autoCapitalize="none"
-                    keyboardType="number-pad"
-                    maxLength={10}
-                    style={[
-                      styles.input,
-                      {
-                        color: theme.text.primary,
-                        borderColor: raceDateError ? theme.status.error : theme.hairline,
-                        backgroundColor: theme.surface.raised,
-                      },
-                    ]}
-                  />
-                  {raceDateError && (
-                    <Text style={[styles.fieldError, { color: theme.status.error }]}>
-                      {raceDateError}
-                    </Text>
-                  )}
-                  {goalRealismPreview && goalRealismPreview.realism !== 'realistic' ? (
-                    <GoalRealismNotice assessment={goalRealismPreview} variant="preview" />
-                  ) : null}
-                </>
-              ) : (
-                <>
-                  <Text style={[styles.fieldLabel, { color: theme.text.secondary }]}>DURATION (WEEKS)</Text>
-                  <TextInput
-                    value={durationWeeks}
-                    onChangeText={setDurationWeeks}
-                    placeholder="e.g. 12"
-                    placeholderTextColor={theme.text.secondary}
-                    keyboardType="number-pad"
-                    style={[
-                      styles.input,
-                      { color: theme.text.primary, borderColor: theme.hairline, backgroundColor: theme.surface.raised },
-                    ]}
+                  <NumberField
+                    accessibilityLabel="Plan length in weeks"
+                    value={planLengthWeeks}
+                    onChangeValue={setPlanLengthWeeks}
+                    maxIntegerDigits={3}
+                    placeholder={String(DEFAULT_PLAN_WEEKS)}
                   />
                 </>
               )}
@@ -388,38 +294,6 @@ export default function HomeScreen() {
   );
 }
 
-function Chip({
-  label,
-  selected,
-  onPress,
-  theme,
-}: {
-  label: string;
-  selected: boolean;
-  onPress: () => void;
-  theme: ReturnType<typeof useTheme>;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected }}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.chip,
-        {
-          borderColor: selected ? theme.text.primary : theme.hairline,
-          backgroundColor: selected ? theme.text.primary : theme.surface.raised,
-        },
-        pressed && styles.pressed,
-      ]}
-    >
-      <Text style={[styles.chipText, { color: selected ? theme.surface.base : theme.text.primary }]}>
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -452,22 +326,21 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
     marginTop: Spacing.two,
   },
-  chipRow: {
+  targetRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.two,
-  },
-  chip: {
-    minHeight: Spacing.six,
-    borderWidth: 1.5,
-    borderRadius: Radius.control,
-    paddingHorizontal: Spacing.three,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.three,
   },
-  chipText: {
+  targetText: {
+    flexShrink: 1,
     fontFamily: FontFamily.body.medium,
+    fontSize: FontSize.md,
+  },
+  changeLink: {
+    fontFamily: FontFamily.body.semiBold,
     fontSize: FontSize.sm,
+    textDecorationLine: 'underline',
   },
   input: {
     minHeight: Spacing.six,
@@ -485,11 +358,6 @@ const styles = StyleSheet.create({
   error: {
     fontFamily: FontFamily.body.medium,
     fontSize: FontSize.xs,
-  },
-  fieldError: {
-    fontFamily: FontFamily.body.medium,
-    fontSize: FontSize.xs,
-    marginTop: Spacing.half,
   },
   primaryButton: {
     minHeight: Spacing.six,

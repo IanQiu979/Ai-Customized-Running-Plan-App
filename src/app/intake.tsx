@@ -12,10 +12,27 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ClockField } from '@/components/inputs/ClockField';
+import { DateField } from '@/components/inputs/DateField';
+import { NumberField } from '@/components/inputs/NumberField';
 import { IntakeExitAction } from '@/components/intake/IntakeExitAction';
 import { FontFamily, FontSize, PressedOpacity, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { API_BASE_URL, describeError, getIntake, putIntake } from '@/lib/apiClient';
+import {
+  clockFieldError,
+  clockPartsToSeconds,
+  datePartsToIso,
+  dateFieldError,
+  EMPTY_CLOCK,
+  EMPTY_DATE,
+  isClockBlank,
+  isDateBlank,
+  isoToDateParts,
+  secondsToClockParts,
+  type ClockParts,
+  type DateParts,
+} from '@/lib/fieldInput';
 import { getGoalRealismIntakeCopy } from '@/lib/goalRealismDisclosure';
 import { assessGoalRealism } from '@/lib/paceDerivation';
 import type { ExperienceAnswer, InjuryFlag, IntakeResponses, RaceDistance } from '@/lib/planTypes';
@@ -48,115 +65,21 @@ const INJURY_OPTIONS: { value: InjuryFlag; label: string }[] = [
 
 const DAY_OPTIONS = [1, 2, 3, 4, 5, 6, 7];
 
-/** "MM:SS" for under an hour, "H:MM:SS" once it runs past one — mirrors the clock format
- * runners already read splits in. Returns '' for undefined so a fresh intake starts blank. */
-function secToClock(sec: number | undefined): string {
-  if (sec === undefined) return '';
-  const h = Math.floor(sec / 3600);
-  const m = Math.floor((sec % 3600) / 60);
-  const s = Math.floor(sec % 60);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
-}
-
-/** Parses "MM:SS" or "H:MM:SS" into total seconds. `null` on anything unparseable — the caller
- * turns that into an inline error rather than guessing. */
-function clockToSec(text: string): number | null {
-  const trimmed = text.trim();
-  if (!trimmed) return null;
-  const parts = trimmed.split(':');
-  if (parts.length !== 2 && parts.length !== 3) return null;
-  const numbers = parts.map(Number);
-  if (numbers.some((n) => !Number.isInteger(n) || n < 0)) return null;
-  if (numbers.length === 2) {
-    const [m, s] = numbers;
-    if (s > 59) return null;
-    const total = m * 60 + s;
-    return total > 0 ? total : null;
-  }
-  const [h, m, s] = numbers;
-  if (m > 59 || s > 59) return null;
-  const total = h * 3600 + m * 60 + s;
-  return total > 0 ? total : null;
-}
-
-/** As-you-type mask for a `YYYY-MM-DD` field: strips non-digits, caps at 8 digits, and inserts
- * the two `-` separators as they're reached. No native date picker here — see the routing note
- * in AGENTS.md on new dependencies; this is the deliberate text-input fallback. */
-function formatDateInput(text: string): string {
-  const digits = text.replace(/\D/g, '').slice(0, 8);
-  let out = digits.slice(0, 4);
-  if (digits.length > 4) out += `-${digits.slice(4, 6)}`;
-  if (digits.length > 6) out += `-${digits.slice(6, 8)}`;
-  return out;
-}
-
-/** Inline, complete-but-invalid check for a `YYYY-MM-DD` field. Returns `null` while the runner
- * is still typing (fewer than 8 digits) so the message doesn't flash on every keystroke — only
- * once all 8 digits are in does an out-of-range month/day or non-existent calendar date surface. */
-function dateFieldError(text: string): string | null {
-  const digits = text.replace(/\D/g, '');
-  if (digits.length < 8) return null;
-  const year = Number(text.slice(0, 4));
-  const month = Number(text.slice(5, 7));
-  const day = Number(text.slice(8, 10));
-  if (month < 1 || month > 12) return 'Enter a valid month (01-12).';
-  if (day < 1 || day > 31) return 'Enter a valid day (01-31).';
-  const parsed = new Date(Date.UTC(year, month - 1, day));
-  if (
-    parsed.getUTCFullYear() !== year ||
-    parsed.getUTCMonth() !== month - 1 ||
-    parsed.getUTCDate() !== day
-  ) {
-    return 'Enter a valid calendar date.';
-  }
-  return null;
-}
-
-/** As-you-type mask for a "MM:SS"/"H:MM:SS" field: strips non-digits, caps at 6 digits, and
- * groups them from the right into seconds, then minutes, then whatever's left as hours — so
- * "1234" becomes "12:34" and "12345" becomes "1:23:45", matching `secToClock`'s own format. */
-function formatTimeInput(text: string): string {
-  const digits = text.replace(/\D/g, '').slice(0, 6);
-  if (digits.length <= 2) return digits;
-  if (digits.length <= 4) {
-    return `${digits.slice(0, digits.length - 2)}:${digits.slice(-2)}`;
-  }
-  const seconds = digits.slice(-2);
-  const minutes = digits.slice(-4, -2);
-  const hours = digits.slice(0, -4);
-  return `${hours}:${minutes}:${seconds}`;
-}
-
-/** Inline, complete-but-invalid check for a "MM:SS"/"H:MM:SS" field. Waits until the seconds
- * group has both digits typed before judging anything "complete", so an in-progress "1:2" isn't
- * flagged while the runner is still typing. */
-function timeFieldError(text: string): string | null {
-  const trimmed = text.trim();
-  if (!trimmed) return null;
-  const parts = trimmed.split(':');
-  if (parts.length < 2 || parts.length > 3) return null;
-  const secondsPart = parts[parts.length - 1];
-  if (secondsPart.length < 2) return null;
-  const numbers = parts.map(Number);
-  if (numbers.some((n) => Number.isNaN(n) || n < 0)) {
-    return 'Enter a valid time (MM:SS or H:MM:SS).';
-  }
-  const seconds = numbers[numbers.length - 1];
-  const minutes = numbers[numbers.length - 2];
-  if (seconds > 59) return 'Seconds must be less than 60.';
-  if (parts.length === 3 && minutes > 59) return 'Minutes must be less than 60.';
-  return null;
-}
-
 /**
  * The intake questionnaire — all 10 `IntakeResponses` fields (`planTypes.ts`), prefilled from
  * `getIntake()` when the runner already has one saved, saved back via `putIntake()`. Hand-rolled
  * throughout (no form library, per project convention): single-selects are a column of
- * `Pressable` rows, multi-selects are toggle chips, races/goal-time/recent-performance fields are
- * plain `TextInput`s converted at submit time. Validation here mirrors only what the server
+ * `Pressable` rows, multi-selects are toggle chips. Numeric answers go through
+ * `components/inputs/` — `NumberField` for age and weekly volume, `DateField` for the race date,
+ * `ClockField` for the two times — so a date or a time is entered one component per box with the
+ * `-`/`:` printed between them, never typed, and no free text is ever parsed. That replaced a
+ * masked single field the captain could not enter values into on a phone (2026-08-15); see
+ * `src/lib/fieldInput.ts`'s header for the repro. Validation here mirrors only what the server
  * itself rejects with an actionable message (the recent-performance half-filled pair) — every
  * other rule is the server's `validateIntake` to own, surfaced via `ApiError.body.error`.
+ *
+ * This screen is the ONLY place the runner is asked for their target race. Home reads it back
+ * from the saved intake and never re-asks — see `src/lib/planRequest.ts`.
  */
 export default function IntakeScreen() {
   const theme = useTheme();
@@ -192,28 +115,27 @@ export default function IntakeScreen() {
   const [weeklyKm, setWeeklyKm] = useState('');
 
   const [raceDistance, setRaceDistance] = useState<RaceDistance | undefined>(undefined);
-  const [raceDate, setRaceDate] = useState('');
-  const [goalTime, setGoalTime] = useState('');
+  const [raceDate, setRaceDate] = useState<DateParts>(EMPTY_DATE);
+  const [goalTime, setGoalTime] = useState<ClockParts>(EMPTY_CLOCK);
 
   const [recentDistance, setRecentDistance] = useState<RaceDistance | undefined>(undefined);
-  const [recentTime, setRecentTime] = useState('');
+  const [recentTime, setRecentTime] = useState<ClockParts>(EMPTY_CLOCK);
 
   const [injuries, setInjuries] = useState<InjuryFlag[]>(['none']);
   const [injuryNotes, setInjuryNotes] = useState('');
 
-  // Inline, as-you-type feedback for the three masked date/time fields — derived from the current
-  // text on every render rather than held in their own state, so there's nothing to keep in sync.
+  // Inline, as-you-type feedback for the three structured date/time fields — derived from the
+  // current parts on every render rather than held in their own state, so there's nothing to keep
+  // in sync. Each stays quiet until the runner has typed enough for a box to be judged.
   const raceDateError = raceDistance ? dateFieldError(raceDate) : null;
-  const goalTimeError = raceDistance ? timeFieldError(goalTime) : null;
-  const recentTimeError = timeFieldError(recentTime);
+  const goalTimeError = raceDistance ? clockFieldError(goalTime) : null;
+  const recentTimeError = clockFieldError(recentTime);
 
   // Derived, not stateful — recomputed every render like the error checks above. Only meaningful
   // once both a complete goal time and a complete recent performance are entered; `undefined`
   // otherwise (mirrors `assessGoalRealism`'s own "both or neither" contract).
-  const goalTimeSecForRealism =
-    raceDistance && !goalTimeError && goalTime.trim() ? clockToSec(goalTime) : null;
-  const recentTimeSecForRealism =
-    recentDistance && !recentTimeError && recentTime.trim() ? clockToSec(recentTime) : null;
+  const goalTimeSecForRealism = raceDistance ? clockPartsToSeconds(goalTime) : null;
+  const recentTimeSecForRealism = recentDistance ? clockPartsToSeconds(recentTime) : null;
   const goalRealism =
     raceDistance && goalTimeSecForRealism !== null && recentDistance && recentTimeSecForRealism !== null
       ? assessGoalRealism({
@@ -238,10 +160,10 @@ export default function IntakeScreen() {
         setDaysPerWeek(intake.daysPerWeek);
         setWeeklyKm(String(intake.weeklyKm));
         setRaceDistance(intake.raceDistance);
-        setRaceDate(intake.raceDate ?? '');
-        setGoalTime(secToClock(intake.goalTimeSec));
+        setRaceDate(isoToDateParts(intake.raceDate));
+        setGoalTime(secondsToClockParts(intake.goalTimeSec));
         setRecentDistance(intake.recentPerformance?.distance);
-        setRecentTime(intake.recentPerformance ? secToClock(intake.recentPerformance.timeSec) : '');
+        setRecentTime(secondsToClockParts(intake.recentPerformance?.timeSec));
         setInjuries(intake.injuries.length > 0 ? intake.injuries : ['none']);
         setInjuryNotes(intake.injuryNotes ?? '');
       } catch (fetchError) {
@@ -303,34 +225,35 @@ export default function IntakeScreen() {
     // `validateIntake`) — a recent performance with only a distance or only a time disables
     // every numeric pace without saying so.
     const hasRecentDistance = recentDistance !== undefined;
-    const hasRecentTime = recentTime.trim().length > 0;
+    const hasRecentTime = !isClockBlank(recentTime);
     if (hasRecentDistance !== hasRecentTime) {
       setError('Provide both a recent distance and a time, or leave both blank.');
       return;
     }
     let recentTimeSec: number | null = null;
     if (hasRecentDistance && hasRecentTime) {
-      recentTimeSec = clockToSec(recentTime);
+      recentTimeSec = clockPartsToSeconds(recentTime);
       if (recentTimeSec === null) {
-        setError('Recent time must be in MM:SS or H:MM:SS format.');
+        setError('Enter your recent time as hours, minutes and seconds.');
         return;
       }
     }
 
-    if (
-      raceDistance &&
-      raceDate.trim().length > 0 &&
-      (raceDate.replace(/\D/g, '').length < 8 || dateFieldError(raceDate))
-    ) {
-      setError('Race date must be a valid YYYY-MM-DD date.');
-      return;
+    let raceDateIso: string | undefined;
+    if (raceDistance && !isDateBlank(raceDate)) {
+      const parsed = datePartsToIso(raceDate);
+      if (parsed === null) {
+        setError('Enter your race date as a real calendar date, or clear it.');
+        return;
+      }
+      raceDateIso = parsed;
     }
 
     let goalTimeSec: number | undefined;
-    if (raceDistance && goalTime.trim().length > 0) {
-      const parsed = clockToSec(goalTime);
+    if (raceDistance && !isClockBlank(goalTime)) {
+      const parsed = clockPartsToSeconds(goalTime);
       if (parsed === null) {
-        setError('Goal time must be in MM:SS or H:MM:SS format.');
+        setError('Enter your goal time as hours, minutes and seconds, or clear it.');
         return;
       }
       goalTimeSec = parsed;
@@ -343,7 +266,7 @@ export default function IntakeScreen() {
       daysPerWeek,
       weeklyKm: weeklyKmNum,
       ...(raceDistance ? { raceDistance } : {}),
-      ...(raceDistance && raceDate.trim() ? { raceDate: raceDate.trim() } : {}),
+      ...(raceDateIso ? { raceDate: raceDateIso } : {}),
       ...(goalTimeSec !== undefined ? { goalTimeSec } : {}),
       ...(recentDistance && recentTimeSec !== null
         ? { recentPerformance: { distance: recentDistance, timeSec: recentTimeSec } }
@@ -390,13 +313,12 @@ export default function IntakeScreen() {
           </Field>
 
           <Field label="Age" theme={theme}>
-            <TextInput
+            <NumberField
+              accessibilityLabel="Age"
               value={age}
-              onChangeText={setAge}
+              onChangeValue={setAge}
+              maxIntegerDigits={3}
               placeholder="e.g. 34"
-              placeholderTextColor={theme.text.secondary}
-              keyboardType="number-pad"
-              style={[styles.input, inputThemeStyle(theme)]}
             />
           </Field>
 
@@ -429,13 +351,13 @@ export default function IntakeScreen() {
           </Field>
 
           <Field label="Weekly distance (km)" theme={theme}>
-            <TextInput
+            <NumberField
+              accessibilityLabel="Weekly distance in kilometres"
               value={weeklyKm}
-              onChangeText={setWeeklyKm}
+              onChangeValue={setWeeklyKm}
+              mode="decimal"
+              maxIntegerDigits={3}
               placeholder="e.g. 35"
-              placeholderTextColor={theme.text.secondary}
-              keyboardType="decimal-pad"
-              style={[styles.input, inputThemeStyle(theme)]}
             />
           </Field>
 
@@ -457,20 +379,12 @@ export default function IntakeScreen() {
 
           {raceDistance ? (
             <>
-              <Field label="Race date (optional, YYYY-MM-DD)" theme={theme}>
-                <TextInput
-                  value={raceDate}
-                  onChangeText={(text) => setRaceDate(formatDateInput(text))}
-                  placeholder="2026-09-26"
-                  placeholderTextColor={theme.text.secondary}
-                  autoCapitalize="none"
-                  keyboardType="number-pad"
-                  maxLength={10}
-                  style={[
-                    styles.input,
-                    inputThemeStyle(theme),
-                    raceDateError && { borderColor: theme.status.error },
-                  ]}
+              <Field label="Race date (optional)" theme={theme}>
+                <DateField
+                  accessibilityLabel="Race date"
+                  parts={raceDate}
+                  onChange={setRaceDate}
+                  invalid={raceDateError !== null}
                 />
                 {raceDateError && (
                   <Text style={[styles.fieldError, { color: theme.status.error }]}>
@@ -479,19 +393,12 @@ export default function IntakeScreen() {
                 )}
               </Field>
 
-              <Field label="Goal time (optional, MM:SS or H:MM:SS)" theme={theme}>
-                <TextInput
-                  value={goalTime}
-                  onChangeText={(text) => setGoalTime(formatTimeInput(text))}
-                  placeholder="24:00"
-                  placeholderTextColor={theme.text.secondary}
-                  keyboardType="number-pad"
-                  maxLength={8}
-                  style={[
-                    styles.input,
-                    inputThemeStyle(theme),
-                    goalTimeError && { borderColor: theme.status.error },
-                  ]}
+              <Field label="Goal time (optional)" theme={theme}>
+                <ClockField
+                  accessibilityLabel="Goal time"
+                  parts={goalTime}
+                  onChange={setGoalTime}
+                  invalid={goalTimeError !== null}
                 />
                 {goalTimeError && (
                   <Text style={[styles.fieldError, { color: theme.status.error }]}>
@@ -521,20 +428,14 @@ export default function IntakeScreen() {
                 />
               ))}
             </View>
-            <TextInput
-              value={recentTime}
-              onChangeText={(text) => setRecentTime(formatTimeInput(text))}
-              placeholder="Time — MM:SS or H:MM:SS"
-              placeholderTextColor={theme.text.secondary}
-              keyboardType="number-pad"
-              maxLength={8}
-              style={[
-                styles.input,
-                inputThemeStyle(theme),
-                styles.recentTimeInput,
-                recentTimeError && { borderColor: theme.status.error },
-              ]}
-            />
+            <View style={styles.recentTimeInput}>
+              <ClockField
+                accessibilityLabel="Recent performance time"
+                parts={recentTime}
+                onChange={setRecentTime}
+                invalid={recentTimeError !== null}
+              />
+            </View>
             {recentTimeError && (
               <Text style={[styles.fieldError, { color: theme.status.error }]}>
                 {recentTimeError}
