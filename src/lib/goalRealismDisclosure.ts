@@ -1,3 +1,13 @@
+/**
+ * The one owner of goal-realism disclosure copy — which realism outcome speaks, and what it says,
+ * on the plan screen and at both goal-entry points. Classification, thresholds, and the race-pace
+ * cap stay in `paceDerivation.ts`; nothing here may imply a number this module didn't get.
+ *
+ * The load-bearing invariant: only `'implausible'` is capped (`cappedTimeSec` set). `'ambitious'`
+ * still anchors race-pace reps at the runner's declared goal, so its copy must never claim an
+ * adjustment that didn't happen. Every outcome is pinned in
+ * `__tests__/goalRealismDisclosure.test.ts`.
+ */
 import type { GoalRealismAssessment } from '@/lib/planTypes';
 
 export interface GoalRealismNoticeCopy {

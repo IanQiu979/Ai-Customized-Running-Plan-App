@@ -14,10 +14,9 @@ interface GoalRealismNoticeProps {
 /**
  * The calm, neutral card explaining a goal that isn't `'realistic'` — same raised-surface,
  * hairline-border treatment as `FallbackNotice`, never `status.error`: this is a coaching judgment
- * call, not a failure. `'implausible'` (a capped race-pace anchor, `cappedTimeSec` set) gets the
- * "was adjusted" copy; `'ambitious'` still anchors race-pace reps at the declared goal, so it gets
- * a softer heads-up instead — callers must not claim an adjustment that didn't happen. Call sites
- * that render this before a plan exists pass `variant="preview"` for the future-tense wording.
+ * call, not a failure. Which outcome speaks and what it says is owned entirely by
+ * `src/lib/goalRealismDisclosure.ts` — this component only renders what that returns. Call sites
+ * that render it before a plan exists pass `variant="preview"` for the future-tense wording.
  */
 export function GoalRealismNotice({ assessment, variant = 'plan' }: GoalRealismNoticeProps) {
   const theme = useTheme();

@@ -105,14 +105,18 @@ src/
     quotaPeriod.ts                # canonical — `currentPeriod(anchorDate, now)`, the purchase-day
                                    #            anchored window with the month-end clamp. Shared
                                    #            by the app and `workers/`. 10 unit tests
+    goalRealismDisclosure.ts # pure, app-only copy helper (new 2026-08-15) — the ONE place that
+                              #  decides whether a realism notice shows and what it says
+                              #  ('plan' vs 'preview' tense); classification and cap arithmetic
+                              #  stay in paceDerivation.ts
     quotaDisplay.ts          # pure, app-only display helper (new 2026-08-05) — `formatQuotaLine()`
                               #  phrases a `QuotaStatus` for Settings/Home/the paywall; the numbers
                               #  themselves stay server-computed, this only formats them
     fixtures/examplePlan.ts  # hand-built 5K screen fixture; `plan/[id].tsx` still renders it
     __tests__/               # supabase, loadRules, notation, examplePlan.fixture, tierLimits,
                               # quotaPeriod, planTemplates (golden + general), paceDerivation,
-                              # quotaDisplay (6 tests, new 2026-08-05) — the two engine contracts
-                              # included
+                              # quotaDisplay (6 tests, new 2026-08-05), goalRealismDisclosure
+                              # (new 2026-08-15) — the two engine contracts included
 ```
 
 `src/lib/tierLimits.ts` and `src/lib/quotaPeriod.ts` are, like `planTypes.ts`, **pure and
