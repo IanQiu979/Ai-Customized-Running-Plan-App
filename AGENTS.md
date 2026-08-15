@@ -212,6 +212,20 @@ Built-ins also available: `Explore`, `Plan`, `general-purpose`. Plugin agents ar
   the half-typed sign-up form (2026-08-08). `src/lib/sessionGate.ts` holds the latch and the full
   explanation; read its header before touching that gate, and note it is splash sequencing, never an
   authorization signal.
+- **Intake owns the runner's target; no other screen re-asks it.** Home reads it back from the
+  saved intake and asks only for a plan length, and only when there is no race date to derive one
+  from. Adding a race-distance or race-date control anywhere outside `/intake` recreates the
+  "take the survey twice" bug the captain reported on 2026-08-15. The rule is code, not convention:
+  `src/lib/planRequest.ts`.
+- **A race target is optional, and nothing may default one.** `buildTemplatePlan` carries
+  `raceDistance?: RaceDistance` with no fallback; race week, the taper phase and the taper tail of
+  the load curve are all gated on `isRacePlan`. Re-introducing a `?? '5k'` silently gives a
+  general-fitness runner a race plan — see `src/lib/planTemplates.ts` and its `noRace` test suite.
+- **`keyboardType` restricts nothing — it only picks which keyboard is offered.** A hardware
+  keyboard, paste, dictation or autofill puts letters into a "number" field (verified on device).
+  Every numeric input goes through `src/components/inputs/`, which filters keystrokes via
+  `src/lib/fieldInput.ts`; dates and times are segmented boxes with the `-`/`:` printed, never
+  typed. Do not add a raw `<TextInput keyboardType="...">` for a numeric answer.
 - **AI output validation is structural, not strict-content.** `ai-feature-builder` and
   `prompt-engineer` follow [`docs/reference/plan-generation.md`](docs/reference/plan-generation.md):
   validate shape, retry once, fall back to a template.
