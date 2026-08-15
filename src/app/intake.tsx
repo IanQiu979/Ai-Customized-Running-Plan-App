@@ -16,6 +16,7 @@ import { IntakeExitAction } from '@/components/intake/IntakeExitAction';
 import { FontFamily, FontSize, PressedOpacity, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { API_BASE_URL, describeError, getIntake, putIntake } from '@/lib/apiClient';
+import { getGoalRealismIntakeCopy } from '@/lib/goalRealismDisclosure';
 import { assessGoalRealism } from '@/lib/paceDerivation';
 import type { ExperienceAnswer, InjuryFlag, IntakeResponses, RaceDistance } from '@/lib/planTypes';
 
@@ -221,6 +222,7 @@ export default function IntakeScreen() {
           recent: { distance: recentDistance, timeSec: recentTimeSecForRealism },
         })
       : undefined;
+  const goalRealismCopy = getGoalRealismIntakeCopy(goalRealism);
 
   useEffect(() => {
     let cancelled = false;
@@ -496,10 +498,9 @@ export default function IntakeScreen() {
                     {goalTimeError}
                   </Text>
                 )}
-                {!goalTimeError && goalRealism && goalRealism.realism !== 'realistic' ? (
+                {!goalTimeError && goalRealismCopy ? (
                   <Text style={[styles.fieldError, { color: theme.text.secondary }]}>
-                    Based on your recent performance, that goal is {goalRealism.realism} — the plan
-                    will target a more sustainable pace.
+                    {goalRealismCopy}
                   </Text>
                 ) : null}
               </Field>

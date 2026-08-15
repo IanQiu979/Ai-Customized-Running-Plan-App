@@ -5,6 +5,19 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-08-15 — complete goal-realism disclosure and correct ambitious-goal copy
+
+- The immutable plan screen now renders `GoalRealismNotice` for both warned outcomes, not only
+  `implausible`. An `ambitious` plan explains that the goal was flagged as a stretch but its entered
+  pace was kept and not capped; the existing `implausible` title and body remain unchanged; a
+  `realistic` plan remains silent.
+- Intake no longer tells ambitious runners that their plan will target a more sustainable pace.
+  Its advisory now says the entered goal pace will be kept but will be a stretch, while the
+  implausible-goal message keeps the existing sustainable-pace explanation.
+- New pure disclosure helpers centralize the plan/intake visibility and copy, with regression tests
+  covering realistic, ambitious, implausible, and absent assessments. Goal-realism classification,
+  thresholds, and cap arithmetic were not changed.
+
 ## 2026-08-10 (later) — email sign-up and Google sign-in fixed against the deployed Worker
 
 Captain's report: email sign-up fails `"Invalid origin"`, Google sign-in fails `"Invalid callback

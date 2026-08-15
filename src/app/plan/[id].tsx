@@ -13,6 +13,7 @@ import { EffortOrder, FontFamily, FontSize, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { API_BASE_URL, describeError, getPlan } from '@/lib/apiClient';
 import { EXAMPLE_PLAN_ID, examplePlan } from '@/lib/fixtures/examplePlan';
+import { shouldShowGoalRealismNotice } from '@/lib/goalRealismDisclosure';
 import type { Plan } from '@/lib/planTypes';
 
 /**
@@ -121,7 +122,7 @@ export default function PlanScreen() {
         ]}
       >
         <PlanNameplate plan={plan} />
-        {plan.goalRealism?.realism === 'implausible' ? (
+        {shouldShowGoalRealismNotice(plan.goalRealism) ? (
           <GoalRealismNotice assessment={plan.goalRealism} />
         ) : null}
         {/*

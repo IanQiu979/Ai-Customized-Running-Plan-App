@@ -149,7 +149,10 @@ always "Skip for now" once intake exists. Home now prefills `raceDistance`/`race
 intake (once per mount). A new `GoalRealismNotice` component surfaces `Plan.goalRealism` on the
 plan screen and as a live read-only preview at both goal-entry points (Intake, Home — Home's
 preview only shows when the panel's selected race distance still matches the one the saved goal
-time was recorded against). 278 tests pass (272 + 6 new for `quotaDisplay.ts`), typecheck and lint
+time was recorded against). **Corrected 2026-08-15:** the immutable plan now shows the notice for
+both warned outcomes, including an `ambitious` goal that was honoured rather than capped; Intake's
+ambitious copy now says the entered pace is kept instead of falsely promising a sustainable-pace
+adjustment. 278 tests pass (272 + 6 new for `quotaDisplay.ts`), typecheck and lint
 clean; no `workers/` change in this batch. **Not touched, deliberately:** the backend deploy
 (captain-only) and the Pro/Elite AI-generation prompt (still the one unbound seam in
 `workers/src/deps.ts`) — only the free-tier template engine plus this client polish landed. Full
@@ -365,10 +368,13 @@ the literal previous week) and issue #33 (goal-realism handling).
       existed on load or was just saved, "Skip for now" otherwise. Home now prefills
       `raceDistance`/`raceDate` from saved intake once per mount. New
       `src/components/plan/GoalRealismNotice.tsx` surfaces `Plan.goalRealism` on the plan screen
-      (`realism === 'implausible'`) and as a live read-only preview at both goal-entry points
-      (Intake's goal-time field, Home's goal panel — Home's preview only shows when the panel's
-      selected race distance still matches the one the saved goal time was recorded against, to
-      avoid judging a stored goal time against a distance it was never set for). This also closes
+      for both warned outcomes (`ambitious` says the goal was honoured, `implausible` keeps the
+      capped-goal explanation) and as a live read-only preview at both goal-entry points (Intake's
+      goal-time field, Home's goal panel — Home's preview only shows when the panel's selected race
+      distance still matches the one the saved goal time was recorded against, to avoid judging a
+      stored goal time against a distance it was never set for). Intake's ambitious preview also
+      says the entered pace is kept instead of promising an adjustment the engine does not make.
+      This also closes
       a launch-readiness audit's "goal-realism UI half not built" doc-vs-code drift finding
       (external to this repo). 278 tests pass (272 + 6 new for `quotaDisplay.ts`), typecheck and
       lint clean; no `workers/` change. Full account: `docs/change_log.md`'s 2026-08-05 entry (the
@@ -815,7 +821,9 @@ reasoning, worked cases, and the type contract:
 `src/lib/paceDerivation.ts` landed 2026-08-03 with the exact ruled threshold and cap arithmetic.
 **The client-facing warning landed 2026-08-05** — `GoalRealismNotice` on the plan screen, plus a
 live preview at both goal-entry points (Intake, Home), closing the gap between this ruling and what
-the runner actually saw. See `docs/change_log.md`'s 2026-08-05 entry.
+the runner actually saw. **Corrected 2026-08-15:** the plan-screen branch now includes both
+`ambitious` and `implausible`; ambitious copy explicitly says the declared goal pace was kept, and
+Intake no longer claims that ambitious goals are adjusted. See `docs/change_log.md`.
 
 ## Decided (2026-08-06) — youth (under-18) HR-zone policy, `v22-youth-policy-research-s1` §6-A/E
 
