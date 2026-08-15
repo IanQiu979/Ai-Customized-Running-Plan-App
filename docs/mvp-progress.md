@@ -6,7 +6,23 @@
 > Milestone definitions live in [`planning/02-product-requirements.md`](../planning/02-product-requirements.md).
 > Decision history lives in [`change_log.md`](change_log.md).
 
-**Last updated:** 2026-08-10 (later) — Ian reported two production sign-in bugs blocking him from
+**Last updated:** 2026-08-15 — Google sign-up was audited end to end after a phone failure left
+all live auth tables empty. The live Worker has all three required auth secret bindings and starts
+a Google URL with the exact production callback; Google serves its real sign-in page. Email/password
+was re-proved live (credential user/account/session created, then removed). The remaining interactive
+Google consent/token-exchange proof needs the captain's Google account, so no Google D1 row is
+claimed yet. Client OAuth is now explicit and observable: browser cancel/denial/callback errors are
+shown, the session cookie is verified and the reactive session refreshed before reporting success,
+and social sign-up uses the same post-signup redirect as email. Worker callback errors are logged
+without secrets, fake OAuth test bindings are committed/pinned instead of inherited from `.dev.vars`,
+and [`google-oauth-runbook.md`](google-oauth-runbook.md) gives the exact console settings, rotation,
+and D1 proof steps. Captain-only checks: Google Auth Platform → Audience must be Production or list
+his exact account as a test user; Credentials → the deployed client must be Web application with
+`https://pace-blueprint-production.i78979848.workers.dev/api/auth/callback/google`; because secret
+values cannot be read back, re-set `GOOGLE_CLIENT_SECRET --env production` from that same client if
+there is any doubt after its rotation, then deploy `--env production`.
+
+Previous entry: 2026-08-10 (later) — Ian reported two production sign-in bugs blocking him from
 using the deployed app: email sign-up failed `"Invalid origin"`, and Google sign-in failed
 `"Invalid callback URL"`. Both reproduced against the **live deployed Worker**, not the local test
 suite (see "the harness gap" below), and both are now fixed in `workers/src/auth.ts` and

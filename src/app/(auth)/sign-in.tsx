@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { API_BASE_URL, authClient, describeError } from '@/lib/apiClient';
+import { API_BASE_URL, authClient, describeError, signInWithGoogle } from '@/lib/apiClient';
 import { FontFamily, FontSize, PressedOpacity, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -53,21 +53,14 @@ export default function SignInScreen() {
 
   async function handleGoogleSignIn() {
     setError(null);
+    setSubmitting(true);
     try {
-      const { error: socialError } = await authClient.signIn.social({ provider: 'google', callbackURL: '/' });
-      if (socialError) {
-        // better-auth returns { code: 'PROVIDER_NOT_FOUND', message: 'Provider not found' } when a
-        // provider isn't registered — the case here until the captain's Google OAuth credentials
-        // land (v22-google-oauth-creds). Show a plain, honest message instead of the raw backend
-        // string; keep the button visible either way.
-        if (socialError.code === 'PROVIDER_NOT_FOUND') {
-          setError("Google sign-in isn't available yet.");
-        } else {
-          setError(socialError.message ?? 'Google sign-in failed.');
-        }
-      }
+      const outcome = await signInWithGoogle();
+      if (!outcome.ok) setError(outcome.message);
     } catch (socialError) {
       setError(describeError(socialError, 'Google sign-in failed.', API_BASE_URL));
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -133,11 +126,12 @@ export default function SignInScreen() {
 
             <Pressable
               accessibilityRole="button"
+              disabled={submitting}
               onPress={handleGoogleSignIn}
               style={({ pressed }) => [
                 styles.secondaryButton,
                 { borderColor: theme.text.primary },
-                pressed && styles.pressed,
+                (pressed || submitting) && styles.pressed,
               ]}
             >
               <Text style={[styles.secondaryButtonText, { color: theme.text.primary }]}>Continue with Google</Text>

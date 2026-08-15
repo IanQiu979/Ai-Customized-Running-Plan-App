@@ -111,6 +111,17 @@ export function createAuth(env: Env) {
 
     socialProviders: buildSocialProviders(env),
 
+    // OAuth redirects normally turn callback failures into a browser page. Keep a structured,
+    // secret-free server log as well so the token exchange — previously the only unobservable link
+    // in this chain — can be diagnosed from Worker logs without exposing codes, tokens, or secrets.
+    logger: {
+      level: 'error',
+      log(level, message, ...args) {
+        if (level === 'error') console.error('better-auth error', { message, details: sanitizeAuthLog(args) });
+        else if (level === 'warn') console.warn('better-auth warning', { message });
+      },
+    },
+
     /**
      * REQUIRED, not optional polish. Out of the box better-auth authenticates with a cookie, and a
      * React Native client has no cookie jar in the browser sense — the session token comes back in
@@ -170,7 +181,47 @@ function buildSocialProviders(env: Env) {
     return {};
   }
 
-  return {
-    google: { clientId, clientSecret },
+  return { google: { clientId, clientSecret } };
+}
+
+function sanitizeOAuthError(error: unknown): Record<string, unknown> {
+  if (!(error instanceof Error)) return { kind: typeof error };
+
+  const candidate = error as Error & {
+    status?: number | string;
+    statusCode?: number;
+    code?: string;
+    response?: { status?: number; statusText?: string };
   };
+  return {
+    name: candidate.name,
+    message: redactSensitiveText(candidate.message),
+    code: candidate.code,
+    status: candidate.statusCode ?? candidate.status ?? candidate.response?.status,
+    statusText: candidate.response?.statusText,
+  };
+}
+
+function sanitizeAuthLog(args: unknown[]): unknown[] {
+  return args.map((arg) => sanitizeAuthLogValue(arg));
+}
+
+function sanitizeAuthLogValue(value: unknown, depth = 0): unknown {
+  if (value instanceof Error) return sanitizeOAuthError(value);
+  if (typeof value === 'string') return redactSensitiveText(value);
+  if (typeof value === 'number' || typeof value === 'boolean' || value === null) return value;
+  if (depth >= 2 || typeof value !== 'object') return typeof value;
+
+  const redacted: Record<string, unknown> = {};
+  for (const [key, child] of Object.entries(value)) {
+    if (/secret|token|cookie|authorization|code|state/i.test(key)) redacted[key] = '[redacted]';
+    else redacted[key] = sanitizeAuthLogValue(child, depth + 1);
+  }
+  return redacted;
+}
+
+function redactSensitiveText(value: string): string {
+  return value
+    .replace(/(client_secret|access_token|refresh_token|id_token|code|cookie|state)=?[^\s&,]*/gi, '$1=[redacted]')
+    .slice(0, 500);
 }

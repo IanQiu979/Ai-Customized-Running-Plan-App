@@ -5,6 +5,31 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-08-15 — Google sign-up end-to-end audit and observable native return
+
+- Audited the live chain rather than inferring from local tests: D1 began empty; the production
+  Worker lists `BETTER_AUTH_SECRET`, `GOOGLE_CLIENT_ID`, and `GOOGLE_CLIENT_SECRET`; its generated
+  URL uses the exact deployed HTTPS callback and Google serves the real account sign-in page. Secret
+  values cannot be read back, so a rotated secret still requires one interactive exchange (or
+  captain re-set) to prove. Consent publishing/test-user status remains a Google Console check.
+- Replaced the auth screens' fire-and-forget Google call with an explicit native flow that opens the
+  Expo authorization proxy, observes every browser result, reads callback errors, persists the
+  returned better-auth cookie, verifies `getSession`, and notifies the reactive session atom. A
+  successful Google sign-up now marks the same one-shot Intake redirect as email sign-up; failures
+  no longer leave a dead button or a valid session sitting on the form.
+- Added callback error copy for cancellation, consent denial, expired/missing state, invalid code
+  (including stale-secret guidance), missing callback cookies, and post-return session failure.
+  Both Google buttons disable while auth is in flight.
+- Added secret-free better-auth callback logging in the Worker, plus regression tests for log
+  redaction and mobile error mapping. Worker tests now pin fake Google bindings in committed config,
+  closing the exact `.dev.vars`/production drift trap where CI can pass against configuration no
+  deployed environment has.
+- Re-proved email/password against production: a diagnostic account created a `credential` account
+  row and session, then `/api/delete-account` removed it; Google remains pending the captain's
+  interactive consent, and no Google persistence claim is made. Exact Google Cloud settings,
+  secret rotation commands, mobile steps, and before/after D1 queries are in
+  [`google-oauth-runbook.md`](google-oauth-runbook.md).
+
 ## 2026-08-15 — complete goal-realism disclosure and correct ambitious-goal copy
 
 - The immutable plan screen now renders `GoalRealismNotice` for both warned outcomes, not only

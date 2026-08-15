@@ -55,6 +55,11 @@ export default defineConfig({
            */
           BETTER_AUTH_URL: 'http://localhost:8787',
           APP_SCHEME: 'paceblueprint://',
+          // OAuth credentials are pinned too. Fake values are sufficient because the suite only
+          // builds authorization URLs; pinning them prevents a developer's `.dev.vars` (or their
+          // absence) from making "Google configured" pass locally while production is missing it.
+          GOOGLE_CLIENT_ID: '000000000000-testonlytestonlytestonly.apps.googleusercontent.com',
+          GOOGLE_CLIENT_SECRET: 'TEST-ONLY-not-a-real-google-secret',
         },
       },
     })),

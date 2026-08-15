@@ -198,16 +198,18 @@ server, `describeError()` to turn either into a message screens can show), re-ex
 `TypeError` used to fall through that check into a generic, misleading fallback message — see
 `docs/change_log.md`'s 2026-08-07 entry for the full story. `src/app/(auth)/sign-in.tsx` and
 `sign-up.tsx` are the two screens built against it —
-email/password, plus a "Continue with Google" button. **Google OAuth works in production as of
-2026-08-09**: `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` are set on the deployed Worker
-(`wrangler secret put … --env production`), and `POST /api/auth/sign-in/social` against
-`https://pace-blueprint-production.i78979848.workers.dev` returns a real `accounts.google.com`
-authorization URL that Google's server accepts (a real sign-in page, not
-`invalid_client`/`redirect_uri_mismatch`). It was broken until then because those secrets had never
-been set on the deployed Worker — see `docs/change_log.md`'s 2026-08-09 entry and
-`workers/src/auth.ts`'s `buildSocialProviders`. Still unproven: the client secret is only exercised
-at the token exchange, and the OAuth consent screen's publishing status, both needing one real
-in-app sign-in — see `docs/mvp-progress.md`'s "Blocked / awaiting a decision". The root layout (`src/app/_layout.tsx`) reads `authClient.useSession()` and gates the entire route tree
+email/password, plus a "Continue with Google" button. Native Google auth is driven by
+`signInWithGoogle()` in `apiClient.ts`: it asks better-auth for an authorization URL without an
+automatic redirect, opens `@better-auth/expo`'s browser proxy (so the browser receives the signed
+OAuth state cookie), observes the deep-link result, turns callback errors into user copy, stores the
+returned session cookie, verifies `getSession()`, and explicitly notifies the reactive session atom.
+That last step prevents a successful return from leaving the runner on the auth form. Social sign-up
+also marks `postSignupRedirect`, so first-time Google users follow the same Intake route as email
+users. The production Worker has `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` bound and its live URL
+uses the accepted deployed HTTPS callback, but token exchange and consent audience still require a
+real human Google login; the exact proof and console contract are in
+[`google-oauth-runbook.md`](google-oauth-runbook.md). Worker callback errors use a redacting logger
+so token/state failures are visible without secrets. The root layout (`src/app/_layout.tsx`) reads `authClient.useSession()` and gates the entire route tree
 on it with Expo Router's `Stack.Protected` — there is no anonymous browsing at all, matching every
 `/api/*` route already 403ing anonymously.
 
