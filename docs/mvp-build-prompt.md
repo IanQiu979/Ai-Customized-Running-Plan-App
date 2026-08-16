@@ -333,9 +333,10 @@ README's project structure), not Supabase.
 
 1. `api-designer`: finalize the contract — `idempotencyKey` in the body, the error taxonomy
    (`402` over-quota, `403` anon, `409` in-flight duplicate, timeout semantics, structured
-   `{ error, code }`), `quota-status` invocation method, and the configure-time race fields
-   (race distance/date/goal-time travel per-generation; intake's stored race is a default,
-   not the authority — they must never silently disagree).
+   `{ error, code }`), `quota-status` invocation method, and the race fields (**settled
+   2026-08-15, the opposite of this prompt's original ruling: intake's stored race IS the
+   authority and nothing re-asks it per generation** — see `AGENTS.md`'s intake-once guardrail
+   and `src/lib/planRequest.ts`).
 2. `prompt-engineer` ∥ `jobs-queues-edge`:
    - `prompt-engineer`: the Pro/Elite system prompt — skeleton-in-prompt, representative-week
      output contract (forced tool call), token budget, brevity mandate, tier-differentiated

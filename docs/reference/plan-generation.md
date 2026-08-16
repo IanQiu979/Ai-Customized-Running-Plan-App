@@ -83,12 +83,19 @@ is unit-tested with no network and no Anthropic spend:
 3. **Atomic quota gate** — the single conditional insert described under "Quotas" below.
 4. **Reconcile plan length** — a race farther out than the tier's max plan length gets a delayed
    start so the taper lands on race day (ported from Echo V1's `reconcilePlanLength`); a
-   compressed race gets an honest, short plan. **Never refuse.** A declared red-flag injury
+   compressed race gets an honest, short plan. **Never refuse a runner's situation.** The one
+   exception, added 2026-08-15 and validated before the quota gate rather than here: a `raceDate`
+   that has already passed is rejected outright (`validateRequest` in
+   `workers/src/lib/generate-plan-flow.ts`), because the week floor would otherwise charge a
+   generation for a degenerate one-week plan. Race day itself, and a request with no race at all,
+   both generate normally. A declared red-flag injury
    produces a normal, volume-adjusted plan with a strengthened disclaimer (see "Coaching source of
    truth" above), not a rejection, and does not consume quota.
 5. **Build the parametric template skeleton** — from `planTemplates.ts` and the coaching docs:
    phases, deload cadence, weekly volumes under `loadRules.ts` caps, workout primitives from
-   `workout-library.md`, Day 1–7 slots with real rest days.
+   `workout-library.md`, Day 1–7 slots with real rest days. A plan with no target race is a first
+   class shape, not a 5K in disguise: no invented distance, no taper phase, and a final week that
+   is never a deload — see `src/lib/planTemplates.ts` and its `noRace` suite.
 6. **Free tier stops here.** Template + effort descriptions. No AI call, ever.
 7. **Pro/Elite — one Claude call** (`claude-sonnet-5`, verified live 2026-07-10). **SHIPPED
    2026-08-10, in a deliberately narrower shape than the paragraph below originally sketched** —

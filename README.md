@@ -1,8 +1,9 @@
 # V2.2 — Running Training Plan Builder
 
-An Expo / React Native app that turns a runner's intake answers (goal, experience, schedule,
-target race) into a structured, week-by-week training plan. Part of the **PACE family**: it is
-deliberately narrow — it builds plans, it is not a training log.
+An Expo / React Native app that turns a runner's intake answers (goal, experience, schedule, and
+an optional target race) into a structured, week-by-week training plan. Part of the **PACE
+family**: it is deliberately narrow — it builds plans, it is not a training log. Intake is
+answered once and owns the runner's target; a runner with no race gets a general-fitness plan.
 
 ## Status
 

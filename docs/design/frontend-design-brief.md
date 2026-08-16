@@ -69,8 +69,16 @@ the flow is **8 questions, or 10 with a race**.
 > enforces it — `pace` and `hrZone` are optional on `Workout`.
 
 **Two different "goal" concepts. Never merge them.** `intake.goal` is a one-time general training
-goal captured at onboarding. Configure-plan's `goalType` is chosen on *every* generation: a target
-**race** (plan spans today → race day) or a fixed **duration** (8, 12, or 16 weeks).
+goal captured at onboarding. The request's `goalType` is separate: a target **race** (plan spans
+today → race day) or a fixed **duration** (a number of weeks).
+
+> **Superseded, 2026-08-15 — the target race is asked once, at intake.** This brief originally had
+> the race distance and race date re-chosen on every generation, with intake's answers as a mere
+> default. Shipping that produced the "take the survey twice" bug the captain reported: intake is
+> now the only surface that asks for a target race, and no other screen may re-ask it. The target
+> is also genuinely optional — nothing may default a race distance. The rule is code, not prose:
+> `src/lib/planRequest.ts`, with the guardrail in [`AGENTS.md`](../../AGENTS.md). Everything below
+> that shows a distance chip row or a date control outside intake is superseded by it.
 
 **Sign-up is required.** Google, Apple, email/password. No guest mode in v1 — never write "continue
 as guest" or "skip for now" on auth. Apple Sign-In must appear in the design even though it is not
@@ -528,6 +536,13 @@ steppers with a mono unit label (reusing the numeral-forward identity rather tha
 as mono time entries (hh:mm:ss), the recent one paired with its own distance chip row · **injuries** as
 multi-select chips with a one-tap "None right now" so nobody has to type, plus a free-text field.
 
+> **Shipped controls differ for every numeric answer (2026-08-15).** `keyboardType` restricts
+> nothing — a hardware keyboard, paste, dictation or autofill puts letters into a "number" field —
+> and a `number-pad` cannot produce the `-` and `:` the date and time labels ask for. Numbers,
+> dates and times therefore go through `src/components/inputs/` (digit-filtered entry; dates and
+> times as segmented boxes with the separators printed, never typed), not a native picker or a
+> masked mono entry. The design intent above still holds; the mechanism does not.
+
 The optional steps (race date, goal time, recent time, constraints) show a visible plain-text **Skip**.
 Required steps — including **age** — show only Back and Continue.
 
@@ -585,6 +600,12 @@ link — not a dead disabled control.
 > copy always resets to a date, never a month name. Free's cadence word is "ever," not a date.
 
 ### Configure plan · *modal · system theme · deliberately motif-free*
+
+> **Superseded in part by Part 0's 2026-08-15 note.** The sub-fields described below re-ask the
+> target race, which is now intake's alone. What survives is the tier caption, the notes
+> disclosure, and the generate CTA — shipped inline on Home, which shows the saved target
+> read-only with a **Change** link to `/intake` and asks for a plan length only when there is no
+> race date to derive one from.
 
 No ribbon, no wave. This is a decision screen, not a celebration screen — withholding the motif here is
 what makes its arrival at the reveal feel *earned* rather than wallpapered everywhere.

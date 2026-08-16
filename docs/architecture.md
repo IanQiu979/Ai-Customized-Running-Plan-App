@@ -77,6 +77,11 @@ src/
     onboarding/             # HeroRibbon (new 2026-08-08) — the week-ribbon motif at 2x hero scale,
                              # building itself cell by cell then settling into an ambient pulse.
                              # Reduced-motion aware; illustration only, never the user's data
+    inputs/                 # NumberField, SegmentedField, DateField, ClockField (new 2026-08-15) —
+                             # every numeric/structured answer in the app. Keystrokes are filtered
+                             # through src/lib/fieldInput.ts; dates and times are segmented boxes
+                             # with the `-`/`:` printed, never typed. No screen uses a raw
+                             # <TextInput keyboardType="..."> for a number
   constants/
     theme.ts                # "Instrument & Matter" token system — current, see below
     navigation-theme.ts      # bridges theme.ts's tokens into @react-navigation/native's `Theme`
@@ -110,6 +115,11 @@ src/
     quotaPeriod.ts                # canonical — `currentPeriod(anchorDate, now)`, the purchase-day
                                    #            anchored window with the month-end clamp. Shared
                                    #            by the app and `workers/`. 10 unit tests
+    planRequest.ts           # pure (new 2026-08-15) — intake owns the runner's target and Home
+                              #  never re-asks it; also the shared stale-race-date guard. See the
+                              #  src/lib/ notes below
+    fieldInput.ts            # pure (new 2026-08-15) — the digit/decimal filters and clock/date part
+                              #  parsers behind src/components/inputs/
     goalRealismDisclosure.ts # pure, app-only copy helper (new 2026-08-15) — the ONE place that
                               #  decides whether a realism notice shows and what it says
                               #  ('plan' vs 'preview' tense); classification and cap arithmetic
@@ -119,9 +129,10 @@ src/
                               #  themselves stay server-computed, this only formats them
     fixtures/examplePlan.ts  # hand-built 5K screen fixture; `plan/[id].tsx` still renders it
     __tests__/               # supabase, loadRules, notation, examplePlan.fixture, tierLimits,
-                              # quotaPeriod, planTemplates (golden + general), paceDerivation,
-                              # quotaDisplay (6 tests, new 2026-08-05), goalRealismDisclosure
-                              # (new 2026-08-15) — the two engine contracts included
+                              # quotaPeriod, planTemplates (golden + general + noRace),
+                              # paceDerivation, quotaDisplay (6 tests, new 2026-08-05),
+                              # goalRealismDisclosure, planRequest, fieldInput (new 2026-08-15)
+                              # — the two engine contracts included
 ```
 
 `src/lib/tierLimits.ts` and `src/lib/quotaPeriod.ts` are, like `planTypes.ts`, **pure and
