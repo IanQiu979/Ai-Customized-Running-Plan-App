@@ -196,8 +196,9 @@ both warned outcomes, including an `ambitious` goal that was honoured rather tha
 ambitious copy now says the entered pace is kept instead of falsely promising a sustainable-pace
 adjustment. 278 tests pass (272 + 6 new for `quotaDisplay.ts`), typecheck and lint
 clean; no `workers/` change in this batch. **Not touched, deliberately:** the backend deploy
-(captain-only) and the Pro/Elite AI-generation prompt (still the one unbound seam in
-`workers/src/deps.ts`) — only the free-tier template engine plus this client polish landed. Full
+(captain-only) and the Pro/Elite AI-generation prompt (bound in `workers/src/deps.ts` on
+2026-08-10, still awaiting `ANTHROPIC_API_KEY`) — only the free-tier template engine plus this
+client polish landed. Full
 account: `docs/change_log.md`'s 2026-08-05 entry (the newest one, above the Google OAuth entry).
 Previous entry: 2026-08-05 — Google OAuth's credentials are provisioned and verified working in
 local dev: `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` are in `workers/.dev.vars`, and
@@ -292,8 +293,11 @@ deterministic template plans and reproduces the approved 12-week 5K fixture exac
 between the two landed 2026-08-04**: `workers/src/deps.ts` now binds `generate-plan`'s skeleton
 builder to `src/lib/planTemplates.ts` (`createTemplateSkeletonBuilder()`), so `generate-plan`
 returns a real plan instead of `503`, and the plan screen renders it via `GET /api/plans/:id`. The
-Pro/Elite personalization prompt is the one seam in `deps.ts` still bound to a typed *unavailable*;
-M3 is complete for the deterministic/template path and incomplete only for that prompt.
+Pro/Elite personalization prompt — `deps.ts`'s second seam — was bound on 2026-08-10, so both plan-
+engine seams now take real implementations and no seam is left on a typed *unavailable*. M3 is
+complete for the deterministic/template path and for the personalizer's code; the one remaining gap
+is `ANTHROPIC_API_KEY`, unset everywhere, so paid-tier requests still receive the quota-exempt
+template fallback.
 
 `planTypes.ts`, `loadRules.ts`, and (as of the 2026-07-11
 review-and-refine cycle) `notation.ts` are the app's `lib/` layer — shared vocabulary, safety
@@ -356,7 +360,8 @@ the literal previous week) and issue #33 (goal-realism handling).
       Bearer sessions), `migrations/` for both better-auth's tables and the app's, the quota ledger
       with its atomic gate and reserve→settle/release lifecycle, and the routes `generate-plan`,
       `quota-status`, `purchase-tier`, `delete-account`, `GET/PUT /api/intake`,
-      `GET /api/plans[/:id]`. 75 tests in real `workerd` against real D1. Verified end to end against
+      `GET /api/plans[/:id]`. Tested in real `workerd` against real D1 — run
+      `npm --prefix workers test` for the current count. Verified end to end against
       `wrangler dev`, offline. `generate-plan` returns `503 engine_unavailable` (and charges nothing)
       until the plan engine exists. Details: [`workers/README.md`](../workers/README.md)
 - [x] `src/lib/tierLimits.ts` and `src/lib/quotaPeriod.ts` — pure, shared by the app and the Worker,
@@ -646,8 +651,9 @@ view to `buildTemplatePlan()` instead of the static fixture; intake and server w
 **Nothing is currently in flight.** The pure engine and its test contracts are complete, and as of
 2026-08-04 steps 4, 7, 8, and 10 below (plan view, intake, `generate-plan`, My Plans) are wired end
 to end and E2E-verified. **As of 2026-08-05, step 9 (quota UI + dummy paywall) is also done** — see
-"Done" below. The one remaining critical-path item is the Pro/Elite personalization prompt noted in
-step 8, which is server-only (`workers/`) and untouched by this client-only batch.
+"Done" below. The Pro/Elite personalization prompt noted in step 8 was bound on 2026-08-10, so the
+one remaining critical-path item is provisioning `ANTHROPIC_API_KEY` (captain-only), without which
+paid-tier requests still fall back to the quota-exempt template plan.
 
 - **Cycle 1** (2026-07-11): Ian scored the rendered plan 3/10, five rulings applied. Docs rebuilt
   (`notation.md` added; `workout-library.md` and `example-plan-5k-pro.md` rewritten;
