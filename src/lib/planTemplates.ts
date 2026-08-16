@@ -404,10 +404,20 @@ function interpolateCanonical(values: readonly number[], weekIndex: number, tota
  * drops the taper phase. A no-race plan interpolates across the loading block and finishes at its
  * peak; a race plan still sees the whole curve, taper included.
  */
-const LOADING_WEEKS_IN_CANONICAL = 10;
+const TAPER_ENTRIES: ReadonlyMap<readonly number[], number> = new Map<readonly number[], number>([
+  // Weeks 11 and 12 of the 12-week 5K plan.
+  [FIVE_K_WEEKLY_LOAD, 2],
+  // The same two weeks, minus race week, which has no long run of its own.
+  [FIVE_K_LONG_RUNS, 1],
+]);
 
 function taperAwareCurve(values: readonly number[], includeTaper: boolean): readonly number[] {
-  return includeTaper ? values : values.slice(0, LOADING_WEEKS_IN_CANONICAL);
+  if (includeTaper) return values;
+  const taperEntries = TAPER_ENTRIES.get(values);
+  if (taperEntries === undefined) {
+    throw new Error('taperAwareCurve: no taper length registered for this canonical curve.');
+  }
+  return values.slice(0, values.length - taperEntries);
 }
 
 function targetVolumeKm(
@@ -868,7 +878,12 @@ function buildGenericWeek(args: {
       : Math.max(
           1,
           Math.round(
-            clampWeeklyVolume({ lastLoadingWeekKm, proposedKm: rawVolumeKm, level }),
+            clampWeeklyVolume({
+              lastLoadingWeekKm,
+              proposedKm: rawVolumeKm,
+              level,
+              baselineWeeklyKm: intake.weeklyKm,
+            }),
           ),
         ),
     weekNumber,

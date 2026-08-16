@@ -21,7 +21,11 @@ import type { GeneratePlanRequest, IntakeResponses, RaceDistance } from './planT
 /** The default length of a plan with no race date to measure against. */
 export const DEFAULT_PLAN_WEEKS = 12;
 
-/** Mirrors `MAX_PLAN_DURATION_WEEKS` in `workers/src/lib/planEngine.ts`. */
+/**
+ * The single source of the maximum plan length, for both sides. `workers/src/lib/planEngine.ts`
+ * imports it as `MAX_PLAN_DURATION_WEEKS` rather than re-declaring the number, so the client's
+ * refusal and the server's can never drift apart.
+ */
 export const MAX_PLAN_WEEKS = 104;
 
 export type PlanTarget =

@@ -107,9 +107,11 @@ export default function HomeScreen() {
           if (cancelled) return;
           setIntake(fetchedIntake);
         } catch (fetchError) {
+          // Only `loadError` — the last known intake stays. A failed fetch is not an answer, and
+          // rendering the empty state ("Answer a few questions… You only do this once") tells a
+          // runner who has already completed intake that they have not.
           if (!cancelled) {
             setLoadError(describeError(fetchError, 'Could not load your intake.', API_BASE_URL));
-            setIntake(null);
           }
         } finally {
           if (!cancelled) setCheckingIntake(false);

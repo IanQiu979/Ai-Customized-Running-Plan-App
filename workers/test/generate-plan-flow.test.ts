@@ -12,6 +12,7 @@ import type { GeneratePlanRequest } from '../../src/lib/planTypes';
 import type { GeneratePlanDeps } from '../src/lib/generate-plan-flow';
 import { generatePlan } from '../src/lib/generate-plan-flow';
 import type { PersonalizeResult, SkeletonResult } from '../src/lib/planEngine';
+import { RACE_DATE_PASSED_MESSAGE } from '../../src/lib/planRequest';
 import { FakeStore, INTAKE, makePlan, type FakeStoreOptions } from './fakes';
 
 const USER = 'user-1';
@@ -111,6 +112,47 @@ describe('request validation', () => {
       kind: 'invalid_request',
       message: 'raceDistance must be one of 5k|10k|half|marathon.',
     });
+  });
+
+  // The client refuses a stale race date before sending (`src/lib/planRequest.ts`), but a
+  // client-only guard is not a guard: any other caller would reach `weeksUntilRace`'s one-week
+  // floor and buy a degenerate plan with a real quota slot.
+  it('refuses a race date that has already passed, before reserving anything', async () => {
+    const { deps, store } = makeDeps();
+
+    const outcome = await generatePlan(
+      USER,
+      { goalType: 'race', raceDistance: '5k', raceDate: '2026-07-31', idempotencyKey: 'k' },
+      deps,
+    );
+
+    expect(outcome).toEqual({
+      kind: 'invalid_request',
+      message: RACE_DATE_PASSED_MESSAGE,
+    });
+    expect(store.reserveCalls).toHaveLength(0);
+    expect(store.settled).toHaveLength(0);
+  });
+
+  it('still generates on race day itself', async () => {
+    const { deps } = makeDeps();
+    const outcome = await generatePlan(
+      USER,
+      { goalType: 'race', raceDistance: '5k', raceDate: NOW.slice(0, 10), idempotencyKey: 'k' },
+      deps,
+    );
+    expect(outcome.kind).toBe('ok');
+  });
+
+  it('refuses a past race date even when it rides on a duration request', async () => {
+    const { deps, store } = makeDeps();
+    const outcome = await generatePlan(
+      USER,
+      { ...VALID_REQUEST, raceDate: '2020-01-01' } as GeneratePlanRequest,
+      deps,
+    );
+    expect(outcome).toEqual({ kind: 'invalid_request', message: RACE_DATE_PASSED_MESSAGE });
+    expect(store.reserveCalls).toHaveLength(0);
   });
 
   it('still accepts a duration goal carrying a valid race distance', async () => {

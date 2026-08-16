@@ -152,6 +152,52 @@ describe('a plan generates with no race specified', () => {
     expect(plan.disclaimers.length).toBeGreaterThan(0);
   });
 
+  // Dropping the taper tail moved the LAST entry of the canonical curve from the taper's 28 km to
+  // the block's 48 km peak, and `interpolateCanonical` collapses to that last entry whenever a plan
+  // is one week long. Week 1 has no prior loading week, so the week-on-week growth rule cannot
+  // fire — a runner asking for a single week off a 35 km baseline was handed 48 km, 137% of it,
+  // with no ramp at all. The first week is now held at the declared baseline in typed code
+  // (`clampWeeklyVolume`'s `baselineWeeklyKm`).
+  it.each([1, 2, 3, 4, 8, 12])(
+    'never opens a %i-week no-race plan above the volume the runner already runs',
+    (durationWeeks) => {
+      const plan = buildNoRace({ durationWeeks });
+      expect(plan.weeklyLoad[0]).toBeLessThanOrEqual(NO_RACE_INTAKE.weeklyKm);
+    },
+  );
+
+  it('holds a one-week no-race plan at the baseline instead of the block peak', () => {
+    expect(buildNoRace({ durationWeeks: 1 }).weeklyLoad).toEqual([35]);
+  });
+
+  it.each([2, 3])(
+    'ramps a %i-week no-race plan within the week-on-week growth rule',
+    (durationWeeks) => {
+      const load = buildNoRace({ durationWeeks }).weeklyLoad;
+      expect(load[0]).toBeLessThanOrEqual(NO_RACE_INTAKE.weeklyKm);
+      load.slice(1).forEach((km, index) => {
+        // `load-rules.md § Rule 1`: growth above 15% on the last loading week is rejected and
+        // recalculated at 10%, so no step may clear the 15% threshold (bar rounding).
+        expect((km - load[index]) / load[index]).toBeLessThanOrEqual(0.15 + 0.02);
+      });
+    },
+  );
+
+  it('leaves a race plan on the taper-inclusive curve', () => {
+    // Same runner, same one-week degenerate length, but a race plan still reads the full curve,
+    // whose last entry is the taper — unchanged by any of the above.
+    const plan = buildTemplatePlan({
+      intake: { ...NO_RACE_INTAKE, raceDistance: '5k' },
+      goalType: 'race',
+      durationWeeks: 1,
+      raceDistance: '5k',
+      raceDate: '2026-12-05',
+      tierAtGeneration: 'free',
+      density: 'free',
+    });
+    expect(plan.weeklyLoad[0]).toBeLessThanOrEqual(NO_RACE_INTAKE.weeklyKm);
+  });
+
   it.each([1, 2, 3, 5, 8, 26])('builds a coherent %i-week plan with no race', (durationWeeks) => {
     const plan = buildNoRace({ durationWeeks });
     expect(plan.weeks).toHaveLength(durationWeeks);

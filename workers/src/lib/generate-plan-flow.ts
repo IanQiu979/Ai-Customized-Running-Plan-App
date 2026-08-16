@@ -17,6 +17,7 @@
 import type { IntakeResponses, Plan, Tier } from '../../../src/lib/planTypes';
 import type { GeneratePlanRequest } from '../../../src/lib/planTypes';
 import { MAX_PLAN_DURATION_WEEKS, type PlanPersonalizer, type SkeletonBuilder } from './planEngine';
+import { RACE_DATE_PASSED_MESSAGE, isRaceDatePast } from '../../../src/lib/planRequest';
 import type { PlanStore } from './store';
 
 export interface GeneratePlanDeps {
@@ -55,7 +56,7 @@ export async function generatePlan(
   const now = deps.now();
 
   // --- request validation (step 1's other half; auth itself happened in the route) -------------
-  const invalid = validateRequest(request);
+  const invalid = validateRequest(request, now);
   if (invalid) {
     return { kind: 'invalid_request', message: invalid };
   }
@@ -230,7 +231,15 @@ function stamp(plan: Plan, tier: Tier, engine: Plan['engine'], isFallback: boole
   return { ...plan, tierAtGeneration: tier, engine, isFallback };
 }
 
-function validateRequest(request: GeneratePlanRequest): string | null {
+/**
+ * `now` is the flow's injected clock, threaded in for one check: a race date that has already
+ * passed. `weeksUntilRace` floors at one week, so a stale date would otherwise buy a degenerate
+ * one-week plan at the cost of a quota slot. This runs before `store.reserve`, so nothing is
+ * charged, and it reuses the client's own wording (`src/lib/planRequest.ts`) so a runner arriving
+ * by any route is told the same thing. The server-side week floor itself is deliberate behaviour
+ * for other callers and is untouched.
+ */
+function validateRequest(request: GeneratePlanRequest, now: string): string | null {
   if (!request || typeof request !== 'object') {
     return 'Request body must be a JSON object.';
   }
@@ -258,6 +267,10 @@ function validateRequest(request: GeneratePlanRequest): string | null {
     if (!request.raceDistance) return 'raceDistance is required when goalType is "race".';
     if (!request.raceDate) return 'raceDate is required when goalType is "race".';
     if (!isIsoCalendarDate(request.raceDate)) return 'raceDate must be a valid YYYY-MM-DD calendar date.';
+  }
+  // Race day itself is still generatable; only a date strictly before today is refused.
+  if (isIsoCalendarDate(request.raceDate) && isRaceDatePast(request.raceDate, new Date(now))) {
+    return RACE_DATE_PASSED_MESSAGE;
   }
   if (request.goalType === 'duration') {
     if (

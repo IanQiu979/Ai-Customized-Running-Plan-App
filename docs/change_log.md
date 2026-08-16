@@ -5,6 +5,32 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-08-16 — review fixes on the intake-once branch
+
+Five findings from the review of the branch below, all fixed forward.
+
+- **A one-week no-race plan no longer opens above the runner's own volume.** Dropping the taper
+  tail moved the canonical curve's last entry from the taper's 28 km to the block's 48 km peak, and
+  `interpolateCanonical` collapses to that last entry when a plan is one week long — so a runner
+  asking for a single week off a 35 km baseline got 48 km, 137% of it, with no ramp. Week 1 has no
+  prior loading week, so the growth rule could not fire and only the level's absolute ceiling
+  applied. `clampWeeklyVolume` (`src/lib/loadRules.ts`) now takes `baselineWeeklyKm` and holds a
+  first week at the runner's declared volume. Arithmetic clamping in typed code, per CLAUDE.md;
+  race plans keep the taper-inclusive curve and are unchanged.
+- **A past race date is refused by the server, not only the client.** `validateRequest`
+  (`workers/src/lib/generate-plan-flow.ts`) now checks `raceDate` recency before `store.reserve`, so
+  a stale date can no longer reach `weeksUntilRace`'s one-week floor and charge a quota slot for a
+  degenerate plan. It reuses `RACE_DATE_PASSED_MESSAGE` so both routes say the same thing. Race day
+  itself still generates, and the server-side week floor is untouched.
+- **A failed intake fetch no longer says "you haven't done intake yet."** Home keeps the last known
+  intake across a transient `getIntake()` failure and shows only `loadError`; a genuine "no intake"
+  answer from the server still renders the empty state.
+- **The canonical taper boundary is derived per curve**, not from one shared `10`: the two canonical
+  arrays are different lengths with different taper tails (2 entries and 1), so editing either can
+  no longer silently mis-cut the slice.
+- **`MAX_PLAN_WEEKS` has one home.** `workers/src/lib/planEngine.ts` imports it from
+  `src/lib/planRequest.ts` as `MAX_PLAN_DURATION_WEEKS` instead of re-declaring 104.
+
 ## 2026-08-15 (later) — intake asked once, race target optional, structured numeric inputs
 
 Captain's phone test: "the homepage is very very confusing… after you've done [the intake] once,
