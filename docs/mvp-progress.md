@@ -335,8 +335,10 @@ the literal previous week) and issue #33 (goal-realism handling).
       gitignored and untracked; no secret is committed; `ANTHROPIC_API_KEY` is server-side only and
       read in exactly one file, `workers/src/lib/model.ts`
 - [x] `gh` 2.96.0 installed; `wrangler` 4.118 available via `npx`
-- [ ] **Cloudflare account resources — none created.** `wrangler login`, `wrangler d1 create`,
-      `wrangler secret put`, `wrangler deploy`: all the captain's, all unrun. See "Blocked" below.
+- [x] **Cloudflare account resources created.** `wrangler login`, `wrangler d1 create`,
+      `wrangler deploy`, and the `BETTER_AUTH_SECRET` / Google OAuth `wrangler secret put`s have all
+      run; `ANTHROPIC_API_KEY` has not. "Blocked / awaiting a decision" below is the row-by-row
+      status.
 - ~~Supabase project `v2.2_plan_generation`~~ — **superseded 2026-08-02.** The backend is Cloudflare
   now (`workers/`); the Supabase project is unused, and `supabase/` is dead scaffold kept for
   reference. Google OAuth and email/password were enabled on it and were not carried over:
@@ -965,11 +967,14 @@ intact underneath.
   captain runs `wrangler secret put ANTHROPIC_API_KEY --env production` (and the local `.dev.vars`
   equivalent for `wrangler dev`), Pro/Elite generation starts calling Claude for real with no other
   code change.
-- 🔴 **No Cloudflare account resources exist.** `wrangler login` is interactive and unrun, so
-  `wrangler d1 create`, `wrangler secret put`, and `wrangler deploy` are all unrun too, and
-  `wrangler.toml`'s `database_id` is a deliberately fake placeholder. Local work is unaffected —
-  `wrangler dev` and the test suite need no account — but nothing is reachable from a phone. Full
-  list in "Blocked" above.
+- 🟢 **Resolved: the Cloudflare account resources exist.** `wrangler login`, `wrangler d1 create`
+  (the real `database_id` is committed), `wrangler deploy --env production`, and the
+  `BETTER_AUTH_SECRET` / Google OAuth `wrangler secret put`s have all run, so a phone can now reach
+  `https://pace-blueprint-production.i78979848.workers.dev`. The only captain-only command never
+  run is `wrangler secret put ANTHROPIC_API_KEY` (the 🔴 item above); one *re*-deploy is still
+  outstanding for the 2026-08-10 `INVALID_ORIGIN` fix — see "Blocked" above.
+  Local work never depended on any of it — `wrangler dev` and the test suite need no account. Full
+  row-by-row status in "Blocked" above.
 - 🟢 **Resolved 2026-08-04: `generate-plan` can now actually generate a plan.** The deterministic
   skeleton binding (`workers/src/deps.ts` → `createTemplateSkeletonBuilder()` →
   `src/lib/planTemplates.ts`) landed, so the route, quota gate, idempotency, validation, and
