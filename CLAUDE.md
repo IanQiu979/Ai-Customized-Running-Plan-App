@@ -18,7 +18,9 @@ against `wrangler dev` locally — auth, the quota ledger, `quota-status`, `purc
 `delete-account`, intake, plan reads, and `generate-plan`'s free-tier deterministic template
 engine (`src/lib/planTemplates.ts`) — and **it is deployed** as wrangler's named `production`
 environment, live at `https://pace-blueprint-production.i78979848.workers.dev` (confirmed by
-`curl` 2026-08-09). The Pro/Elite AI-generation path is not yet built. On the client side, `src/lib/apiClient.ts`
+`curl` 2026-08-09). Both plan-engine seams are bound (template skeleton 2026-08-04, Pro/Elite
+personalizer 2026-08-10); the remaining gap is `ANTHROPIC_API_KEY`, unset everywhere, so paid-tier
+requests still receive the quota-exempt template fallback. On the client side, `src/lib/apiClient.ts`
 (better-auth's Expo client plus typed fetch wrappers for the other `/api/*` routes),
 `src/app/(auth)/onboarding.tsx`, `sign-in.tsx`/`sign-up.tsx`, the intake screen, the generate-plan action, the plan
 view (real plans plus the permanent example-plan fixture), and the My Plans list all exist, and
@@ -39,7 +41,7 @@ exercised at the token exchange, and the OAuth consent screen's publishing statu
 |---|---|
 | `npm start` | `expo start` |
 | `npm run ios` / `npm run android` / `npm run web` | `expo start --ios` / `--android` / `--web` |
-| `npm run typecheck` | `tsc --noEmit` |
+| `npm run typecheck` | `npm run routes:generate && tsc --noEmit` |
 | `npm run lint` | `expo lint` |
 | `npm test` | `jest` |
 | `npm --prefix workers run dev` | `wrangler dev` — the backend, locally, no Cloudflare account needed |
