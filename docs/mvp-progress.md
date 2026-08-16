@@ -6,7 +6,49 @@
 > Milestone definitions live in [`planning/02-product-requirements.md`](../planning/02-product-requirements.md).
 > Decision history lives in [`change_log.md`](change_log.md).
 
-**Last updated:** 2026-08-10 (later) — Ian reported two production sign-in bugs blocking him from
+**Last updated:** 2026-08-15 (later) — the captain phone-tested the core loop and called the
+homepage and intake "very very confusing": intake was effectively asked twice, a race target was
+mandatory, and the numeric keyboards lacked the `:` and `-` the fields demanded. All three
+reproduced on an iOS 26.5 simulator and are fixed; see
+[`change_log.md`](change_log.md#2026-08-15-later--intake-asked-once-race-target-optional-structured-numeric-inputs)
+for the full account.
+
+- **Intake asked once.** Home no longer re-asks goal type / race distance / race date. It reads the
+  target off the saved intake and asks only for a plan length, and only when there is no race date
+  to derive one from. `src/lib/planRequest.ts` is the pure module that owns that decision.
+- **A race target is optional end to end.** Home's "Select a race distance." block is gone. Two
+  engine defects behind it are fixed in `src/lib/planTemplates.ts`: the silent `?? '5k'` default is
+  removed, and a plan with no race no longer emits a `taper` phase or interpolates the taper tail of
+  the canonical load curve (it used to finish *below* the volume it started at). Race plans are
+  unchanged, golden fixture included.
+- **A past race date is refused on both screens.** Home does not send the request (so no quota slot
+  is charged for the one-week plan `weeksUntilRace`'s floor would otherwise produce) and intake does
+  not save the date; each says why and names the control that fixes it. Race day itself, and a blank
+  date, are both still valid. `src/lib/planRequest.ts` owns the decision and both messages.
+- **A no-race plan never ends on a deload** — captain's coaching ruling; the every-N-weeks cadence
+  yields for the final week only, and only for `isRacePlan === false`. Known limitation, pinned by a
+  documenting test: a 4-week no-race plan still finishes below its opening volume, because at that
+  length the canonical curve's own dip lands on week 2 and `clampWeeklyVolume`'s growth ceiling — a
+  safety rule, deliberately not bent — cannot recover it.
+- **`raceDistance` is validated whenever present, on any goal type**, since the client now sends it
+  with `goalType: 'duration'` too; `racePhaseWeights` is exhaustive rather than silently falling
+  through to the marathon weights.
+- **Numeric inputs are structured.** New `src/components/inputs/` splits dates into `YYYY - MM - DD`
+  and times into `H : MM : SS` with the separators printed rather than typed, and filters every
+  keystroke via `src/lib/fieldInput.ts` — `keyboardType` alone restricts nothing, which is how the
+  letter `v` reached the intake AGE field on the simulator.
+- **Verified by hand on an iOS 26.5 simulator**, headlessly via `simctl`: Home in both the race and
+  no-race states, and the keyboard each numeric field raises. **Not verified: Android** — no Android
+  SDK is installed on this machine, so the `number-pad`/`decimal-pad` choice rests on the React
+  Native contract for those two values (both supported on Android; `numeric` deliberately avoided,
+  as it differs across platforms).
+- **Open for the captain (item 4 of the brief, report-only, no redesign done):** what is still
+  confusing about Home once 1–3 are fixed. Findings are in the task report — headline items are the
+  quota line being the only status text, `NOTES (OPTIONAL)` having no effect on Free tier, Home
+  showing nothing about plans already generated, and "Change" silently meaning "reopen the whole
+  10-field intake".
+
+Previous entry: 2026-08-10 (later) —  Ian reported two production sign-in bugs blocking him from
 using the deployed app: email sign-up failed `"Invalid origin"`, and Google sign-in failed
 `"Invalid callback URL"`. Both reproduced against the **live deployed Worker**, not the local test
 suite (see "the harness gap" below), and both are now fixed in `workers/src/auth.ts` and

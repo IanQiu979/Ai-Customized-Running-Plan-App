@@ -220,3 +220,59 @@ describe('createTemplateSkeletonBuilder', () => {
     expect(proRuns.some((run) => run.pace !== undefined)).toBe(true);
   });
 });
+
+describe('createTemplateSkeletonBuilder — no race named anywhere', () => {
+  /**
+   * The captain's 2026-08-15 report: "the race stage should be optional, it's not a mandatory
+   * thing you need to input." Home used to refuse to generate without one. `INTAKE` here has no
+   * `raceDistance`, which is exactly that runner — the request must produce a real plan, and it
+   * must not have a 5K (or any other distance) invented for it on the way through.
+   */
+  it('builds a real plan for a runner who named no race', async () => {
+    const result = await createTemplateSkeletonBuilder().build({
+      tier: 'free',
+      goalType: 'duration',
+      durationWeeks: 12,
+      intake: INTAKE,
+      now: '2026-08-01T00:00:00.000Z',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.plan.weeks).toHaveLength(12);
+    expect(result.plan.title).toBe('12-Week Running Plan');
+    expect(result.plan.weeklyLoad.every((km) => km > 0)).toBe(true);
+  });
+
+  it('leaves the race fields off the plan instead of defaulting them to 5K', async () => {
+    const result = await createTemplateSkeletonBuilder().build({
+      tier: 'pro',
+      goalType: 'duration',
+      durationWeeks: 12,
+      intake: INTAKE,
+      now: '2026-08-01T00:00:00.000Z',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.plan.raceDistance).toBeUndefined();
+    expect(result.plan.raceDate).toBeUndefined();
+  });
+
+  it('emits no taper phase, because there is no race day to taper into', async () => {
+    // Before the fix this returned base x4 / build x4 / peak x2 / taper x2 — the 5K weighting,
+    // reached through a silent `?? '5k'`, winding a general-fitness runner down for a race that
+    // did not exist.
+    const result = await createTemplateSkeletonBuilder().build({
+      tier: 'free',
+      goalType: 'duration',
+      durationWeeks: 12,
+      intake: INTAKE,
+      now: '2026-08-01T00:00:00.000Z',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.plan.weeks.map((week) => week.phase)).not.toContain('taper');
+  });
+});

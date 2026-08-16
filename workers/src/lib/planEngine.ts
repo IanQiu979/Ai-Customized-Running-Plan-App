@@ -27,6 +27,7 @@
 import type { Engine, IntakeResponses, Plan, Tier } from '../../../src/lib/planTypes';
 import type { GoalType, RaceDistance } from '../../../src/lib/planTypes';
 import { buildTemplatePlan } from '../../../src/lib/planTemplates';
+import { MAX_PLAN_WEEKS } from '../../../src/lib/planRequest';
 import type { ModelCaller } from './model';
 import { isPlanShaped } from './planValidation';
 
@@ -106,8 +107,11 @@ const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000;
  * `buildTemplatePlan`'s per-week generation loop against a client sending an absurd
  * `durationWeeks` or a race date decades out — before this was wired to a real engine, that input
  * was inert (every request 503'd first), so nothing enforced it.
+ *
+ * The number itself lives in `src/lib/planRequest.ts` (`MAX_PLAN_WEEKS`), which both sides import,
+ * so the client's "104 weeks or fewer" refusal and this one are one value, not two.
  */
-export const MAX_PLAN_DURATION_WEEKS = 104;
+export const MAX_PLAN_DURATION_WEEKS = MAX_PLAN_WEEKS;
 
 /**
  * How many weeks a race-goal plan should span when the client sends a race date instead of an

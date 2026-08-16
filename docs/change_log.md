@@ -5,6 +5,114 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-08-16 — review fixes on the intake-once branch
+
+Five findings from the review of the branch below, all fixed forward.
+
+- **A one-week no-race plan no longer opens above the runner's own volume.** Dropping the taper
+  tail moved the canonical curve's last entry from the taper's 28 km to the block's 48 km peak, and
+  `interpolateCanonical` collapses to that last entry when a plan is one week long — so a runner
+  asking for a single week off a 35 km baseline got 48 km, 137% of it, with no ramp. Week 1 has no
+  prior loading week, so the growth rule could not fire and only the level's absolute ceiling
+  applied. `clampWeeklyVolume` (`src/lib/loadRules.ts`) now takes `baselineWeeklyKm` and holds a
+  first week at the runner's declared volume. Arithmetic clamping in typed code, per CLAUDE.md;
+  race plans keep the taper-inclusive curve and are unchanged.
+- **A past race date is refused by the server, not only the client.** `validateRequest`
+  (`workers/src/lib/generate-plan-flow.ts`) now checks `raceDate` recency before `store.reserve`, so
+  a stale date can no longer reach `weeksUntilRace`'s one-week floor and charge a quota slot for a
+  degenerate plan. It reuses `RACE_DATE_PASSED_MESSAGE` so both routes say the same thing. Race day
+  itself still generates, and the server-side week floor is untouched.
+- **A failed intake fetch no longer says "you haven't done intake yet."** Home keeps the last known
+  intake across a transient `getIntake()` failure; a genuine "no intake" answer from the server
+  still renders the empty state. The error banner sits above both branches, so a runner looking at
+  a retained target is told the refresh failed rather than shown a possibly stale target in
+  silence — keeping the intake without surfacing the error would trade one wrong message for none
+  at all.
+- **The canonical taper boundary is derived per curve**, not from one shared `10`: the two canonical
+  arrays are different lengths with different taper tails (2 entries and 1), so editing either can
+  no longer silently mis-cut the slice.
+- **`MAX_PLAN_WEEKS` has one home.** `workers/src/lib/planEngine.ts` imports it from
+  `src/lib/planRequest.ts` as `MAX_PLAN_DURATION_WEEKS` instead of re-declaring 104.
+- **The spec no longer describes a second survey.** On the captain's ruling, two lines in
+  `planning/` that still had the target race re-chosen per generation were corrected to match
+  shipped behavior: `02-product-requirements.md`'s user flow (Home reads the target back from
+  intake and asks only for a plan length when there is no race date) and
+  `03-engineering-requirements.md`'s goal-realism advisory (intake review is the only goal-entry
+  point). Recording a decision already made, not a spec change — leaving them stale invited a
+  future session to faithfully rebuild the duplicate survey. `src/lib/planRequest.ts` is the code
+  that enforces it.
+
+## 2026-08-15 (later) — intake asked once, race target optional, structured numeric inputs
+
+Captain's phone test: "the homepage is very very confusing… after you've done [the intake] once,
+you have to do it once more… the race stage should be optional… the keyboard is missing the colons,
+the dashes." All three reproduced on an iOS 26.5 simulator before anything was changed.
+
+- **Intake is asked exactly once.** There is one intake *screen* but there were two intake
+  *surfaces*: `/intake`, which asks for a target race and race date, and Home's generate panel,
+  which asked for a goal type, a race distance and a race date all over again — and, unlike intake,
+  refused to proceed without them. Home no longer asks any question intake has answered. It reads
+  the target back from the saved intake ("YOUR TARGET — Half Marathon on 2026-09-26 / General
+  fitness — no target race") with a **Change** link to `/intake`, and asks only for a plan length,
+  and only when there is no race date to derive one from. New pure module `src/lib/planRequest.ts`
+  holds that decision so it is unit-testable. A return visit generates another plan with no
+  re-answering at all.
+- **A race target is optional end to end.** Home's "Select a race distance." wall is gone; a runner
+  with no race gets a general-fitness plan. Two engine defects behind that were fixed in
+  `src/lib/planTemplates.ts`:
+  1. `buildTemplatePlan` ended with `params.raceDistance ?? params.intake.raceDistance ?? '5k'`, so
+     a runner who named no race silently got 5K periodization. The `?? '5k'` is gone; `raceDistance`
+     stays `undefined` and every race-specific branch is gated on a new `isRacePlan`. This is the
+     same rule PR #75 established for a *stated* goal, applied to one deliberately left blank.
+  2. A no-race plan still ran out through a `taper` — a wind-down into a race day that did not
+     exist, and (because every quality branch is gated on base/build/peak or on a race goal type) a
+     final stretch with no quality work at all. No-race plans now allocate base/build/peak only. The
+     volume curve had the same problem independently: `FIVE_K_WEEKLY_LOAD`'s last two entries *are*
+     the 5K taper, so a 12-week general plan finished at 24 km off a 35 km baseline, below where it
+     started. A no-race plan now interpolates the loading block of the same approved curve.
+     **No number was invented** — see `generalPhaseWeights` and `taperAwareCurve` for the
+     derivation from `plan-structure.md`. Race plans are byte-identical to before, golden 5K fixture
+     included.
+- **Numeric fields are structured, not masked free text.** The captain's "missing the colons, the
+  dashes" was accurate twice over. (a) `number-pad` genuinely has no `:` or `-`; the old screens hid
+  that behind an as-you-type mask, so the field's own label demanded punctuation the keyboard could
+  not produce and the digits regrouped under the thumb while typing (`1` → `14` → `1:45`). (b)
+  `keyboardType` restricts nothing — a hardware keyboard, paste, dictation or autofill puts letters
+  straight into a "number" field; verified on the simulator, where the letter `v` landed in the
+  intake AGE field and produced "Age must be a whole number between 13 and 100." New
+  `src/components/inputs/` — `NumberField`, `SegmentedField`, `DateField`, `ClockField` — split
+  dates into `YYYY - MM - DD` and times into `H : MM : SS` with the separators **printed, never
+  typed**, filter every keystroke through `src/lib/fieldInput.ts`, and auto-advance between boxes.
+  Verified on device: age → `number-pad`, weekly distance → `decimal-pad`, race date and both time
+  fields → digit boxes with a `number-pad`.
+- **A stale race date is refused on both screens, and charges nothing.** Home shows the target
+  read-only now, so a runner returning after their race would have had that date sent verbatim:
+  `weeksUntilRace` floors at one week and the quota slot is reserved before the skeleton is built,
+  so the request would have charged a generation for a degenerate one-week plan. Home refuses
+  before sending, and intake refuses to save a past date, each saying so and naming the control
+  that fixes it (`RACE_DATE_PASSED_MESSAGE` / `INTAKE_RACE_DATE_PASSED_MESSAGE` in
+  `src/lib/planRequest.ts`). Race day itself still generates and still saves; a blank date is still
+  valid, because the race is optional. The server-side floor is deliberate behaviour for other
+  callers and was not changed.
+- **A no-race plan never ends on a deload.** Captain's ruling as a McMillan-certified coach: the
+  last week of a plan is the last week the runner sees, and finishing on a recovery week leaves
+  them at or below where they started — the visible symptom behind the original report. The final
+  week of a plan with `isRacePlan === false` is forced to be a loading week, deliberately bending
+  the every-N-weeks deload cadence for that week alone. The cadence, `deloadVolume`, and race plans
+  (whose final week is race week or taper) are untouched. Known limitation, pinned by its own
+  documenting test: a **4-week** no-race plan still finishes below its opening volume — at that
+  length the canonical curve's own dip lands on week 2, and `clampWeeklyVolume`'s week-on-week
+  growth ceiling cannot recover it in the two weeks left. That ceiling is a safety rule and was
+  deliberately not bent.
+- **`raceDistance` is validated on any goal type.** The client now deliberately sends it alongside
+  `goalType: 'duration'` for a target-distance-with-no-date runner, so the value check in
+  `workers/src/lib/generate-plan-flow.ts` was hoisted out of the `race` branch and runs whenever the
+  field is present. `racePhaseWeights` is now an exhaustive `switch` rather than a chained ternary
+  that silently handed an unrecognised value the marathon weights.
+- 392 root tests (was 332) and 133 `workers/` tests (was 130) pass; typecheck and lint clean on both
+  sides. Not verified: Android — no Android SDK on this machine. Billing, tiers, entitlement, auth
+  and the paywall were not touched.
+
 ## 2026-08-15 — complete goal-realism disclosure and correct ambitious-goal copy
 
 - The immutable plan screen now renders `GoalRealismNotice` for both warned outcomes, not only

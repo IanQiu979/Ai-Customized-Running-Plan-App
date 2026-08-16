@@ -42,11 +42,13 @@ src/
     (tabs)/
       _layout.tsx          # tab bar — all four tabs today: Home, Glossary, My Plans, Settings
                             #           (Settings added 2026-08-05)
-      index.tsx             # Home placeholder shell + a temporary demo link to the fixture plan;
-                             #  as of 2026-08-05 also prefills raceDistance/raceDate from saved
-                             #  intake (once per mount) and shows GET /api/quota-status inline.
-                             #  The temporary "Sign out" button that lived here is gone — moved to
-                             #  settings.tsx.
+      index.tsx             # Home — quota line, the runner's target READ BACK from saved intake
+                             #  (never re-asked), and Generate plan. As of 2026-08-15 it no longer
+                             #  carries its own goal-type / race-distance / race-date panel: that
+                             #  duplicated intake and blocked a runner with no race. The only field
+                             #  left is a plan length, shown only when there is no race date to
+                             #  derive one from; "Change" routes to /intake. Decision logic lives in
+                             #  src/lib/planRequest.ts, not here.
       settings.tsx           # Settings tab (new 2026-08-05) — tier + quota (GET
                               #  /api/quota-status, src/lib/quotaDisplay.ts), sign-out (moved off
                               #  Home), a Free-tier "Upgrade" entry point to /paywall, and Delete
@@ -54,7 +56,10 @@ src/
       glossary.tsx           # abbreviations glossary — sourced from notation.ts, nothing hardcoded
       my-plans.tsx           # My Plans — lists plans off GET /api/plans, refetched on every tab
                               #            focus (useFocusEffect), not just on mount
-    intake.tsx               # onboarding questionnaire, against GET/PUT /api/intake; its
+    intake.tsx               # onboarding questionnaire — THE ONLY place a target race is asked
+                              # for (2026-08-15). Numeric answers use src/components/inputs/
+                              # (segmented YYYY-MM-DD and H:MM:SS boxes, digit-filtered).
+                              # Against GET/PUT /api/intake; its
                               # exit-header action replaces to Home ("Done" once intake exists,
                               # "Skip for now" otherwise), and as of 2026-08-05 a successful save
                               # also router.replace('/(tabs)')s there instead of staying put
@@ -72,6 +77,11 @@ src/
     onboarding/             # HeroRibbon (new 2026-08-08) — the week-ribbon motif at 2x hero scale,
                              # building itself cell by cell then settling into an ambient pulse.
                              # Reduced-motion aware; illustration only, never the user's data
+    inputs/                 # NumberField, SegmentedField, DateField, ClockField (new 2026-08-15) —
+                             # every numeric/structured answer in the app. Keystrokes are filtered
+                             # through src/lib/fieldInput.ts; dates and times are segmented boxes
+                             # with the `-`/`:` printed, never typed. No screen uses a raw
+                             # <TextInput keyboardType="..."> for a number
   constants/
     theme.ts                # "Instrument & Matter" token system — current, see below
     navigation-theme.ts      # bridges theme.ts's tokens into @react-navigation/native's `Theme`
@@ -105,6 +115,11 @@ src/
     quotaPeriod.ts                # canonical — `currentPeriod(anchorDate, now)`, the purchase-day
                                    #            anchored window with the month-end clamp. Shared
                                    #            by the app and `workers/`. 10 unit tests
+    planRequest.ts           # pure (new 2026-08-15) — intake owns the runner's target and Home
+                              #  never re-asks it; also the shared stale-race-date guard. See the
+                              #  src/lib/ notes below
+    fieldInput.ts            # pure (new 2026-08-15) — the digit/decimal filters and clock/date part
+                              #  parsers behind src/components/inputs/
     goalRealismDisclosure.ts # pure, app-only copy helper (new 2026-08-15) — the ONE place that
                               #  decides whether a realism notice shows and what it says
                               #  ('plan' vs 'preview' tense); classification and cap arithmetic
@@ -114,9 +129,10 @@ src/
                               #  themselves stay server-computed, this only formats them
     fixtures/examplePlan.ts  # hand-built 5K screen fixture; `plan/[id].tsx` still renders it
     __tests__/               # supabase, loadRules, notation, examplePlan.fixture, tierLimits,
-                              # quotaPeriod, planTemplates (golden + general), paceDerivation,
-                              # quotaDisplay (6 tests, new 2026-08-05), goalRealismDisclosure
-                              # (new 2026-08-15) — the two engine contracts included
+                              # quotaPeriod, planTemplates (golden + general + noRace),
+                              # paceDerivation, quotaDisplay (6 tests, new 2026-08-05),
+                              # goalRealismDisclosure, planRequest, fieldInput (new 2026-08-15)
+                              # — the two engine contracts included
 ```
 
 `src/lib/tierLimits.ts` and `src/lib/quotaPeriod.ts` are, like `planTypes.ts`, **pure and
@@ -322,10 +338,30 @@ src/lib/
                             #          5K case. Free's 12-week/5K limit is a UI/quota gate applied
                             #          on top of this engine, not a limit of the engine itself — a
                             #          Pro/Elite fallback still needs, say, a 26-week marathon
-                            #          template.
+                            #          template. Since 2026-08-15 a plan with no race is a first
+                            #          class shape, not a 5K in disguise: no invented distance, no
+                            #          taper phase, the loading block of the curve only, and a final
+                            #          week forced to be a loading week so it never ends on a deload
+                            #          (captain's coaching ruling — the cadence yields for that week
+                            #          alone). Race plans, golden fixture included, are unchanged.
   paceDerivation.ts        # exists — Riegel cross-distance equivalency, source-relative training
                             #          bands, and the ruled goal-realism/race-pace cap (decision
                             #          13, 2026-07-10)
+  planRequest.ts           # exists (2026-08-15) — the rule that intake owns the runner's target and
+                            #          Home never re-asks it: `planTargetFromIntake()`,
+                            #          `needsPlanLength()`, `buildGeneratePlanRequest()`. Pure, so
+                            #          the "asked exactly once" and "no race needed" guarantees are
+                            #          unit-tested without rendering a screen. Also owns the
+                            #          stale-race-date guard both screens share — `isRaceDatePast()`
+                            #          (`now` is injected, never read from the clock in here),
+                            #          `intakeRaceDateError()` and the two messages. Home sends no
+                            #          request and intake saves nothing when the date has passed, so
+                            #          no quota slot is charged for the one-week plan the server's
+                            #          `weeksUntilRace` floor would otherwise produce.
+  fieldInput.ts            # exists (2026-08-15) — digit/decimal filters and the clock/date part
+                            #          parsers behind `src/components/inputs/`. Its header records
+                            #          why `keyboardType` alone is not enough (it restricts nothing;
+                            #          a letter reached a number-pad field on device).
   quotaDisplay.ts          # exists (2026-08-05) — `formatQuotaLine()`, pure display phrasing for
                             #          `QuotaStatus`. There is no separate `subscription.ts`; the
                             #          tier-read/dummy-purchase ground it would have covered is
@@ -438,7 +474,7 @@ it `getSession()` ignores the header and every route 403s a user who just signed
 |---|---|---|---|---|
 | `ANY /api/auth/*` | — | better-auth's own | better-auth's own | Sign-up, sign-in, sign-out, session, OAuth callbacks. Email/password and Google both work in production (Google since 2026-08-09 — see `docs/change_log.md`). |
 | `GET /health` | none | — | `{ ok: true }` | Liveness. Touches no database. |
-| `POST /api/generate-plan` | session | `{ goalType: "race"\|"duration", raceDistance?, raceDate?, durationWeeks?, notes?, idempotencyKey }` | `{ plan, planId, isFallback, quotaConsumed }`, or `402` over-quota / `403` anon / `409` intake-required | Enforces tier + quota server-side, branches by tier, validates, persists. A duplicate `idempotencyKey` returns the existing plan instead of generating twice. Free gets the template plan (since 2026-08-04). Pro/Elite call the personalization prompt (bound since 2026-08-10) but, with no `ANTHROPIC_API_KEY` configured anywhere yet, still fall back to the same template today (`isFallback: true`, quota-exempt) — see "Current — `generate-plan`" above. `quotaConsumed` tells the client whether this fallback counted against the tier limit, so `FallbackNotice` can pick `counted` vs `exempt`. |
+| `POST /api/generate-plan` | session | `{ goalType: "race"\|"duration", raceDistance?, raceDate?, durationWeeks?, notes?, idempotencyKey }` | `{ plan, planId, isFallback, quotaConsumed }`, or `402` over-quota / `403` anon / `409` intake-required | Enforces tier + quota server-side, branches by tier, validates, persists. `raceDistance` is validated whenever it is present, on either goal type — a `duration` request legitimately carries one for a runner with a target distance and no date. A duplicate `idempotencyKey` returns the existing plan instead of generating twice. Free gets the template plan (since 2026-08-04). Pro/Elite call the personalization prompt (bound since 2026-08-10) but, with no `ANTHROPIC_API_KEY` configured anywhere yet, still fall back to the same template today (`isFallback: true`, quota-exempt) — see "Current — `generate-plan`" above. `quotaConsumed` tells the client whether this fallback counted against the tier limit, so `FallbackNotice` can pick `counted` vs `exempt`. |
 | `GET /api/quota-status` | session | — | `{ tier, used, limit, periodEnd }` | Drives Home's and Settings' "N of M plans used" line (`src/lib/quotaDisplay.ts`'s `formatQuotaLine()`, consumed by both since 2026-08-05). `used` counts **non-fallback** plans in the current purchase-anchored period, server-side, never a client counter. `periodEnd` is `null` for Free (lifetime allowance) and also `null` while the temporary `ALL_USERS_UNLIMITED_ACCESS` override is on (see below) — the UI must not render a countdown for either. |
 | `POST /api/purchase-tier` | session | `{ tier: "pro"\|"elite", source: "dummy" }` | `{ tier, periodStart: string \| null, periodEnd: string \| null }` | v1 dummy flow, called from `src/app/paywall.tsx` (new 2026-08-05) with honest "test upgrade, no payment required" copy. v2 swaps `source` to `"revenuecat"` and verifies the receipt — same route, same table write. `source: "revenuecat"` is refused in v1 rather than trusted. |
 | `POST /api/delete-account` | session | — | `{ deleted: true }` | Really deletes; no soft-delete flag, because the app's own copy promises erasure. The only route that deletes a plan. Called from Settings' Delete Account flow (new 2026-08-05), followed client-side by `authClient.signOut()` to invalidate the local session store. |

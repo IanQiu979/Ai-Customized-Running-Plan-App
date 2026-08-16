@@ -183,6 +183,13 @@ export interface WeeklyVolumeClampInput {
   lastLoadingWeekKm: number;
   proposedKm: number;
   level: ExperienceLevel;
+  /**
+   * The runner's declared current weekly volume. Used only when there is no prior loading week to
+   * grow from — the plan's first week, where the week-on-week growth rule has nothing to measure
+   * against. Without it the first week is bounded only by the level's absolute ceiling, which is a
+   * ceiling for a trained runner, not a step the runner in front of us can take in one week.
+   */
+  baselineWeeklyKm?: number;
 }
 
 /**
@@ -190,14 +197,27 @@ export interface WeeklyVolumeClampInput {
  * A deload week is skipped as the growth reference. A proposal above the reject threshold is
  * recalculated at the lower rate, per `load-rules.md § Rule 1 › Enforcement` — it is not merely
  * trimmed to the threshold.
+ *
+ * The first week of a plan has no loading week behind it, so the growth rule cannot fire. It is
+ * held at the runner's declared baseline instead: week 1 may match what they are already running,
+ * never exceed it. That matters because the canonical curve is interpolated, and a plan short
+ * enough to collapse to a single point lands on the curve's peak rather than its opening week —
+ * 137% of baseline, with no ramp at all, for a runner asking for one week of training.
  */
 export function clampWeeklyVolume({
   lastLoadingWeekKm,
   proposedKm,
   level,
+  baselineWeeklyKm,
 }: WeeklyVolumeClampInput): number {
   const ceiling = MAX_WEEKLY_KM[level];
-  if (lastLoadingWeekKm <= 0) return Math.min(proposedKm, ceiling);
+  if (lastLoadingWeekKm <= 0) {
+    const firstWeekCeiling =
+      baselineWeeklyKm !== undefined && baselineWeeklyKm > 0
+        ? Math.min(ceiling, baselineWeeklyKm)
+        : ceiling;
+    return Math.min(proposedKm, firstWeekCeiling);
+  }
 
   const growth = (proposedKm - lastLoadingWeekKm) / lastLoadingWeekKm;
   const allowed =
