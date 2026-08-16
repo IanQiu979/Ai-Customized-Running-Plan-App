@@ -196,9 +196,8 @@ both warned outcomes, including an `ambitious` goal that was honoured rather tha
 ambitious copy now says the entered pace is kept instead of falsely promising a sustainable-pace
 adjustment. 278 tests pass (272 + 6 new for `quotaDisplay.ts`), typecheck and lint
 clean; no `workers/` change in this batch. **Not touched, deliberately:** the backend deploy
-(captain-only) and the Pro/Elite AI-generation prompt (bound in `workers/src/deps.ts` on
-2026-08-10, still awaiting `ANTHROPIC_API_KEY`) — only the free-tier template engine plus this
-client polish landed. Full
+(captain-only) and the Pro/Elite AI-generation prompt (still the one unbound seam in
+`workers/src/deps.ts`) — only the free-tier template engine plus this client polish landed. Full
 account: `docs/change_log.md`'s 2026-08-05 entry (the newest one, above the Google OAuth entry).
 Previous entry: 2026-08-05 — Google OAuth's credentials are provisioned and verified working in
 local dev: `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` are in `workers/.dev.vars`, and
@@ -990,8 +989,12 @@ intact underneath.
 - 🟢 **Resolved 2026-08-03: the client can now talk to `workers/`.** `src/lib/apiClient.ts` and
   `src/app/(auth)/` (email/password sign-in/sign-up, `Stack.Protected` session gate) landed in
   `06b1f89`. **Google OAuth resolved in local dev 2026-08-05** — credentials provisioned and
-  verified working against `wrangler dev`; production's `wrangler secret put` is the one piece
-  still pending, and is the captain's own step (needs their Cloudflare login). No screen yet
+  verified working against `wrangler dev`. **`GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` were
+  provisioned on the named `production` Worker on 2026-08-09**, and the provider-registration probe
+  against it returns a real Google authorization URL instead of `PROVIDER_NOT_FOUND`. That proves
+  registration only: the client secret itself is exercised nowhere but the token exchange, and the
+  OAuth consent screen's publishing status is unknown — both remain unverified in production and
+  need the captain's Google-side and in-app check. No screen yet
   consumes `apiClient.ts`'s other wrappers (`quota-status`, intake, plans, `generate-plan`) —
   those land with the screens that need them.
 - 🟡 **`supabase/` and `src/lib/supabase.ts` are dead code** kept deliberately (2026-08-02) so the
