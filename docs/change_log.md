@@ -23,8 +23,11 @@ Five findings from the review of the branch below, all fixed forward.
   degenerate plan. It reuses `RACE_DATE_PASSED_MESSAGE` so both routes say the same thing. Race day
   itself still generates, and the server-side week floor is untouched.
 - **A failed intake fetch no longer says "you haven't done intake yet."** Home keeps the last known
-  intake across a transient `getIntake()` failure and shows only `loadError`; a genuine "no intake"
-  answer from the server still renders the empty state.
+  intake across a transient `getIntake()` failure; a genuine "no intake" answer from the server
+  still renders the empty state. The error banner sits above both branches, so a runner looking at
+  a retained target is told the refresh failed rather than shown a possibly stale target in
+  silence — keeping the intake without surfacing the error would trade one wrong message for none
+  at all.
 - **The canonical taper boundary is derived per curve**, not from one shared `10`: the two canonical
   arrays are different lengths with different taper tails (2 entries and 1), so editing either can
   no longer silently mis-cut the slice.

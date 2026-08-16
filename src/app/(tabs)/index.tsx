@@ -192,11 +192,17 @@ export default function HomeScreen() {
         >
           <Text style={[styles.title, { color: theme.text.primary }]}>Pace Blueprint</Text>
 
+          {/*
+            Outside the branches on purpose. A failed refresh keeps the last known intake, so the
+            has-intake branch is exactly where the runner most needs telling: the target below is
+            the last one that loaded, not necessarily what the server holds now.
+          */}
+          {loadError && <Text style={[styles.error, { color: theme.status.error }]}>{loadError}</Text>}
+
           {checkingIntake ? (
             <ActivityIndicator color={theme.text.primary} style={styles.checkingSpinner} />
           ) : !hasIntake ? (
             <View style={styles.section}>
-              {loadError && <Text style={[styles.error, { color: theme.status.error }]}>{loadError}</Text>}
               <Text style={[styles.body, { color: theme.text.secondary }]}>
                 Answer a few questions about your running and we&apos;ll build your plan. You only
                 do this once.

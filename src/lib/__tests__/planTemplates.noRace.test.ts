@@ -183,9 +183,11 @@ describe('a plan generates with no race specified', () => {
     },
   );
 
-  it('leaves a race plan on the taper-inclusive curve', () => {
-    // Same runner, same one-week degenerate length, but a race plan still reads the full curve,
-    // whose last entry is the taper — unchanged by any of the above.
+  it('still reads the taper tail, not the loading peak, for a one-week race plan', () => {
+    // Same runner, same degenerate length, but a race plan reads the full curve, whose last entry
+    // is the taper's 28 km — the number that distinguishes the two curves. On the sliced curve the
+    // last entry is the 48 km peak, which the baseline clamp would then show as 35, so asserting
+    // "at or below baseline" here would pass on either curve and prove nothing.
     const plan = buildTemplatePlan({
       intake: { ...NO_RACE_INTAKE, raceDistance: '5k' },
       goalType: 'race',
@@ -195,7 +197,7 @@ describe('a plan generates with no race specified', () => {
       tierAtGeneration: 'free',
       density: 'free',
     });
-    expect(plan.weeklyLoad[0]).toBeLessThanOrEqual(NO_RACE_INTAKE.weeklyKm);
+    expect(plan.weeklyLoad).toEqual([28]);
   });
 
   it.each([1, 2, 3, 5, 8, 26])('builds a coherent %i-week plan with no race', (durationWeeks) => {
