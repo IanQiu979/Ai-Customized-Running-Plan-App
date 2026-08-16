@@ -159,8 +159,8 @@ Note that the 10% here is **not** R-A's 10%. R-A's gated *which pace anchors the
 gates *whether the app says anything*. Same number, different job.
 
 The check is one pure function, `assessGoalRealism()` in `paceDerivation.ts`, called by the client
-for a non-blocking advisory at both goal-entry points (intake review **and** the configure modal —
-goal time travels per-generation) and by the engine to apply the cap and stamp the verdict onto the
+for a non-blocking advisory at the single goal-entry point (intake review — intake owns the goal,
+and Home never re-asks it) and by the engine to apply the cap and stamp the verdict onto the
 immutable plan (`Plan.goalRealism`). Same function on both sides, so the warning and the cap cannot
 disagree; the server-side cap remains the authority.
 

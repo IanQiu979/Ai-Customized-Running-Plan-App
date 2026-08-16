@@ -33,6 +33,14 @@ Five findings from the review of the branch below, all fixed forward.
   no longer silently mis-cut the slice.
 - **`MAX_PLAN_WEEKS` has one home.** `workers/src/lib/planEngine.ts` imports it from
   `src/lib/planRequest.ts` as `MAX_PLAN_DURATION_WEEKS` instead of re-declaring 104.
+- **The spec no longer describes a second survey.** On the captain's ruling, two lines in
+  `planning/` that still had the target race re-chosen per generation were corrected to match
+  shipped behavior: `02-product-requirements.md`'s user flow (Home reads the target back from
+  intake and asks only for a plan length when there is no race date) and
+  `03-engineering-requirements.md`'s goal-realism advisory (intake review is the only goal-entry
+  point). Recording a decision already made, not a spec change — leaving them stale invited a
+  future session to faithfully rebuild the duplicate survey. `src/lib/planRequest.ts` is the code
+  that enforces it.
 
 ## 2026-08-15 (later) — intake asked once, race target optional, structured numeric inputs
 
