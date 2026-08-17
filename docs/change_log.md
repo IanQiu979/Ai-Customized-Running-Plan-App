@@ -9,6 +9,17 @@ make a behavior-changing commit, add a bullet under today's date — create a ne
 
 Five findings from the review of the branch below, all fixed forward.
 
+- **Documentation-only: the drift audit's status corrections landed** (findings D3, D9, D10, C1,
+  C2). `README.md`, `CLAUDE.md`, `docs/architecture.md`, `docs/mvp-progress.md`, and
+  `workers/README.md` had all still described the Pro/Elite personalizer as unbuilt (it was bound
+  2026-08-10) and Google OAuth as unprovisioned in production (both secrets were set 2026-08-09,
+  with the token exchange and consent-screen publishing status still unproven). Hard-coded
+  `workers/` test counts were removed rather than re-pinned to a new number — they rot on every
+  test added; the file trees now point at `npm --prefix workers test`. `AGENTS.md`'s Expo pin and
+  `CLAUDE.md`'s `typecheck` row were realigned with `package.json` (`~54.0.36`,
+  `npm run routes:generate && tsc --noEmit`). No application code, config, secret, or coaching rule
+  changed.
+
 - **A one-week no-race plan no longer opens above the runner's own volume.** Dropping the taper
   tail moved the canonical curve's last entry from the taper's 28 km to the block's 48 km peak, and
   `interpolateCanonical` collapses to that last entry when a plan is one week long — so a runner

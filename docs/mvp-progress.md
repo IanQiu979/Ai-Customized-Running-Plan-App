@@ -292,8 +292,11 @@ deterministic template plans and reproduces the approved 12-week 5K fixture exac
 between the two landed 2026-08-04**: `workers/src/deps.ts` now binds `generate-plan`'s skeleton
 builder to `src/lib/planTemplates.ts` (`createTemplateSkeletonBuilder()`), so `generate-plan`
 returns a real plan instead of `503`, and the plan screen renders it via `GET /api/plans/:id`. The
-Pro/Elite personalization prompt is the one seam in `deps.ts` still bound to a typed *unavailable*;
-M3 is complete for the deterministic/template path and incomplete only for that prompt.
+Pro/Elite personalization prompt — `deps.ts`'s second seam — was bound on 2026-08-10, so both plan-
+engine seams now take real implementations and no seam is left on a typed *unavailable*. M3 is
+complete for the deterministic/template path and for the personalizer's code; the one remaining gap
+is `ANTHROPIC_API_KEY`, unset everywhere, so paid-tier requests still receive the quota-exempt
+template fallback.
 
 `planTypes.ts`, `loadRules.ts`, and (as of the 2026-07-11
 review-and-refine cycle) `notation.ts` are the app's `lib/` layer — shared vocabulary, safety
@@ -332,8 +335,10 @@ the literal previous week) and issue #33 (goal-realism handling).
       gitignored and untracked; no secret is committed; `ANTHROPIC_API_KEY` is server-side only and
       read in exactly one file, `workers/src/lib/model.ts`
 - [x] `gh` 2.96.0 installed; `wrangler` 4.118 available via `npx`
-- [ ] **Cloudflare account resources — none created.** `wrangler login`, `wrangler d1 create`,
-      `wrangler secret put`, `wrangler deploy`: all the captain's, all unrun. See "Blocked" below.
+- [x] **Cloudflare account resources created.** `wrangler login`, `wrangler d1 create`,
+      `wrangler deploy`, and the `BETTER_AUTH_SECRET` / Google OAuth `wrangler secret put`s have all
+      run; `ANTHROPIC_API_KEY` has not. "Blocked / awaiting a decision" below is the row-by-row
+      status.
 - ~~Supabase project `v2.2_plan_generation`~~ — **superseded 2026-08-02.** The backend is Cloudflare
   now (`workers/`); the Supabase project is unused, and `supabase/` is dead scaffold kept for
   reference. Google OAuth and email/password were enabled on it and were not carried over:
@@ -356,7 +361,8 @@ the literal previous week) and issue #33 (goal-realism handling).
       Bearer sessions), `migrations/` for both better-auth's tables and the app's, the quota ledger
       with its atomic gate and reserve→settle/release lifecycle, and the routes `generate-plan`,
       `quota-status`, `purchase-tier`, `delete-account`, `GET/PUT /api/intake`,
-      `GET /api/plans[/:id]`. 75 tests in real `workerd` against real D1. Verified end to end against
+      `GET /api/plans[/:id]`. Tested in real `workerd` against real D1 — run
+      `npm --prefix workers test` for the current count. Verified end to end against
       `wrangler dev`, offline. `generate-plan` returns `503 engine_unavailable` (and charges nothing)
       until the plan engine exists. Details: [`workers/README.md`](../workers/README.md)
 - [x] `src/lib/tierLimits.ts` and `src/lib/quotaPeriod.ts` — pure, shared by the app and the Worker,
@@ -646,8 +652,9 @@ view to `buildTemplatePlan()` instead of the static fixture; intake and server w
 **Nothing is currently in flight.** The pure engine and its test contracts are complete, and as of
 2026-08-04 steps 4, 7, 8, and 10 below (plan view, intake, `generate-plan`, My Plans) are wired end
 to end and E2E-verified. **As of 2026-08-05, step 9 (quota UI + dummy paywall) is also done** — see
-"Done" below. The one remaining critical-path item is the Pro/Elite personalization prompt noted in
-step 8, which is server-only (`workers/`) and untouched by this client-only batch.
+"Done" below. The Pro/Elite personalization prompt noted in step 8 was bound on 2026-08-10, so the
+one remaining critical-path item is provisioning `ANTHROPIC_API_KEY` (captain-only), without which
+paid-tier requests still fall back to the quota-exempt template plan.
 
 - **Cycle 1** (2026-07-11): Ian scored the rendered plan 3/10, five rulings applied. Docs rebuilt
   (`notation.md` added; `workout-library.md` and `example-plan-5k-pro.md` rewritten;
@@ -960,11 +967,14 @@ intact underneath.
   captain runs `wrangler secret put ANTHROPIC_API_KEY --env production` (and the local `.dev.vars`
   equivalent for `wrangler dev`), Pro/Elite generation starts calling Claude for real with no other
   code change.
-- 🔴 **No Cloudflare account resources exist.** `wrangler login` is interactive and unrun, so
-  `wrangler d1 create`, `wrangler secret put`, and `wrangler deploy` are all unrun too, and
-  `wrangler.toml`'s `database_id` is a deliberately fake placeholder. Local work is unaffected —
-  `wrangler dev` and the test suite need no account — but nothing is reachable from a phone. Full
-  list in "Blocked" above.
+- 🟢 **Resolved: the Cloudflare account resources exist.** `wrangler login`, `wrangler d1 create`
+  (the real `database_id` is committed), `wrangler deploy --env production`, and the
+  `BETTER_AUTH_SECRET` / Google OAuth `wrangler secret put`s have all run, so a phone can now reach
+  `https://pace-blueprint-production.i78979848.workers.dev`. The only captain-only command never
+  run is `wrangler secret put ANTHROPIC_API_KEY` (the 🔴 item above); one *re*-deploy is still
+  outstanding for the 2026-08-10 `INVALID_ORIGIN` fix — see "Blocked" above.
+  Local work never depended on any of it — `wrangler dev` and the test suite need no account. Full
+  row-by-row status in "Blocked" above.
 - 🟢 **Resolved 2026-08-04: `generate-plan` can now actually generate a plan.** The deterministic
   skeleton binding (`workers/src/deps.ts` → `createTemplateSkeletonBuilder()` →
   `src/lib/planTemplates.ts`) landed, so the route, quota gate, idempotency, validation, and
@@ -984,8 +994,12 @@ intact underneath.
 - 🟢 **Resolved 2026-08-03: the client can now talk to `workers/`.** `src/lib/apiClient.ts` and
   `src/app/(auth)/` (email/password sign-in/sign-up, `Stack.Protected` session gate) landed in
   `06b1f89`. **Google OAuth resolved in local dev 2026-08-05** — credentials provisioned and
-  verified working against `wrangler dev`; production's `wrangler secret put` is the one piece
-  still pending, and is the captain's own step (needs their Cloudflare login). No screen yet
+  verified working against `wrangler dev`. **`GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` were
+  provisioned on the named `production` Worker on 2026-08-09**, and the provider-registration probe
+  against it returns a real Google authorization URL instead of `PROVIDER_NOT_FOUND`. That proves
+  registration only: the client secret itself is exercised nowhere but the token exchange, and the
+  OAuth consent screen's publishing status is unknown — both remain unverified in production and
+  need the captain's Google-side and in-app check. No screen yet
   consumes `apiClient.ts`'s other wrappers (`quota-status`, intake, plans, `generate-plan`) —
   those land with the screens that need them.
 - 🟡 **`supabase/` and `src/lib/supabase.ts` are dead code** kept deliberately (2026-08-02) so the

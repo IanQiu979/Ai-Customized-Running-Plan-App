@@ -7,7 +7,7 @@ file holds only routing: who to dispatch, in what order. On conflict, CLAUDE.md 
 
 Read the exact versioned docs at https://docs.expo.dev/versions/v54.0.0/ before writing any code.
 
-This project is pinned to Expo SDK 54 (`expo ~54.0.0`, 54.0.36 installed). Docs for a newer SDK
+This project is pinned to Expo SDK 54 (`expo ~54.0.36`, 54.0.36 installed). Docs for a newer SDK
 describe APIs this project does not have. If you upgrade the SDK, update this link in the same
 commit.
 

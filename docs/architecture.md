@@ -34,8 +34,8 @@ src/
       onboarding.tsx        # 2026-08-08 — the signed-out landing screen. Animated week-ribbon hero
                             #   (components/onboarding/), the pitch, then "Get started" -> sign-up.
                             #   No form; the CTA is disabled until the hero settles
-      sign-in.tsx            # email/password sign-in + a "Continue with Google" button, verified
-                              #   working against local dev (2026-08-05); production pending
+      sign-in.tsx            # email/password sign-in + a "Continue with Google" button; Google
+                              #   provider live in production since 2026-08-09
       sign-up.tsx            # email/password sign-up + the same Google button
                             #   both auth screens scroll (KeyboardAvoidingView + ScrollView) as of
                             #   2026-08-08 — centred content used to be unreachable under a keyboard
@@ -163,10 +163,11 @@ workers/                    # a SEPARATE npm project; Metro is told to skip it (
     deps.ts                 # the only file that reads a secret; binds every seam
     lib/store.ts            # every D1 statement — authorization lives here
     lib/generate-plan-flow.ts  # the eleven pipeline steps, pure, deps injected
-    lib/planEngine.ts       # skeleton + personalizer seams (neither implemented — see below)
+    lib/planEngine.ts       # skeleton + personalizer seams (bound 2026-08-04 and 2026-08-10)
     lib/planValidation.ts   # structural validation, shape only
     lib/model.ts            # the Anthropic call, behind an injectable seam
-  test/                     # 75 tests in real workerd + real D1 (Miniflare). No network.
+  test/                     # vitest in real workerd + real D1 (Miniflare). No network;
+                            # run `npm --prefix workers test` for the current count
 ```
 
 Full operational detail — how to run it, what the captain must do himself, why the layout is what
@@ -283,9 +284,9 @@ test`).
 
 ```
 src/app/
-  (auth)/sign-in, sign-up  # exists today — email/password; Google button verified working against
-                           # local dev (2026-08-05), production secret put still pending. Gated in
-                           # by root Stack.Protected when there is no session.
+  (auth)/sign-in, sign-up  # exists today — email/password; Google provider live in production
+                           # since 2026-08-09. Gated in by root Stack.Protected when there is no
+                           # session.
   (tabs)/index          # Home / Create plan — exists today (placeholder shell + demo link)
   (tabs)/glossary       # exists today — abbreviations glossary, not in the original blueprint's
                          # tab list; added for Ian's 2026-07-11 notation ruling (see change_log.md)
