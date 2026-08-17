@@ -21,7 +21,7 @@
 
 | Milestone | State |
 |---|---|
-| M1 — Foundation (account → empty Home) | **In progress.** Server (auth + schema + account routes) is deployed on Cloudflare (`workers/`, live `production` environment); client-side email/password and Google OAuth both work in production (Google since 2026-08-09) |
+| M1 — Foundation (account → empty Home) | **In progress.** Server (auth + schema + account routes) is deployed on Cloudflare (`workers/`, live `production` environment); client-side email/password works in production, and Google is registered in production since 2026-08-09 (registration only — see "How it is now" for the two unproven riders) |
 | M2 — Intake (questionnaire persists) | **In progress.** Intake is asked exactly once: Home reads the target back from the saved intake and asks only for a plan length, and only when there is no race date to derive one from (`src/lib/planRequest.ts`) |
 | M3 — Plan engine (3 tiers produce valid plans) | **In progress.** Pure template/pace engine wired into the Worker's `generate-plan` route and the client's generate-plan action; the plan view renders a real generated plan (via `GET /api/plans/:id`) alongside the permanent static golden fixture. Paid tiers still serve the quota-exempt template fallback — see "How it is now" |
 | M4 — Tiers & quotas (server-side, unbypassable) | **In progress.** The quota ledger, atomic gate, fallback exemption, `quota-status` and `purchase-tier` are built and tested server-side; a Settings tab now displays tier/quota and a dummy paywall now lets a runner call `purchase-tier` (2026-08-05) |
@@ -63,8 +63,9 @@
   (`npm test`), 139 `workers/` tests across 7 files (`npm --prefix workers test`). Typecheck clean
   on both sides and root lint clean (`workers/` has no lint script — its gate is typecheck + test).
   The dated entries below record each point in time's counts — this line is the current one.
-- **Verified by hand on an iOS 26.5 simulator.** Android is unverified — no Android SDK on this
-  machine, so the `number-pad`/`decimal-pad` choice rests on the React Native contract for those
+- **Verified by hand on an iOS 26.5 simulator**, scoped to the 2026-08-15 check: Home in both the
+  race and no-race states, and the keyboard each numeric field raises. Android is unverified — no
+  Android SDK on this machine, so the `number-pad`/`decimal-pad` choice rests on the React Native contract for those
   two values.
 
 ---
