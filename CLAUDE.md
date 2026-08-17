@@ -25,13 +25,13 @@ requests still receive the quota-exempt template fallback. On the client side, `
 `src/app/(auth)/onboarding.tsx`, `sign-in.tsx`/`sign-up.tsx`, the intake screen, the generate-plan action, the plan
 view (real plans plus the permanent example-plan fixture), and the My Plans list all exist, and
 `src/app/_layout.tsx` gates the whole app behind a session — email/password works in production,
-and Google sign-in works too as of 2026-08-09 — it was dead until then because
+and the Google provider is registered there as of 2026-08-09 (registration only; a real end-to-end
+Google sign-in has never run) — it was dead until then because
 `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` were never set on the deployed Worker
 (`sign-in/social` answered `PROVIDER_NOT_FOUND`); the captain set both with
-`wrangler secret put … --env production`. Still unproven: the client secret itself, which is only
-exercised at the token exchange, and the OAuth consent screen's publishing status. See
-`docs/mvp-progress.md`'s "Blocked / awaiting a decision" and `AGENTS.md`'s guardrail on the
-`production` environment name. Route tree, `lib/` layout, the
+`wrangler secret put … --env production`. See `docs/mvp-progress.md`'s "Current state" for what is
+and isn't proven live, its "Blocked / awaiting a decision" for the captain-only items, and
+`AGENTS.md`'s guardrail on the `production` environment name. Route tree, `lib/` layout, the
 `generate-plan` flow, the API table, the D1 schema, and the proposed visual direction all live in
 [`docs/architecture.md`](docs/architecture.md).
 
