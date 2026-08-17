@@ -215,8 +215,9 @@ server, `describeError()` to turn either into a message screens can show), re-ex
 `TypeError` used to fall through that check into a generic, misleading fallback message — see
 `docs/change_log.md`'s 2026-08-07 entry for the full story. `src/app/(auth)/sign-in.tsx` and
 `sign-up.tsx` are the two screens built against it —
-email/password, plus a "Continue with Google" button. **Google OAuth works in production as of
-2026-08-09**: `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` are set on the deployed Worker
+email/password, plus a "Continue with Google" button. **The Google provider is registered in
+production as of 2026-08-09** — registration only; no end-to-end Google sign-in has run yet:
+`GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` are set on the deployed Worker
 (`wrangler secret put … --env production`), and `POST /api/auth/sign-in/social` against
 `https://pace-blueprint-production.i78979848.workers.dev` returns a real `accounts.google.com`
 authorization URL that Google's server accepts (a real sign-in page, not

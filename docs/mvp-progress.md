@@ -65,8 +65,8 @@
   The dated entries below record each point in time's counts — this line is the current one.
 - **Verified by hand on an iOS 26.5 simulator**, scoped to the 2026-08-15 check: Home in both the
   race and no-race states, and the keyboard each numeric field raises. Android is unverified — no
-  Android SDK on this machine, so the `number-pad`/`decimal-pad` choice rests on the React Native contract for those
-  two values.
+  Android SDK on this machine, so the `number-pad`/`decimal-pad` choice rests on the React Native
+  contract for those two values.
 
 ---
 
@@ -691,12 +691,12 @@ with **no backend at all**.
          week 9 at 45 km with a 300 m interval jog, and `paceDerivation.test.ts`'s
          >10%-goal-improvement gate already replaced by a test asserting ruling 3's goal-pace
          convergence (240 s/km), plus an `it.todo` naming the then-open goal-realism question
-          (Open item 5) instead of inventing an answer to it. **That `it.todo` is now gone** —
-          2026-07-12's ruling replaced it with real tests. This step and "Known debt" previously
-          said this resync was still pending — it wasn't, by the time this pass read the actual
-          files; see `docs/change_log.md`'s new correction bullet (the cycles are recorded under
-          "Done" → "Domain" above). What remains is
-         writing `planTemplates.ts`/`paceDerivation.ts` themselves against these already-correct
+         (Open item 5) instead of inventing an answer to it. **That `it.todo` is now gone** —
+         2026-07-12's ruling replaced it with real tests. This step and "Known debt" previously
+         said this resync was still pending — it wasn't, by the time this pass read the actual
+         files; see `docs/change_log.md`'s new correction bullet (the cycles themselves are
+         recorded under "Done" → "Domain" above). What remains is writing
+         `planTemplates.ts`/`paceDerivation.ts` themselves against these already-correct
          specs — tracked in step 3 above, not a doc/test sync problem.
 4. [x] **Plan view rendering a real template plan — done 2026-08-04.** `src/app/plan/[id].tsx`
        now renders a real generated plan via `GET /api/plans/:id`, alongside the permanent static

@@ -35,7 +35,7 @@ unused, and are marked legacy.
 | Layer | Choice | Notes |
 |-------|--------|-------|
 | App | Expo / React Native + TypeScript, expo-router | |
-| Auth | better-auth on D1 — email/password and Google OAuth, both live in production since 2026-08-09 | Required sign-up, no guest mode in v1. The Google provider is registered; the client secret at token exchange and consent-screen publishing status remain unproven. Apple Sign-In parked ([`docs/apple-dev-blocked.md`](docs/apple-dev-blocked.md)) |
+| Auth | better-auth on D1 — email/password live in production; Google OAuth registered there since 2026-08-09 | Required sign-up, no guest mode in v1. Google is registration-only so far: the client secret at token exchange and consent-screen publishing status remain unproven. Apple Sign-In parked ([`docs/apple-dev-blocked.md`](docs/apple-dev-blocked.md)) |
 | Database | Cloudflare D1 (SQLite) | **No row-level security** — ownership is enforced in Worker code, see [`docs/architecture.md`](docs/architecture.md) |
 | Server logic | Cloudflare Workers (`workers/`) | AI calls + quota enforcement live here, never in the client |
 | AI | Claude API (`claude-sonnet-5`) via a Worker route | API key stays server-side, never in the app bundle |
