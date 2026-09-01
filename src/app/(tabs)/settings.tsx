@@ -1,9 +1,11 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { FontFamily, FontSize, PressedOpacity, Radius, Spacing } from '@/constants/theme';
+import { ActionRow, Group, Row } from '@/components/layout/GroupedRows';
+import { ScreenHeader } from '@/components/layout/ScreenHeader';
+import { FontFamily, FontSize, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { API_BASE_URL, authClient, deleteAccount, describeError, getQuotaStatus } from '@/lib/apiClient';
 import { formatQuotaLine } from '@/lib/quotaDisplay';
@@ -13,9 +15,14 @@ import type { QuotaStatus } from '@/lib/planTypes';
  * Settings. On focus, fetches `getQuotaStatus()` and renders the runner's tier and quota line
  * (`formatQuotaLine`). Free tier gets a proactive "Upgrade" entry point to `/paywall` (no quota
  * param — that route is reserved for the 402 redirect out of Home). Sign-out (moved here from
- * Home) and Delete Account (native confirm, then `deleteAccount()`) round it out — no
- * on delete-account success, an explicit `authClient.signOut()` invalidates the local session
- * store so `src/app/_layout.tsx`'s `Stack.Protected` guard bounces to `(auth)`.
+ * Home) and Delete Account (native confirm, then `deleteAccount()`) round it out — on
+ * delete-account success, an explicit `authClient.signOut()` invalidates the local session store
+ * so `src/app/_layout.tsx`'s `Stack.Protected` guard bounces to `(auth)`.
+ *
+ * **Zero accent, no exception** (`docs/design/trailhead-visual-system.md` §1). This screen is flat
+ * grouped rows and hairlines. The "Upgrade" row is deliberately not an ember button: the offer
+ * lives on the Paywall, and this is a door to it. `status.error` on Delete Account is a status
+ * colour, not the accent.
  */
 export default function SettingsScreen() {
   const theme = useTheme();
@@ -99,77 +106,47 @@ export default function SettingsScreen() {
     <View style={[styles.container, { backgroundColor: theme.surface.base }]}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         <ScrollView contentContainerStyle={styles.content}>
-          <Text style={[styles.title, { color: theme.text.primary }]}>Settings</Text>
+          <ScreenHeader title="Settings" />
 
           {loading ? (
             <ActivityIndicator color={theme.text.primary} style={styles.spinner} />
           ) : (
-            <View style={styles.section}>
-              {error && <Text style={[styles.error, { color: theme.status.error }]}>{error}</Text>}
-              {quota && (
-                <>
-                  <Text style={[styles.fieldLabel, { color: theme.text.secondary }]}>TIER</Text>
-                  <Text style={[styles.tierValue, { color: theme.text.primary }]}>
-                    {quota.tier.toUpperCase()}
-                  </Text>
-                  <Text style={[styles.body, { color: theme.text.secondary }]}>
-                    {formatQuotaLine(quota)}
-                  </Text>
-                  {!quota.unlimited && quota.tier === 'free' && (
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => router.push('/paywall')}
-                      style={({ pressed }) => [
-                        styles.primaryButton,
-                        { backgroundColor: theme.accent.ember },
-                        pressed && styles.pressed,
-                      ]}
-                    >
-                      <Text style={[styles.primaryButtonText, { color: theme.accent.onEmber }]}>
-                        Upgrade
-                      </Text>
-                    </Pressable>
-                  )}
-                </>
-              )}
-            </View>
+            <Group title="Account">
+              {/* The error is a `Text` in `status.error`, not a `Row` — routing it through the
+                  row's value slot would set a failure in `text.primary` and make it read as
+                  though it were the account state itself. */}
+              {error ? (
+                <Text style={[styles.error, { color: theme.status.error }]}>{error}</Text>
+              ) : null}
+              {quota ? <Row label="Tier" value={quota.tier.toUpperCase()} mono /> : null}
+              {quota ? <Row label="Plans" value={formatQuotaLine(quota)} mono /> : null}
+              {quota && !quota.unlimited && quota.tier === 'free' ? (
+                <ActionRow
+                  label="Upgrade"
+                  hint="Pace targets, HR zones and a coach's note on every week"
+                  onPress={() => router.push('/paywall')}
+                />
+              ) : null}
+            </Group>
           )}
 
-          <Pressable
-            accessibilityRole="button"
-            onPress={handleSignOut}
-            style={({ pressed }) => [
-              styles.secondaryButton,
-              { borderColor: theme.text.secondary },
-              pressed && styles.pressed,
-            ]}
-          >
-            <Text style={[styles.secondaryButtonText, { color: theme.text.secondary }]}>Sign out</Text>
-          </Pressable>
+          <Group title="Session">
+            <ActionRow label="Sign out" onPress={handleSignOut} />
+          </Group>
 
-          <View style={styles.section}>
-            {deleteError && (
-              <Text style={[styles.error, { color: theme.status.error }]}>{deleteError}</Text>
-            )}
-            <Pressable
-              accessibilityRole="button"
-              disabled={deleting}
+          <Group title="Danger zone">
+            <ActionRow
+              label="Delete account"
+              hint="Permanently deletes your account, intake and plans"
+              tone="destructive"
+              busy={deleting}
               onPress={confirmDeleteAccount}
-              style={({ pressed }) => [
-                styles.secondaryButton,
-                { borderColor: theme.status.error },
-                (pressed || deleting) && styles.pressed,
-              ]}
-            >
-              {deleting ? (
-                <ActivityIndicator color={theme.status.error} />
-              ) : (
-                <Text style={[styles.secondaryButtonText, { color: theme.status.error }]}>
-                  Delete Account
-                </Text>
-              )}
-            </Pressable>
-          </View>
+            />
+          </Group>
+
+          {deleteError && (
+            <Text style={[styles.error, { color: theme.status.error }]}>{deleteError}</Text>
+          )}
         </ScrollView>
       </SafeAreaView>
     </View>
@@ -187,57 +164,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.four,
     paddingTop: Spacing.four,
     paddingBottom: Spacing.six,
-    gap: Spacing.four,
-  },
-  title: {
-    fontFamily: FontFamily.display.bold,
-    fontSize: FontSize.xxl,
+    gap: Spacing.five,
   },
   spinner: {
     marginTop: Spacing.four,
   },
-  section: {
-    gap: Spacing.two,
-  },
-  fieldLabel: {
-    fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.xs,
-  },
-  tierValue: {
-    fontFamily: FontFamily.display.bold,
-    fontSize: FontSize.xl,
-  },
-  body: {
-    fontFamily: FontFamily.body.regular,
-    fontSize: FontSize.sm,
-  },
   error: {
     fontFamily: FontFamily.body.medium,
     fontSize: FontSize.xs,
-  },
-  primaryButton: {
-    minHeight: Spacing.six,
-    borderRadius: Radius.control,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: Spacing.two,
-  },
-  primaryButtonText: {
-    fontFamily: FontFamily.body.semiBold,
-    fontSize: FontSize.sm,
-  },
-  secondaryButton: {
-    minHeight: Spacing.six,
-    borderRadius: Radius.control,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  secondaryButtonText: {
-    fontFamily: FontFamily.body.semiBold,
-    fontSize: FontSize.sm,
-  },
-  pressed: {
-    opacity: PressedOpacity,
   },
 });

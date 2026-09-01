@@ -151,6 +151,11 @@ Steps: **13 / 15 / 17 / 20 / 24 / 32 / 44**.
 - **Stroke** — `hairline` (rules, baselines, separators), `thin: 1` (input and secondary-button
   borders), `mark: 1.5` (icons, chevrons, the route line, the locked-field dash). A glyph should
   weigh the same on every device, which is why `mark` is fixed rather than a hairline.
+- **`grid.inverseHairline`** — the edge of a `surface.inverse` slab, chalk-at-alpha in *both*
+  schemes because the slab is dark in both. In dark mode `surface.inverse` measures 1.09:1 against
+  `surface.base` — ordinary for an adjacent-surface pair, fatal for a card whose whole job is to
+  read as a distinct object — so the Paywall's pricing slabs need a defined edge, not more
+  lightness separation.
 - **The route line** — a contour/elevation polyline drawn at `mark` weight in `grid.routeLine`.
   Three variants, all the same component (`src/components/brand/RouteLine.tsx`): a `header` rule
   under a screen title, a `card` stroke inside a summary card, and a `hero` stroke on the dusk

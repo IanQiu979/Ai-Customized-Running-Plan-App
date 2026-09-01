@@ -84,6 +84,17 @@ export const Colors = {
       readoutBracket: hairlineLight,
       /** The contour motif's stroke. Heavier than `hairline` — it is a drawn line, not a rule. */
       routeLine: 'rgba(30, 24, 21, 0.28)',
+      /**
+       * The edge of a `surface.inverse` slab. Chalk-at-alpha in BOTH schemes, unlike `hairline`,
+       * and that is the point: the slab is dark in both, so the ordinary light-mode hairline
+       * (espresso @ 10%) would be invisible on it.
+       *
+       * It exists because in dark mode `surface.inverse` measures only 1.09:1 against
+       * `surface.base` — the same order as any adjacent-surface pair, but on a card whose entire
+       * job is to read as a distinct object. Without a defined edge the Paywall's pricing slabs
+       * simply dissolve into the page.
+       */
+      inverseHairline: hairlineDark,
     },
   },
   dark: {
@@ -121,6 +132,7 @@ export const Colors = {
       registrationTick: hairlineDark,
       readoutBracket: hairlineDark,
       routeLine: 'rgba(244, 241, 234, 0.32)',
+      inverseHairline: hairlineDark, // identical to light mode on purpose — see that comment
     },
   },
 } as const;
