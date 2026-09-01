@@ -144,13 +144,21 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.body.regular,
     fontSize: FontSize.sm,
   },
+  // The value column is right-aligned, which only shows once a value is short enough not to wrap.
+  // A long one ("Unlimited plans during the test pass") shrank and then set its own lines flush
+  // left inside the shrunken box, so it ran ragged against the "ELITE" directly above it. The
+  // shrink is what makes wrapping possible at all; `textAlign` is what keeps the column a column.
   rowValue: {
+    flexShrink: 1,
     fontFamily: FontFamily.body.medium,
     fontSize: FontSize.sm,
+    textAlign: 'right',
   },
   rowValueMono: {
+    flexShrink: 1,
     fontFamily: FontFamily.mono.bold,
     fontSize: FontSize.sm,
+    textAlign: 'right',
   },
   actionText: {
     flexShrink: 1,

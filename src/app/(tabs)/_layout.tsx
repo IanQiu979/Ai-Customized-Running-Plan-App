@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { TabBarIcon, type TabIconName } from '@/components/nav/TabBarIcon';
 import { FontFamily, FontSize, Spacing, Stroke, Tracking } from '@/constants/theme';
@@ -19,8 +20,26 @@ import { useTheme } from '@/hooks/use-theme';
  * **The ember accent never touches this bar.** One accent, one forward-action per screen, and
  * navigation is not that action.
  */
+/**
+ * The bar has to be told how tall it is. React Navigation sizes it for a stock item — a compact
+ * icon over a caption — and Trailhead's item is taller than that: `Spacing.two` of top padding, a
+ * `Spacing.four` icon, the mono label, and the active tick beneath it. Left at the default the
+ * extra ran off the bottom of the bar and the labels were sheared in half; measured in the web
+ * build 2026-09-01, the item's content ended 19pt below the bar's own bottom edge.
+ *
+ * This is the smallest height that fits the item *inside its own padding box* rather than merely
+ * inside the bar: `Spacing.seven + Spacing.one` stops the shearing but leaves the tick sitting
+ * exactly on the bar's bottom edge, which reads as clipped on a device with no home indicator.
+ *
+ * The safe-area inset is added on top (and repeated as padding) because overriding `height` opts
+ * out of the height React Navigation would otherwise compute *including* that inset — without it
+ * the labels would sit under the home indicator on a notched phone.
+ */
+const TabBarContentHeight = Spacing.seven + Spacing.two;
+
 export default function TabLayout() {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
 
   return (
     <Tabs
@@ -30,6 +49,8 @@ export default function TabLayout() {
           backgroundColor: theme.surface.raised,
           borderTopColor: theme.hairline,
           borderTopWidth: Stroke.hairline,
+          height: TabBarContentHeight + insets.bottom,
+          paddingBottom: insets.bottom,
           elevation: 0,
           shadowOpacity: 0,
         },
