@@ -36,12 +36,18 @@ const VARIANT_HEIGHT = {
 
 export type RouteLineVariant = keyof typeof VARIANT_HEIGHT;
 
+/** The dash rhythm of the not-yet-real ridge: dots one stroke-width long, a small gap apart.
+ * With round linecaps a `thin`-length dash renders as a dot, which is exactly the mockup's
+ * "pencilled-in, not drawn yet" reading. */
+const DASH_PATTERN = [Stroke.thin, Spacing.two] as const;
+
 export function RouteLine({
   variant = 'header',
   color,
   strokeWidth = Stroke.mark,
   showSummit = false,
   baseline = false,
+  dashed = false,
   style,
 }: {
   variant?: RouteLineVariant;
@@ -54,6 +60,9 @@ export function RouteLine({
   showSummit?: boolean;
   /** A hairline under the ridge, the way a chart has an axis. Used by the header variant. */
   baseline?: boolean;
+  /** Draw the ridge as a dotted stroke — the "preview of a plan that doesn't exist yet" reading
+   * from the Home empty-state mockup. A solid route line asserts a route; this one sketches it. */
+  dashed?: boolean;
   style?: StyleProp<ViewStyle>;
 }) {
   const theme = useTheme();
@@ -103,6 +112,7 @@ export function RouteLine({
             strokeWidth={strokeWidth}
             strokeLinecap="round"
             strokeLinejoin="round"
+            strokeDasharray={dashed ? DASH_PATTERN : undefined}
           />
           {showSummit && summit ? (
             <Circle

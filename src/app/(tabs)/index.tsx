@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { RouteLine } from '@/components/brand/RouteLine';
 import { LockedPanel } from '@/components/home/LockedPanel';
 import { PlanContentTeaser } from '@/components/home/PlanContentTeaser';
 import { NumberField } from '@/components/inputs/NumberField';
@@ -242,6 +243,22 @@ export default function HomeScreen() {
                 Answer a few questions about your running and we&apos;ll build your plan. You only
                 do this once.
               </Text>
+
+              {/* The mockup's plan-shape preview: the route line pencilled in as dots over its
+                  baseline, because the plan it previews doesn't exist yet. Pure ornament — the
+                  caption below it carries the meaning for assistive tech. */}
+              <View
+                style={[
+                  styles.previewCard,
+                  { borderColor: theme.hairline, backgroundColor: theme.surface.raised },
+                ]}
+              >
+                <RouteLine variant="card" dashed baseline />
+                <Text style={[styles.previewCaption, { color: theme.text.secondary }]}>
+                  A preview of what your plan&apos;s shape will look like — no plan yet.
+                </Text>
+              </View>
+
               <Pressable
                 accessibilityRole="button"
                 onPress={() => router.push('/intake')}
@@ -473,6 +490,17 @@ const styles = StyleSheet.create({
   statValue: {
     fontFamily: FontFamily.display.bold,
     fontSize: FontSize.lg,
+  },
+  previewCard: {
+    borderWidth: Stroke.hairline,
+    borderRadius: Radius.card,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.three,
+    gap: Spacing.two,
+  },
+  previewCaption: {
+    fontFamily: FontFamily.body.regular,
+    fontSize: FontSize.xs,
   },
   targetCard: {
     borderWidth: Stroke.hairline,

@@ -12,7 +12,7 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
-import Svg, { Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
+import Svg, { Circle, Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 
 import { DuskGradient, Motion, Spacing, Stroke } from '@/constants/theme';
 import { ROUTE_PROFILE, routeLength, routePath, routePoints } from '@/lib/routeProfile';
@@ -49,10 +49,15 @@ const GLOW_FLOOR = 0.45;
  * made of, plus one `slow` of slack — never a hand-picked number. */
 const DRAW_CEILING_MS = Motion.duration.reveal + Motion.duration.slow;
 
+/** The halo ring around the route line's terminal dot — the mockup draws it at just over half
+ * strength so it reads as glow rather than as a second dot. */
+const TERMINAL_HALO_OPACITY = 0.55;
+
 /**
- * `cover` is the landing screen's full hero. `band` is the shorter header the two form screens
- * wear, so the dusk exception carries across all three signed-out screens without a 256pt cover
- * fighting an on-screen keyboard for room.
+ * `cover` is the landing screen's AND the sign-in screen's full hero — the mockup gives sign-in
+ * the tall star-and-route-line illustration, not a header band. `band` is the shorter header the
+ * sign-up form wears, so the dusk exception carries across all three signed-out screens without
+ * every one of them spending 256pt against an on-screen keyboard.
  */
 const HERO_HEIGHT = {
   cover: Spacing.seven * 4,
@@ -64,6 +69,7 @@ export type DuskHeroSize = keyof typeof HERO_HEIGHT;
 export function DuskHero({
   size: heroSize = 'cover',
   onSettled,
+  showTerminals = false,
   children,
 }: {
   size?: DuskHeroSize;
@@ -71,6 +77,10 @@ export function DuskHero({
    * captain's constraint is that the hero is settled, not mid-build, before that button is
    * interactive. The form screens gate nothing and simply omit it. */
   onSettled?: () => void;
+  /** A start dot and a glowing terminal dot on the route line — the sign-in mockup's "route you
+   * are about to travel" reading. Off by default: the landing hero's line is a ridge, not a
+   * journey, and marking every hero's endpoints would flatten the two compositions into one. */
+  showTerminals?: boolean;
   children?: ReactNode;
 }) {
   const reduceMotion = useReducedMotion();
@@ -197,6 +207,35 @@ export function DuskHero({
             strokeDashoffset={0}
             opacity={0.35}
           />
+          {showTerminals && points.length > 1 ? (
+            <>
+              {/* Where the route begins — quiet, the same stroke light as the settled line. */}
+              <Circle
+                cx={points[0].x}
+                cy={points[0].y}
+                r={Stroke.mark * 2}
+                fill={DuskGradient.routeLine}
+              />
+              {/* Where it is headed — the glow color, with a halo ring around it. The dots sit at
+                  the field's edges, so the halo half-clips against the hero's bounds exactly the
+                  way the mockup's does. */}
+              <Circle
+                cx={points[points.length - 1].x}
+                cy={points[points.length - 1].y}
+                r={Stroke.mark * 3}
+                fill={DuskGradient.routeGlow}
+              />
+              <Circle
+                cx={points[points.length - 1].x}
+                cy={points[points.length - 1].y}
+                r={Stroke.mark * 6}
+                fill="none"
+                stroke={DuskGradient.routeGlow}
+                strokeWidth={Stroke.thin}
+                opacity={TERMINAL_HALO_OPACITY}
+              />
+            </>
+          ) : null}
         </Svg>
       ) : null}
 
