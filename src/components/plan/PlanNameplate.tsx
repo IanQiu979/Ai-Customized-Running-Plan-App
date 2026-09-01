@@ -1,14 +1,18 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { FontFamily, FontSize, Spacing } from '@/constants/theme';
+import { FontFamily, FontSize, Spacing, Tracking } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Plan } from '@/lib/planTypes';
 
 import { formatPlanDate } from './format';
 
 /**
- * The equipment nameplate: title at 24-32, and beneath it a small mono metadata line reading
- * like a serial plate rather than a caption. `mvp-blueprint.md` Part 7, "Plan view".
+ * The plan's masthead: the title at display scale, and beneath it a small mono metadata line
+ * that reads like a serial plate rather than a caption.
+ *
+ * The title takes `FontSize.hero`, the step Trailhead added for exactly this — Big Shoulders
+ * Display is optically much smaller than the Barlow Condensed it replaced, so the old `xxl` no
+ * longer carried the top of a screen.
  */
 export function PlanNameplate({ plan }: { plan: Plan }) {
   const theme = useTheme();
@@ -43,11 +47,13 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: FontFamily.display.extraBold,
-    fontSize: FontSize.xxl,
+    fontSize: FontSize.hero,
+    letterSpacing: Tracking.display,
   },
   metadata: {
     fontFamily: FontFamily.mono.regular,
     fontSize: FontSize.xs,
+    letterSpacing: Tracking.label,
   },
   intro: {
     fontFamily: FontFamily.body.regular,
