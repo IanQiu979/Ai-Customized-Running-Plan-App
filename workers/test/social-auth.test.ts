@@ -20,7 +20,7 @@
  */
 
 import { env } from 'cloudflare:test';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { createAuth } from '../src/auth';
 import type { Env } from '../src/env';
@@ -45,6 +45,12 @@ function signInSocial(authEnv: Env): Promise<Response> {
 }
 
 describe('Google provider registration', () => {
+  it('pins fake OAuth credentials in the committed test environment instead of inheriting .dev.vars', () => {
+    const testEnv = env as unknown as Env;
+    expect(testEnv.GOOGLE_CLIENT_ID).toBe(FAKE_CLIENT_ID);
+    expect(testEnv.GOOGLE_CLIENT_SECRET).toBe(FAKE_CLIENT_SECRET);
+  });
+
   it('is absent, and says so honestly, when neither credential is set', async () => {
     const response = await signInSocial(
       withEnv({ GOOGLE_CLIENT_ID: undefined, GOOGLE_CLIENT_SECRET: undefined })
@@ -115,6 +121,28 @@ describe('Google provider registration', () => {
     expect(response.status).toBe(200);
     const body = (await response.json()) as { url: string };
     expect(new URL(body.url).searchParams.get('client_id')).toBe(FAKE_CLIENT_ID);
+  });
+
+  it('logs callback/token-exchange failures without leaking the authorization code or client secret', async () => {
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const response = await createAuth(
+        withEnv({ GOOGLE_CLIENT_ID: FAKE_CLIENT_ID, GOOGLE_CLIENT_SECRET: FAKE_CLIENT_SECRET })
+      ).handler(
+        new Request(
+          'https://example.test/api/auth/callback/google?code=authorization-code-must-never-be-logged&state=missing-state',
+          { method: 'GET' }
+        )
+      );
+
+      expect(response.status).toBe(302);
+      const serialized = JSON.stringify(errorLog.mock.calls);
+      expect(serialized).toContain('better-auth error');
+      expect(serialized).not.toContain('authorization-code-must-never-be-logged');
+      expect(serialized).not.toContain(FAKE_CLIENT_SECRET);
+    } finally {
+      errorLog.mockRestore();
+    }
   });
 });
 

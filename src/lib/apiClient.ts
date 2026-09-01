@@ -24,9 +24,11 @@ import { expoClient } from '@better-auth/expo/client';
 import type { BetterAuthClientPlugin } from 'better-auth/client';
 import { createAuthClient } from 'better-auth/react';
 import * as SecureStore from 'expo-secure-store';
+import * as WebBrowser from 'expo-web-browser';
 import { Platform } from 'react-native';
 
 import { ApiError, NetworkError, isNetworkFailure } from './apiErrors';
+import { describeAuthSessionResult } from './socialAuth';
 import type { ApiErrorBody } from './apiErrors';
 import type {
   GeneratePlanRequest,
@@ -79,11 +81,136 @@ const webStorage = {
   setItem: (_key: string, _value: string) => undefined,
 };
 
+const AUTH_COOKIE_STORAGE_KEY = 'paceblueprint_cookie';
+const SECURE_STORE_VALUE_LIMIT = 1800;
+const CHUNK_MARKER = '\u0001ba-chunks:';
+
+function readNativeAuthCookie(): string {
+  const stored = SecureStore.getItem(AUTH_COOKIE_STORAGE_KEY);
+  if (!stored?.startsWith(CHUNK_MARKER)) return stored ?? '{}';
+
+  const count = Number(stored.slice(CHUNK_MARKER.length));
+  if (!Number.isInteger(count) || count < 1) return '{}';
+  let value = '';
+  for (let index = 0; index < count; index += 1) {
+    const chunk = SecureStore.getItem(`${AUTH_COOKIE_STORAGE_KEY}.${index}`);
+    if (chunk === null) return '{}';
+    value += chunk;
+  }
+  return value;
+}
+
+function writeNativeAuthCookie(value: string): void {
+  if (value.length <= SECURE_STORE_VALUE_LIMIT) {
+    SecureStore.setItem(AUTH_COOKIE_STORAGE_KEY, value);
+    return;
+  }
+
+  // Match @better-auth/expo's storage adapter: clear the base key first and write its chunk marker
+  // last, so an interrupted write reads as absent instead of combining old and new cookie pieces.
+  SecureStore.setItem(AUTH_COOKIE_STORAGE_KEY, '');
+  const count = Math.ceil(value.length / SECURE_STORE_VALUE_LIMIT);
+  for (let index = 0; index < count; index += 1) {
+    const start = index * SECURE_STORE_VALUE_LIMIT;
+    SecureStore.setItem(
+      `${AUTH_COOKIE_STORAGE_KEY}.${index}`,
+      value.slice(start, start + SECURE_STORE_VALUE_LIMIT)
+    );
+  }
+  SecureStore.setItem(AUTH_COOKIE_STORAGE_KEY, `${CHUNK_MARKER}${count}`);
+}
+
 const expoAuthPlugin = expoClient({
   scheme: 'paceblueprint',
   storagePrefix: 'paceblueprint',
   storage: Platform.OS === 'web' ? webStorage : SecureStore,
 }) as unknown as BetterAuthClientPlugin;
+
+export type GoogleAuthOutcome =
+  | { ok: true }
+  | { ok: false; message: string };
+
+async function openNativeGoogleAuth(onBeforeSessionNotify?: () => void): Promise<GoogleAuthOutcome> {
+  const callbackURL = await import('expo-linking').then((Linking) => Linking.createURL('/'));
+  const start = await baseAuthClient.signIn.social({
+    provider: 'google',
+    callbackURL,
+    errorCallbackURL: callbackURL,
+    newUserCallbackURL: callbackURL,
+    disableRedirect: true,
+  });
+
+  if (start.error) {
+    if (start.error.code === 'PROVIDER_NOT_FOUND') {
+      return { ok: false, message: "Google sign-in isn't available yet." };
+    }
+    return { ok: false, message: start.error.message ?? 'Google sign-in could not start.' };
+  }
+  if (!start.data?.url) {
+    return { ok: false, message: 'Google sign-in did not return an authorization URL.' };
+  }
+
+  // The browser needs the signed OAuth state cookie that the native fetch cannot share with it.
+  // Route through @better-auth/expo's server proxy, which sets that cookie in the browser before
+  // redirecting to Google. Opening Google's URL directly reaches the callback with no state and
+  // fails before persistence — exactly the empty-user/account/session symptom this audit began with.
+  const proxyURL = `${API_BASE_URL}/api/auth/expo-authorization-proxy?${new URLSearchParams({
+    authorizationURL: start.data.url,
+  }).toString()}`;
+  const result = await WebBrowser.openAuthSessionAsync(proxyURL, callbackURL);
+  const callbackError = describeAuthSessionResult(result);
+  if (callbackError) return { ok: false, message: callbackError };
+  if (result.type !== 'success') {
+    return { ok: false, message: 'Google sign-in did not complete. Please try again.' };
+  }
+
+  // The Expo server plugin appends the session Set-Cookie value to the successful deep link. The
+  // dependency's built-in browser callback normally stores it invisibly; this explicit flow mirrors
+  // that storage format so the screen can observe and surface every non-success result.
+  const callback = new URL(result.url);
+  const cookie = callback.searchParams.get('cookie');
+  if (!cookie) {
+    return { ok: false, message: 'Google signed in, but no app session was returned. Please try again.' };
+  }
+
+  // No secret or token is logged or exposed to application state. Keep the dependency's cookie
+  // JSON and chunk marker format exactly, because authClient.getCookie() is its reader.
+  const existing = readNativeAuthCookie();
+  let parsed: Record<string, { value: string; expires: string | null }>;
+  try {
+    parsed = JSON.parse(existing) as Record<string, { value: string; expires: string | null }>;
+  } catch {
+    parsed = {};
+  }
+  for (const [name, attributes] of (await import('better-auth/cookies')).parseSetCookieHeader(cookie)) {
+    const maxAge = attributes['max-age'];
+    if (maxAge !== undefined && Number(maxAge) <= 0) {
+      delete parsed[name];
+      continue;
+    }
+    const expires = maxAge
+      ? new Date(Date.now() + Number(maxAge) * 1000)
+      : attributes.expires
+        ? new Date(String(attributes.expires))
+        : null;
+    parsed[name] = { value: String(attributes.value), expires: expires?.toISOString() ?? null };
+  }
+  writeNativeAuthCookie(JSON.stringify(parsed));
+
+  const session = await baseAuthClient.getSession({ fetchOptions: { disableCache: true } });
+  if (session.error || !session.data?.user?.id) {
+    return { ok: false, message: 'Google signed in, but the app could not establish a session. Please try again.' };
+  }
+  // The sign-up screen sets its one-shot Intake redirect immediately before this notification.
+  // Ordering matters: notifying first can let Stack.Protected unmount the form before its caller
+  // marks the redirect, recreating the post-signup race this project already fixed for email.
+  onBeforeSessionNotify?.();
+  // Direct cookie persistence sits outside the dependency's hidden callback hook, so explicitly
+  // notify the reactive session atom. Stack.Protected then routes immediately instead of leaving a
+  // successfully authenticated runner sitting on the form until a later focus/refetch event.
+  authClient.$store.notify('$sessionSignal');
+  return { ok: true };
+}
 
 const baseAuthClient = createAuthClient({
   baseURL: API_BASE_URL,
@@ -96,6 +223,25 @@ export const authClient = baseAuthClient as typeof baseAuthClient & {
 };
 
 export const { signIn, signUp, signOut, useSession } = authClient;
+
+export async function signInWithGoogle(options?: {
+  onBeforeSessionNotify?: () => void;
+}): Promise<GoogleAuthOutcome> {
+  if (Platform.OS === 'web') {
+    const result = await authClient.signIn.social({ provider: 'google', callbackURL: '/' });
+    if (result.error) {
+      return {
+        ok: false,
+        message:
+          result.error.code === 'PROVIDER_NOT_FOUND'
+            ? "Google sign-in isn't available yet."
+            : result.error.message ?? 'Google sign-in could not start.',
+      };
+    }
+    return { ok: true };
+  }
+  return openNativeGoogleAuth(options?.onBeforeSessionNotify);
+}
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   // `fetch` rejects with a bare `TypeError` when the request never reached a server — wrong host,
