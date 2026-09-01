@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { StyleSheet, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
+import { View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
 
 import { Spacing, Stroke } from '@/constants/theme';
@@ -93,7 +93,7 @@ export function RouteLine({
               x2={width}
               y2={height - inset}
               stroke={theme.hairline}
-              strokeWidth={StyleSheet.hairlineWidth}
+              strokeWidth={Stroke.hairline}
             />
           ) : null}
           <Path

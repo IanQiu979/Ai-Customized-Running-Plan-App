@@ -2,7 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 
 import { EffortChip } from '@/components/plan/EffortChip';
 import { ReadoutBracket } from '@/components/plan/ReadoutBracket';
-import { FontFamily, FontSize, Spacing, Tracking } from '@/constants/theme';
+import { FontFamily, FontSize, Spacing, Stroke, Tracking } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 /**
@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
   why: {
     marginTop: Spacing.one,
     paddingLeft: Spacing.three,
-    borderLeftWidth: StyleSheet.hairlineWidth,
+    borderLeftWidth: Stroke.hairline,
     gap: Spacing.half,
   },
   whyLabel: {

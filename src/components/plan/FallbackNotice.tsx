@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { FontFamily, FontSize, Radius, Spacing } from '@/constants/theme';
+import { FontFamily, FontSize, Radius, Spacing, Stroke } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 /**
@@ -41,7 +41,7 @@ export function FallbackNotice({ variant }: FallbackNoticeProps) {
 
 const styles = StyleSheet.create({
   card: {
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: Stroke.hairline,
     borderRadius: Radius.card,
     padding: Spacing.three,
     gap: Spacing.one,

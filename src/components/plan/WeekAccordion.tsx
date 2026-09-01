@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Effort, FontFamily, FontSize, PressedOpacity, Spacing } from '@/constants/theme';
+import { Effort, FontFamily, FontSize, PressedOpacity, Spacing, Stroke } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Week } from '@/lib/planTypes';
 
@@ -106,7 +106,7 @@ function Chevron({ expanded, color }: { expanded: boolean; color: string }) {
 
 const styles = StyleSheet.create({
   card: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: Stroke.hairline,
   },
   header: {
     flexDirection: 'row',
@@ -130,7 +130,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     gap: Spacing.half,
     height: BAR_TRACK_HEIGHT,
-    borderBottomWidth: StyleSheet.hairlineWidth, // the baseline — unbroken under rest-day gaps
+    borderBottomWidth: Stroke.hairline, // the baseline — unbroken under rest-day gaps
   },
   cell: {
     flex: 1,
@@ -153,8 +153,8 @@ const styles = StyleSheet.create({
     height: Spacing.two,
     // Fixed weight, not `hairlineWidth` — see `Chevron`. An 8pt square's rotated diagonal is
     // 11.3pt, comfortably inside the 16pt box above.
-    borderRightWidth: 1.5,
-    borderBottomWidth: 1.5,
+    borderRightWidth: Stroke.mark,
+    borderBottomWidth: Stroke.mark,
   },
   chevronMarkDown: {
     transform: [{ rotate: '45deg' }], // vertex down — the old ▾, collapsed
@@ -169,7 +169,7 @@ const styles = StyleSheet.create({
     marginTop: Spacing.two,
     marginLeft: WEEK_GUTTER_WIDTH + Spacing.three,
     paddingLeft: Spacing.three,
-    borderLeftWidth: StyleSheet.hairlineWidth,
+    borderLeftWidth: Stroke.hairline,
   },
   whyLabel: {
     fontFamily: FontFamily.mono.regular,
