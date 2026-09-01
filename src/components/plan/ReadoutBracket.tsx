@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { Spacing } from '@/constants/theme';
+import { Spacing, Stroke } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 /**
@@ -20,8 +20,8 @@ const styles = StyleSheet.create({
   wrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderLeftWidth: StyleSheet.hairlineWidth * 2,
-    borderRightWidth: StyleSheet.hairlineWidth * 2,
+    borderLeftWidth: Stroke.hairline * 2,
+    borderRightWidth: Stroke.hairline * 2,
     paddingHorizontal: Spacing.one,
   },
 });

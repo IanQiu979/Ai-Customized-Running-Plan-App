@@ -4,12 +4,20 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { RouteLine } from '@/components/brand/RouteLine';
 import { DisclaimerFooter } from '@/components/plan/DisclaimerFooter';
 import { FallbackNotice } from '@/components/plan/FallbackNotice';
 import { GoalRealismNotice } from '@/components/plan/GoalRealismNotice';
 import { PlanNameplate } from '@/components/plan/PlanNameplate';
 import { WeekAccordion } from '@/components/plan/WeekAccordion';
-import { EffortOrder, FontFamily, FontSize, Spacing } from '@/constants/theme';
+import {
+  EffortOrder,
+  FontFamily,
+  FontSize,
+  Spacing,
+  Stroke,
+  Tracking,
+} from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { API_BASE_URL, describeError, getPlan } from '@/lib/apiClient';
 import { EXAMPLE_PLAN_ID, examplePlan } from '@/lib/fixtures/examplePlan';
@@ -25,10 +33,15 @@ import type { Plan } from '@/lib/planTypes';
  * `FallbackNotice`, `WeekAccordion`, and `DisclaimerFooter` only ever need a `Plan`-shaped object
  * and carry no opinion on where it came from.
  *
- * Plain native scroll, one continuous surface — no per-row stagger, no wave, no
- * scroll-driven animation (all Phase 6+). `Animated.ScrollView` (Reanimated) is used in place
- * of the plain RN `ScrollView` only so a scroll handler can attach later without restructuring
- * the screen — nothing is animated on scroll yet.
+ * Trailhead adds a stat row under the nameplate — weeks, tier, and the plan's own engine, read
+ * straight off the `Plan` — and the route-line motif between it and the week list, so the screen
+ * opens like a document rather than a feed. No ember anywhere: this screen is a read, and its one
+ * forward action (generate another) belongs to Home.
+ *
+ * Plain native scroll, one continuous surface — no per-row stagger and no scroll-driven
+ * animation. `Animated.ScrollView` (Reanimated) is used in place of the plain RN `ScrollView`
+ * only so a scroll handler can attach later without restructuring the screen; nothing is animated
+ * on scroll yet.
  */
 export default function PlanScreen() {
   const theme = useTheme();
@@ -95,6 +108,7 @@ export default function PlanScreen() {
     return (
       <View style={[styles.centered, { backgroundColor: theme.surface.base }]}>
         <Stack.Screen options={{ headerShown: true, headerTitle: '' }} />
+        <Text style={[styles.errorTitle, { color: theme.text.primary }]}>Nothing to show</Text>
         <Text style={[styles.error, { color: theme.status.error }]}>
           {error ?? 'This plan could not be found.'}
         </Text>
@@ -122,15 +136,34 @@ export default function PlanScreen() {
         ]}
       >
         <PlanNameplate plan={plan} />
+
+        {/* Three plain readings of the `Plan` itself — no derivation, no inference about what a
+            tier or an engine implies. */}
+        <View
+          style={[
+            styles.statRow,
+            { borderTopColor: theme.hairline, borderBottomColor: theme.hairline },
+          ]}
+        >
+          <Stat label="WEEKS" value={String(plan.durationWeeks)} />
+          <View style={[styles.statDivider, { backgroundColor: theme.hairline }]} />
+          <Stat label="TIER" value={plan.tierAtGeneration.toUpperCase()} />
+          <View style={[styles.statDivider, { backgroundColor: theme.hairline }]} />
+          <Stat label="DAYS / WEEK" value={String(daysPerWeek(plan))} />
+        </View>
+
+        <RouteLine variant="card" showSummit />
+
         {shouldShowGoalRealismNotice(plan.goalRealism) ? (
           <GoalRealismNotice assessment={plan.goalRealism} />
         ) : null}
+
         {/*
-          The ribbon below (`WeekAccordion`) colours each run day by effort but carries no key of
-          its own — a screen reader gets the effort word per day from `describeDays`, but a
+          The ribbon inside each `WeekAccordion` colours every run day by effort but carries no key
+          of its own — a screen reader gets the effort word per day from `describeDays`, but a
           sighted user previously had no way to decode the colours at all (UX audit finding 3).
-          One legend here, not one per week: it's plan-level information, not per-week, and
-          repeating it in every `WeekAccordion` row would be noisier than the bug it fixes.
+          One legend here, not one per week: it's plan-level information, and repeating it in every
+          row would be noisier than the bug it fixes.
         */}
         <View
           style={styles.legend}
@@ -144,18 +177,43 @@ export default function PlanScreen() {
             </View>
           ))}
         </View>
+
         {/* The server owns whether this immutable plan consumed quota; never infer it from the
           current account state, which may have changed since generation. */}
         {plan.isFallback ? <FallbackNotice variant={quotaConsumed ? 'counted' : 'exempt'} /> : null}
-        <View style={styles.ribbon}>
+
+        <View style={styles.weeks}>
           {plan.weeks.map((week) => (
             <WeekAccordion key={week.weekNumber} week={week} />
           ))}
         </View>
+
         <DisclaimerFooter disclaimers={plan.disclaimers} />
       </Animated.ScrollView>
     </View>
   );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  const theme = useTheme();
+  return (
+    <View style={styles.stat}>
+      <Text style={[styles.statValue, { color: theme.text.primary }]}>{value}</Text>
+      <Text style={[styles.statLabel, { color: theme.text.secondary }]}>{label}</Text>
+    </View>
+  );
+}
+
+/** Run days in the plan's first week.
+ *
+ * Read off the data rather than off intake, because a plan is immutable and the runner's intake
+ * is not — a plan generated at 4 days/week must keep saying 4 after they change their answer.
+ * Week 1 specifically: a deload week later in the block legitimately has fewer run days, so an
+ * average across the plan would report a number that appears in no actual week. */
+function daysPerWeek(plan: Plan): number {
+  const firstWeek = plan.weeks[0];
+  if (!firstWeek) return 0;
+  return firstWeek.days.filter((day) => day.kind === 'run').length;
 }
 
 /** "recovery" -> "Recovery" — `EffortLevel`s are stored lowercase (`planTypes.ts`); the legend
@@ -174,6 +232,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: Spacing.four,
+    gap: Spacing.two,
   },
   scroll: {
     flex: 1,
@@ -181,7 +240,32 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: Spacing.four,
     paddingTop: Spacing.four,
-    gap: Spacing.five,
+    gap: Spacing.four,
+  },
+  statRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    borderTopWidth: Stroke.hairline,
+    borderBottomWidth: Stroke.hairline,
+    paddingVertical: Spacing.three,
+    gap: Spacing.three,
+  },
+  stat: {
+    flex: 1,
+    gap: Spacing.half,
+  },
+  statDivider: {
+    width: Stroke.hairline,
+  },
+  statValue: {
+    fontFamily: FontFamily.display.extraBold,
+    fontSize: FontSize.xl,
+    letterSpacing: Tracking.display,
+  },
+  statLabel: {
+    fontFamily: FontFamily.mono.regular,
+    fontSize: FontSize.xs,
+    letterSpacing: Tracking.label,
   },
   legend: {
     flexDirection: 'row',
@@ -200,11 +284,16 @@ const styles = StyleSheet.create({
     borderRadius: Spacing.one,
   },
   legendLabel: {
-    fontFamily: FontFamily.mono.medium,
+    fontFamily: FontFamily.mono.regular,
     fontSize: FontSize.xs,
   },
-  ribbon: {
+  weeks: {
     gap: Spacing.one,
+  },
+  errorTitle: {
+    fontFamily: FontFamily.display.bold,
+    fontSize: FontSize.xl,
+    letterSpacing: Tracking.display,
   },
   error: {
     fontFamily: FontFamily.body.medium,

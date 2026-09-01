@@ -8,17 +8,27 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { API_BASE_URL, authClient, describeError, signInWithGoogle } from '@/lib/apiClient';
-import { FontFamily, FontSize, PressedOpacity, Radius, Spacing } from '@/constants/theme';
-import { markPostSignupRedirect } from '@/lib/postSignupRedirect';
+import { AuthField } from '@/components/auth/AuthField';
+import { DuskHero } from '@/components/brand/DuskHero';
+import {
+  DuskGradient,
+  FontFamily,
+  FontSize,
+  PressedOpacity,
+  Radius,
+  Spacing,
+  Stroke,
+  Tracking,
+} from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { API_BASE_URL, authClient, describeError, signInWithGoogle } from '@/lib/apiClient';
+import { markPostSignupRedirect } from '@/lib/postSignupRedirect';
 
-/** Function over form for this pass — see `sign-in.tsx`'s header for the same note. */
+/** Sign-up. Peer of `sign-in.tsx` — same dusk band, same paper form, same single ember action. */
 export default function SignUpScreen() {
   const theme = useTheme();
   const router = useRouter();
@@ -72,17 +82,12 @@ export default function SignUpScreen() {
     }
   }
 
+  const disabled = submitting || !name || !email || !password;
+
   return (
     <View style={[styles.container, { backgroundColor: theme.surface.base }]}>
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right', 'bottom']}>
-        {/*
-          The form is centred, but centring alone puts it off *both* edges once the container is
-          shorter than the content — which is exactly what a keyboard does (Android resizes the
-          window, iOS covers the bottom), and an error message only makes the content taller. With
-          no scroll container the title, or the Sign up button, becomes unreachable. `flexGrow: 1`
-          keeps today's centred look on a tall screen and lets the content scroll when it doesn't
-          fit.
-        */}
+      <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
+        {/* Same scroll/keyboard rationale as `sign-in.tsx`, with one more field to overflow. */}
         <KeyboardAvoidingView
           style={styles.keyboardAvoider}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -91,79 +96,99 @@ export default function SignUpScreen() {
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
           >
-            <Text style={[styles.title, { color: theme.text.primary }]}>Create account</Text>
-
-            <TextInput
-              value={name}
-              onChangeText={setName}
-              placeholder="Name"
-              placeholderTextColor={theme.text.secondary}
-              autoCapitalize="words"
-              autoComplete="name"
-              style={[styles.input, { color: theme.text.primary, borderColor: theme.hairline, backgroundColor: theme.surface.raised }]}
-            />
-            <TextInput
-              value={email}
-              onChangeText={setEmail}
-              placeholder="Email"
-              placeholderTextColor={theme.text.secondary}
-              autoCapitalize="none"
-              autoComplete="email"
-              keyboardType="email-address"
-              style={[styles.input, { color: theme.text.primary, borderColor: theme.hairline, backgroundColor: theme.surface.raised }]}
-            />
-            <TextInput
-              value={password}
-              onChangeText={setPassword}
-              placeholder="Password (min 8 characters)"
-              placeholderTextColor={theme.text.secondary}
-              autoCapitalize="none"
-              autoComplete="password-new"
-              secureTextEntry
-              style={[styles.input, { color: theme.text.primary, borderColor: theme.hairline, backgroundColor: theme.surface.raised }]}
-            />
-
-            {error && <Text style={[styles.error, { color: theme.status.error }]}>{error}</Text>}
-
-            <Pressable
-              accessibilityRole="button"
-              disabled={submitting || !name || !email || !password}
-              onPress={handleSignUp}
-              style={({ pressed }) => [
-                styles.primaryButton,
-                { backgroundColor: theme.accent.hivis },
-                (pressed || submitting) && styles.pressed,
-              ]}
-            >
-              {submitting ? (
-                <ActivityIndicator color={theme.accent.onAccent} />
-              ) : (
-                <Text style={[styles.primaryButtonText, { color: theme.accent.onAccent }]}>Sign up</Text>
-              )}
-            </Pressable>
-
-            <Pressable
-              accessibilityRole="button"
-              disabled={submitting}
-              onPress={handleGoogleSignIn}
-              style={({ pressed }) => [
-                styles.secondaryButton,
-                { borderColor: theme.text.primary },
-                (pressed || submitting) && styles.pressed,
-              ]}
-            >
-              <Text style={[styles.secondaryButtonText, { color: theme.text.primary }]}>Continue with Google</Text>
-            </Pressable>
-
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => router.push('/(auth)/sign-in')}
-              style={styles.linkButton}
-            >
-              <Text style={[styles.linkText, { color: theme.text.secondary }]}>
-                Already have an account? <Text style={{ color: theme.text.primary }}>Sign in</Text>
+            <DuskHero size="band">
+              <Text style={[styles.eyebrow, { color: DuskGradient.onDuskMuted }]}>
+                PACE BLUEPRINT
               </Text>
-            </Pressable>
+              <Text style={[styles.title, { color: DuskGradient.onDusk }]}>Create account</Text>
+            </DuskHero>
+
+            <View style={styles.form}>
+              <AuthField
+                label="Name"
+                value={name}
+                onChangeText={setName}
+                placeholder="Your name"
+                autoCapitalize="words"
+                autoComplete="name"
+              />
+              <AuthField
+                label="Email"
+                value={email}
+                onChangeText={setEmail}
+                placeholder="you@example.com"
+                autoCapitalize="none"
+                autoComplete="email"
+                keyboardType="email-address"
+              />
+              <AuthField
+                label="Password"
+                value={password}
+                onChangeText={setPassword}
+                placeholder="At least 8 characters"
+                autoCapitalize="none"
+                autoComplete="password-new"
+                secureTextEntry
+              />
+
+              {error && <Text style={[styles.error, { color: theme.status.error }]}>{error}</Text>}
+
+              <Pressable
+                accessibilityRole="button"
+                disabled={disabled}
+                onPress={handleSignUp}
+                style={({ pressed }) => [
+                  styles.primaryButton,
+                  { backgroundColor: disabled ? theme.progress.disabled : theme.accent.ember },
+                  pressed && !disabled && styles.pressed,
+                ]}
+              >
+                {submitting ? (
+                  <ActivityIndicator color={theme.accent.onEmber} />
+                ) : (
+                  <Text
+                    style={[
+                      styles.primaryButtonText,
+                      { color: disabled ? theme.text.primary : theme.accent.onEmber },
+                    ]}
+                  >
+                    Sign up
+                  </Text>
+                )}
+              </Pressable>
+
+              <View style={styles.divider}>
+                <View style={[styles.dividerRule, { backgroundColor: theme.hairline }]} />
+                <Text style={[styles.dividerLabel, { color: theme.text.secondary }]}>OR</Text>
+                <View style={[styles.dividerRule, { backgroundColor: theme.hairline }]} />
+              </View>
+
+              <Pressable
+                accessibilityRole="button"
+                disabled={submitting}
+                onPress={handleGoogleSignIn}
+                style={({ pressed }) => [
+                  styles.secondaryButton,
+                  { borderColor: theme.text.primary },
+                  (pressed || submitting) && styles.pressed,
+                ]}
+              >
+                <Text style={[styles.secondaryButtonText, { color: theme.text.primary }]}>
+                  Continue with Google
+                </Text>
+              </Pressable>
+
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.push('/(auth)/sign-in')}
+                style={styles.linkButton}
+              >
+                <Text style={[styles.linkText, { color: theme.text.secondary }]}>
+                  Already have an account?{' '}
+                  <Text style={{ color: theme.text.primary }}>Sign in</Text>
+                </Text>
+              </Pressable>
+            </View>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -171,28 +196,28 @@ export default function SignUpScreen() {
   );
 }
 
+// Identical to `sign-in.tsx`'s sheet, deliberately: these two screens are peers, and a shared
+// stylesheet module would be one more place to look when only one of them is wrong.
 const styles = StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1 },
   keyboardAvoider: { flex: 1 },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.three,
+  scrollContent: { flexGrow: 1 },
+  eyebrow: {
+    fontFamily: FontFamily.mono.regular,
+    fontSize: FontSize.xs,
+    letterSpacing: Tracking.label,
   },
   title: {
-    fontFamily: FontFamily.display.bold,
+    fontFamily: FontFamily.display.extraBold,
     fontSize: FontSize.xxl,
-    marginBottom: Spacing.three,
+    letterSpacing: Tracking.display,
   },
-  input: {
-    minHeight: Spacing.six,
-    borderWidth: 1,
-    borderRadius: Radius.control,
-    paddingHorizontal: Spacing.three,
-    fontFamily: FontFamily.body.regular,
-    fontSize: FontSize.sm,
+  form: {
+    paddingHorizontal: Spacing.four,
+    paddingTop: Spacing.four,
+    paddingBottom: Spacing.four,
+    gap: Spacing.three,
   },
   error: {
     fontFamily: FontFamily.body.medium,
@@ -203,15 +228,30 @@ const styles = StyleSheet.create({
     borderRadius: Radius.control,
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: Spacing.one,
   },
   primaryButtonText: {
     fontFamily: FontFamily.body.semiBold,
     fontSize: FontSize.sm,
   },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
+  dividerRule: {
+    flex: 1,
+    height: Stroke.hairline,
+  },
+  dividerLabel: {
+    fontFamily: FontFamily.mono.regular,
+    fontSize: FontSize.xs,
+    letterSpacing: Tracking.label,
+  },
   secondaryButton: {
     minHeight: Spacing.six,
     borderRadius: Radius.control,
-    borderWidth: 1.5,
+    borderWidth: Stroke.mark,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -221,7 +261,6 @@ const styles = StyleSheet.create({
   },
   linkButton: {
     alignItems: 'center',
-    marginTop: Spacing.two,
     minHeight: Spacing.six,
     justifyContent: 'center',
   },

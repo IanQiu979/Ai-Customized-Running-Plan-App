@@ -1,6 +1,6 @@
 import { StyleSheet, TextInput, type TextInputProps } from 'react-native';
 
-import { FontFamily, FontSize, Radius, Spacing } from '@/constants/theme';
+import { FontFamily, FontSize, Radius, Spacing, Stroke } from '@/constants/theme';
 import { decimalOnly, digitsOnly } from '@/lib/fieldInput';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -69,7 +69,7 @@ export function NumberField({
 const styles = StyleSheet.create({
   input: {
     minHeight: Spacing.six,
-    borderWidth: 1,
+    borderWidth: Stroke.thin,
     borderRadius: Radius.control,
     paddingHorizontal: Spacing.three,
     fontFamily: FontFamily.body.regular,

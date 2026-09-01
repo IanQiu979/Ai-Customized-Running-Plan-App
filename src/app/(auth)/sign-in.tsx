@@ -8,19 +8,33 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { API_BASE_URL, authClient, describeError, signInWithGoogle } from '@/lib/apiClient';
-import { FontFamily, FontSize, PressedOpacity, Radius, Spacing } from '@/constants/theme';
+import { AuthField } from '@/components/auth/AuthField';
+import { DuskHero } from '@/components/brand/DuskHero';
+import {
+  DuskGradient,
+  FontFamily,
+  FontSize,
+  PressedOpacity,
+  Radius,
+  Spacing,
+  Stroke,
+  Tracking,
+} from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { API_BASE_URL, authClient, describeError, signInWithGoogle } from '@/lib/apiClient';
 
 /**
- * Function over form for this pass (captain's explicit call) — no design polish, just a working
- * email/password sign-in and a Google button. `Stack.Protected` in the root layout does the
- * actual navigation once a session exists; this screen only needs to make the sign-in call.
+ * Sign-in. Trailhead gives it the same dusk exception the landing screen has, at `band` height
+ * rather than `cover` — enough for the gradient to carry across all three signed-out screens
+ * without a 256pt hero fighting the keyboard for room. The form itself is paper and ink, and the
+ * one ember element on the screen is the Sign in button.
+ *
+ * `Stack.Protected` in the root layout does the actual navigation once a session exists; this
+ * screen only needs to make the sign-in call.
  */
 export default function SignInScreen() {
   const theme = useTheme();
@@ -64,15 +78,16 @@ export default function SignInScreen() {
     }
   }
 
+  const disabled = submitting || !email || !password;
+
   return (
     <View style={[styles.container, { backgroundColor: theme.surface.base }]}>
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right', 'bottom']}>
+      <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
         {/*
-          Centred content overflows off *both* edges once the container is shorter than the
-          content, which is exactly what a keyboard does (Android resizes the window, iOS covers
-          the bottom) — and an error message only makes the content taller. Without a scroll
-          container the title, or the Sign in button, becomes unreachable. `flexGrow: 1` keeps
-          today's centred look on a tall screen and lets the content scroll when it doesn't fit.
+          The form scrolls. Without a scroll container the title, or the Sign in button, becomes
+          unreachable once the container is shorter than the content — which is exactly what a
+          keyboard does (Android resizes the window, iOS covers the bottom), and an error message
+          only makes the content taller.
         */}
         <KeyboardAvoidingView
           style={styles.keyboardAvoider}
@@ -82,70 +97,90 @@ export default function SignInScreen() {
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
           >
-            <Text style={[styles.title, { color: theme.text.primary }]}>Sign in</Text>
-
-            <TextInput
-              value={email}
-              onChangeText={setEmail}
-              placeholder="Email"
-              placeholderTextColor={theme.text.secondary}
-              autoCapitalize="none"
-              autoComplete="email"
-              keyboardType="email-address"
-              style={[styles.input, { color: theme.text.primary, borderColor: theme.hairline, backgroundColor: theme.surface.raised }]}
-            />
-            <TextInput
-              value={password}
-              onChangeText={setPassword}
-              placeholder="Password"
-              placeholderTextColor={theme.text.secondary}
-              autoCapitalize="none"
-              autoComplete="password"
-              secureTextEntry
-              style={[styles.input, { color: theme.text.primary, borderColor: theme.hairline, backgroundColor: theme.surface.raised }]}
-            />
-
-            {error && <Text style={[styles.error, { color: theme.status.error }]}>{error}</Text>}
-
-            <Pressable
-              accessibilityRole="button"
-              disabled={submitting || !email || !password}
-              onPress={handleSignIn}
-              style={({ pressed }) => [
-                styles.primaryButton,
-                { backgroundColor: theme.accent.hivis },
-                (pressed || submitting) && styles.pressed,
-              ]}
-            >
-              {submitting ? (
-                <ActivityIndicator color={theme.accent.onAccent} />
-              ) : (
-                <Text style={[styles.primaryButtonText, { color: theme.accent.onAccent }]}>Sign in</Text>
-              )}
-            </Pressable>
-
-            <Pressable
-              accessibilityRole="button"
-              disabled={submitting}
-              onPress={handleGoogleSignIn}
-              style={({ pressed }) => [
-                styles.secondaryButton,
-                { borderColor: theme.text.primary },
-                (pressed || submitting) && styles.pressed,
-              ]}
-            >
-              <Text style={[styles.secondaryButtonText, { color: theme.text.primary }]}>Continue with Google</Text>
-            </Pressable>
-
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => router.push('/(auth)/sign-up')}
-              style={styles.linkButton}
-            >
-              <Text style={[styles.linkText, { color: theme.text.secondary }]}>
-                No account? <Text style={{ color: theme.text.primary }}>Sign up</Text>
+            <DuskHero size="band">
+              <Text style={[styles.eyebrow, { color: DuskGradient.onDuskMuted }]}>
+                PACE BLUEPRINT
               </Text>
-            </Pressable>
+              <Text style={[styles.title, { color: DuskGradient.onDusk }]}>Welcome back</Text>
+            </DuskHero>
+
+            <View style={styles.form}>
+              <AuthField
+                label="Email"
+                value={email}
+                onChangeText={setEmail}
+                placeholder="you@example.com"
+                autoCapitalize="none"
+                autoComplete="email"
+                keyboardType="email-address"
+              />
+              <AuthField
+                label="Password"
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Your password"
+                autoCapitalize="none"
+                autoComplete="password"
+                secureTextEntry
+              />
+
+              {error && <Text style={[styles.error, { color: theme.status.error }]}>{error}</Text>}
+
+              <Pressable
+                accessibilityRole="button"
+                disabled={disabled}
+                onPress={handleSignIn}
+                style={({ pressed }) => [
+                  styles.primaryButton,
+                  { backgroundColor: disabled ? theme.progress.disabled : theme.accent.ember },
+                  pressed && !disabled && styles.pressed,
+                ]}
+              >
+                {submitting ? (
+                  <ActivityIndicator color={theme.accent.onEmber} />
+                ) : (
+                  <Text
+                    style={[
+                      styles.primaryButtonText,
+                      { color: disabled ? theme.text.primary : theme.accent.onEmber },
+                    ]}
+                  >
+                    Sign in
+                  </Text>
+                )}
+              </Pressable>
+
+              <View style={styles.divider}>
+                <View style={[styles.dividerRule, { backgroundColor: theme.hairline }]} />
+                <Text style={[styles.dividerLabel, { color: theme.text.secondary }]}>OR</Text>
+                <View style={[styles.dividerRule, { backgroundColor: theme.hairline }]} />
+              </View>
+
+              <Pressable
+                accessibilityRole="button"
+                disabled={submitting}
+                onPress={handleGoogleSignIn}
+                style={({ pressed }) => [
+                  styles.secondaryButton,
+                  { borderColor: theme.text.primary },
+                  (pressed || submitting) && styles.pressed,
+                ]}
+              >
+                <Text style={[styles.secondaryButtonText, { color: theme.text.primary }]}>
+                  Continue with Google
+                </Text>
+              </Pressable>
+
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.push('/(auth)/sign-up')}
+                style={styles.linkButton}
+              >
+                <Text style={[styles.linkText, { color: theme.text.secondary }]}>
+                  No account? <Text style={{ color: theme.text.primary }}>Sign up</Text>
+                </Text>
+              </Pressable>
+            </View>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -157,24 +192,22 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1 },
   keyboardAvoider: { flex: 1 },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.three,
+  scrollContent: { flexGrow: 1 },
+  eyebrow: {
+    fontFamily: FontFamily.mono.regular,
+    fontSize: FontSize.xs,
+    letterSpacing: Tracking.label,
   },
   title: {
-    fontFamily: FontFamily.display.bold,
+    fontFamily: FontFamily.display.extraBold,
     fontSize: FontSize.xxl,
-    marginBottom: Spacing.three,
+    letterSpacing: Tracking.display,
   },
-  input: {
-    minHeight: Spacing.six,
-    borderWidth: 1,
-    borderRadius: Radius.control,
-    paddingHorizontal: Spacing.three,
-    fontFamily: FontFamily.body.regular,
-    fontSize: FontSize.sm,
+  form: {
+    paddingHorizontal: Spacing.four,
+    paddingTop: Spacing.four,
+    paddingBottom: Spacing.four,
+    gap: Spacing.three,
   },
   error: {
     fontFamily: FontFamily.body.medium,
@@ -185,15 +218,30 @@ const styles = StyleSheet.create({
     borderRadius: Radius.control,
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: Spacing.one,
   },
   primaryButtonText: {
     fontFamily: FontFamily.body.semiBold,
     fontSize: FontSize.sm,
   },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
+  dividerRule: {
+    flex: 1,
+    height: Stroke.hairline,
+  },
+  dividerLabel: {
+    fontFamily: FontFamily.mono.regular,
+    fontSize: FontSize.xs,
+    letterSpacing: Tracking.label,
+  },
   secondaryButton: {
     minHeight: Spacing.six,
     borderRadius: Radius.control,
-    borderWidth: 1.5,
+    borderWidth: Stroke.mark,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -203,7 +251,6 @@ const styles = StyleSheet.create({
   },
   linkButton: {
     alignItems: 'center',
-    marginTop: Spacing.two,
     minHeight: Spacing.six,
     justifyContent: 'center',
   },

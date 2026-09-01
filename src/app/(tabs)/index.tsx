@@ -11,9 +11,20 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { LockedPanel } from '@/components/home/LockedPanel';
+import { PlanContentTeaser } from '@/components/home/PlanContentTeaser';
 import { NumberField } from '@/components/inputs/NumberField';
+import { ScreenHeader } from '@/components/layout/ScreenHeader';
 import { GoalRealismNotice } from '@/components/plan/GoalRealismNotice';
-import { FontFamily, FontSize, PressedOpacity, Radius, Spacing } from '@/constants/theme';
+import {
+  FontFamily,
+  FontSize,
+  PressedOpacity,
+  Radius,
+  Spacing,
+  Stroke,
+  Tracking,
+} from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { API_BASE_URL, ApiError, describeError, generatePlan, getIntake, getQuotaStatus } from '@/lib/apiClient';
 import { mintIdempotencyKey } from '@/lib/idempotencyKey';
@@ -41,7 +52,19 @@ const MAX_NOTES_LENGTH = 1000;
  * type / race distance / race date panel, which the captain met as a second run through the same
  * survey and which blocked him outright when he had no race (2026-08-15). The target now comes
  * from `planTargetFromIntake`; the only field left is a plan length, and only when there is no
- * race date to derive one from. "Change target" goes back to `/intake` — one place, one answer.
+ * race date to derive one from. "Change" goes back to `/intake` — one place, one answer.
+ *
+ * Trailhead ships three states here, plus the two the network forces:
+ *
+ *  - **Empty** — no intake yet.
+ *  - **Populated** — the target, the one ember "Generate plan", and a row pushing to My Plans.
+ *  - **Free tier** — the same, with Notes locked behind a dashed `LockedPanel` and a second panel
+ *    teasing what a Pro/Elite plan actually contains.
+ *  - Loading, and a load error that keeps the last known intake on screen.
+ *
+ * The Free-tier lock is a **display** of `getQuotaStatus().tier`, never a decision made here.
+ * Free tier is template-only and never reaches the model, so notes typed by a Free runner were
+ * already being discarded server-side; showing the field as open was the bug.
  */
 export default function HomeScreen() {
   const theme = useTheme();
@@ -70,6 +93,12 @@ export default function HomeScreen() {
   const hasIntake = intake !== null;
   const target = planTargetFromIntake(intake);
   const askPlanLength = needsPlanLength(target);
+
+  // Strictly a read of the server's answer. `quota === null` means "not answered yet", which is
+  // NOT the same as "free" — rendering the lock on an unknown tier would flash a paywall at a
+  // paying runner for as long as the request takes.
+  const notesLocked = quota?.tier === 'free';
+  const tierKnown = quota !== null;
 
   // Read-only preview of the same `assessGoalRealism()` the server runs — no new request field,
   // computed client-side from the runner's already-saved intake. Both the goal time and the
@@ -139,7 +168,10 @@ export default function HomeScreen() {
     const built = buildGeneratePlanRequest({
       target,
       planLengthWeeks,
-      notes,
+      // A locked field collects nothing, so there is nothing to send. This is not the client
+      // enforcing the tier — the server already ignores notes on a template-only plan — it is the
+      // request matching what the runner was actually able to type.
+      notes: notesLocked ? '' : notes,
       idempotencyKey,
       now: new Date(),
     });
@@ -190,7 +222,7 @@ export default function HomeScreen() {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
         >
-          <Text style={[styles.title, { color: theme.text.primary }]}>Pace Blueprint</Text>
+          <ScreenHeader eyebrow="Pace Blueprint" title="Today" routeLine />
 
           {/*
             Outside the branches on purpose. A failed refresh keeps the last known intake, so the
@@ -203,6 +235,9 @@ export default function HomeScreen() {
             <ActivityIndicator color={theme.text.primary} style={styles.checkingSpinner} />
           ) : !hasIntake ? (
             <View style={styles.section}>
+              <Text style={[styles.lede, { color: theme.text.primary }]}>
+                Let&apos;s find your starting line.
+              </Text>
               <Text style={[styles.body, { color: theme.text.secondary }]}>
                 Answer a few questions about your running and we&apos;ll build your plan. You only
                 do this once.
@@ -212,11 +247,11 @@ export default function HomeScreen() {
                 onPress={() => router.push('/intake')}
                 style={({ pressed }) => [
                   styles.primaryButton,
-                  { backgroundColor: theme.accent.hivis },
+                  { backgroundColor: theme.accent.ember },
                   pressed && styles.pressed,
                 ]}
               >
-                <Text style={[styles.primaryButtonText, { color: theme.accent.onAccent }]}>
+                <Text style={[styles.primaryButtonText, { color: theme.accent.onEmber }]}>
                   Start intake
                 </Text>
               </Pressable>
@@ -224,24 +259,52 @@ export default function HomeScreen() {
           ) : (
             <View style={styles.section}>
               {quotaError && <Text style={[styles.error, { color: theme.status.error }]}>{quotaError}</Text>}
+
+              {/* The stat row: tier and remaining quota as a plate, not a caption. */}
               {quota && (
-                <Text style={[styles.body, { color: theme.text.secondary }]}>{formatQuotaLine(quota)}</Text>
+                <View
+                  style={[
+                    styles.statRow,
+                    { borderTopColor: theme.hairline, borderBottomColor: theme.hairline },
+                  ]}
+                >
+                  <View style={styles.stat}>
+                    <Text style={[styles.statLabel, { color: theme.text.secondary }]}>TIER</Text>
+                    <Text style={[styles.statValue, { color: theme.text.primary }]}>
+                      {quota.tier.toUpperCase()}
+                    </Text>
+                  </View>
+                  <View style={[styles.statDivider, { backgroundColor: theme.hairline }]} />
+                  <View style={styles.stat}>
+                    <Text style={[styles.statLabel, { color: theme.text.secondary }]}>PLANS</Text>
+                    <Text style={[styles.statValue, { color: theme.text.primary }]}>
+                      {formatQuotaLine(quota)}
+                    </Text>
+                  </View>
+                </View>
               )}
 
-              <Text style={[styles.fieldLabel, { color: theme.text.secondary }]}>YOUR TARGET</Text>
-              <View style={styles.targetRow}>
+              <View
+                style={[
+                  styles.targetCard,
+                  { borderColor: theme.hairline, backgroundColor: theme.surface.raised },
+                ]}
+              >
+                <View style={styles.targetHeader}>
+                  <Text style={[styles.fieldLabel, { color: theme.text.secondary }]}>YOUR TARGET</Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Change target"
+                    hitSlop={Spacing.two}
+                    onPress={() => router.push('/intake')}
+                    style={({ pressed }) => pressed && styles.pressed}
+                  >
+                    <Text style={[styles.changeLink, { color: theme.text.primary }]}>Change</Text>
+                  </Pressable>
+                </View>
                 <Text style={[styles.targetText, { color: theme.text.primary }]}>
                   {describePlanTarget(target)}
                 </Text>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Change target"
-                  hitSlop={Spacing.two}
-                  onPress={() => router.push('/intake')}
-                  style={({ pressed }) => pressed && styles.pressed}
-                >
-                  <Text style={[styles.changeLink, { color: theme.text.primary }]}>Change</Text>
-                </Pressable>
               </View>
 
               {goalRealismPreview && goalRealismPreview.realism !== 'realistic' ? (
@@ -249,7 +312,7 @@ export default function HomeScreen() {
               ) : null}
 
               {askPlanLength && (
-                <>
+                <View style={styles.field}>
                   <Text style={[styles.fieldLabel, { color: theme.text.secondary }]}>
                     PLAN LENGTH (WEEKS)
                   </Text>
@@ -260,23 +323,56 @@ export default function HomeScreen() {
                     maxIntegerDigits={3}
                     placeholder={String(DEFAULT_PLAN_WEEKS)}
                   />
-                </>
+                </View>
               )}
 
-              <Text style={[styles.fieldLabel, { color: theme.text.secondary }]}>NOTES (OPTIONAL)</Text>
-              <TextInput
-                value={notes}
-                onChangeText={(text) => setNotes(text.slice(0, MAX_NOTES_LENGTH))}
-                placeholder="Anything else the plan should account for"
-                placeholderTextColor={theme.text.secondary}
-                multiline
-                maxLength={MAX_NOTES_LENGTH}
-                style={[
-                  styles.input,
-                  styles.notesInput,
-                  { color: theme.text.primary, borderColor: theme.hairline, backgroundColor: theme.surface.raised },
-                ]}
-              />
+              {/* Held back until the server has answered — see `tierKnown`. */}
+              {tierKnown && (
+                <LockedPanel
+                  locked={notesLocked}
+                  label="Notes"
+                  onUnlock={() => router.push('/paywall')}
+                >
+                  <View style={styles.field}>
+                    <Text style={[styles.fieldLabel, { color: theme.text.secondary }]}>
+                      NOTES (OPTIONAL)
+                    </Text>
+                    <TextInput
+                      accessibilityLabel="Notes"
+                      value={notes}
+                      onChangeText={(text) => setNotes(text.slice(0, MAX_NOTES_LENGTH))}
+                      placeholder="Anything else the plan should account for"
+                      placeholderTextColor={theme.progress.informative}
+                      editable={!notesLocked}
+                      multiline
+                      maxLength={MAX_NOTES_LENGTH}
+                      style={[
+                        styles.notesInput,
+                        {
+                          color: theme.text.primary,
+                          borderColor: theme.hairline,
+                          backgroundColor: theme.surface.raised,
+                        },
+                      ]}
+                    />
+                  </View>
+                </LockedPanel>
+              )}
+
+              {notesLocked && (
+                <LockedPanel
+                  locked
+                  label="Pace targets, HR zones and coach's notes"
+                  onUnlock={() => router.push('/paywall')}
+                >
+                  <View style={styles.field}>
+                    <Text style={[styles.fieldLabel, { color: theme.text.secondary }]}>
+                      ON PRO &amp; ELITE
+                    </Text>
+                    <PlanContentTeaser />
+                  </View>
+                </LockedPanel>
+              )}
 
               {generateError && (
                 <Text style={[styles.error, { color: theme.status.error }]}>{generateError}</Text>
@@ -288,17 +384,35 @@ export default function HomeScreen() {
                 onPress={handleGenerate}
                 style={({ pressed }) => [
                   styles.primaryButton,
-                  { backgroundColor: theme.accent.hivis },
+                  { backgroundColor: theme.accent.ember },
                   (pressed || generating) && styles.pressed,
                 ]}
               >
                 {generating ? (
-                  <ActivityIndicator color={theme.accent.onAccent} />
+                  <ActivityIndicator color={theme.accent.onEmber} />
                 ) : (
-                  <Text style={[styles.primaryButtonText, { color: theme.accent.onAccent }]}>
+                  <Text style={[styles.primaryButtonText, { color: theme.accent.onEmber }]}>
                     Generate plan
                   </Text>
                 )}
+              </Pressable>
+
+              {/* The push toward My Plans. A row, not a second button — this screen already spent
+                  its one accent above, and a competing CTA is exactly what that rule prevents. */}
+              <Pressable
+                accessibilityRole="link"
+                accessibilityLabel="Go to My Plans"
+                onPress={() => router.push('/(tabs)/my-plans')}
+                style={({ pressed }) => [
+                  styles.navRow,
+                  { borderTopColor: theme.hairline },
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text style={[styles.navRowText, { color: theme.text.primary }]}>
+                  Everything you&apos;ve built
+                </Text>
+                <Text style={[styles.navRowHint, { color: theme.text.secondary }]}>My Plans →</Text>
               </Pressable>
             </View>
           )}
@@ -321,52 +435,83 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.six,
     gap: Spacing.four,
   },
-  title: {
-    fontFamily: FontFamily.display.bold,
-    fontSize: FontSize.xxl,
-  },
   checkingSpinner: {
     marginTop: Spacing.four,
   },
   section: {
-    gap: Spacing.two,
+    gap: Spacing.three,
+  },
+  lede: {
+    fontFamily: FontFamily.display.bold,
+    fontSize: FontSize.xl,
+    letterSpacing: Tracking.display,
   },
   body: {
     fontFamily: FontFamily.body.regular,
     fontSize: FontSize.sm,
   },
-  fieldLabel: {
-    fontFamily: FontFamily.mono.medium,
-    fontSize: FontSize.xs,
-    marginTop: Spacing.two,
+  statRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    borderTopWidth: Stroke.hairline,
+    borderBottomWidth: Stroke.hairline,
+    paddingVertical: Spacing.three,
+    gap: Spacing.four,
   },
-  targetRow: {
+  stat: {
+    flex: 1,
+    gap: Spacing.half,
+  },
+  statDivider: {
+    width: Stroke.hairline,
+  },
+  statLabel: {
+    fontFamily: FontFamily.mono.regular,
+    fontSize: FontSize.xs,
+    letterSpacing: Tracking.label,
+  },
+  statValue: {
+    fontFamily: FontFamily.display.bold,
+    fontSize: FontSize.lg,
+  },
+  targetCard: {
+    borderWidth: Stroke.hairline,
+    borderRadius: Radius.card,
+    padding: Spacing.three,
+    gap: Spacing.two,
+  },
+  targetHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: Spacing.three,
   },
   targetText: {
-    flexShrink: 1,
-    fontFamily: FontFamily.body.medium,
-    fontSize: FontSize.md,
+    fontFamily: FontFamily.display.bold,
+    fontSize: FontSize.xl,
+    letterSpacing: Tracking.display,
   },
   changeLink: {
     fontFamily: FontFamily.body.semiBold,
     fontSize: FontSize.sm,
     textDecorationLine: 'underline',
   },
-  input: {
-    minHeight: Spacing.six,
-    borderWidth: 1,
-    borderRadius: Radius.control,
-    paddingHorizontal: Spacing.three,
-    fontFamily: FontFamily.body.regular,
-    fontSize: FontSize.sm,
+  field: {
+    gap: Spacing.one,
+  },
+  fieldLabel: {
+    fontFamily: FontFamily.mono.regular,
+    fontSize: FontSize.xs,
+    letterSpacing: Tracking.label,
   },
   notesInput: {
     minHeight: Spacing.six * 1.5,
+    borderWidth: Stroke.thin,
+    borderRadius: Radius.control,
+    paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
+    fontFamily: FontFamily.body.regular,
+    fontSize: FontSize.sm,
     textAlignVertical: 'top',
   },
   error: {
@@ -383,6 +528,25 @@ const styles = StyleSheet.create({
   primaryButtonText: {
     fontFamily: FontFamily.body.semiBold,
     fontSize: FontSize.sm,
+  },
+  navRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.three,
+    borderTopWidth: Stroke.hairline,
+    paddingTop: Spacing.three,
+    minHeight: Spacing.six,
+  },
+  navRowText: {
+    flexShrink: 1,
+    fontFamily: FontFamily.body.medium,
+    fontSize: FontSize.sm,
+  },
+  navRowHint: {
+    fontFamily: FontFamily.mono.regular,
+    fontSize: FontSize.xs,
+    letterSpacing: Tracking.label,
   },
   pressed: {
     opacity: PressedOpacity,

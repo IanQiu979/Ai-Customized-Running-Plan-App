@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { FontFamily, FontSize, Radius, Spacing } from '@/constants/theme';
+import { FontFamily, FontSize, Radius, Spacing, Stroke } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { digitsOnly } from '@/lib/fieldInput';
 
@@ -108,7 +108,7 @@ const styles = StyleSheet.create({
     minHeight: Spacing.six,
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
+    borderWidth: Stroke.thin,
     borderRadius: Radius.control,
     paddingHorizontal: Spacing.two,
   },
@@ -117,7 +117,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   separator: {
-    fontFamily: FontFamily.mono.medium,
+    fontFamily: FontFamily.mono.regular,
     fontSize: FontSize.sm,
     paddingHorizontal: Spacing.one,
   },

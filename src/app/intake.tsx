@@ -16,7 +16,15 @@ import { ClockField } from '@/components/inputs/ClockField';
 import { DateField } from '@/components/inputs/DateField';
 import { NumberField } from '@/components/inputs/NumberField';
 import { IntakeExitAction } from '@/components/intake/IntakeExitAction';
-import { FontFamily, FontSize, PressedOpacity, Radius, Spacing } from '@/constants/theme';
+import {
+  FontFamily,
+  FontSize,
+  PressedOpacity,
+  Radius,
+  Spacing,
+  Stroke,
+  Tracking,
+} from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { API_BASE_URL, describeError, getIntake, putIntake } from '@/lib/apiClient';
 import {
@@ -100,6 +108,10 @@ export default function IntakeScreen() {
     headerTitle: 'Intake',
     headerShadowVisible: false,
     headerStyle: { backgroundColor: theme.surface.base },
+    // The one place in the app that renders a native header *title*. The nav theme deliberately
+    // leaves its `fonts` block stock (`constants/navigation-theme.ts` says why), so without this
+    // the word "Intake" would be the only San Francisco / Roboto glyphs in a Trailhead screen.
+    headerTitleStyle: { fontFamily: FontFamily.body.semiBold, fontSize: FontSize.md },
     headerRight: () => (
       <IntakeExitAction
         color={theme.text.primary}
@@ -483,14 +495,14 @@ export default function IntakeScreen() {
             onPress={handleSave}
             style={({ pressed }) => [
               styles.primaryButton,
-              { backgroundColor: theme.accent.hivis },
+              { backgroundColor: theme.accent.ember },
               (pressed || submitting) && styles.pressed,
             ]}
           >
             {submitting ? (
-              <ActivityIndicator color={theme.accent.onAccent} />
+              <ActivityIndicator color={theme.accent.onEmber} />
             ) : (
-              <Text style={[styles.primaryButtonText, { color: theme.accent.onAccent }]}>
+              <Text style={[styles.primaryButtonText, { color: theme.accent.onEmber }]}>
                 Save intake
               </Text>
             )}
@@ -610,12 +622,13 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   fieldLabel: {
-    fontFamily: FontFamily.mono.medium,
+    fontFamily: FontFamily.mono.regular,
     fontSize: FontSize.xs,
+    letterSpacing: Tracking.label,
   },
   input: {
     minHeight: Spacing.six,
-    borderWidth: 1,
+    borderWidth: Stroke.thin,
     borderRadius: Radius.control,
     paddingHorizontal: Spacing.three,
     fontFamily: FontFamily.body.regular,
@@ -634,7 +647,7 @@ const styles = StyleSheet.create({
   },
   optionRow: {
     minHeight: Spacing.six,
-    borderWidth: 1.5,
+    borderWidth: Stroke.mark,
     borderRadius: Radius.control,
     paddingHorizontal: Spacing.three,
     justifyContent: 'center',
@@ -650,7 +663,7 @@ const styles = StyleSheet.create({
   },
   chip: {
     minHeight: Spacing.six,
-    borderWidth: 1.5,
+    borderWidth: Stroke.mark,
     borderRadius: Radius.control,
     paddingHorizontal: Spacing.three,
     alignItems: 'center',

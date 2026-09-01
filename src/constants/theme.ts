@@ -1,19 +1,23 @@
 /**
- * V2.2 design tokens — "Instrument & Matter".
+ * V2.2 design tokens — **"Trailhead"** (captain-approved 2026-09-01, replacing "Instrument &
+ * Matter").
  *
- * Source of truth: `docs/design/frontend-design-brief.md` Part 2 (contrast-verified color
- * values — never edit a hex here without re-verifying contrast and updating that doc) and
- * `docs/design/mvp-blueprint.md` Part 2 (the `grid.*` measurement tokens) and Part 5 (motion).
+ * Source of truth: `docs/design/trailhead-visual-system.md`, which records every hex below
+ * together with the contrast ratio it was verified at. Never edit a hex here without re-running
+ * that document's contrast table and updating it in the same commit — the standing rule from
+ * `CLAUDE.md` carries over unchanged from the previous system.
  *
- * Every value below is either lifted verbatim from the brief, or — where the brief explicitly
- * flagged a value as an unresolved defect — computed here to the contrast target the brief
- * specified. Those two cases are documented individually below; nothing is guessed.
+ * The system in one line: warm paper and espresso ink, one ember-orange accent spent on exactly
+ * one action per screen, a thin contour "route line" as the only ornament, and a single
+ * deliberate bold exception (the signed-out dusk gradient, `DuskGradient` below).
  *
  * Naming is by role ("surface.base", "text.secondary"), never by appearance ("gray600"), so a
- * future rebrand only ever changes a value, never every call site.
+ * future rebrand only ever changes a value, never every call site. That rule is why the accent is
+ * `accent.ember`/`accent.onEmber` rather than the old appearance-named `hivis`: the previous name
+ * described a high-visibility yellow-green that no longer exists anywhere in the system.
  */
 
-import { Platform } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 
 import { EFFORT_LEVELS, EFFORT_ORDINAL, EffortLevel } from '@/lib/planTypes';
 
@@ -24,92 +28,111 @@ import { EFFORT_LEVELS, EFFORT_ORDINAL, EffortLevel } from '@/lib/planTypes';
 export type ColorScheme = 'light' | 'dark';
 
 /**
- * Bases, hairline @ opacity — brief Part 2 "Bases and text" + "Supporting tokens".
+ * Bases, hairline @ opacity.
  *
- * `hairline` is asphalt-at-alpha in light mode and chalk-at-alpha in dark mode: the only
- * separator in the app outside the two shadow users (modals/sheets).
+ * `hairline` is ink-at-alpha in light mode and chalk-at-alpha in dark mode: the only separator in
+ * the app outside the two shadow users (modals/sheets). Trailhead leans on it far harder than the
+ * previous system did — grouped rows in Glossary and Settings are hairlines and nothing else.
  */
-const hairlineLight = 'rgba(20, 23, 28, 0.10)'; // asphalt @ 10%
-const hairlineDark = 'rgba(247, 247, 244, 0.12)'; // chalk @ 12%
+const hairlineLight = 'rgba(30, 24, 21, 0.10)'; // espresso @ 10%
+const hairlineDark = 'rgba(244, 241, 234, 0.12)'; // chalk @ 12%
 
 export const Colors = {
   light: {
     surface: {
-      base: '#F7F7F4', // chalk — the page canvas
-      raised: '#EDEDE8', // cards, rows, inputs, chips, sheets — darker than base in light mode
-      overlay: 'rgba(20, 23, 28, 0.55)', // asphalt @ 55% — solid modal scrim, never a blur
+      base: '#F4F1EA', // chalk — warm paper, the page canvas
+      raised: '#EAE6DC', // cards, rows, inputs, chips, sheets, the tab bar
+      overlay: 'rgba(30, 24, 21, 0.55)', // espresso @ 55% — solid modal scrim, never a blur
+      /**
+       * The dark slab. Paywall's pricing cards are dark in BOTH schemes — that inversion is the
+       * whole "premium pricing page" gesture, and a card that quietly turns into ordinary
+       * `raised` in dark mode loses it. Pair only with `text.onInverse` / `text.onInverseMuted`.
+       */
+      inverse: '#1E1815',
     },
     hairline: hairlineLight,
     text: {
-      primary: '#14171C', // asphalt on chalk — 16.74:1
-      // graphite on chalk — 5.91:1 (passes AA). The brief's recorded value is correct as-is
-      // for light mode; only dark mode needed a lift (see below).
-      secondary: '#5A6069',
+      primary: '#241C17', // espresso ink on chalk — 14.85:1
+      secondary: '#6A6058', // 5.43:1 on base, 4.92:1 on raised — AA on both
+      onInverse: '#F4F1EA', // chalk on surface.inverse — 15.56:1
+      onInverseMuted: '#A1968B', // 6.06:1 on surface.inverse
     },
-    // color.progress split (Ruling 13, 2026-07-10): "disabled" (inert) vs "informative"
-    // (meaningful but quiet) are different roles and were failing contrast in the second one.
+    // The `progress` split (carried over from Ruling 13, 2026-07-10): "disabled" (inert) vs
+    // "informative" (quiet but meaningful) are different roles with different contrast floors.
     progress: {
-      disabled: '#8D93A0', // original single value — kept for genuinely inert states only
-      // COMPUTED — the brief left this "Exact hex TBD when design-system implements theme.ts;
-      // record the contrast targets, not a guessed value." Target: >=4.5:1 for text (inactive
-      // quota captions), >=3:1 for meaningful non-text (intake progress-hairline fill, active
-      // quota pips), against surface.base (#F7F7F4). Same hue/saturation family as the original
-      // progress value, lightness lowered until AA text-contrast cleared.
-      // Verified: #676D7B on #F7F7F4 = 4.83:1.
-      informative: '#676D7B',
+      // Genuinely inert only — a disabled control's own fill. 2.36:1: deliberately below AA,
+      // because "you cannot use this" is exactly what it must communicate. Never put text on it.
+      disabled: '#A79D92',
+      // Meaningful non-decorative state: inactive tab labels/icons, the intake progress hairline,
+      // quota pips. Target >=4.5:1 text / >=3:1 non-text against BOTH base and raised, since the
+      // tab bar sits on raised. Verified: 5.43:1 on base, 4.92:1 on raised.
+      informative: '#6A6058',
     },
     status: {
-      error: '#AB214F', // 6.39:1 against chalk
-      success: '#206F6C', // 5.51:1 against chalk
+      error: '#A32E1E', // 6.27:1 against chalk
+      success: '#2F6B4F', // 5.58:1 against chalk
     },
     chart: {
-      loadLine: '#745E3E', // desaturated bronze
-      loadFill: 'rgba(90, 96, 105, 0.12)', // graphite @ 12%
+      loadLine: '#8A6A3A', // warm bronze — the load curve's stroke
+      loadFill: 'rgba(106, 96, 88, 0.12)', // text.secondary @ 12%
     },
-    // The three tokens Part 2 of the blueprint derives from `hairline`. Baselines and tick
-    // marks reuse `hairline` directly per that doc and have no token of their own.
+    // Derived from `hairline`. Baselines and tick marks reuse `hairline` directly and have no
+    // token of their own.
     grid: {
-      frame: 'rgba(20, 23, 28, 0.05)', // ~half of hairline's own opacity
+      frame: 'rgba(30, 24, 21, 0.05)', // ~half of hairline's own opacity
       registrationTick: hairlineLight,
       readoutBracket: hairlineLight,
+      /** The contour motif's stroke. Heavier than `hairline` — it is a drawn line, not a rule. */
+      routeLine: 'rgba(30, 24, 21, 0.28)',
+      /**
+       * The edge of a `surface.inverse` slab. Chalk-at-alpha in BOTH schemes, unlike `hairline`,
+       * and that is the point: the slab is dark in both, so the ordinary light-mode hairline
+       * (espresso @ 10%) would be invisible on it.
+       *
+       * It exists because in dark mode `surface.inverse` measures only 1.09:1 against
+       * `surface.base` — the same order as any adjacent-surface pair, but on a card whose entire
+       * job is to read as a distinct object. Without a defined edge the Paywall's pricing slabs
+       * simply dissolve into the page.
+       */
+      inverseHairline: hairlineDark,
     },
   },
   dark: {
     surface: {
-      base: '#14171C', // asphalt
-      raised: '#1D2128', // lighter than base in dark mode
-      overlay: 'rgba(20, 23, 28, 0.80)', // asphalt @ 80%
+      base: '#1E1815', // espresso
+      raised: '#2A2320', // lighter than base in dark mode
+      overlay: 'rgba(30, 24, 21, 0.80)', // espresso @ 80%
+      // Deeper than `base`, not lighter: in dark mode the pricing slab still has to read as a
+      // distinct, denser object rather than dissolving into the page.
+      inverse: '#120E0C',
     },
     hairline: hairlineDark,
     text: {
-      primary: '#F7F7F4', // chalk on asphalt — 16.74:1
-      // COMPUTED — "verified defect": graphite on asphalt measures 2.83:1 (fails AA). The brief
-      // mandates a lifted dark-mode value at >=4.5:1, "not optional... four screens are pinned
-      // dark and a user cannot escape it." Same hue/saturation family as graphite, lightness
-      // raised until AA text-contrast cleared against asphalt (#14171C).
-      // Verified: #7E8590 on #14171C = 4.83:1.
-      secondary: '#7E8590',
+      primary: '#F4F1EA', // chalk on espresso — 15.56:1
+      secondary: '#A1968B', // 6.06:1 on base, 5.33:1 on raised — AA on both
+      onInverse: '#F4F1EA', // 17.02:1 on surface.inverse
+      onInverseMuted: '#A1968B', // 6.63:1 on surface.inverse
     },
     progress: {
-      disabled: '#4B5561', // original single value — kept for genuinely inert states only
-      // COMPUTED — same brief instruction as the light-mode value above. Target: >=4.5:1 text
-      // (inactive tab labels — the original value measured 2.13:1 here), >=3:1 non-text, against
-      // surface.base (#14171C). Same hue/saturation family as the original progress value.
-      // Verified: #788696 on #14171C = 4.83:1.
-      informative: '#788696',
+      disabled: '#5C524B', // 2.31:1 — inert only, same rule as light mode
+      // Verified: 5.32:1 on base, 4.69:1 on raised. The lighter tab-bar surface is the binding
+      // constraint here, exactly as it is in light mode.
+      informative: '#968C82',
     },
     status: {
-      error: '#DE5482', // 4.87:1 against asphalt
-      success: '#37BEB9', // 7.89:1 against asphalt
+      error: '#E8735A', // 5.88:1 against espresso
+      success: '#5CBE96', // 7.74:1 against espresso
     },
     chart: {
-      loadLine: '#BCA98F', // desaturated bronze
-      loadFill: 'rgba(90, 96, 105, 0.18)', // graphite @ 18%
+      loadLine: '#C4A375', // warm bronze
+      loadFill: 'rgba(161, 150, 139, 0.18)', // text.secondary @ 18%
     },
     grid: {
-      frame: 'rgba(247, 247, 244, 0.06)', // ~half of hairline's own opacity
+      frame: 'rgba(244, 241, 234, 0.06)', // ~half of hairline's own opacity
       registrationTick: hairlineDark,
       readoutBracket: hairlineDark,
+      routeLine: 'rgba(244, 241, 234, 0.32)',
+      inverseHairline: hairlineDark, // identical to light mode on purpose — see that comment
     },
   },
 } as const;
@@ -117,15 +140,71 @@ export const Colors = {
 export type ThemeColors = (typeof Colors)[ColorScheme];
 
 // ---------------------------------------------------------------------------------------------
-// The effort scale — brief Part 2 "The effort scale". A color always means an intensity; it
-// never decorates. `barHeight` is the mandatory non-hue accessibility channel (Part 7 #1): the
-// bar-height ramp is monotonic and identical in both color schemes.
+// The accent — ember orange. ONE forward action per screen, and never in navigation.
+//
+// Unlike the previous system's accent this is scheme-aware, and it has to be: a single ember that
+// clears AA on chalk is too dark to clear it on espresso, and vice versa. `onEmber` is the only
+// legal text/icon color on an ember fill in its own scheme.
+// ---------------------------------------------------------------------------------------------
+
+export const Accent = {
+  light: {
+    /** The screen's single primary forward-action. Nothing else. 5.06:1 vs chalk. */
+    ember: '#B4400E',
+    /** The second gradient stop of the primary CTA only. Never standalone, never for text. */
+    emberDeep: '#8C2F1B',
+    /** Chalk on ember — 5.06:1. */
+    onEmber: '#F4F1EA',
+  },
+  dark: {
+    ember: '#E2662E', // 5.16:1 vs espresso
+    emberDeep: '#B4400E',
+    onEmber: '#1E1815', // espresso on ember — 5.16:1
+  },
+} as const;
+
+export type ThemeAccent = (typeof Accent)[ColorScheme];
+
+// ---------------------------------------------------------------------------------------------
+// The dusk gradient — the ONE deliberate bold exception, and it is scoped to the signed-out
+// screens (`(auth)/onboarding`, `sign-in`, `sign-up`). Everything past the session gate is
+// paper-and-ink. Theme-invariant on purpose: this hero looks the same at 3pm and 3am, which is
+// what makes it read as a cover rather than as a screen.
+//
+// `stops` runs plum -> ember -> amber, top to bottom. Copy sits in the top 60% of the field,
+// where the darkest two stops are: chalk on plum is 14.18:1 and chalk on the ember mid-stop is
+// 7.34:1. The amber tail is 3.17:1 against chalk and therefore carries NO text — it is the last
+// 15% of the gradient and nothing but the route line crosses it.
+// ---------------------------------------------------------------------------------------------
+
+export const DuskGradient = {
+  stops: ['#2E1740', '#8C2F1B', '#C8721C'] as const,
+  /** Fractional offsets for the three stops above. */
+  offsets: [0, 0.55, 1] as const,
+  /** Headlines on the dusk field. */
+  onDusk: '#F4F1EA',
+  /** Supporting copy on the dusk field — 11.43:1 against the plum stop and 5.91:1 against the
+   * ember mid-stop, so it clears AA everywhere copy is allowed to sit. */
+  onDuskMuted: '#E6D8C6',
+  /** The animated route line drawn across the hero. */
+  routeLine: 'rgba(244, 241, 234, 0.55)',
+  /** The glow that travels the route line as it draws. */
+  routeGlow: '#F6C56A',
+} as const;
+
+// ---------------------------------------------------------------------------------------------
+// The effort scale — a color always means an intensity; it never decorates. `barHeight` is the
+// mandatory non-hue accessibility channel: the ramp is monotonic and identical in both schemes.
 //
 // `EffortLevel`, its render order, and its intensity ordinal are owned by `planTypes.ts` — the
 // module both this app and the `generate-plan` edge function import — so this file only ever
-// derives from it, never redeclares it. Before this (issue #32 finding 4), the level, its order,
-// and its ordinal were each duplicated here, and a reorder in one could silently desync the
-// others.
+// derives from it, never redeclares it.
+//
+// Trailhead re-tunes all ten hues into the warm palette. Two things drove the values, not taste:
+// every hue clears 4:1 against its own base (the previous system's light ramp sat at 3.00–3.06:1,
+// with no headroom at all), and no effort hue may collide with `Accent.ember` — a plan ribbon
+// full of accent-colored bars would destroy the "one accent per screen" rule the whole system
+// rests on. That is why `tempo` is a distinctly browner orange (#A85A12) than ember (#B4400E).
 // ---------------------------------------------------------------------------------------------
 
 /** Low to high intensity, in ribbon-render order — `planTypes.ts`'s `EFFORT_LEVELS`, not a
@@ -134,65 +213,67 @@ export const EffortOrder: readonly EffortLevel[] = EFFORT_LEVELS;
 
 /**
  * `barHeight` is `0.4 + 0.15 × EFFORT_ORDINAL[level]`: recovery through interval land on exactly
- * 0.4 / 0.55 / 0.7 / 0.85 / 1, the ramp `frontend-design-brief.md` Part 2 records. Deriving it
- * from `planTypes.ts`'s ordinal, rather than hand-writing each fraction, means a future reorder
- * there fails loudly instead of silently skewing these bar heights out of sync with the colours
- * below.
+ * 0.4 / 0.55 / 0.7 / 0.85 / 1. Deriving it from `planTypes.ts`'s ordinal, rather than
+ * hand-writing each fraction, means a future reorder there fails loudly instead of silently
+ * skewing these bar heights out of sync with the colours below.
  */
 const barHeightFor = (level: EffortLevel): number => 0.4 + 0.15 * EFFORT_ORDINAL[level];
 
 export const Effort: Record<EffortLevel, { light: string; dark: string; barHeight: number }> = {
-  recovery: { dark: '#6FA8C9', light: '#5196BE', barHeight: barHeightFor('recovery') },
-  easy: { dark: '#4FA97E', light: '#4A9F76', barHeight: barHeightFor('easy') },
-  steady: { dark: '#C9A227', light: '#AB8A21', barHeight: barHeightFor('steady') },
-  tempo: { dark: '#D9772B', light: '#D87427', barHeight: barHeightFor('tempo') },
-  interval: { dark: '#C6402F', light: '#C6402F', barHeight: barHeightFor('interval') },
+  // Ratios are against each scheme's own `surface.base`; the floor for this non-text channel is
+  // 3:1 and every value below clears 4:1.
+  recovery: { light: '#3E7C8C', dark: '#67AABC', barHeight: barHeightFor('recovery') }, // 4.17 / 6.73
+  easy: { light: '#3F7D57', dark: '#5FB183', barHeight: barHeightFor('easy') }, // 4.35 / 6.77
+  steady: { light: '#94711A', dark: '#C79B2E', barHeight: barHeightFor('steady') }, // 4.02 / 6.82
+  tempo: { light: '#A85A12', dark: '#DD8A3C', barHeight: barHeightFor('tempo') }, // 4.50 / 6.50
+  interval: { light: '#992040', dark: '#DE5C7E', barHeight: barHeightFor('interval') }, // 7.06 / 4.96
 };
 
 // ---------------------------------------------------------------------------------------------
-// The accent — brief Part 2 "The accent". Theme-invariant: hivis means the same thing whether
-// the screen is light or dark, so it is never nested under `Colors`.
-// ---------------------------------------------------------------------------------------------
-
-export const Accent = {
-  /** The single primary forward-action of whatever screen you're on. Nothing else. */
-  hivis: '#D8F14A',
-  /** The second gradient stop of the primary CTA only. Never standalone, never for text. */
-  hivisDeep: '#BBD911',
-  /** The only legal text/icon color on a hivis fill — asphalt, 14.20:1, both schemes. */
-  onAccent: '#14171C',
-} as const;
-
-// ---------------------------------------------------------------------------------------------
-// Typography — brief Part 2 "Type". Six fixed steps; three families, each isolated to its role.
-// Barlow Condensed carries display text AND every numeral in the app (pace, distance, splits,
-// week counts, prices, the intake stepper) — a number inline in Inter body copy needs its own
-// styled wrapper; RN does not substitute fonts per character range.
+// Typography — three families, each isolated to its role.
+//
+// Big Shoulders Display carries display text AND every numeral in the app (pace, distance,
+// splits, week counts, prices, the intake stepper). A number inline in Public Sans body copy
+// needs its own styled wrapper; RN does not substitute fonts per character range.
 // ---------------------------------------------------------------------------------------------
 
 export const FontFamily = {
   /** Display text, and every numeral in the app. */
   display: {
-    semiBold: 'BarlowCondensed_600SemiBold',
-    bold: 'BarlowCondensed_700Bold',
-    extraBold: 'BarlowCondensed_800ExtraBold',
+    semiBold: 'BigShoulders_600SemiBold',
+    bold: 'BigShoulders_700Bold',
+    extraBold: 'BigShoulders_800ExtraBold',
   },
   /** Body copy and UI chrome. */
   body: {
-    regular: 'Inter_400Regular',
-    medium: 'Inter_500Medium',
-    semiBold: 'Inter_600SemiBold',
-    bold: 'Inter_700Bold',
+    regular: 'PublicSans_400Regular',
+    medium: 'PublicSans_500Medium',
+    semiBold: 'PublicSans_600SemiBold',
+    bold: 'PublicSans_700Bold',
   },
-  /** Pace splits, HR zones, unit labels, ribbon week numbers — genuinely monospace/tabular. */
+  /**
+   * Pace splits, HR zones, unit labels, week numbers, all-caps field labels — genuinely
+   * monospace/tabular.
+   *
+   * Two weights, not three: Space Mono only ships 400 and 700 (Google publishes no Medium or
+   * SemiBold for it). The previous system's `mono.medium` / `mono.semiBold` roles collapse onto
+   * these — quiet labels take `regular`, emphatic ones take `bold`. Inventing a `medium` alias
+   * that resolved to the same file as `regular` would be a token that lies.
+   */
   mono: {
-    regular: 'IBMPlexMono_400Regular',
-    medium: 'IBMPlexMono_500Medium',
-    semiBold: 'IBMPlexMono_600SemiBold',
+    regular: 'SpaceMono_400Regular',
+    bold: 'SpaceMono_700Bold',
   },
 } as const;
 
-/** The six fixed steps from the brief: 32 / 24 / 20 / 17 / 15 / 13. */
+/**
+ * Seven steps: 13 / 15 / 17 / 20 / 24 / 32 / 44.
+ *
+ * `hero` (44) is new in Trailhead and exists for one reason: Big Shoulders Display is a
+ * condensed face with a much smaller optical size than the Barlow Condensed it replaced, so a
+ * 32pt screen title no longer carries a screen. It is display-only — never legal on body or mono
+ * text, which would simply be oversized rather than emphatic.
+ */
 export const FontSize = {
   xs: 13,
   sm: 15,
@@ -200,13 +281,22 @@ export const FontSize = {
   lg: 20,
   xl: 24,
   xxl: 32,
+  hero: 44,
+} as const;
+
+/**
+ * Letter-spacing. Two values, each bound to one role.
+ *
+ * `display` counteracts Big Shoulders' natural tightness at large sizes; `label` opens up the
+ * all-caps mono field labels that carry most of the app's structure. Body copy is never tracked.
+ */
+export const Tracking = {
+  display: -0.4,
+  label: 1.1,
 } as const;
 
 // ---------------------------------------------------------------------------------------------
-// Spacing — brief Part 2 "Spacing, radii, depth". `48` inserted between the old `five` (32) and
-// `six` (64): the ramp decelerated (×1.5, then ×1.33) then jumped ×2 with no "large section gap"
-// step. The old `six` (64) is renamed `seven`; nothing in the app still references the old name
-// (its only two call sites were in `src/app/explore.tsx`, deleted in this same change).
+// Spacing.
 // ---------------------------------------------------------------------------------------------
 
 export const Spacing = {
@@ -221,22 +311,41 @@ export const Spacing = {
 } as const;
 
 // ---------------------------------------------------------------------------------------------
-// Radius — brief Part 2. Deliberately 8px apart, not a "two values 2px apart" trap.
+// Radius — Trailhead tightens both steps (control 12 -> 10, card 20 -> 16). Paper and ink is a
+// flatter, squarer language than the previous system's; a 20pt card radius reads as consumer-app
+// softness next to a hairline-ruled pricing table. Still deliberately 6pt apart, not a "two
+// values 2px apart" trap.
 // ---------------------------------------------------------------------------------------------
 
 export const Radius = {
   /** Buttons, chips, inputs, segmented tracks. */
-  control: 12,
+  control: 10,
   /** Cards, sheets, modals. */
-  card: 20,
+  card: 16,
+  /** Tier badges and other true capsules. Never on anything that contains a paragraph. */
+  pill: 999,
 } as const;
 
 // ---------------------------------------------------------------------------------------------
-// Motion — brief Part 4 / mvp-blueprint Part 5. Eleven values total; `reveal` and `ambient` are
-// each reserved to their one named use and must never be reused elsewhere.
+// Stroke weights. Trailhead is a line-drawing system, so these stopped being incidental and
+// became tokens: before this, `1.5` was hardcoded in four components and `1` in three.
+// ---------------------------------------------------------------------------------------------
+
+export const Stroke = {
+  /** Rules, baselines, row separators — one physical pixel is the whole point. */
+  hairline: StyleSheet.hairlineWidth,
+  /** Input and secondary-button borders. */
+  thin: 1,
+  /** Icons, chevrons, the route line, the locked-field dash — a glyph should weigh the same on
+   * every device, so this is a fixed 1.5 rather than a hairline. */
+  mark: 1.5,
+} as const;
+
+// ---------------------------------------------------------------------------------------------
+// Motion.
 // Springs are recorded as the design-specified damping ratio (0 = undamped, 1 = critically
-// damped) rather than a platform spring config — the motion implementation translates this into
-// Reanimated's `withSpring` parameters when it lands (Phase 6).
+// damped) rather than a platform spring config — callers translate this into Reanimated's
+// `withSpring` parameters.
 // ---------------------------------------------------------------------------------------------
 
 export const Motion = {
@@ -245,19 +354,17 @@ export const Motion = {
     quick: 180, // state crossfades, toggles
     standard: 250, // the default; entrances
     slow: 350, // full-screen pushes
-    reveal: 650, // RESERVED — the wave's one-time stroke-draw only
-    // RESERVED — the one-way period of the onboarding hero ribbon's settled ambient opacity
-    // pulse (yoyo cycle), the same way `reveal` above is reserved to the wave's stroke-draw: it
-    // must never become a generic "make it feel alive" duration elsewhere. A genuine addition,
-    // not a reuse — every duration above is a sub-350ms response to an event; this is a loop
-    // period, a different kind of quantity, and none of the other nine fit it without either
-    // making the shimmer frantic or silently redefining what that token means.
-    // This is also the single sanctioned exception to mvp-blueprint.md Part 1's manifesto, which
-    // bans "idle floating", "ambient looping", and "breathing gradients" ("if nothing is
-    // happening, nothing moves"). The exception is scoped tightly: opacity only, all cells in
-    // phase (never a travelling sweep — that's loading-skeleton vocabulary), amplitude capped
-    // per color scheme — see `AmbientPulseFloor` below, which is where the actual floor values
-    // and the contrast math behind them live.
+    /** RESERVED — the route line's one-time stroke-draw, and nothing else. */
+    reveal: 650,
+    /**
+     * RESERVED — the one-way period of the auth hero's settled ambient glow (yoyo cycle).
+     *
+     * This is the single sanctioned exception to "if nothing is happening, nothing moves", and it
+     * is scoped tightly: opacity only, on the dusk hero's route line only, never on a paper-and-
+     * ink screen. Unlike the previous system's ambient pulse this one has no contrast floor to
+     * negotiate — it glows a light stroke against a dark gradient that carries no text where the
+     * stroke travels — which is why there is no longer an `AmbientPulseFloor` token.
+     */
     ambient: 2800,
   },
   curve: {
@@ -277,60 +384,40 @@ export const Motion = {
 } as const;
 
 // ---------------------------------------------------------------------------------------------
-// Interaction — issue #32 finding 3. Every `Pressable` in the app dims to the same opacity on
-// press; before this token, `index.tsx` and `WeekAccordion.tsx` each hardcoded their own `0.7`.
-// `Motion.duration.instant` is reserved for animating this transition once Phase 6 wires real
-// press-in/press-out springs — until then it's a flat, unanimated opacity swap.
+// Interaction. Every `Pressable` in the app dims to the same opacity on press.
 // ---------------------------------------------------------------------------------------------
 
 export const PressedOpacity = 0.7;
 
-// ---------------------------------------------------------------------------------------------
-// Ambient pulse floor — accessibility-reviewer finding 1 (onboarding hero ribbon, 2026-08-08).
-// `PressedOpacity` (0.7) is safe as the settled ambient pulse's trough in dark mode — worst case
-// there is dark `recovery` at 4.04:1 against `Colors.dark.surface.base`, still clear of the
-// brief's 3:1 floor for this channel — but it is NOT safe in light mode. Verified with the
-// standard WCAG relative-luminance formula against the actual hexes (`Effort[level].light`,
-// alpha-blended toward `Colors.light.surface.base`, vs. that same base):
-//   recovery 3.03:1 full -> 2.10:1 at .7   easy   3.00:1 full -> 2.10:1 at .7
-//   steady   3.06:1 full -> 2.11:1 at .7   tempo  3.03:1 full -> 2.15:1 at .7
-//   interval 4.69:1 full -> 2.94:1 at .7
-// Four of the five light-mode efforts are already only barely above 3:1 AT FULL OPACITY (`easy`
-// the tightest, 3.0045:1 with zero pulse at all) — there is essentially no contrast headroom
-// left for a shared opacity dip. `easy` needs alpha >= 0.9988 to hold 3:1; 0.999 is the smallest
-// floor that clears every light-mode effort with a hair of margin (0.999 -> easy 3.001:1,
-// recovery 3.027:1, steady 3.059:1, tempo 3.031:1, interval 4.679:1). The resulting light-mode
-// pulse is barely perceptible by design — that thinness is inherent to how close these five
-// hexes already sit to the floor, not something this token can fix. A genuinely visible light-
-// mode pulse would need `design-system` to revisit the light effort hexes for more headroom.
-export const AmbientPulseFloor = {
-  light: 0.999,
-  dark: PressedOpacity,
-} as const;
+/**
+ * The opacity a locked/teaser surface is dimmed to — the Free-tier Notes field and the blurred
+ * plan-content teaser on Home.
+ *
+ * It is NOT `PressedOpacity` wearing a second hat: press feedback is a 100ms transient on a live
+ * control, this is the resting state of something the runner cannot use. Deliberately shallow, so
+ * the teaser still reads as real content worth paying for rather than as a rendering failure, and
+ * applied only to surfaces whose text is decorative — never to text a runner must actually read.
+ */
+export const LockedOpacity = 0.45;
 
 // ---------------------------------------------------------------------------------------------
 // Layout constants.
 // ---------------------------------------------------------------------------------------------
 
 /**
- * PARKED — deliberately uncalled, and not to be given a call site until the condition below is
- * met (issue #32 finding 8, which asked "use it or fix the comment"; this is the "fix the
- * comment" half, and the reason).
+ * PARKED — deliberately uncalled.
  *
- * This models the height of a tab bar that *floats over* screen content — the case where a
- * screen must pad its own bottom because nothing else reserves that space. That tab bar was
- * never built. `src/app/(tabs)/_layout.tsx` sets no `position: 'absolute'` on `tabBarStyle`, so
- * React Navigation lays the bar out **in normal flow**, as a sibling below the screen container,
- * and the bar applies the bottom safe-area inset itself. A tab screen's viewport therefore
+ * This models the height of a tab bar that *floats over* screen content — the case where a screen
+ * must pad its own bottom because nothing else reserves that space. `src/app/(tabs)/_layout.tsx`
+ * sets no `position: 'absolute'` on `tabBarStyle`, so React Navigation lays the bar out in normal
+ * flow and the bar applies the bottom safe-area inset itself. A tab screen's viewport therefore
  * already ends where the tab bar begins: padding it by this constant adds trailing void, not
- * clearance — the "floating dead gap" `frontend-design-brief.md` Part 8 warns about.
+ * clearance.
  *
  * It becomes correct — and should be applied to every scrolling tab screen at once — the day
- * `tabBarStyle` goes `position: 'absolute'`. Until then, a tab screen's bottom padding is an
- * ordinary `Spacing` value like any other.
+ * `tabBarStyle` goes `position: 'absolute'`.
  */
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
 
-/** Binds only on iPad/tablet/resizable web — invisible on every phone (360–430pt). Phone-only
- * v1 (decision 12, 2026-07-10) makes this dead weight until v2, per the brief. */
+/** Binds only on iPad/tablet/resizable web — invisible on every phone (360–430pt). */
 export const MaxContentWidth = 800;

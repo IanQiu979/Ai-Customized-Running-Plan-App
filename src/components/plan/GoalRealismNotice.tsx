@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { FontFamily, FontSize, Radius, Spacing } from '@/constants/theme';
+import { FontFamily, FontSize, Radius, Spacing, Stroke } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { getGoalRealismNoticeCopy } from '@/lib/goalRealismDisclosure';
 import type { GoalRealismNoticeVariant } from '@/lib/goalRealismDisclosure';
@@ -36,7 +36,7 @@ export function GoalRealismNotice({ assessment, variant = 'plan' }: GoalRealismN
 
 const styles = StyleSheet.create({
   card: {
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: Stroke.hairline,
     borderRadius: Radius.card,
     padding: Spacing.three,
     gap: Spacing.one,

@@ -83,7 +83,7 @@ src/
                              # with the `-`/`:` printed, never typed. No screen uses a raw
                              # <TextInput keyboardType="..."> for a number
   constants/
-    theme.ts                # "Instrument & Matter" token system — current, see below
+    theme.ts                # "Trailhead" token system — current, see below
     navigation-theme.ts      # bridges theme.ts's tokens into @react-navigation/native's `Theme`
                              #  shape, so ThemeProvider never leaks the library's own stock
                              #  DefaultTheme/DarkTheme colors (fixes issue #27)
@@ -586,43 +586,56 @@ The full list, with what was done instead, is the header of
 **Tier and quota are only ever written by the Worker** — the client has no database access at all,
 so it can never write its own tier or quota.
 
-## Current — visual direction (`theme.ts`, commit `145d7e0`)
+## Current — visual direction ("Trailhead", `theme.ts`)
 
-`src/constants/theme.ts` is the "Instrument & Matter" token system below — the stock Expo
-template palette it replaced (light `#000000`/`#ffffff`/`#F0F0F3`/`#E0E1E6`/`#60646C`, dark
-`#ffffff`/`#000000`/`#212225`/`#2E3135`/`#B0B4BA`) is gone, along with the template screens that
-used it (`explore.tsx` and friends). `Spacing` now runs half=2, one=4, two=8, three=16, four=24,
-five=32, **six=48** (new step), seven=64 (the old `six`); `MaxContentWidth = 800` is unchanged from
-the scaffold. `BottomTabInset`'s value is likewise unchanged, but as of 2026-07-12 (issue #32
+> **Source of truth: [`docs/design/trailhead-visual-system.md`](design/trailhead-visual-system.md)**
+> (captain-approved 2026-09-01). Every hex, the contrast tables, the type scale and the ornament
+> rules live there and in `src/constants/theme.ts`'s own header comment; this section is a summary
+> and never the authority. That document supersedes `docs/design/frontend-design-brief.md`
+> Parts 2 (tokens) and 3 (the ribbon/wave motif) — the rest of the brief still governs. Where the
+> two disagree about a *value*, Trailhead wins; about a *rule*, the brief wins.
+>
+> **Trailhead lives on `redesign/trailhead-2026-09-01` and is not merged to `main`.** On `main`,
+> `theme.ts` is still the previous "Instrument & Matter" system. This section describes the branch.
+
+`src/constants/theme.ts` holds the Trailhead tokens: warm chalk paper and espresso ink, hairline
+rules instead of boxes, and numerals set like a printed table. `Spacing` runs half=2, one=4, two=8,
+three=16, four=24, five=32, **six=48**, seven=64; `MaxContentWidth = 800` is unchanged from the
+scaffold. `BottomTabInset`'s value is likewise unchanged, but as of 2026-07-12 (issue #32
 finding 8) it carries a docblock explaining why it still has zero call sites: it models a tab bar
 that *floats over* content, and the real tab bar (`(tabs)/_layout.tsx`) lays out in normal flow
 instead, so applying the inset today would add trailing void, not clearance — see
-`docs/mvp-progress.md`'s "Known debt" for the full reasoning. Full rationale for every other
-value — contrast math, the two computed dark-mode fixes, the `grid.*` tokens — lives in the token
-file's own header comment and `docs/design/frontend-design-brief.md` Part 2; this section is a
-summary, not the source of truth.
+`docs/mvp-progress.md`'s "Known debt" for the full reasoning.
 
-- **Bases**: `asphalt #14171C` (dark), `chalk #F7F7F4` (light), `graphite #5A6069` (secondary
-  text) — deliberately not pure black/white, and deliberately not a cream-and-terracotta look.
-- **Effort scale** — the palette *is* the information, not decoration: `recovery #6FA8C9`,
-  `easy #4FA97E`, `steady #C9A227`, `tempo #D9772B`, `interval #C6402F`. A color always means an
-  intensity. `barHeight` (the ramp's mandatory non-hue accessibility channel) is computed as
+- **Bases**: chalk `#F4F1EA` (light) and espresso `#1E1815` (dark), plus a `surface.inverse` slab
+  used dark in *both* schemes — the Paywall's pricing cards, whose edge comes from
+  `grid.inverseHairline` rather than from lightness separation.
+- **Effort scale** — the palette *is* the information, not decoration; the ramp was re-picked in
+  Trailhead so every value clears 4:1 (the old light ramp sat at 3.00–3.06:1, with no headroom for
+  an opacity dip). `barHeight`, the mandatory non-hue accessibility channel, is still computed as
   `0.4 + 0.15 × EFFORT_ORDINAL[level]` against `planTypes.ts`'s ordinal rather than hand-written
-  per level (issue #32 findings 4 and 7, 2026-07-12) — see "Current" above.
-- One accent, `hivis #D8F14A`, reserved exclusively for the single primary forward-action of
-  whatever screen you're on — boldness spent in exactly one place. (There is no "next workout"
-  card in v1 — decision 5, 2026-07-10 — so hivis does not move to one; it stays on the primary
-  CTA.)
+  per level (issue #32 findings 4 and 7, 2026-07-12).
+- **One accent, ember**, reserved for the single primary forward-action of whatever screen you're
+  on — boldness spent in exactly one place, and **never in navigation**. Unlike the previous
+  system's theme-invariant `hivis`, it is scheme-aware (`Accent[scheme].ember`, resolved by
+  `useTheme()`), because no single ember clears AA on both chalk and espresso. Several screens
+  spend no accent at all: a destination is not a call to action.
 - **Interaction**: one `PressedOpacity` token (`0.7`) for every `Pressable`'s press-dim, added
   2026-07-12 (issue #32 finding 3) so the value can't fork across components the way it had in
-  `index.tsx` and `WeekAccordion.tsx`.
-- Type: a condensed grotesque for display and numerals (running is numbers — distance, pace,
-  splits), a neutral body face, a mono face for split tables. Scale 32/24/20/17/15/13.
-- **Signature element — the "week ribbon"**: each training week renders as seven cells colored
-  by effort, rest days as gaps. A 16-week plan reads as a barcode of periodization at a glance.
-  The plan view is meant to lead with the ribbon rather than a list. **This per-week micro ribbon
-  is implemented** (`src/components/plan/WeekAccordion.tsx`); the macro periodization wave
-  (`mvp-blueprint.md` Part 3) is not built yet.
+  `index.tsx` and `WeekAccordion.tsx`. Distinct from `LockedOpacity` (`0.45`), which is the
+  *resting* dim of a surface the runner cannot use, not press feedback.
+- Type: Big Shoulders Display for display and every numeral (running is numbers — distance, pace,
+  splits), Public Sans for body and UI chrome, Space Mono for pace, HR and all-caps labels. Scale
+  13/15/17/20/24/32/44.
+- **Signature element — the route line**: a thin contour/elevation stroke
+  (`src/components/brand/RouteLine.tsx`, geometry in `src/lib/routeProfile.ts`), carried through
+  Home, My Plans and Plan view in three variants. It replaced the ribbon/wave motif as the
+  signature. The **per-week effort ribbon** inside a plan is not ornament and stays
+  (`src/components/plan/WeekAccordion.tsx`) — it encodes real data; the macro periodization wave
+  (`mvp-blueprint.md` Part 3) is not built and is no longer planned.
+- **One deliberate exception**: the signed-out screens carry a plum→ember→amber dusk gradient and
+  an animated route line (`src/components/brand/DuskHero.tsx`). Everything past the session gate is
+  paper and ink.
 - **React Navigation's own chrome is tokened too, not just the screens built on top of it.**
   `src/constants/navigation-theme.ts` bridges the same `Colors` tokens into the `Theme` shape
   `@react-navigation/native` expects (`background`→`surface.base`, `card`→`surface.raised`,
@@ -630,7 +643,7 @@ summary, not the source of truth.
   `status.error`), so `_layout.tsx`'s `ThemeProvider` never falls back to the library's own stock
   `DefaultTheme`/`DarkTheme` palette for transition underlays, header defaults, or the back-swipe
   reveal (closes issue #27, a 2026-07-11 frontend-audit finding). `primary` deliberately maps to
-  `text.primary`, not `Accent.hivis` — hivis stays reserved for the single per-screen forward-action.
+  `text.primary`, not the accent — ember stays reserved for the single per-screen forward-action.
 - Accessibility rule, non-negotiable: an effort color is never the only signal — always pair it
   with a text label, so the plan stays legible to color-blind users.
 - Standing rule (already in the engineering spec): theme tokens only, no hardcoded colors or
@@ -647,3 +660,8 @@ summary, not the source of truth.
 - The v1 aesthetic is the blueprint's **Instrument & Matter** system
   (`docs/design/mvp-blueprint.md` Part 1). Its banned list — glow, glassmorphism, ambient/idle
   motion, frosted panels — applies to the future scroll-driven animations too, not just to v1.
+  **The aesthetic was replaced by Trailhead on 2026-09-01** (see "Current — visual direction"). The
+  banned list still governs everything past the session gate. The signed-out dusk hero is the one
+  sanctioned departure from it: `DuskHero.tsx`'s route line draws itself once and then settles into
+  a slow opacity-only ambient glow — never hue, position or scale — and under `reduceMotion` it is
+  simply present at full opacity with no draw and no loop.

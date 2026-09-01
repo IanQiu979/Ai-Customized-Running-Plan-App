@@ -5,6 +5,80 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-09-01 — "Trailhead": the visual system replaced, every screen rebuilt
+
+On branch `redesign/trailhead-2026-09-01`, **not merged to `main`** — nothing below is released.
+The captain's audit pass over the shipped app returned one complaint, twice: it looked cluttered,
+and no screen said what it was for. The response was not a tidy-up. The whole visual system was
+replaced with **Trailhead** (approved 2026-09-01 from a Claude Design mockup), recorded in the new
+[`docs/design/trailhead-visual-system.md`](design/trailhead-visual-system.md), which supersedes
+`frontend-design-brief.md` Parts 2 (tokens) and 3 (the ribbon/wave motif) as the source of truth
+for colour, type, and ornament. The rest of that brief — Part 0's law, the tier table, the screen
+inventory, the accessibility floors, the copy rulings — is untouched and still governs.
+
+- **The token system is new, not re-tuned** (`src/constants/theme.ts`). Warm chalk paper and
+  espresso ink, hairline rules instead of boxes. `Accent.hivis` (`#D8F14A`) is gone in favour of a
+  **scheme-aware** `Accent[scheme].ember` — two changes at once: the old name described a
+  yellow-green the system no longer contains, and no single ember clears AA on both chalk and
+  espresso, so a theme-invariant accent was no longer possible. `useTheme()` resolves it, so call
+  sites still read `theme.accent.*`. New tokens: `surface.inverse` + `text.onInverse*`,
+  `grid.routeLine`, `grid.inverseHairline`, `DuskGradient`, `FontSize.hero` (44), `Tracking`,
+  `Stroke`, `Radius.pill`, `LockedOpacity`. Every hex is contrast-verified in the design doc's
+  tables; radii tightened (control 12→10, card 20→16) because paper and ink is a squarer language.
+- **The effort ramp was re-picked for headroom.** The old light ramp sat at 3.00–3.06:1 — four of
+  five efforts barely above the 3:1 floor at *full opacity*, which is the only reason
+  `AmbientPulseFloor` ever existed. Every new value clears 4:1, so the floor token is deleted along
+  with its single consumer. `tempo` is a deliberately browner orange than ember so a plan's week
+  ribbon can never read as a screen full of accents. The colour-is-never-the-only-signal rule and
+  the monotonic bar-height ramp are unchanged.
+- **One ornament, and one exception.** The ribbon/wave signature is retired: `HeroRibbon` put a
+  copy of the plan view's own data viz on the landing screen. The signature is now the **route
+  line**, a thin contour stroke (`src/components/brand/RouteLine.tsx`) generated from a fixed
+  seeded profile (`src/lib/routeProfile.ts`, pure and tested) so a screen draws the same ridge on
+  every launch. The signed-out screens are the one deliberate exception — a plum→ember→amber dusk
+  gradient with an animated route line (`components/brand/DuskHero.tsx`). Everything past the
+  session gate is paper and ink. The per-week effort ribbon inside a plan stays; it encodes data,
+  it is not ornament.
+- **Ember is barred from navigation and spent once per screen.** The tab bar gained four
+  thin-stroke line icons where every tab previously rendered `tabBarIcon: () => null`; the active
+  state is an ink tick, not an accent. On Home the single ember is "Generate plan", so the push to
+  My Plans is a plain row rather than a second button. My Plans, Plan view, Glossary and Settings
+  spend **no** accent at all — a destination is not a call to action, and Settings' "Upgrade" is a
+  row with a chevron because the offer lives on the Paywall.
+- **Type is new.** Big Shoulders Display / Public Sans / Space Mono replace Barlow Condensed /
+  Inter / IBM Plex Mono (old packages uninstalled in the same commit). `mono.medium` and
+  `mono.semiBold` collapse onto `regular` / `bold` across all 13 call sites — Google publishes no
+  Medium or SemiBold for Space Mono, and an alias resolving to the same file is a token that lies.
+  `FontSize.hero` exists because Big Shoulders is optically much smaller than the Barlow it
+  replaced, so a 32pt title no longer carries a screen.
+- **Every screen was rebuilt to its register.** Home ships all three states (empty / populated /
+  Free) plus the two the network forces; sign-in and sign-up moved onto the dusk exception with a
+  shared `components/auth/AuthField.tsx`; My Plans and Plan view took the formal register with
+  hairline stat rows; the Paywall took dark pricing slabs on `surface.inverse` (dark in *both*
+  schemes — the inversion is the gesture) with the one ember on Elite; Settings and Glossary went
+  flat grouped rows via the new `components/layout/GroupedRows.tsx`. Two anti-drift details:
+  every plan count on the Paywall reads `TIER_PLAN_LIMITS` (the constant `workers/` also imports),
+  and My Plans' most-recent date is computed from `max(createdAt)` rather than read off `plans[0]`,
+  since `GET /api/plans`' ordering is the server's business.
+- **Free-tier Notes are now locked in the UI — a correction, not new enforcement.** Free tier is
+  template-only and never reaches the model, so notes a Free runner typed were already discarded
+  server-side; showing the field open was the bug. Home renders it inside a dashed `LockedPanel`
+  with an "Upgrade to unlock" affordance, plus a second panel teasing what Pro and Elite add. No
+  Worker change was needed and none was made. The lock is a **display** of
+  `getQuotaStatus().tier`, never a decision made in the client (`AGENTS.md`): `quota === null`
+  means "the server has not answered yet" and is deliberately **not** treated as free, or a paying
+  runner would see a paywall flash for the length of the request. The teaser is a fixed
+  illustration, not the runner's own intake run through a plan engine — deriving a pace
+  client-side would be both inventing coaching content and plan generation in the client.
+- **Verification, honestly.** `typecheck && lint && test` clean at 469 tests across 29 suites,
+  including a new `src/components/__tests__/render.test.tsx` (16 tests) — `tsc` proves the new
+  components type-check and proves nothing about whether they render, and an undefined `d` on a
+  `Path` is a clean typecheck and a blank screen. Deliberately not snapshots: pinning an ornament's
+  tree makes every visual tweak a test edit. **No screen has been seen rendered**, in a browser or
+  on a device. `npx expo export --platform web` builds the whole route tree and the DOM confirms
+  all nine font faces bundle and preload, but the export does not inline the root `.env`, so the
+  bundle throws `Missing EXPO_PUBLIC_API_BASE_URL` and never hydrates.
+
 ## 2026-08-16 — review fixes on the intake-once branch
 
 Five findings from the review of the branch below, all fixed forward.

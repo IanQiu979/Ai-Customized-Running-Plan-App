@@ -149,6 +149,13 @@ These surfaced during design. Each needs a human answer. Four of them change cod
 
 ## Part 2 — The global system
 
+> **Superseded, 2026-09-01 — see [`trailhead-visual-system.md`](trailhead-visual-system.md).** The
+> colour, type, shape and ornament values below describe the retired "Instrument & Matter" system.
+> Trailhead is the source of truth for every value in this Part and in Part 3. Kept for the
+> reasoning, which is still worth reading; do not implement a hex from here. Everything outside
+> Parts 2 and 3 — Part 0's law, the tier table, the screen inventory, the accessibility floors, the
+> copy rulings — is unchanged and still governs.
+
 ### Bases and text
 
 Deliberately not pure black and white.
@@ -334,6 +341,12 @@ Every interactive target is **≥44×44** unless noted.
 ---
 
 ## Part 3 — The signature motif
+
+> **Superseded, 2026-09-01 — see [`trailhead-visual-system.md`](trailhead-visual-system.md).** The
+> signature is the **route line**, a thin contour stroke, not the ribbon-and-wave motif below. The
+> **week ribbon (micro) survives** — it encodes real data and is still built as described here,
+> though on Trailhead's re-tuned effort ramp. The **periodization wave (macro) is retired**: a
+> hero-scale week ribbon competes with the plan's own data viz. `HeroRibbon` is deleted.
 
 Two scales, deliberately kept on **separate color systems** so they cannot be confused for one another.
 

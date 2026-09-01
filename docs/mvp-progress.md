@@ -26,7 +26,7 @@
 | M3 — Plan engine (3 tiers produce valid plans) | **In progress.** Pure template/pace engine wired into the Worker's `generate-plan` route and the client's generate-plan action; the plan view renders a real generated plan (via `GET /api/plans/:id`) alongside the permanent static golden fixture. Paid tiers still serve the quota-exempt template fallback — see "How it is now" |
 | M4 — Tiers & quotas (server-side, unbypassable) | **In progress.** The quota ledger, atomic gate, fallback exemption, `quota-status` and `purchase-tier` are built and tested server-side; a Settings tab now displays tier/quota and a dummy paywall now lets a runner call `purchase-tier` (2026-08-05) |
 | M5 — My Plans (history) | **In progress.** A My Plans tab lists plans off `GET /api/plans` |
-| M6 — Polish & TestFlight | **In progress.** First real onboarding screen landed 2026-08-08 (`(auth)/onboarding.tsx` + an animated week-ribbon hero); no EAS build exists yet |
+| M6 — Polish & TestFlight | **In progress.** The whole visual system was replaced with **Trailhead** and every screen rebuilt on it — but **on `redesign/trailhead-2026-09-01`, not merged to `main`**, and no screen has been seen rendered yet. See "How it is now". No EAS build exists |
 
 ### How it is now
 
@@ -55,6 +55,21 @@
   a deload; a past race date is refused on both screens (race day and a blank date remain valid);
   numeric inputs are structured (`src/components/inputs/` + `src/lib/fieldInput.ts`). Full
   account: the "Last updated" entry below.
+- **The design system is now "Trailhead" — live in a branch, not on `main`.** All of
+  `redesign/trailhead-2026-09-01` is **unreleased**: `src/constants/theme.ts` on `main` is still
+  "Instrument & Matter", and everything in this bullet describes the branch only. There, the token
+  system, the fonts, the signature motif and every screen were replaced — warm chalk and espresso
+  ink, one scheme-aware ember accent spent on exactly one action per screen and barred from
+  navigation, a route-line contour as the only ornament, and a dusk gradient on the signed-out
+  screens as the single deliberate exception. Free-tier Notes are now shown locked, which is a UI
+  correction and not new enforcement: Free is template-only, so those notes were already discarded
+  server-side. Source of truth for every value:
+  [`docs/design/trailhead-visual-system.md`](design/trailhead-visual-system.md), which supersedes
+  `frontend-design-brief.md` Parts 2 and 3. Full account: `change_log.md`, 2026-09-01. **Two things
+  are not done on that branch** — no screen has been seen rendered in a browser or on a device (the
+  web export does not inline the root `.env`, so the bundle throws `Missing
+  EXPO_PUBLIC_API_BASE_URL` and never hydrates), and it has had no review pass. Its gate is clean
+  at 469 root tests across 29 suites; the 433/26 figure below is `main`'s.
 - **Test-mode override:** `ALL_USERS_UNLIMITED_ACCESS = "true"` still sits in the top-level
   `[vars]` of `workers/wrangler.toml` (the committed `[env.production.vars]` value is `"false"`),
   so the captain's test pass runs with every account Elite and the quota gate bypassed. Set the
@@ -675,7 +690,12 @@ view to `buildTemplatePlan()` instead of the static fixture; intake and server w
 
 ## In flight
 
-Nothing is in flight. The one remaining critical-path item — `ANTHROPIC_API_KEY`, without which
+**The Trailhead redesign, on `redesign/trailhead-2026-09-01`.** Functionally complete across every
+screen in scope and clean on its own gate, but unmerged and unfinished in two specific ways: no
+screen has been seen rendered (browser or device), and it has had no review pass. Detail in
+"Current state" above and `change_log.md`, 2026-09-01.
+
+Nothing else is in flight. The one remaining critical-path item — `ANTHROPIC_API_KEY`, without which
 paid-tier requests serve the quota-exempt template fallback — is a captain-only action, not work
 in progress; see "Current state" above and "Blocked" below. The 2026-07-11 coaching cycles 1 and 2 are
 recorded under "Done" → "Domain" above, not here.

@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { FontFamily, FontSize, Spacing } from '@/constants/theme';
+import { FontFamily, FontSize, Spacing, Stroke } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 /**
@@ -24,7 +24,7 @@ export function DisclaimerFooter({ disclaimers }: { disclaimers: readonly string
 
 const styles = StyleSheet.create({
   wrap: {
-    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopWidth: Stroke.hairline,
     paddingTop: Spacing.three,
     gap: Spacing.two,
   },
