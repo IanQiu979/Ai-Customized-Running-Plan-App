@@ -49,13 +49,28 @@ const GLOW_FLOOR = 0.45;
  * made of, plus one `slow` of slack — never a hand-picked number. */
 const DRAW_CEILING_MS = Motion.duration.reveal + Motion.duration.slow;
 
+/**
+ * `cover` is the landing screen's full hero. `band` is the shorter header the two form screens
+ * wear, so the dusk exception carries across all three signed-out screens without a 256pt cover
+ * fighting an on-screen keyboard for room.
+ */
+const HERO_HEIGHT = {
+  cover: Spacing.seven * 4,
+  band: Spacing.seven * 2,
+} as const;
+
+export type DuskHeroSize = keyof typeof HERO_HEIGHT;
+
 export function DuskHero({
+  size: heroSize = 'cover',
   onSettled,
   children,
 }: {
-  /** Raised once the line has finished drawing. The captain's constraint: the hero must be
-   * settled, not mid-build, before the CTA becomes interactive. */
-  onSettled: () => void;
+  size?: DuskHeroSize;
+  /** Raised once the line has finished drawing. The landing screen uses it to gate its CTA — the
+   * captain's constraint is that the hero is settled, not mid-build, before that button is
+   * interactive. The form screens gate nothing and simply omit it. */
+  onSettled?: () => void;
   children?: ReactNode;
 }) {
   const reduceMotion = useReducedMotion();
@@ -70,7 +85,7 @@ export function DuskHero({
   const settle = useCallback(() => {
     if (settled.current) return;
     settled.current = true;
-    onSettled();
+    onSettled?.();
   }, [onSettled]);
 
   const inset = Stroke.mark / 2 + Stroke.thin;
@@ -145,7 +160,7 @@ export function DuskHero({
 
   return (
     <View
-      style={styles.hero}
+      style={[styles.hero, { minHeight: HERO_HEIGHT[heroSize] }]}
       onLayout={handleLayout}
       accessible
       accessibilityRole="image"
@@ -199,9 +214,8 @@ export function DuskHero({
 
 const styles = StyleSheet.create({
   hero: {
-    // Tall enough to be a cover rather than a banner, and fixed in absolute tokens so a short
-    // viewport shrinks the surrounding spacers instead of the hero.
-    minHeight: Spacing.seven * 4,
+    // Height comes from `HERO_HEIGHT`, in absolute tokens, so a short viewport shrinks the
+    // surrounding spacers rather than the hero.
     justifyContent: 'flex-start',
     overflow: 'hidden',
   },
