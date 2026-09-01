@@ -12,6 +12,7 @@ import type { GeneratePlanRequest } from '../../src/lib/planTypes';
 import type { GeneratePlanDeps } from '../src/lib/generate-plan-flow';
 import { generatePlan } from '../src/lib/generate-plan-flow';
 import type { PersonalizeResult, SkeletonResult } from '../src/lib/planEngine';
+import { RACE_DATE_PASSED_MESSAGE } from '../../src/lib/planRequest';
 import { FakeStore, INTAKE, makePlan, type FakeStoreOptions } from './fakes';
 
 const USER = 'user-1';
@@ -82,6 +83,14 @@ describe('request validation', () => {
       'a race goal with an absurd explicit durationWeeks',
       { goalType: 'race', raceDistance: '5k', raceDate: '2026-10-01', durationWeeks: 999_999, idempotencyKey: 'k' },
     ],
+    // A "duration" request legitimately carries `raceDistance` when the runner named a target
+    // distance with no date (`src/lib/planRequest.ts`), and that value shapes the periodization
+    // exactly as a race goal's does — so it needs the same value check, which used to live only
+    // inside the `race` branch.
+    [
+      'a duration goal with an unknown race distance',
+      { ...VALID_REQUEST, raceDistance: 'ultra' as never },
+    ],
   ])('rejects %s before reserving anything', async (_label, request) => {
     const { deps, store } = makeDeps();
 
@@ -90,6 +99,66 @@ describe('request validation', () => {
     expect(outcome.kind).toBe('invalid_request');
     // Nothing was reserved, so a malformed request can never cost a plan slot.
     expect(store.reserveCalls).toHaveLength(0);
+  });
+
+  it('names the offending field when a duration goal carries a bad race distance', async () => {
+    const { deps } = makeDeps();
+    const outcome = await generatePlan(
+      USER,
+      { ...VALID_REQUEST, raceDistance: 'ultra' as never },
+      deps,
+    );
+    expect(outcome).toEqual({
+      kind: 'invalid_request',
+      message: 'raceDistance must be one of 5k|10k|half|marathon.',
+    });
+  });
+
+  // The client refuses a stale race date before sending (`src/lib/planRequest.ts`), but a
+  // client-only guard is not a guard: any other caller would reach `weeksUntilRace`'s one-week
+  // floor and buy a degenerate plan with a real quota slot.
+  it('refuses a race date that has already passed, before reserving anything', async () => {
+    const { deps, store } = makeDeps();
+
+    const outcome = await generatePlan(
+      USER,
+      { goalType: 'race', raceDistance: '5k', raceDate: '2026-07-31', idempotencyKey: 'k' },
+      deps,
+    );
+
+    expect(outcome).toEqual({
+      kind: 'invalid_request',
+      message: RACE_DATE_PASSED_MESSAGE,
+    });
+    expect(store.reserveCalls).toHaveLength(0);
+    expect(store.settled).toHaveLength(0);
+  });
+
+  it('still generates on race day itself', async () => {
+    const { deps } = makeDeps();
+    const outcome = await generatePlan(
+      USER,
+      { goalType: 'race', raceDistance: '5k', raceDate: NOW.slice(0, 10), idempotencyKey: 'k' },
+      deps,
+    );
+    expect(outcome.kind).toBe('ok');
+  });
+
+  it('refuses a past race date even when it rides on a duration request', async () => {
+    const { deps, store } = makeDeps();
+    const outcome = await generatePlan(
+      USER,
+      { ...VALID_REQUEST, raceDate: '2020-01-01' } as GeneratePlanRequest,
+      deps,
+    );
+    expect(outcome).toEqual({ kind: 'invalid_request', message: RACE_DATE_PASSED_MESSAGE });
+    expect(store.reserveCalls).toHaveLength(0);
+  });
+
+  it('still accepts a duration goal carrying a valid race distance', async () => {
+    const { deps } = makeDeps();
+    const outcome = await generatePlan(USER, { ...VALID_REQUEST, raceDistance: 'half' }, deps);
+    expect(outcome.kind).toBe('ok');
   });
 
   it('caps notes length because it reaches a model prompt as free text', async () => {

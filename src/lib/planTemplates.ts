@@ -279,21 +279,67 @@ function raceDayWorkout(distance: RaceDistance): Workout {
   };
 }
 
-function allocatePhaseCounts(durationWeeks: number, raceDistance: RaceDistance): number[] {
-  // The source examples scale the aerobic → structured → race-specific → taper shape to
-  // distance and plan length. The 12-week 5K weights reproduce base×4/build×4/peak×2/taper×2.
-  const weights = raceDistance === '5k'
-    ? [4, 4, 2, 2]
-    : raceDistance === '10k'
-      ? [5, 5, 4, 2]
-      : raceDistance === 'half'
-        ? [6, 6, 4, 2]
-        : [9, 9, 8, 4];
+/**
+ * Phase weights for a plan that IS aimed at a race: aerobic base → structured work →
+ * race-specific → taper, scaled to distance. The 12-week 5K weights reproduce
+ * base×4/build×4/peak×2/taper×2.
+ */
+function racePhaseWeights(raceDistance: RaceDistance): number[] {
+  switch (raceDistance) {
+    case '5k':
+      return [4, 4, 2, 2];
+    case '10k':
+      return [5, 5, 4, 2];
+    case 'half':
+      return [6, 6, 4, 2];
+    case 'marathon':
+      return [9, 9, 8, 4];
+    default: {
+      // Exhaustive by type. Reached only if an unvalidated value gets this far, which used to fall
+      // through a chained ternary and hand out marathon periodization silently; both boundaries
+      // (`validateRequest` and `validateIntake` in `workers/`) reject it before here.
+      const unreachable: never = raceDistance;
+      throw new Error(`Unknown race distance: ${String(unreachable)}`);
+    }
+  }
+}
+
+/**
+ * Phase weights for a plan with **no race**. A taper is by definition the wind-down into a race
+ * day, so a plan without one has no taper to allocate — this returns three weights (base / build /
+ * peak) and `phasesForPlan` never emits a fourth phase for these plans. Nothing is invented here:
+ *
+ * - When the runner named a target distance in intake but is generating an open-ended block
+ *   (no race date), the distance's own first three weights are reused verbatim, minus the taper.
+ * - When no distance is known at all, the weights are equal thirds — a direct read of
+ *   `training_zones.md § McMillan Periodization Cycles` as ported in
+ *   `docs/reference/coaching/plan-structure.md`, whose general macrocycle runs weeks 1–6 build,
+ *   7–12 progressive, 13–18 race-specific, i.e. equal thirds once the race-defined taper is
+ *   dropped. Guessing a race distance in order to reach a distance-specific weighting is exactly
+ *   the silent assumption this replaced.
+ */
+function generalPhaseWeights(raceDistance: RaceDistance | undefined): number[] {
+  if (!raceDistance) return [1, 1, 1];
+  return racePhaseWeights(raceDistance).slice(0, 3);
+}
+
+function allocatePhaseCounts(
+  durationWeeks: number,
+  raceDistance: RaceDistance | undefined,
+  isRacePlan: boolean,
+): number[] {
+  const weights = isRacePlan && raceDistance
+    ? racePhaseWeights(raceDistance)
+    : generalPhaseWeights(raceDistance);
   const totalWeight = weights.reduce((sum, value) => sum + value, 0);
 
   if (durationWeeks < 4) {
-    // Short-runway plans keep the race-specific/taper end of the progression rather than refuse.
-    return [0, 0, Math.max(0, durationWeeks - 1), Math.min(1, durationWeeks)];
+    // Short-runway plans keep the sharp end of the progression rather than refuse. A race plan
+    // still lands its taper on race week; a no-race plan has no taper to land, so every week it
+    // has goes to `peak`.
+    return isRacePlan
+      ? [0, 0, Math.max(0, durationWeeks - 1), Math.min(1, durationWeeks)]
+      : [0, 0, durationWeeks];
   }
 
   const raw = weights.map((weight) => (durationWeeks * weight) / totalWeight);
@@ -325,9 +371,13 @@ function allocatePhaseCounts(durationWeeks: number, raceDistance: RaceDistance):
   return counts;
 }
 
-function phasesForPlan(durationWeeks: number, raceDistance: RaceDistance): Phase[] {
+function phasesForPlan(
+  durationWeeks: number,
+  raceDistance: RaceDistance | undefined,
+  isRacePlan: boolean,
+): Phase[] {
   const names: Phase[] = ['base', 'build', 'peak', 'taper'];
-  return allocatePhaseCounts(durationWeeks, raceDistance).flatMap((count, index) =>
+  return allocatePhaseCounts(durationWeeks, raceDistance, isRacePlan).flatMap((count, index) =>
     Array.from({ length: count }, () => names[index]),
   );
 }
@@ -341,12 +391,46 @@ function interpolateCanonical(values: readonly number[], weekIndex: number, tota
   return values[lowerIndex] + (values[upperIndex] - values[lowerIndex]) * fraction;
 }
 
+/**
+ * `FIVE_K_WEEKLY_LOAD` and `FIVE_K_LONG_RUNS` are a **race** shape: their last two entries are the
+ * 12-week 5K plan's taper, the deliberate wind-down into race day. Every plan's volume curve is
+ * interpolated from them, which meant a plan with no race still wound down at the end — a runner
+ * whose goal was "get fitter" finished a 12-week block at 24 km off a 35 km baseline, below where
+ * they started, tapering for a start line that did not exist. (Reproduced against `wrangler dev`
+ * on 2026-08-15, before and after: `[…, 45, 48, 40, 28]`.)
+ *
+ * Dropping the taper is not a new load progression, and no number here is invented: these are the
+ * same captain-approved values with the race-defined tail excluded, exactly as `generalPhaseWeights`
+ * drops the taper phase. A no-race plan interpolates across the loading block and finishes at its
+ * peak; a race plan still sees the whole curve, taper included.
+ */
+const TAPER_ENTRIES: ReadonlyMap<readonly number[], number> = new Map<readonly number[], number>([
+  // Weeks 11 and 12 of the 12-week 5K plan.
+  [FIVE_K_WEEKLY_LOAD, 2],
+  // The same two weeks, minus race week, which has no long run of its own.
+  [FIVE_K_LONG_RUNS, 1],
+]);
+
+function taperAwareCurve(values: readonly number[], includeTaper: boolean): readonly number[] {
+  if (includeTaper) return values;
+  const taperEntries = TAPER_ENTRIES.get(values);
+  if (taperEntries === undefined) {
+    throw new Error('taperAwareCurve: no taper length registered for this canonical curve.');
+  }
+  return values.slice(0, values.length - taperEntries);
+}
+
 function targetVolumeKm(
   startingWeeklyKm: number,
   weekIndex: number,
   durationWeeks: number,
+  includeTaper: boolean,
 ): number {
-  const canonical = interpolateCanonical(FIVE_K_WEEKLY_LOAD, weekIndex, durationWeeks);
+  const canonical = interpolateCanonical(
+    taperAwareCurve(FIVE_K_WEEKLY_LOAD, includeTaper),
+    weekIndex,
+    durationWeeks,
+  );
   return Math.max(1, Math.round(canonical * (startingWeeklyKm / 35)));
 }
 
@@ -410,11 +494,14 @@ function targetLongRunKm(
   weekIndex: number,
   durationWeeks: number,
   maxSingleRunKm: number,
+  includeTaper: boolean,
 ): number {
-  const scheduledLongRunWeeks = Math.max(1, durationWeeks - 1);
+  // A race plan's final week is race day, so it has no scheduled long run; a no-race plan trains
+  // through to the end and does.
+  const scheduledLongRunWeeks = Math.max(1, includeTaper ? durationWeeks - 1 : durationWeeks);
   const longRunWeekIndex = Math.min(weekIndex, scheduledLongRunWeeks - 1);
   const canonical = interpolateCanonical(
-    FIVE_K_LONG_RUNS,
+    taperAwareCurve(FIVE_K_LONG_RUNS, includeTaper),
     longRunWeekIndex,
     scheduledLongRunWeeks,
   );
@@ -555,7 +642,7 @@ function buildCanonicalFiveKWeek(args: {
     ? [4, 8, 12].includes(weekNumber)
     : !isRaceWeek && phase !== 'taper' && weekNumber % deloadCadence === 0;
   const desiredVolumeKm = applyInjuryVolumeAdjustment(
-    targetVolumeKm(intake.weeklyKm, weekIndex, durationWeeks),
+    targetVolumeKm(intake.weeklyKm, weekIndex, durationWeeks, true),
     weekNumber,
     injuryReductionPct,
     redFlagReductionPct,
@@ -645,7 +732,7 @@ function buildCanonicalFiveKWeek(args: {
     maxSingleRunKm,
     Math.max(
       minimumLongRunKm,
-      targetLongRunKm(intake.weeklyKm, weekIndex, durationWeeks, maxSingleRunKm),
+      targetLongRunKm(intake.weeklyKm, weekIndex, durationWeeks, maxSingleRunKm, true),
     ),
   );
 
@@ -732,8 +819,12 @@ function buildGenericWeek(args: {
   weekNumber: number;
   durationWeeks: number;
   phase: Phase;
-  raceDistance: RaceDistance;
-  goalType: GoalType;
+  /** Absent when the runner named no target distance anywhere. Never defaulted — see
+   * `buildTemplatePlan`'s note on the removed `?? '5k'`. */
+  raceDistance?: RaceDistance;
+  /** True only for a race goal type that also has a distance to aim at. Gates race week, the
+   * race-pace taper session, and everything else that presumes a start line exists. */
+  isRacePlan: boolean;
   intake: IntakeResponses;
   density: TemplateDensity;
   easyPace?: Pace;
@@ -752,7 +843,7 @@ function buildGenericWeek(args: {
     durationWeeks,
     phase,
     raceDistance,
-    goalType,
+    isRacePlan,
     intake,
     density,
     easyPace,
@@ -766,9 +857,19 @@ function buildGenericWeek(args: {
     injuryReductionPct,
     redFlagReductionPct,
   } = args;
-  const isRaceWeek = goalType === 'race' && weekNumber === durationWeeks;
-  const isDeload = !isRaceWeek && phase !== 'taper' && weekNumber % deloadCadence === 0;
-  const rawVolumeKm = targetVolumeKm(intake.weeklyKm, weekNumber - 1, durationWeeks);
+  const isRaceWeek = isRacePlan && raceDistance !== undefined && weekNumber === durationWeeks;
+  // A no-race plan must never end on a deload (captain ruling, 2026-08-15, as a McMillan-certified
+  // coach): its last week is the last week the runner sees, and finishing on a recovery week leaves
+  // them at or below the volume they started at — the visible symptom behind the original report.
+  // The every-`deloadCadence`-weeks rule yields to that for the final week only; nothing else about
+  // the cadence changes, and a race plan's final week is race week or taper, so it is untouched.
+  const endsOnForcedLoadingWeek = !isRacePlan && weekNumber === durationWeeks;
+  const isDeload =
+    !isRaceWeek &&
+    !endsOnForcedLoadingWeek &&
+    phase !== 'taper' &&
+    weekNumber % deloadCadence === 0;
+  const rawVolumeKm = targetVolumeKm(intake.weeklyKm, weekNumber - 1, durationWeeks, isRacePlan);
   const desiredVolumeKm = applyInjuryVolumeAdjustment(
     isDeload
       ? lastLoadingWeekKm > 0
@@ -777,7 +878,12 @@ function buildGenericWeek(args: {
       : Math.max(
           1,
           Math.round(
-            clampWeeklyVolume({ lastLoadingWeekKm, proposedKm: rawVolumeKm, level }),
+            clampWeeklyVolume({
+              lastLoadingWeekKm,
+              proposedKm: rawVolumeKm,
+              level,
+              baselineWeeklyKm: intake.weeklyKm,
+            }),
           ),
         ),
     weekNumber,
@@ -827,7 +933,7 @@ function buildGenericWeek(args: {
       }),
     );
   }
-  if (!isDeload && goalType === 'race' && phase === 'taper') {
+  if (!isDeload && isRacePlan && phase === 'taper') {
     quality.push(
       intervalRun({
         distanceKm: scaleQualityDistanceKm(10, desiredVolumeKm),
@@ -853,7 +959,7 @@ function buildGenericWeek(args: {
   );
   const longRunFromCurve = Math.max(
     longRunFloor,
-    targetLongRunKm(intake.weeklyKm, weekNumber - 1, durationWeeks, maxSingleRunKm),
+    targetLongRunKm(intake.weeklyKm, weekNumber - 1, durationWeeks, maxSingleRunKm, isRacePlan),
   );
   const longRunVolumeBudget = Math.max(longRunFloor, desiredVolumeKm - qualityKm - easyCount);
   const longDistanceKm = Math.min(maxSingleRunKm, longRunFromCurve, longRunVolumeBudget);
@@ -887,25 +993,31 @@ function buildGenericWeek(args: {
 /** Builds a deterministic, runtime-independent template plan. */
 export function buildTemplatePlan(params: TemplatePlanParams): Plan {
   const durationWeeks = Math.max(1, Math.round(params.durationWeeks));
-  const raceDistance = params.raceDistance ?? params.intake.raceDistance ?? '5k';
+  // No `?? '5k'`. A runner who named no race must never have one invented for them — the captain's
+  // standing rule against silently overriding a stated goal (`docs/change_log.md`, PR #75) applies
+  // just as much to a goal they deliberately left blank. `raceDistance` stays `undefined` all the
+  // way through, and every race-specific branch below is gated on `isRacePlan`, which requires
+  // both a race goal type AND a distance to aim it at.
+  const raceDistance = params.raceDistance ?? params.intake.raceDistance;
+  const isRacePlan = params.goalType === 'race' && raceDistance !== undefined;
   const level = toExperienceLevel(params.intake.experience);
   const trainingPaces = deriveTrainingPaces(params.intake.recentPerformance, level);
   const racePaceTarget =
-    params.goalType === 'race' && params.intake.goalTimeSec !== undefined
+    isRacePlan && raceDistance && params.intake.goalTimeSec !== undefined
       ? deriveRacePaceTarget({
           goalTimeSec: params.intake.goalTimeSec,
           raceDistance,
           recent: params.intake.recentPerformance,
         })
       : undefined;
-  const phases = phasesForPlan(durationWeeks, raceDistance);
+  const phases = phasesForPlan(durationWeeks, raceDistance, isRacePlan);
   const maxSingleRunKm = MAX_SINGLE_RUN_KM[level];
   const deloadCadence = deloadEveryWeeks(level, params.intake.age);
   const injuryReductionPct = injuryVolumeReductionPct(params.intake.injuries);
   const redFlagReductionPct = redFlagVolumeReductionPct(params.intake.injuries);
 
   const useGoldenFiveKShape =
-    params.goalType === 'race' &&
+    isRacePlan &&
     raceDistance === '5k' &&
     durationWeeks === 12 &&
     normalizedRunCount(params.intake.daysPerWeek) === 4;
@@ -936,7 +1048,7 @@ export function buildTemplatePlan(params: TemplatePlanParams): Plan {
           durationWeeks,
           phase,
           raceDistance,
-          goalType: params.goalType,
+          isRacePlan,
           intake: params.intake,
           density: params.density,
           easyPace: trainingPaces.easy,
@@ -962,7 +1074,7 @@ export function buildTemplatePlan(params: TemplatePlanParams): Plan {
   });
 
   const goalRealism =
-    params.goalType === 'race' && params.intake.goalTimeSec !== undefined
+    isRacePlan && raceDistance && params.intake.goalTimeSec !== undefined
       ? assessGoalRealism({
           goalTimeSec: params.intake.goalTimeSec,
           raceDistance,
@@ -979,12 +1091,12 @@ export function buildTemplatePlan(params: TemplatePlanParams): Plan {
 
   return {
     title:
-      params.goalType === 'race'
+      isRacePlan && raceDistance
         ? `${durationWeeks}-Week ${distanceLabel(raceDistance)} Plan`
         : `${durationWeeks}-Week Running Plan`,
     goalType: params.goalType,
-    ...(params.goalType === 'race' ? { raceDistance } : {}),
-    ...(params.goalType === 'race' && params.raceDate ? { raceDate: params.raceDate } : {}),
+    ...(isRacePlan && raceDistance ? { raceDistance } : {}),
+    ...(isRacePlan && params.raceDate ? { raceDate: params.raceDate } : {}),
     durationWeeks,
     tierAtGeneration: params.tierAtGeneration,
     engine: 'template',

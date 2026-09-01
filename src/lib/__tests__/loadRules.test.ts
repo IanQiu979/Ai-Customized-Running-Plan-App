@@ -111,6 +111,36 @@ describe('weekly volume', () => {
     ).toBe(40);
   });
 
+  it('holds a first week at the baseline the runner declared', () => {
+    // No previous loading week means the growth rule cannot fire, so the only other bound was the
+    // level's absolute ceiling — a ceiling for a trained runner, not a one-week step for this one.
+    expect(
+      clampWeeklyVolume({
+        lastLoadingWeekKm: 0,
+        proposedKm: 48,
+        level: 'intermediate',
+        baselineWeeklyKm: 35,
+      }),
+    ).toBe(35);
+    expect(
+      clampWeeklyVolume({
+        lastLoadingWeekKm: 0,
+        proposedKm: 30,
+        level: 'intermediate',
+        baselineWeeklyKm: 35,
+      }),
+    ).toBe(30);
+    // The absolute ceiling still wins over an implausible baseline.
+    expect(
+      clampWeeklyVolume({
+        lastLoadingWeekKm: 0,
+        proposedKm: 500,
+        level: 'beginner',
+        baselineWeeklyKm: 500,
+      }),
+    ).toBe(40);
+  });
+
   it('compares a post-deload proposal against the last loading week, not the deload week', () => {
     expect(
       clampWeeklyVolume({

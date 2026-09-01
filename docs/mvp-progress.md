@@ -1,10 +1,116 @@
 # MVP Progress
 
-> The single place to see where V2.2 actually is. Updated after every exchange that changes a
-> decision or completes work. If this file and reality disagree, reality wins — fix the file.
+> The single place to see where V2.2 actually is. **Current state** below is the one home for
+> "how it is now"; the dated entries under it are the immutable record of how it got here. Never
+> rewrite a dated entry to carry a newer fact — if one is superseded, Current state is what
+> corrects it. Updated after every exchange that changes a decision or completes work. If this
+> file and reality disagree, reality wins — fix the file.
 >
 > Milestone definitions live in [`planning/02-product-requirements.md`](../planning/02-product-requirements.md).
 > Decision history lives in [`change_log.md`](change_log.md).
+
+## Current state
+
+> The single place to look for "how it is now" — the milestones and the facts below, nothing else
+> in this file. Detail registers this section points at: per-item records in **Done**, the roadmap
+> in **Next**, captain-only open items in **Blocked**, decision records in **Decided**, and risks
+> in **Known debt**. Test counts were re-verified by running the suites on 2026-08-17; the dated
+> entries below record what each point in time showed, this section is the current one.
+
+### Milestones
+
+| Milestone | State |
+|---|---|
+| M1 — Foundation (account → empty Home) | **In progress.** Server (auth + schema + account routes) is deployed on Cloudflare (`workers/`, live `production` environment); client-side email/password works in production, and Google is registered in production since 2026-08-09 (registration only — see "How it is now" for the two unproven riders) |
+| M2 — Intake (questionnaire persists) | **In progress.** Intake is asked exactly once: Home reads the target back from the saved intake and asks only for a plan length, and only when there is no race date to derive one from (`src/lib/planRequest.ts`) |
+| M3 — Plan engine (3 tiers produce valid plans) | **In progress.** Pure template/pace engine wired into the Worker's `generate-plan` route and the client's generate-plan action; the plan view renders a real generated plan (via `GET /api/plans/:id`) alongside the permanent static golden fixture. Paid tiers still serve the quota-exempt template fallback — see "How it is now" |
+| M4 — Tiers & quotas (server-side, unbypassable) | **In progress.** The quota ledger, atomic gate, fallback exemption, `quota-status` and `purchase-tier` are built and tested server-side; a Settings tab now displays tier/quota and a dummy paywall now lets a runner call `purchase-tier` (2026-08-05) |
+| M5 — My Plans (history) | **In progress.** A My Plans tab lists plans off `GET /api/plans` |
+| M6 — Polish & TestFlight | **In progress.** First real onboarding screen landed 2026-08-08 (`(auth)/onboarding.tsx` + an animated week-ribbon hero); no EAS build exists yet |
+
+### How it is now
+
+- **Backend is live and reachable from a phone.** Cloudflare D1 + Workers + better-auth in
+  `workers/`, deployed to the named `production` environment at
+  `https://pace-blueprint-production.i78979848.workers.dev`. `wrangler login`, `wrangler d1
+  create`, `wrangler deploy --env production`, and the `BETTER_AUTH_SECRET` / Google OAuth
+  `wrangler secret put`s have all run. Auth, the quota ledger, intake, and plan reads/generation
+  work end to end. Row-by-row captain-only status: "Blocked" below.
+- **Auth: email/password works; Google is registered, with two unproven riders.** The
+  `sign-in/social` probe against the live Worker returns a real Google authorization URL (the
+  provider is registered). Still unproven in production: the client secret at the token exchange,
+  and the OAuth consent screen's publishing status (Testing blocks everyone but listed test
+  users). The 2026-08-10 `INVALID_ORIGIN` / `INVALID_CALLBACK_URL` fix is merged and tested but
+  **not redeployed**, so those code fixes are not live until the captain runs `wrangler deploy
+  --env production`. The `paceblueprint://` deep-link scheme matches `app.json` but has never been
+  exercised by a real built app.
+- **Plan engine is fully wired.** The pure template/pace engine (`src/lib/planTemplates.ts` +
+  `src/lib/paceDerivation.ts`) is bound into `generate-plan` via `workers/src/deps.ts`; the plan
+  view renders real generated plans. The Pro/Elite personalization prompt is built, bound, and
+  tested (2026-08-10) but has **never made a live model call**: `ANTHROPIC_API_KEY` is unset
+  everywhere, so paid-tier requests still serve the honest, quota-exempt template fallback. That
+  key is the **only** remaining critical-path item — detail in "Known debt" 🔴 and "Blocked".
+- **Intake is asked once and a race target is optional.** Home reads the target off the saved
+  intake and asks only for a plan length when there is no race date. A no-race plan never ends on
+  a deload; a past race date is refused on both screens (race day and a blank date remain valid);
+  numeric inputs are structured (`src/components/inputs/` + `src/lib/fieldInput.ts`). Full
+  account: the "Last updated" entry below.
+- **Test-mode override:** `ALL_USERS_UNLIMITED_ACCESS = "true"` still sits in the top-level
+  `[vars]` of `workers/wrangler.toml` (the committed `[env.production.vars]` value is `"false"`),
+  so the captain's test pass runs with every account Elite and the quota gate bypassed. Set the
+  top-level value to `"false"` before real users arrive. Recorded in "Latest — 2026-08-09".
+- **Test counts, verified by running the suites (2026-08-17):** 433 root tests across 26 suites
+  (`npm test`), 139 `workers/` tests across 7 files (`npm --prefix workers test`). Typecheck clean
+  on both sides and root lint clean (`workers/` has no lint script — its gate is typecheck + test).
+  The dated entries below record each point in time's counts — this line is the current one.
+- **Verified by hand on an iOS 26.5 simulator**, scoped to the 2026-08-15 check: Home in both the
+  race and no-race states, and the keyboard each numeric field raises. Android is unverified — no
+  Android SDK on this machine, so the `number-pad`/`decimal-pad` choice rests on the React Native
+  contract for those two values.
+
+---
+
+**Last updated:** 2026-08-15 (later) — the captain phone-tested the core loop and called the
+homepage and intake "very very confusing": intake was effectively asked twice, a race target was
+mandatory, and the numeric keyboards lacked the `:` and `-` the fields demanded. All three
+reproduced on an iOS 26.5 simulator and are fixed; see
+[`change_log.md`](change_log.md#2026-08-15-later--intake-asked-once-race-target-optional-structured-numeric-inputs)
+for the full account.
+
+- **Intake asked once.** Home no longer re-asks goal type / race distance / race date. It reads the
+  target off the saved intake and asks only for a plan length, and only when there is no race date
+  to derive one from. `src/lib/planRequest.ts` is the pure module that owns that decision.
+- **A race target is optional end to end.** Home's "Select a race distance." block is gone. Two
+  engine defects behind it are fixed in `src/lib/planTemplates.ts`: the silent `?? '5k'` default is
+  removed, and a plan with no race no longer emits a `taper` phase or interpolates the taper tail of
+  the canonical load curve (it used to finish *below* the volume it started at). Race plans are
+  unchanged, golden fixture included.
+- **A past race date is refused on both screens.** Home does not send the request (so no quota slot
+  is charged for the one-week plan `weeksUntilRace`'s floor would otherwise produce) and intake does
+  not save the date; each says why and names the control that fixes it. Race day itself, and a blank
+  date, are both still valid. `src/lib/planRequest.ts` owns the decision and both messages.
+- **A no-race plan never ends on a deload** — captain's coaching ruling; the every-N-weeks cadence
+  yields for the final week only, and only for `isRacePlan === false`. Known limitation, pinned by a
+  documenting test: a 4-week no-race plan still finishes below its opening volume, because at that
+  length the canonical curve's own dip lands on week 2 and `clampWeeklyVolume`'s growth ceiling — a
+  safety rule, deliberately not bent — cannot recover it.
+- **`raceDistance` is validated whenever present, on any goal type**, since the client now sends it
+  with `goalType: 'duration'` too; `racePhaseWeights` is exhaustive rather than silently falling
+  through to the marathon weights.
+- **Numeric inputs are structured.** New `src/components/inputs/` splits dates into `YYYY - MM - DD`
+  and times into `H : MM : SS` with the separators printed rather than typed, and filters every
+  keystroke via `src/lib/fieldInput.ts` — `keyboardType` alone restricts nothing, which is how the
+  letter `v` reached the intake AGE field on the simulator.
+- **Verified by hand on an iOS 26.5 simulator**, headlessly via `simctl`: Home in both the race and
+  no-race states, and the keyboard each numeric field raises. **Not verified: Android** — no Android
+  SDK is installed on this machine, so the `number-pad`/`decimal-pad` choice rests on the React
+  Native contract for those two values (both supported on Android; `numeric` deliberately avoided,
+  as it differs across platforms).
+- **Open for the captain (item 4 of the brief, report-only, no redesign done):** what is still
+  confusing about Home once 1–3 are fixed. Findings are in the task report — headline items are the
+  quota line being the only status text, `NOTES (OPTIONAL)` having no effect on Free tier, Home
+  showing nothing about plans already generated, and "Change" silently meaning "reopen the whole
+  10-field intake".
 
 **Last updated:** 2026-08-15 — Google sign-up was audited end to end after a phone failure left
 all live auth tables empty. The live Worker has all three required auth secret bindings and starts
@@ -22,7 +128,7 @@ his exact account as a test user; Credentials → the deployed client must be We
 values cannot be read back, re-set `GOOGLE_CLIENT_SECRET --env production` from that same client if
 there is any doubt after its rotation, then deploy `--env production`.
 
-Previous entry: 2026-08-10 (later) — Ian reported two production sign-in bugs blocking him from
+Previous entry: 2026-08-10 (later) —  Ian reported two production sign-in bugs blocking him from
 using the deployed app: email sign-up failed `"Invalid origin"`, and Google sign-in failed
 `"Invalid callback URL"`. Both reproduced against the **live deployed Worker**, not the local test
 suite (see "the harness gap" below), and both are now fixed in `workers/src/auth.ts` and
@@ -243,57 +349,6 @@ from 82. Issue #22 remains open.)
 
 ---
 
-## Status at a glance
-
-| Milestone | State |
-|---|---|
-| M1 — Foundation (account → empty Home) | **In progress.** Server (auth + schema + account routes) is deployed on Cloudflare (`workers/`, live `production` environment); client-side email/password and Google OAuth both work in production (Google since 2026-08-09) |
-| M2 — Intake (questionnaire persists) | **In progress.** Intake screen now exists, wired to `GET`/`PUT /api/intake` |
-| M3 — Plan engine (3 tiers produce valid plans) | **In progress.** Pure template/pace engine now wired into the Worker's `generate-plan` route and the client's generate-plan action; the plan view renders a real generated plan (via `GET /api/plans/:id`) alongside the permanent static golden fixture |
-| M4 — Tiers & quotas (server-side, unbypassable) | **In progress.** The quota ledger, atomic gate, fallback exemption, `quota-status` and `purchase-tier` are built and tested server-side; a Settings tab now displays tier/quota and a dummy paywall now lets a runner call `purchase-tier` (2026-08-05) |
-| M5 — My Plans (history) | **In progress.** A My Plans tab lists plans off `GET /api/plans` |
-| M6 — Polish & TestFlight | **In progress.** First real onboarding screen landed 2026-08-08 (`(auth)/onboarding.tsx` + an animated week-ribbon hero), alongside a fix for the sign-up form blanking itself mid-typing |
-
-**The honest summary:** planning, design, and domain research are done to an unusual depth, and
-Phase 0's paper-reconciliation pass is now done too. **As of 2026-08-02 there is also a real
-backend** — `workers/`, on Cloudflare D1 + Workers + better-auth — with auth, the quota ledger, and
-the account routes working end to end against local emulation. **As of 2026-08-03 the pure
-client/shared plan engine also exists.** `src/lib/paceDerivation.ts` derives Riegel equivalents,
-training pace bands, and the ruled goal-realism/cap result; `src/lib/planTemplates.ts` builds
-deterministic template plans and reproduces the approved 12-week 5K fixture exactly.
-`clampWeeklyVolume()` now names and uses the last loading week, and the golden week-8 output is
-30 km. The former red-first suites run normally, with typecheck and lint clean. **The wiring
-between the two landed 2026-08-04**: `workers/src/deps.ts` now binds `generate-plan`'s skeleton
-builder to `src/lib/planTemplates.ts` (`createTemplateSkeletonBuilder()`), so `generate-plan`
-returns a real plan instead of `503`, and the plan screen renders it via `GET /api/plans/:id`. The
-Pro/Elite personalization prompt is the one seam in `deps.ts` still bound to a typed *unavailable*;
-M3 is complete for the deterministic/template path and incomplete only for that prompt.
-
-`planTypes.ts`, `loadRules.ts`, and (as of the 2026-07-11
-review-and-refine cycle) `notation.ts` are the app's `lib/` layer — shared vocabulary, safety
-arithmetic, and run-type/structure-string notation, all pure and tested (83 lib-layer tests, up
-from 64, after Ian's 2026-07-12 round-2 rulings on issue #34 added the long-run deload-week
-measurement fix (ruling R1c) and the race-day/strides test coverage, plus issue #32's
-strides-label regression test; the project total is **121 across 7 suites** as of the same day's
-`formatSecPerKm` carry-boundary fix (issue #28, which added the first test suite under
-`src/components/`), issue #31's screen-reader accessibility fixes, issue #27's navigation-theme
-suite under `src/constants/`, and issue #32's `theme.effort.test.ts`, which together took the
-project total 82 → 93 → 107 → 117 → 121). A golden fixture (`src/lib/fixtures/examplePlan.ts`), a rendered
-plan screen (`src/app/plan/[id].tsx` and `src/components/plan/`), and an abbreviations glossary tab
-(`src/app/(tabs)/glossary.tsx`) exist and render that fixture — but nothing generates a plan from an
-intake yet. `src/lib/planTemplates.ts` and `src/lib/paceDerivation.ts`, the actual generation logic,
-are still unwritten; two TDD test suites for them exist and intentionally fail to compile on the
-missing modules (`npm run typecheck` and `npm run lint` are red for the same reason — expected, not
-a regression). **What changed 2026-07-12: every coaching question blocking that engine's build is
-now answered.** Issue #19's HIGH-severity long-run-cap conflict — the golden plan's own numbers
-breached the coded cap — is closed; the abbreviation set, race-day notation (issue #29), strides
-placement, the Daniels brake, and peak volume are all signed off. The gap between "designed" and
-"working" is smaller than it was, but the engine itself is still ahead. Two coaching/code questions
-remain genuinely open and unrelated to this pass: issue #22 (`clampWeeklyVolume` comparing against
-the literal previous week) and issue #33 (goal-realism handling).
-
----
-
 ## Done
 
 ### Planning and specification
@@ -306,8 +361,10 @@ the literal previous week) and issue #33 (goal-realism handling).
       gitignored and untracked; no secret is committed; `ANTHROPIC_API_KEY` is server-side only and
       read in exactly one file, `workers/src/lib/model.ts`
 - [x] `gh` 2.96.0 installed; `wrangler` 4.118 available via `npx`
-- [ ] **Cloudflare account resources — none created.** `wrangler login`, `wrangler d1 create`,
-      `wrangler secret put`, `wrangler deploy`: all the captain's, all unrun. See "Blocked" below.
+- [x] **Cloudflare account resources created.** `wrangler login`, `wrangler d1 create`,
+      `wrangler deploy`, and the `BETTER_AUTH_SECRET` / Google OAuth `wrangler secret put`s have all
+      run; `ANTHROPIC_API_KEY` has not. "Blocked / awaiting a decision" below is the row-by-row
+      status.
 - ~~Supabase project `v2.2_plan_generation`~~ — **superseded 2026-08-02.** The backend is Cloudflare
   now (`workers/`); the Supabase project is unused, and `supabase/` is dead scaffold kept for
   reference. Google OAuth and email/password were enabled on it and were not carried over:
@@ -330,7 +387,8 @@ the literal previous week) and issue #33 (goal-realism handling).
       Bearer sessions), `migrations/` for both better-auth's tables and the app's, the quota ledger
       with its atomic gate and reserve→settle/release lifecycle, and the routes `generate-plan`,
       `quota-status`, `purchase-tier`, `delete-account`, `GET/PUT /api/intake`,
-      `GET /api/plans[/:id]`. 75 tests in real `workerd` against real D1. Verified end to end against
+      `GET /api/plans[/:id]`. Tested in real `workerd` against real D1 — run
+      `npm --prefix workers test` for the current count. Verified end to end against
       `wrangler dev`, offline. `generate-plan` returns `503 engine_unavailable` (and charges nothing)
       until the plan engine exists. Details: [`workers/README.md`](../workers/README.md)
 - [x] `src/lib/tierLimits.ts` and `src/lib/quotaPeriod.ts` — pure, shared by the app and the Worker,
@@ -617,29 +675,10 @@ view to `buildTemplatePlan()` instead of the static fixture; intake and server w
 
 ## In flight
 
-**Nothing is currently in flight.** The pure engine and its test contracts are complete, and as of
-2026-08-04 steps 4, 7, 8, and 10 below (plan view, intake, `generate-plan`, My Plans) are wired end
-to end and E2E-verified. **As of 2026-08-05, step 9 (quota UI + dummy paywall) is also done** — see
-"Done" below. The one remaining critical-path item is the Pro/Elite personalization prompt noted in
-step 8, which is server-only (`workers/`) and untouched by this client-only batch.
-
-- **Cycle 1** (2026-07-11): Ian scored the rendered plan 3/10, five rulings applied. Docs rebuilt
-  (`notation.md` added; `workout-library.md` and `example-plan-5k-pro.md` rewritten;
-  `plan-structure.md`/`00-README.md` cross-referenced) **and** shipped with real code the same
-  day: `src/lib/notation.ts`, the rebuilt golden fixture, the abbreviations glossary tab, and
-  tests (64 passing). None of that code was logged in `change_log.md` at the time — corrected in
-  the cycle-2 entry below.
-- **Cycle 2** (2026-07-11, later the same day): a code-review pass over cycle 1's doc rebuild
-  found five internal contradictions and one coverage gap (see `docs/change_log.md`'s second
-  2026-07-11 entry for the full list — recovery-menu alignment, the Daniels-brake re-scope, the
-  count × distance prose fix, the `INT`/`RP` anchor example fix, tempo-band phrasing, and the
-  strides extension). **Docs side done, and — corrected in this doc-audit pass — the code side
-  too:** `src/lib/fixtures/examplePlan.ts`, `src/lib/__tests__/planTemplates.golden.test.ts`, and
-  `src/lib/__tests__/paceDerivation.test.ts` all already assert cycle-2's numbers (week 9 at 45 km
-  with a 300 m interval jog; `paceDerivation.test.ts`'s >10%-goal-improvement gate already replaced
-  by a ruling-3-compliant goal-pace assertion plus an `it.todo` for Open item 5). This section
-  previously said that resync was still pending, sourced from a change-log claim that was itself
-  wrong by the time this pass checked the files — both are fixed now.
+Nothing is in flight. The one remaining critical-path item — `ANTHROPIC_API_KEY`, without which
+paid-tier requests serve the quota-exempt template fallback — is a captain-only action, not work
+in progress; see "Current state" above and "Blocked" below. The 2026-07-11 coaching cycles 1 and 2 are
+recorded under "Done" → "Domain" above, not here.
 
 ---
 
@@ -669,10 +708,11 @@ with **no backend at all**.
          >10%-goal-improvement gate already replaced by a test asserting ruling 3's goal-pace
          convergence (240 s/km), plus an `it.todo` naming the then-open goal-realism question
          (Open item 5) instead of inventing an answer to it. **That `it.todo` is now gone** —
-         2026-07-12's ruling replaced it with real tests. This step, "In flight," and "Known
-         debt" previously said this resync was still pending — it wasn't, by the time this pass
-         read the actual files; see `docs/change_log.md`'s new correction bullet. What remains is
-         writing `planTemplates.ts`/`paceDerivation.ts` themselves against these already-correct
+         2026-07-12's ruling replaced it with real tests. This step and "Known debt" previously
+         said this resync was still pending — it wasn't, by the time this pass read the actual
+         files; see `docs/change_log.md`'s new correction bullet (the cycles themselves are
+         recorded under "Done" → "Domain" above). What remains is writing
+         `planTemplates.ts`/`paceDerivation.ts` themselves against these already-correct
          specs — tracked in step 3 above, not a doc/test sync problem.
 4. [x] **Plan view rendering a real template plan — done 2026-08-04.** `src/app/plan/[id].tsx`
        now renders a real generated plan via `GET /api/plans/:id`, alongside the permanent static
@@ -691,9 +731,9 @@ with **no backend at all**.
        `src/lib/apiClient.ts` and `src/app/(auth)/` now let the app sign up, sign in, and sign out
        against it, gated by `Stack.Protected` in the root layout. **Google OAuth's client id/secret
        are now provisioned and verified working against local dev (2026-08-05)** — email/password
-       already worked. **Still to do:** the production `wrangler secret put GOOGLE_CLIENT_ID`/
-       `GOOGLE_CLIENT_SECRET` (needs the captain's own Cloudflare login), plus their `wrangler
-       login`/`d1 create`/`deploy`.
+       already worked. The production secret puts, `wrangler login`/`d1 create`/`deploy` have all
+       since run (2026-08-09) — see "Current state" for the two unproven OAuth riders and the
+       outstanding redeploy of the 2026-08-10 fix.
 7. [x] **Intake** (8 questions, or 10 with a target race, + review) persisting to
        `intake_responses` — **screen done 2026-08-04**, wired to the already-built server side
        (`GET`/`PUT /api/intake`, validated twice: readable message in the route, table CHECKs
@@ -705,7 +745,7 @@ with **no backend at all**.
        client action calling it, and the plan view rendering the result, landed the same pass (step
        4 above). **The Pro/Elite personalization prompt (`workers/src/deps.ts`'s second swap) is
        now bound too, as of 2026-08-10** (`workers/src/lib/planPersonalizationPrompt.ts`) — see
-       "Known debt and risks" below for what still blocks it from making a live call.
+       "Current state" for what still blocks it from making a live call.
 9. [x] **Quota UI + dummy paywall — done 2026-08-05.** `src/app/(tabs)/settings.tsx` (the new
        fourth tab) shows tier + a quota line off `GET /api/quota-status` (new pure
        `src/lib/quotaDisplay.ts`) and a Free-tier "Upgrade" entry point; `src/app/paywall.tsx` (a
@@ -723,7 +763,7 @@ with **no backend at all**.
         **Abbreviation-set sign-off (Open item 4, R5) landed 2026-07-12** — the set is confirmed
         exactly as written, so the copy this tab ships is no longer "proposed," it's final.
 13. [ ] **Ian's rendered-plan review, round 2** (renumbered from "cycle 2" — that label belongs to
-        the 2026-07-11 review-and-refine pass, docs and code both done, see "In flight"). **The
+        the 2026-07-11 review-and-refine pass, docs and code both done, see "Done" → "Domain"). **The
         paper half is done as of 2026-07-12 — every open coaching question is now ruled on.**
         Resolved via issue #34's batched queue: the abbreviation set (Open item 4, R5), the
         Daniels-brake question (Open item 6, R3 — permanently advisory), the strides extension
@@ -934,11 +974,14 @@ intact underneath.
   captain runs `wrangler secret put ANTHROPIC_API_KEY --env production` (and the local `.dev.vars`
   equivalent for `wrangler dev`), Pro/Elite generation starts calling Claude for real with no other
   code change.
-- 🔴 **No Cloudflare account resources exist.** `wrangler login` is interactive and unrun, so
-  `wrangler d1 create`, `wrangler secret put`, and `wrangler deploy` are all unrun too, and
-  `wrangler.toml`'s `database_id` is a deliberately fake placeholder. Local work is unaffected —
-  `wrangler dev` and the test suite need no account — but nothing is reachable from a phone. Full
-  list in "Blocked" above.
+- 🟢 **Resolved: the Cloudflare account resources exist.** `wrangler login`, `wrangler d1 create`
+  (the real `database_id` is committed), `wrangler deploy --env production`, and the
+  `BETTER_AUTH_SECRET` / Google OAuth `wrangler secret put`s have all run, so a phone can now reach
+  `https://pace-blueprint-production.i78979848.workers.dev`. The only captain-only command never
+  run is `wrangler secret put ANTHROPIC_API_KEY` (the 🔴 item above); one *re*-deploy is still
+  outstanding for the 2026-08-10 `INVALID_ORIGIN` fix — see "Blocked" above.
+  Local work never depended on any of it — `wrangler dev` and the test suite need no account. Full
+  row-by-row status in "Blocked" above.
 - 🟢 **Resolved 2026-08-04: `generate-plan` can now actually generate a plan.** The deterministic
   skeleton binding (`workers/src/deps.ts` → `createTemplateSkeletonBuilder()` →
   `src/lib/planTemplates.ts`) landed, so the route, quota gate, idempotency, validation, and
@@ -958,8 +1001,12 @@ intact underneath.
 - 🟢 **Resolved 2026-08-03: the client can now talk to `workers/`.** `src/lib/apiClient.ts` and
   `src/app/(auth)/` (email/password sign-in/sign-up, `Stack.Protected` session gate) landed in
   `06b1f89`. **Google OAuth resolved in local dev 2026-08-05** — credentials provisioned and
-  verified working against `wrangler dev`; production's `wrangler secret put` is the one piece
-  still pending, and is the captain's own step (needs their Cloudflare login). No screen yet
+  verified working against `wrangler dev`. **`GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` were
+  provisioned on the named `production` Worker on 2026-08-09**, and the provider-registration probe
+  against it returns a real Google authorization URL instead of `PROVIDER_NOT_FOUND`. That proves
+  registration only: the client secret itself is exercised nowhere but the token exchange, and the
+  OAuth consent screen's publishing status is unknown — both remain unverified in production and
+  need the captain's Google-side and in-app check. No screen yet
   consumes `apiClient.ts`'s other wrappers (`quota-status`, intake, plans, `generate-plan`) —
   those land with the screens that need them.
 - 🟡 **`supabase/` and `src/lib/supabase.ts` are dead code** kept deliberately (2026-08-02) so the

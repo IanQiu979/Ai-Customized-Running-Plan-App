@@ -1,8 +1,9 @@
 # V2.2 — Running Training Plan Builder
 
-An Expo / React Native app that turns a runner's intake answers (goal, experience, schedule,
-target race) into a structured, week-by-week training plan. Part of the **PACE family**: it is
-deliberately narrow — it builds plans, it is not a training log.
+An Expo / React Native app that turns a runner's intake answers (goal, experience, schedule, and
+an optional target race) into a structured, week-by-week training plan. Part of the **PACE
+family**: it is deliberately narrow — it builds plans, it is not a training log. Intake is
+answered once and owns the runner's target; a runner with no race gets a general-fitness plan.
 
 ## Status
 
@@ -10,7 +11,9 @@ deliberately narrow — it builds plans, it is not a training log.
 it → My Plans) works client-side too.** The Cloudflare backend in [`workers/`](workers/README.md)
 works end to end against local emulation — auth, the quota ledger, `quota-status`, `purchase-tier`,
 `delete-account`, intake, plan reads, and `generate-plan`'s free-tier template engine — and it is
-deployed as the `production` environment; the Pro/Elite AI-generation path is not yet built. On the client, auth screens,
+deployed as the `production` environment. Both plan-engine seams are bound (template skeleton on
+2026-08-04, Pro/Elite personalizer on 2026-08-10); because `ANTHROPIC_API_KEY` remains unset,
+Pro/Elite requests still receive the quota-exempt template fallback. On the client, auth screens,
 the intake screen, the generate-plan action, a plan view (real plans plus the permanent
 golden-fixture example), a My Plans list, a Settings tab (tier/quota display, sign-out, delete
 account), and a dummy paywall all exist. Everything described below that is marked *planned* is
@@ -32,7 +35,7 @@ unused, and are marked legacy.
 | Layer | Choice | Notes |
 |-------|--------|-------|
 | App | Expo / React Native + TypeScript, expo-router | |
-| Auth | better-auth on D1 — email/password today, Google OAuth coded but unprovisioned | Required sign-up, no guest mode in v1. Apple Sign-In parked ([`docs/apple-dev-blocked.md`](docs/apple-dev-blocked.md)) |
+| Auth | better-auth on D1 — email/password live in production; Google OAuth registered there since 2026-08-09 | Required sign-up, no guest mode in v1. Google is registration-only so far: the client secret at token exchange and consent-screen publishing status remain unproven. Apple Sign-In parked ([`docs/apple-dev-blocked.md`](docs/apple-dev-blocked.md)) |
 | Database | Cloudflare D1 (SQLite) | **No row-level security** — ownership is enforced in Worker code, see [`docs/architecture.md`](docs/architecture.md) |
 | Server logic | Cloudflare Workers (`workers/`) | AI calls + quota enforcement live here, never in the client |
 | AI | Claude API (`claude-sonnet-5`) via a Worker route | API key stays server-side, never in the app bundle |
@@ -104,8 +107,8 @@ src/
     (auth)/
       index.tsx            # redirect anchor -> onboarding
       onboarding.tsx        # animated week-ribbon hero, then "Get started" -> sign-up
-      sign-in.tsx, sign-up.tsx  # email/password; "Continue with Google" verified in local dev,
-                                 #   production pending (see docs/mvp-progress.md)
+      sign-in.tsx, sign-up.tsx  # email/password + "Continue with Google"; provider live in
+                                 #   production since 2026-08-09
     (tabs)/
       _layout.tsx
       index.tsx          # Home
@@ -139,14 +142,15 @@ workers/                     # the Cloudflare backend — see workers/README.md
   wrangler.toml
   migrations/                 # 0001 better-auth's tables, 0002 the app's
   src/                         # index, auth, routes, deps, lib/{store,generate-plan-flow,model,...}
-  test/                         # 86 tests in real workerd against real D1
+  test/                         # vitest in real workerd + real D1 (Miniflare). No network;
+                                 # run `npm --prefix workers test` for the current count
 ```
 
 ## Roadmap
 
-- **M1 — Foundation**: Expo app scaffolded, backend + auth working, required sign-up. *Client auth screens done; Google OAuth verified in local dev, production `wrangler secret put` pending.*
+- **M1 — Foundation**: Expo app scaffolded, backend + auth working, required sign-up. *Client auth screens done; Google OAuth live in production since 2026-08-09 (provider registration verified; token exchange and consent-screen publishing status remain unproven).*
 - **M2 — Intake**: onboarding questionnaire persists to the database. *Done.*
-- **M3 — Plan engine**: free template plans + paid AI plans generate reliably; plan view renders. *Template path done; Pro/Elite AI personalization not yet built.*
+- **M3 — Plan engine**: free template plans + paid AI plans generate reliably; plan view renders. *Both seams are bound (skeleton 2026-08-04, personalizer 2026-08-10); `ANTHROPIC_API_KEY` is the remaining gap, so Pro/Elite still receive the quota-exempt template fallback.*
 - **M4 — Tiers & quotas**: dummy paywall, tier and quota enforcement server-side. *Done — server-side enforcement plus a Settings tab (tier/quota display) and dummy paywall client-side.*
 - **M5 — My Plans**: history tab, plan persistence, re-open past plans. *Done.*
 - **M6 — Polish & TestFlight**: empty states, errors, loading, app icon/splash, TestFlight build.

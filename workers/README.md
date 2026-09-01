@@ -49,7 +49,7 @@ workers/
     lib/
       store.ts               # every D1 statement. Authorization lives here — read its header.
       generate-plan-flow.ts  # the eleven pipeline steps, pure, all deps injected
-      planEngine.ts          # skeleton + personalizer seams (skeleton bound 2026-08-04, personalizer not — see below)
+      planEngine.ts          # skeleton + personalizer seams (bound 2026-08-04 and 2026-08-10)
       planValidation.ts      # structural validation, shape only
       model.ts               # the Anthropic call, behind an injectable seam
   test/                  # vitest, inside real workerd + real D1 (Miniflare). No network.
@@ -72,13 +72,12 @@ Working end to end, verified against `wrangler dev` and the Worker test suite:
 - `generate-plan` — Free tier (and, as a template fallback, Pro/Elite) returns a real generated
   plan, as of the 2026-08-04 `createTemplateSkeletonBuilder()` binding in `src/deps.ts`
 
-**One binding in `src/deps.ts` remains unwired: `promptBuilder`.** It needs the Pro/Elite
-personalization prompt, which is coaching-sensitive work of its own — until it lands, Pro/Elite
-generation falls back to the same template Free gets (`isFallback: true`, quota-exempt).
-
-It is deliberately bound to a typed unimplemented seam rather than a mock. `src/lib/planEngine.ts`'s
-header explains why at length; the short version is that the sibling repo shipped a mock as its
-production client and served nothing but dead ends for weeks.
+**Both bindings in `src/deps.ts` are wired.** The template skeleton landed on 2026-08-04 and the
+Pro/Elite personalization prompt (`src/lib/planPersonalizationPrompt.ts`) on 2026-08-10. The prompt
+can add coaching prose only; it cannot replace the skeleton's safety-clamped numbers. The remaining
+gap is `ANTHROPIC_API_KEY`, still unset everywhere, so `resolveModelCaller` selects the honest
+unconfigured caller and Pro/Elite generation falls back to the template (`isFallback: true`,
+quota-exempt) until the captain provisions the key.
 
 ## What the captain has to do (nobody else can)
 
@@ -96,7 +95,7 @@ Worker whose secrets you are certain you set.
 | Apply migrations remotely | `npm --prefix workers run db:migrate:remote` | Needs the above |
 | Auth secret | `wrangler secret put BETTER_AUTH_SECRET --env production` | Generate with `openssl rand -base64 32`. Done |
 | Anthropic key | `wrangler secret put ANTHROPIC_API_KEY --env production` | Your account, your billing |
-| Google OAuth | `wrangler secret put GOOGLE_CLIENT_ID --env production` / `..._SECRET --env production` | **Not done — this is why Google sign-in is broken.** Your Google Cloud project; see below |
+| Google OAuth | `wrangler secret put GOOGLE_CLIENT_ID --env production` / `..._SECRET --env production` | Done 2026-08-09; the provider is registered in production. The token exchange and consent-screen publishing status remain unproven. Your Google Cloud project; see below |
 | Deploy | `wrangler deploy --env production` | Needs all of the above |
 
 This mirrors the Supabase path exactly: `wrangler login` is `supabase login`, and

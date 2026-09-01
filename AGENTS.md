@@ -7,7 +7,7 @@ file holds only routing: who to dispatch, in what order. On conflict, CLAUDE.md 
 
 Read the exact versioned docs at https://docs.expo.dev/versions/v54.0.0/ before writing any code.
 
-This project is pinned to Expo SDK 54 (`expo ~54.0.0`, 54.0.36 installed). Docs for a newer SDK
+This project is pinned to Expo SDK 54 (`expo ~54.0.36`, 54.0.36 installed). Docs for a newer SDK
 describe APIs this project does not have. If you upgrade the SDK, update this link in the same
 commit.
 
@@ -212,6 +212,31 @@ Built-ins also available: `Explore`, `Plan`, `general-purpose`. Plugin agents ar
   the half-typed sign-up form (2026-08-08). `src/lib/sessionGate.ts` holds the latch and the full
   explanation; read its header before touching that gate, and note it is splash sequencing, never an
   authorization signal.
+- **Intake owns the runner's target; no other screen re-asks it.** Home reads it back from the
+  saved intake and asks only for a plan length, and only when there is no race date to derive one
+  from. Adding a race-distance or race-date control anywhere outside `/intake` recreates the
+  "take the survey twice" bug the captain reported on 2026-08-15. The rule is code, not convention:
+  `src/lib/planRequest.ts`.
+- **A race target is optional, and nothing may default one.** `buildTemplatePlan` carries
+  `raceDistance?: RaceDistance` with no fallback; race week, the taper phase and the taper tail of
+  the load curve are all gated on `isRacePlan`. Re-introducing a `?? '5k'` silently gives a
+  general-fitness runner a race plan — see `src/lib/planTemplates.ts` and its `noRace` test suite.
+  Two rules ride with it, both in that file and pinned by that suite: **a no-race plan never ends on
+  a deload** (captain's coaching ruling, 2026-08-15 — the cadence yields for the final week only,
+  and only when `isRacePlan` is false), and `raceDistance` is validated **whenever it is present on
+  any goal type**, not only on `goalType: 'race'` — see `validateRequest` in
+  `workers/src/lib/generate-plan-flow.ts`, since the client sends it with `duration` too.
+- **A race date that has already passed is refused, never generated against.** It would otherwise
+  reach `weeksUntilRace`'s `Math.max(1, …)` floor and charge a quota slot for a one-week plan. Both
+  screens refuse and both say why; the decision and both messages are pure and testable in
+  `src/lib/planRequest.ts` (`isRaceDatePast`, `intakeRaceDateError`). Race day itself is still
+  valid, and so is a blank date. Do not re-implement the comparison in a screen, and do not change
+  the server floor — it is deliberate for other callers.
+- **`keyboardType` restricts nothing — it only picks which keyboard is offered.** A hardware
+  keyboard, paste, dictation or autofill puts letters into a "number" field (verified on device).
+  Every numeric input goes through `src/components/inputs/`, which filters keystrokes via
+  `src/lib/fieldInput.ts`; dates and times are segmented boxes with the `-`/`:` printed, never
+  typed. Do not add a raw `<TextInput keyboardType="...">` for a numeric answer.
 - **AI output validation is structural, not strict-content.** `ai-feature-builder` and
   `prompt-engineer` follow [`docs/reference/plan-generation.md`](docs/reference/plan-generation.md):
   validate shape, retry once, fall back to a template.

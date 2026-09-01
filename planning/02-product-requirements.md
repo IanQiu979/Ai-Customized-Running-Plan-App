@@ -118,8 +118,8 @@ Launch → Sign up / Log in
         — never "this month"; periods are purchase-day-anchored, not calendar months)
          — no "next workout" or "current week" card (decision, 2026-07-10); Home shows only
            the plan link and quota state
-      → Configure plan (goal, race/date or duration) → [paywall if over quota/tier or an
-        out-of-tier selection]
+      → Create plan (target chosen once at intake, read back here; length asked only when
+        there is no race date) → [paywall if over quota/tier or an out-of-tier selection]
       → Generating… → Plan view
       → Tab 2: My Plans (history list → plan view)
       → Tab 3: Settings-lite (account, subscription/paywall (dummy), restore)
