@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AuthField } from '@/components/auth/AuthField';
 import { DuskHero } from '@/components/brand/DuskHero';
+import { DuskSpark } from '@/components/brand/DuskSpark';
 import {
   DuskGradient,
   FontFamily,
@@ -28,10 +29,15 @@ import { useTheme } from '@/hooks/use-theme';
 import { API_BASE_URL, authClient, describeError, signInWithGoogle } from '@/lib/apiClient';
 
 /**
- * Sign-in. Trailhead gives it the same dusk exception the landing screen has, at `band` height
- * rather than `cover` — enough for the gradient to carry across all three signed-out screens
- * without a 256pt hero fighting the keyboard for room. The form itself is paper and ink, and the
- * one ember element on the screen is the Sign in button.
+ * Sign-in. Trailhead gives it the mockup's own composition of the dusk exception: not the
+ * landing screen's big headline, but an illustration — the spark glyph, the route line with its
+ * terminal dots, and the "shape of the plan you're about to make" caption. The screen's title
+ * lives below, on the paper, the way the mockup's cream card carries it. The form itself is
+ * paper and ink, and the one ember element on the screen is the Sign in button.
+ *
+ * The caption sits in the copy slot, in the hero's top band — NOT under the line the way the
+ * mockup letterboxes it — because the amber tail carries no text by system rule
+ * (`trailhead-visual-system.md` §2: 3.17:1 against chalk-coloured copy).
  *
  * `Stack.Protected` in the root layout does the actual navigation once a session exists; this
  * screen only needs to make the sign-in call.
@@ -97,14 +103,43 @@ export default function SignInScreen() {
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
           >
-            <DuskHero size="band">
-              <Text style={[styles.eyebrow, { color: DuskGradient.onDuskMuted }]}>
-                PACE BLUEPRINT
+            <DuskHero size="cover" showTerminals>
+              <DuskSpark />
+              <Text style={[styles.heroCaption, { color: DuskGradient.onDuskMuted }]}>
+                THE SHAPE OF THE PLAN YOU&apos;RE ABOUT TO MAKE
               </Text>
-              <Text style={[styles.title, { color: DuskGradient.onDusk }]}>Welcome back</Text>
             </DuskHero>
 
             <View style={styles.form}>
+              <View style={styles.formHeader}>
+                <Text style={[styles.title, { color: theme.text.primary }]}>Sign in</Text>
+                <Text style={[styles.subtitle, { color: theme.text.secondary }]}>
+                  Pick up where you left off.
+                </Text>
+              </View>
+
+              {/* Social first, then the divider, then email — the mockup's order. */}
+              <Pressable
+                accessibilityRole="button"
+                disabled={submitting}
+                onPress={handleGoogleSignIn}
+                style={({ pressed }) => [
+                  styles.secondaryButton,
+                  { borderColor: theme.text.primary },
+                  (pressed || submitting) && styles.pressed,
+                ]}
+              >
+                <Text style={[styles.secondaryButtonText, { color: theme.text.primary }]}>
+                  Sign in with Google
+                </Text>
+              </Pressable>
+
+              <View style={styles.divider}>
+                <View style={[styles.dividerRule, { backgroundColor: theme.hairline }]} />
+                <Text style={[styles.dividerLabel, { color: theme.text.secondary }]}>OR</Text>
+                <View style={[styles.dividerRule, { backgroundColor: theme.hairline }]} />
+              </View>
+
               <AuthField
                 label="Email"
                 value={email}
@@ -150,27 +185,6 @@ export default function SignInScreen() {
                 )}
               </Pressable>
 
-              <View style={styles.divider}>
-                <View style={[styles.dividerRule, { backgroundColor: theme.hairline }]} />
-                <Text style={[styles.dividerLabel, { color: theme.text.secondary }]}>OR</Text>
-                <View style={[styles.dividerRule, { backgroundColor: theme.hairline }]} />
-              </View>
-
-              <Pressable
-                accessibilityRole="button"
-                disabled={submitting}
-                onPress={handleGoogleSignIn}
-                style={({ pressed }) => [
-                  styles.secondaryButton,
-                  { borderColor: theme.text.primary },
-                  (pressed || submitting) && styles.pressed,
-                ]}
-              >
-                <Text style={[styles.secondaryButtonText, { color: theme.text.primary }]}>
-                  Continue with Google
-                </Text>
-              </Pressable>
-
               <Pressable
                 accessibilityRole="button"
                 onPress={() => router.push('/(auth)/sign-up')}
@@ -193,15 +207,23 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   keyboardAvoider: { flex: 1 },
   scrollContent: { flexGrow: 1 },
-  eyebrow: {
+  heroCaption: {
     fontFamily: FontFamily.mono.regular,
     fontSize: FontSize.xs,
     letterSpacing: Tracking.label,
+    marginTop: Spacing.two,
+  },
+  formHeader: {
+    gap: Spacing.one,
   },
   title: {
     fontFamily: FontFamily.display.extraBold,
     fontSize: FontSize.xxl,
     letterSpacing: Tracking.display,
+  },
+  subtitle: {
+    fontFamily: FontFamily.body.regular,
+    fontSize: FontSize.sm,
   },
   form: {
     paddingHorizontal: Spacing.four,
