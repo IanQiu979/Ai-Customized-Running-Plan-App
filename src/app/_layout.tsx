@@ -1,8 +1,8 @@
 import {
-  BigShouldersDisplay_600SemiBold,
-  BigShouldersDisplay_700Bold,
-  BigShouldersDisplay_800ExtraBold,
-} from '@expo-google-fonts/big-shoulders-display';
+  BigShoulders_600SemiBold,
+  BigShoulders_700Bold,
+  BigShoulders_800ExtraBold,
+} from '@expo-google-fonts/big-shoulders';
 import {
   PublicSans_400Regular,
   PublicSans_500Medium,
@@ -34,9 +34,9 @@ export default function RootLayout() {
   // ARE the `fontFamily` strings the rest of the app writes, so the two lists cannot drift
   // without a missing font silently falling back to the system face.
   const [fontsLoaded] = useFonts({
-    BigShouldersDisplay_600SemiBold,
-    BigShouldersDisplay_700Bold,
-    BigShouldersDisplay_800ExtraBold,
+    BigShoulders_600SemiBold,
+    BigShoulders_700Bold,
+    BigShoulders_800ExtraBold,
     PublicSans_400Regular,
     PublicSans_500Medium,
     PublicSans_600SemiBold,

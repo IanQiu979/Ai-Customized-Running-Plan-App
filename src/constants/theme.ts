@@ -240,9 +240,9 @@ export const Effort: Record<EffortLevel, { light: string; dark: string; barHeigh
 export const FontFamily = {
   /** Display text, and every numeral in the app. */
   display: {
-    semiBold: 'BigShouldersDisplay_600SemiBold',
-    bold: 'BigShouldersDisplay_700Bold',
-    extraBold: 'BigShouldersDisplay_800ExtraBold',
+    semiBold: 'BigShoulders_600SemiBold',
+    bold: 'BigShoulders_700Bold',
+    extraBold: 'BigShoulders_800ExtraBold',
   },
   /** Body copy and UI chrome. */
   body: {
