@@ -212,11 +212,11 @@ export default function HomeScreen() {
                 onPress={() => router.push('/intake')}
                 style={({ pressed }) => [
                   styles.primaryButton,
-                  { backgroundColor: theme.accent.hivis },
+                  { backgroundColor: theme.accent.ember },
                   pressed && styles.pressed,
                 ]}
               >
-                <Text style={[styles.primaryButtonText, { color: theme.accent.onAccent }]}>
+                <Text style={[styles.primaryButtonText, { color: theme.accent.onEmber }]}>
                   Start intake
                 </Text>
               </Pressable>
@@ -288,14 +288,14 @@ export default function HomeScreen() {
                 onPress={handleGenerate}
                 style={({ pressed }) => [
                   styles.primaryButton,
-                  { backgroundColor: theme.accent.hivis },
+                  { backgroundColor: theme.accent.ember },
                   (pressed || generating) && styles.pressed,
                 ]}
               >
                 {generating ? (
-                  <ActivityIndicator color={theme.accent.onAccent} />
+                  <ActivityIndicator color={theme.accent.onEmber} />
                 ) : (
-                  <Text style={[styles.primaryButtonText, { color: theme.accent.onAccent }]}>
+                  <Text style={[styles.primaryButtonText, { color: theme.accent.onEmber }]}>
                     Generate plan
                   </Text>
                 )}
@@ -336,7 +336,7 @@ const styles = StyleSheet.create({
     fontSize: FontSize.sm,
   },
   fieldLabel: {
-    fontFamily: FontFamily.mono.medium,
+    fontFamily: FontFamily.mono.regular,
     fontSize: FontSize.xs,
     marginTop: Spacing.two,
   },

@@ -1,14 +1,15 @@
 import {
-  BarlowCondensed_600SemiBold,
-  BarlowCondensed_700Bold,
-  BarlowCondensed_800ExtraBold,
-} from '@expo-google-fonts/barlow-condensed';
+  BigShouldersDisplay_600SemiBold,
+  BigShouldersDisplay_700Bold,
+  BigShouldersDisplay_800ExtraBold,
+} from '@expo-google-fonts/big-shoulders-display';
 import {
-  IBMPlexMono_400Regular,
-  IBMPlexMono_500Medium,
-  IBMPlexMono_600SemiBold,
-} from '@expo-google-fonts/ibm-plex-mono';
-import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
+  PublicSans_400Regular,
+  PublicSans_500Medium,
+  PublicSans_600SemiBold,
+  PublicSans_700Bold,
+} from '@expo-google-fonts/public-sans';
+import { SpaceMono_400Regular, SpaceMono_700Bold } from '@expo-google-fonts/space-mono';
 import { ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import { Stack, useRouter } from 'expo-router';
@@ -29,17 +30,19 @@ export default function RootLayout() {
   const router = useRouter();
   const { data: session, isPending: sessionPending } = authClient.useSession();
 
+  // The nine faces `FontFamily` (`src/constants/theme.ts`) names, and only those — the keys here
+  // ARE the `fontFamily` strings the rest of the app writes, so the two lists cannot drift
+  // without a missing font silently falling back to the system face.
   const [fontsLoaded] = useFonts({
-    BarlowCondensed_600SemiBold,
-    BarlowCondensed_700Bold,
-    BarlowCondensed_800ExtraBold,
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
-    Inter_700Bold,
-    IBMPlexMono_400Regular,
-    IBMPlexMono_500Medium,
-    IBMPlexMono_600SemiBold,
+    BigShouldersDisplay_600SemiBold,
+    BigShouldersDisplay_700Bold,
+    BigShouldersDisplay_800ExtraBold,
+    PublicSans_400Regular,
+    PublicSans_500Medium,
+    PublicSans_600SemiBold,
+    PublicSans_700Bold,
+    SpaceMono_400Regular,
+    SpaceMono_700Bold,
   });
 
   // `sessionPending` is not a one-shot "still loading" flag — better-auth re-raises it on every

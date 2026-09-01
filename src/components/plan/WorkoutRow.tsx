@@ -114,7 +114,7 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
   },
   mono: {
-    fontFamily: FontFamily.mono.medium,
+    fontFamily: FontFamily.mono.regular,
     fontSize: FontSize.sm,
   },
   description: {

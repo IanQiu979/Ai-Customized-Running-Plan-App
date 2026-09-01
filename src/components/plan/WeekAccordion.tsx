@@ -120,7 +120,7 @@ const styles = StyleSheet.create({
   },
   weekNumber: {
     width: WEEK_GUTTER_WIDTH,
-    fontFamily: FontFamily.mono.semiBold,
+    fontFamily: FontFamily.mono.bold,
     fontSize: FontSize.sm,
     paddingBottom: Spacing.one,
   },
@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
     borderLeftWidth: StyleSheet.hairlineWidth,
   },
   whyLabel: {
-    fontFamily: FontFamily.mono.medium,
+    fontFamily: FontFamily.mono.regular,
     fontSize: FontSize.xs,
     marginBottom: Spacing.half,
   },

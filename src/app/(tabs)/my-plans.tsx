@@ -165,7 +165,7 @@ const styles = StyleSheet.create({
     fontSize: FontSize.md,
   },
   rowMeta: {
-    fontFamily: FontFamily.mono.medium,
+    fontFamily: FontFamily.mono.regular,
     fontSize: FontSize.xs,
   },
   sampleTag: {
@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.half,
   },
   sampleTagText: {
-    fontFamily: FontFamily.mono.semiBold,
+    fontFamily: FontFamily.mono.bold,
     fontSize: FontSize.xs,
   },
   body: {

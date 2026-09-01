@@ -25,6 +25,10 @@ export function useTheme() {
     scheme,
     ...Colors[scheme],
     effort,
-    accent: Accent,
+    // Scheme-resolved, unlike the previous system's theme-invariant accent: no single ember
+    // clears AA on both chalk and espresso, so `Accent` is keyed by scheme the same way `Effort`
+    // is. Call sites read `theme.accent.ember` / `theme.accent.onEmber` and never index a scheme
+    // themselves.
+    accent: Accent[scheme],
   };
 }

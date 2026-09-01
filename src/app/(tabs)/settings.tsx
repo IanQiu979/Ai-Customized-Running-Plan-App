@@ -121,11 +121,11 @@ export default function SettingsScreen() {
                       onPress={() => router.push('/paywall')}
                       style={({ pressed }) => [
                         styles.primaryButton,
-                        { backgroundColor: theme.accent.hivis },
+                        { backgroundColor: theme.accent.ember },
                         pressed && styles.pressed,
                       ]}
                     >
-                      <Text style={[styles.primaryButtonText, { color: theme.accent.onAccent }]}>
+                      <Text style={[styles.primaryButtonText, { color: theme.accent.onEmber }]}>
                         Upgrade
                       </Text>
                     </Pressable>
@@ -200,7 +200,7 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   fieldLabel: {
-    fontFamily: FontFamily.mono.medium,
+    fontFamily: FontFamily.mono.regular,
     fontSize: FontSize.xs,
   },
   tierValue: {

@@ -483,14 +483,14 @@ export default function IntakeScreen() {
             onPress={handleSave}
             style={({ pressed }) => [
               styles.primaryButton,
-              { backgroundColor: theme.accent.hivis },
+              { backgroundColor: theme.accent.ember },
               (pressed || submitting) && styles.pressed,
             ]}
           >
             {submitting ? (
-              <ActivityIndicator color={theme.accent.onAccent} />
+              <ActivityIndicator color={theme.accent.onEmber} />
             ) : (
-              <Text style={[styles.primaryButtonText, { color: theme.accent.onAccent }]}>
+              <Text style={[styles.primaryButtonText, { color: theme.accent.onEmber }]}>
                 Save intake
               </Text>
             )}
@@ -610,7 +610,7 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   fieldLabel: {
-    fontFamily: FontFamily.mono.medium,
+    fontFamily: FontFamily.mono.regular,
     fontSize: FontSize.xs,
   },
   input: {

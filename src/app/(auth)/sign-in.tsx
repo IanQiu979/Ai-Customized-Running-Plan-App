@@ -113,14 +113,14 @@ export default function SignInScreen() {
               onPress={handleSignIn}
               style={({ pressed }) => [
                 styles.primaryButton,
-                { backgroundColor: theme.accent.hivis },
+                { backgroundColor: theme.accent.ember },
                 (pressed || submitting) && styles.pressed,
               ]}
             >
               {submitting ? (
-                <ActivityIndicator color={theme.accent.onAccent} />
+                <ActivityIndicator color={theme.accent.onEmber} />
               ) : (
-                <Text style={[styles.primaryButtonText, { color: theme.accent.onAccent }]}>Sign in</Text>
+                <Text style={[styles.primaryButtonText, { color: theme.accent.onEmber }]}>Sign in</Text>
               )}
             </Pressable>
 

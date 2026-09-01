@@ -200,7 +200,7 @@ const styles = StyleSheet.create({
     borderRadius: Spacing.one,
   },
   legendLabel: {
-    fontFamily: FontFamily.mono.medium,
+    fontFamily: FontFamily.mono.regular,
     fontSize: FontSize.xs,
   },
   ribbon: {

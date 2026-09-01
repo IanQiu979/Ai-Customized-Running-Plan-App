@@ -131,14 +131,14 @@ export default function SignUpScreen() {
               onPress={handleSignUp}
               style={({ pressed }) => [
                 styles.primaryButton,
-                { backgroundColor: theme.accent.hivis },
+                { backgroundColor: theme.accent.ember },
                 (pressed || submitting) && styles.pressed,
               ]}
             >
               {submitting ? (
-                <ActivityIndicator color={theme.accent.onAccent} />
+                <ActivityIndicator color={theme.accent.onEmber} />
               ) : (
-                <Text style={[styles.primaryButtonText, { color: theme.accent.onAccent }]}>Sign up</Text>
+                <Text style={[styles.primaryButtonText, { color: theme.accent.onEmber }]}>Sign up</Text>
               )}
             </Pressable>
 

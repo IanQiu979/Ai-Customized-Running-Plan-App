@@ -46,7 +46,7 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xxl,
   },
   metadata: {
-    fontFamily: FontFamily.mono.medium,
+    fontFamily: FontFamily.mono.regular,
     fontSize: FontSize.xs,
   },
   intro: {

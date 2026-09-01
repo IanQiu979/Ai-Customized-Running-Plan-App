@@ -129,7 +129,7 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   sectionTitle: {
-    fontFamily: FontFamily.mono.medium,
+    fontFamily: FontFamily.mono.regular,
     fontSize: FontSize.xs,
   },
   row: {
@@ -141,7 +141,7 @@ const styles = StyleSheet.create({
     fontSize: FontSize.md,
   },
   code: {
-    fontFamily: FontFamily.mono.semiBold,
+    fontFamily: FontFamily.mono.bold,
   },
   fullName: {
     fontFamily: FontFamily.body.semiBold,

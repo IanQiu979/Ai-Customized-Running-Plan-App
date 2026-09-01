@@ -40,9 +40,9 @@ describe('NavigationLightTheme', () => {
     expect(NavigationLightTheme.fonts).toBe(DefaultTheme.fonts);
   });
 
-  it('does not route the nav-active color through Accent.hivis', () => {
+  it('does not route the nav-active color through the ember accent', () => {
     expect(NavigationLightTheme.colors.primary).toBe(Colors.light.text.primary);
-    expect(NavigationLightTheme.colors.primary).not.toBe(Accent.hivis);
+    expect(NavigationLightTheme.colors.primary).not.toBe(Accent.light.ember);
   });
 });
 
@@ -71,9 +71,9 @@ describe('NavigationDarkTheme', () => {
     expect(NavigationDarkTheme.fonts).toBe(DarkTheme.fonts);
   });
 
-  it('does not route the nav-active color through Accent.hivis', () => {
+  it('does not route the nav-active color through the ember accent', () => {
     expect(NavigationDarkTheme.colors.primary).toBe(Colors.dark.text.primary);
-    expect(NavigationDarkTheme.colors.primary).not.toBe(Accent.hivis);
+    expect(NavigationDarkTheme.colors.primary).not.toBe(Accent.dark.ember);
   });
 });
 
