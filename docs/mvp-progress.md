@@ -115,8 +115,15 @@
   several minutes at a time: it connects on the first attempt and stays connected, with no
   disconnect/reconnect churn observed. A real device flow (iOS Simulator + Expo Go) fetched the
   bundler manifest through the live tunnel URL successfully — the connection carried real traffic
-  correctly. The most likely explanation for the captain's "`--tunnel` is broken" report is the
-  same root cause as above: `expo start --tunnel` forwards Metro, never the Worker (documented in
+  correctly. **One contradictory observation, kept on the record:** an earlier diagnosis-only
+  session on this branch (commit `77cd1c0`, whose `docs/wip-auth-tunnel-diagnosis.md` scratch file
+  has since been deleted) did see the tunnel drop and reconnect during one run — `Tunnel connection
+  has been closed…` followed by another `Tunnel connected.` This session's re-testing (multiple
+  runs, several minutes each, plus the Simulator round trip above) did not reproduce that churn, and
+  nothing in this repo changed between the two sessions that could explain the difference, so it
+  is best read as occasional flakiness on Expo's shared tunnel backend rather than a repo defect.
+  The working theory for the captain's "`--tunnel` is broken" report is the auth root cause above,
+  not the tunnel: `expo start --tunnel` forwards Metro, never the Worker (documented in
   `AGENTS.md`'s guardrails), so even a perfectly working tunnel could not have let a phone sign in
   while `EXPO_PUBLIC_API_BASE_URL` pointed at a dead loopback address — indistinguishable from "the
   tunnel doesn't work" from the captain's seat. Now that the base URL is fixed, `--tunnel` should
@@ -1037,6 +1044,10 @@ intact underneath.
   `https://` URL. Residual risk: nothing enforces this stays correct if the Worker's URL ever
   changes (a new deploy target, a custom domain) — there is no test asserting `.env.example`'s
   value resolves to a live origin.
+- 🟡 **Occasional `expo start --tunnel` churn on Expo's shared ngrok backend is an unquantified
+  residual risk.** Seen once (commit `77cd1c0`'s diagnosis session: drop + reconnect mid-run), not
+  reproduced across this session's longer runs. Outside this repo's control; if it recurs, the
+  fallback is `EXPO_PACKAGER_PROXY_URL` pointed at a self-run `ngrok` v3 tunnel.
 - 🔴 **`wrangler secret put ANTHROPIC_API_KEY` has never been run** (nor its Supabase predecessor).
   Nothing anywhere has an Anthropic key. This is not currently *breaking* anything — with no key the
   model caller returns a typed `not_configured` and the pipeline serves the template plan as a

@@ -34,8 +34,14 @@ blocking him from testing the app at all.
 - **The tunnel itself was not found broken.** `expo start --tunnel` was run and monitored for
   several minutes at a time across multiple sessions: it connected immediately and stayed
   connected with no observed disconnect/reconnect churn, and a real device flow (iOS Simulator +
-  Expo Go) fetched the Metro manifest through the live tunnel URL successfully. The most likely
-  explanation for the original report is the same root cause as above, indistinguishable from "the
+  Expo Go) fetched the Metro manifest through the live tunnel URL successfully. One earlier
+  observation contradicts this and is kept on the record: the diagnosis-only session on this
+  branch (commit `77cd1c0`, its since-deleted `docs/wip-auth-tunnel-diagnosis.md`) saw the tunnel
+  drop and reconnect during one run (`Tunnel connection has been closed…` then `Tunnel connected.`
+  again). This session's re-testing did not reproduce it, and no repo change separates the two
+  runs, so it reads as occasional flakiness on Expo's shared tunnel backend, not a defect here —
+  logged as a residual risk in `docs/mvp-progress.md`. The most likely explanation for the
+  original report is the same root cause as above, indistinguishable from "the
   tunnel doesn't work" from the captain's seat: a working tunnel still can't let a phone sign in
   while the API base URL points at a dead loopback address. For the record: the tunnel runs on
   `@expo/ngrok`'s bundled legacy `ngrok-bin@2.3.42` against Expo's own shared `exp.direct` backend
