@@ -85,7 +85,52 @@
 
 ---
 
-**Last updated:** 2026-08-15 (later) — the captain phone-tested the core loop and called the
+**Last updated:** 2026-09-03 — the captain reported sign-in/sign-up "not working at all" and
+`expo start --tunnel` broken, blocking him from testing the app at all. Both diagnosed and fixed.
+
+- **Root cause of the auth failure: a stale `.env.example`, not the backend.** The deployed Worker
+  was and is healthy — direct probes against
+  `https://pace-blueprint-production.i78979848.workers.dev` succeeded for `/api/auth/ok`,
+  sign-up, and sign-in throughout. The client's `.env` had `EXPO_PUBLIC_API_BASE_URL` pointed at
+  `http://localhost:8787`, and nothing was listening there (`wrangler dev` was not running) — the
+  third time this exact class of bug has hit this project (see the 2026-08-07 entry below). Each
+  prior fix corrected a developer's *local* `.env` but never the committed **template** those
+  `.env`s are copied from — `.env.example` still said the Worker was "not set yet" and defaulted
+  to a loopback address. Fixed `.env.example` to default `EXPO_PUBLIC_API_BASE_URL` to the
+  deployed Worker's `https://` URL for every device type (matching the 2026-08-07 ruling to deploy
+  rather than use a LAN address), so a fresh `.env` copied from the template now works out of the
+  box. No code changed — `src/lib/apiClient.ts` and the auth screens' error handling were already
+  correct from the 2026-08-07 fix.
+- **Verified live, end to end, through the real client.** Built the app for web
+  (`expo start --web`) against the corrected `.env`, loaded it in a real browser, and drove the
+  actual sign-up form via its real React state (not a bypass): a new account
+  (`FM Test` / `fmtest+…@example.com`) was created through the real `authClient` call to the
+  deployed Worker, and immediately signing in with those same credentials against the Worker
+  succeeded (`200`, real session token, real `createdAt`). The compiled app bundle was also
+  inspected directly and confirmed `EXPO_PUBLIC_API_BASE_URL` bakes in as the deployed Worker's
+  URL, not the old loopback value. Device/simulator testing via Expo Go was attempted but blocked
+  by an unrelated environment mismatch (this machine's Expo Go build is for SDK 57; the project is
+  SDK 54) — not a defect in this fix.
+- **The tunnel itself was not broken.** `expo start --tunnel` was run repeatedly and monitored for
+  several minutes at a time: it connects on the first attempt and stays connected, with no
+  disconnect/reconnect churn observed. A real device flow (iOS Simulator + Expo Go) fetched the
+  bundler manifest through the live tunnel URL successfully — the connection carried real traffic
+  correctly. The most likely explanation for the captain's "`--tunnel` is broken" report is the
+  same root cause as above: `expo start --tunnel` forwards Metro, never the Worker (documented in
+  `AGENTS.md`'s guardrails), so even a perfectly working tunnel could not have let a phone sign in
+  while `EXPO_PUBLIC_API_BASE_URL` pointed at a dead loopback address — indistinguishable from "the
+  tunnel doesn't work" from the captain's seat. Now that the base URL is fixed, `--tunnel` should
+  let a phone complete the same live auth flow just verified on web. Noted for the record: the
+  tunnel runs on `@expo/ngrok`'s bundled legacy `ngrok-bin@2.3.42` binary against Expo's own shared
+  `exp.direct` backend (a fixed authtoken baked into `@expo/cli`, not the captain's personal ngrok
+  account) — an external dependency this repo does not control. If it becomes flaky in day-to-day
+  use, the supported escape hatch is `EXPO_PACKAGER_PROXY_URL` pointed at a self-run tunnel (the
+  captain already has a working, authenticated `ngrok` v3 install at `/opt/homebrew/bin/ngrok`) —
+  not implemented since the shared tunnel tested stable.
+- 469 root tests pass, typecheck and lint clean; no `workers/` change (nothing in `workers/` was
+  touched — the defect was entirely in the client-side env template).
+
+Previous entry: 2026-08-15 (later) — the captain phone-tested the core loop and called the
 homepage and intake "very very confusing": intake was effectively asked twice, a race target was
 mandatory, and the numeric keyboards lacked the `:` and `-` the fields demanded. All three
 reproduced on an iOS 26.5 simulator and are fixed; see
@@ -984,6 +1029,14 @@ intact underneath.
 
 ### Standing
 
+- 🟡 **`EXPO_PUBLIC_API_BASE_URL` has drifted to a dead loopback address three times now** (2026-08-07,
+  and again by 2026-09-03) despite each prior fix, because those fixes corrected a developer's
+  local, gitignored `.env` but not the committed `.env.example` template fresh `.env`s are copied
+  from — the template itself defaulted to a loopback address / said "not deployed yet" long after
+  the Worker was live. Fixed 2026-09-03: `.env.example` now defaults to the deployed Worker's
+  `https://` URL. Residual risk: nothing enforces this stays correct if the Worker's URL ever
+  changes (a new deploy target, a custom domain) — there is no test asserting `.env.example`'s
+  value resolves to a live origin.
 - 🔴 **`wrangler secret put ANTHROPIC_API_KEY` has never been run** (nor its Supabase predecessor).
   Nothing anywhere has an Anthropic key. This is not currently *breaking* anything — with no key the
   model caller returns a typed `not_configured` and the pipeline serves the template plan as a
