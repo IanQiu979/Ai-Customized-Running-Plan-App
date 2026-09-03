@@ -15,6 +15,7 @@ import {
   hasRedFlagInjury,
   injuryVolumeReductionPct,
   isUnder18,
+  LONG_RUN_SHARE_CAP,
   MAX_SINGLE_RUN_KM,
   redFlagVolumeReductionPct,
   rpeForZone,
@@ -264,6 +265,36 @@ function shakeoutRun(
   };
 }
 
+/** Warm-up + cool-down `raceDayWorkout` adds around the race itself (3 km WU, 2 km CD). */
+const RACE_DAY_PADDING_KM = 5;
+
+/**
+ * How much of race week is *running the runner does before the start line*, as a share of the
+ * race-week volume the canonical curve prescribes.
+ *
+ * Read straight off the approved 12-week 5K fixture, no new coaching content: its race week is
+ * `FIVE_K_WEEKLY_LOAD`'s last entry (28 km), a total that already contains its own race day
+ * (5 km race + `RACE_DAY_PADDING_KM`), leaving 18 km of pre-race running across three days.
+ * 18/28 is that fixture's own answer to "how much do I still run in race week", expressed as a
+ * ratio so it scales to any baseline — the same "scale the captain-approved curve" idiom as
+ * `targetVolumeKm` and `scaleQualityDistanceKm`.
+ *
+ * It replaces `desiredVolumeKm - race.distanceKm` on the generic path, which assembled race week
+ * backwards: it charged the race itself against the week's volume budget, so for anything longer
+ * than a 5K the race alone exhausted the budget and the days before it collapsed to
+ * `distributeDistance`'s 1 km floor — a marathon race week of three 1 km runs and a 47 km "race
+ * day", reported as the second-biggest week of the taper. Sizing the pre-race days from the
+ * taper instead, and letting race day sit on top of them, is what a taper week actually is.
+ *
+ * At the golden fixture's own 35 km baseline the two agree exactly (28 - 10 = 18 = 28 × 18/28),
+ * which is why `buildCanonicalFiveKWeek` is deliberately left on the subtraction: that path is
+ * byte-locked to the fixture, and a 5K race day is small enough that the bug never bites there.
+ */
+const RACE_WEEK_PRE_RACE_SHARE =
+  (FIVE_K_WEEKLY_LOAD[FIVE_K_WEEKLY_LOAD.length - 1] -
+    (RACE_DISTANCE_KM['5k'] + RACE_DAY_PADDING_KM)) /
+  FIVE_K_WEEKLY_LOAD[FIVE_K_WEEKLY_LOAD.length - 1];
+
 function raceDayWorkout(distance: RaceDistance): Workout {
   const raceKm = RACE_DISTANCE_KM[distance];
   // `raceKm` itself is fractional for half/full marathon (21.1 / 42.195), so the padded total
@@ -273,7 +304,7 @@ function raceDayWorkout(distance: RaceDistance): Workout {
     kind: 'run',
     effort: 'interval',
     label: 'Race Day',
-    distanceKm: Math.round(raceKm + 5),
+    distanceKm: Math.round(raceKm + RACE_DAY_PADDING_KM),
     effortDescription: RACE_DESCRIPTION,
     structure: `WU 3 km · ${raceDistanceText(distance)} race · CD 2 km`,
   };
@@ -518,6 +549,22 @@ function distributeDistance(totalKm: number, count: number, capKm: number): numb
     remainder = Math.max(0, remainder - 1);
     return value;
   });
+}
+
+/**
+ * Per-easy-run ceiling on the generic path: one kilometre under the long run, so the long run is
+ * strictly the week's longest run and `LONG_DESCRIPTION` stays true.
+ *
+ * The canonical 5K path keeps its own literal `longDistanceKm * 0.8` and is deliberately not
+ * routed through here — the golden 12-week fixture is byte-pinned. The generic path needs the
+ * looser ceiling because it is the path where the long run is now clamped: 0.8 caps a week's
+ * absorbable volume at `1.8 x longRun + quality`, so once `clampLongRun` shortens the long run the
+ * week can no longer reach its target at all, and the shortfall is then re-read by
+ * `clampWeeklyVolume` as the next week's growth base. Letting the easy days take the kilometres the
+ * long run gave up keeps the week whole and the runner's declared volume intact.
+ */
+function easyRunCapKm(longDistanceKm: number): number {
+  return Math.max(1, longDistanceKm - 1);
 }
 
 function normalizedRunCount(daysPerWeek: number): number {
@@ -834,6 +881,7 @@ function buildGenericWeek(args: {
   maxSingleRunKm: number;
   deloadCadence: number;
   level: ExperienceLevel;
+  previousLongestKm: number;
   lastLoadingWeekKm: number;
   injuryReductionPct: number;
   redFlagReductionPct: number;
@@ -853,6 +901,7 @@ function buildGenericWeek(args: {
     maxSingleRunKm,
     deloadCadence,
     level,
+    previousLongestKm,
     lastLoadingWeekKm,
     injuryReductionPct,
     redFlagReductionPct,
@@ -895,7 +944,9 @@ function buildGenericWeek(args: {
     const race = raceDayWorkout(raceDistance);
     const requestedRuns = normalizedRunCount(intake.daysPerWeek);
     const easyCount = Math.max(0, requestedRuns - 1);
-    const easyBudgetKm = Math.max(0, desiredVolumeKm - (race.distanceKm ?? 0));
+    // Not `desiredVolumeKm - race.distanceKm`: the race is not a training session competing for
+    // the week's budget, it is the thing the week tapers into. See `RACE_WEEK_PRE_RACE_SHARE`.
+    const easyBudgetKm = Math.max(easyCount, Math.round(desiredVolumeKm * RACE_WEEK_PRE_RACE_SHARE));
     const easyDistances = distributeDistance(easyBudgetKm, easyCount, maxSingleRunKm);
     const easyWorkouts = easyDistances.map((distanceKm, index) =>
       index === easyDistances.length - 1
@@ -962,12 +1013,77 @@ function buildGenericWeek(args: {
     targetLongRunKm(intake.weeklyKm, weekNumber - 1, durationWeeks, maxSingleRunKm, isRacePlan),
   );
   const longRunVolumeBudget = Math.max(longRunFloor, desiredVolumeKm - qualityKm - easyCount);
-  const longDistanceKm = Math.min(maxSingleRunKm, longRunFromCurve, longRunVolumeBudget);
+
+  // Every ceiling in `clampLongRun` must be enforced here too. `buildCanonicalFiveKWeek` has run
+  // this loop since 2026-08-03; this path — which serves every runner who is not on the golden
+  // 12-week/4-day/5K shape, i.e. every 10K, half, marathon and general-fitness plan — never called
+  // `clampLongRun` at all, so the share, spike and time caps were documented but unenforced for
+  // almost everyone (e.g. a 34 km long run inside a 64 km week, 53% against an advanced cap of
+  // 35%). The mismatch that produced it: the long run follows the canonical curve scaled by the
+  // runner's *declared* `weeklyKm`, while the week's volume is separately growth-clamped by
+  // `clampWeeklyVolume`, so the two can drift apart with nothing reconciling them.
+  //
+  // Same convergence argument as the canonical path: the share ceiling is measured against the
+  // week's *assembled* volume (easy runs may not exceed 80% of the long run, so a week cannot
+  // always absorb its full budget), and shrinking the long run shrinks the assembled volume, which
+  // can reopen the share. The map is a contraction, so it converges in a handful of steps and the
+  // loop exits as soon as the clamp stops moving the value.
+  //
+  // Two guards bound the loop, both from the same piece of arithmetic. A share cap `c` is only
+  // reachable by an `n`-run week whose longest run is the long run when `c * n > 1`: every run is
+  // at most `L`, so `L / total >= 1/n` always. The ladder is beginner 25% (needs n >= 5),
+  // intermediate 32% (n >= 4) and advanced 35% (n >= 3), while `normalizedRunCount` floors at 3
+  // days — so on a 3-day week the beginner and intermediate caps cannot be met by any week that
+  // still has a long run.
+  //
+  // `shareCapReachable` therefore skips the clamp entirely for those weeks rather than chasing an
+  // impossible target, and `longRunFloor` — the week's longest quality session plus 1 km — floors
+  // it for the rest. Without them the loop "satisfies" the cap the only way left to it: it drives
+  // the long run below the tempo, the assembled volume falls with it, `clampWeeklyVolume` reads
+  // that depressed total as the next week's growth base, and the plan spirals — a 26-week marathon
+  // plan for a 30 km/week runner collapses to 5 km weeks of 1 km runs. With the guards the cap
+  // binds wherever it is reachable, which covers every case the audit flagged (4-6 day plans at
+  // real volume), no plan assembles less weekly volume than it did before, and the long run stays
+  // strictly the week's longest run so `previousLongestKm` — and therefore the spike cap — stays
+  // truthful.
+  //
+  // What the skip leaves open is a coaching question, not an engineering one: the ladder has no
+  // answer for a 3-day week. It is escalated to Ian, and deliberately not resolved here by
+  // inventing a cap or by emitting an unusable plan.
+  const shareCapReachable = LONG_RUN_SHARE_CAP[level] * requestedRuns > 1;
+  let longDistanceKm = Math.max(
+    longRunFloor,
+    Math.min(maxSingleRunKm, longRunFromCurve, longRunVolumeBudget),
+  );
+  for (let i = 0; shareCapReachable && i < 100; i += 1) {
+    const easyTotalKm = distributeDistance(
+      desiredVolumeKm - longDistanceKm - qualityKm,
+      easyCount,
+      easyRunCapKm(longDistanceKm),
+    ).reduce((sum, distanceKm) => sum + distanceKm, 0);
+    const assembledVolumeKm = longDistanceKm + qualityKm + easyTotalKm;
+    const { km } = clampLongRun({
+      proposedKm: longDistanceKm,
+      weeklyKm: assembledVolumeKm,
+      level,
+      previousLongestKm,
+      easyPaceSecPerKm: easyPace?.highSecPerKm,
+      isDeload,
+      lastLoadingWeekKm,
+    });
+    // Floored so a fractional ceiling never leaks into the rendered plan, and held at `longRunFloor`
+    // per the note above. Flooring only shrinks the value, so the loop's invariant holds and it
+    // still terminates: `flooredKm >= longDistanceKm` breaks the moment the clamp stops biting, and
+    // the floor itself is a fixed point reached in one step.
+    const flooredKm = Math.max(longRunFloor, Math.floor(km));
+    if (flooredKm >= longDistanceKm) break;
+    longDistanceKm = flooredKm;
+  }
   const long = longRun(longDistanceKm, easyPace, density, intake.age);
   const easyDistances = distributeDistance(
     desiredVolumeKm - longDistanceKm - qualityKm,
     easyCount,
-    longDistanceKm * 0.8,
+    easyRunCapKm(longDistanceKm),
   );
   const easyWorkouts = easyDistances.map((distanceKm) =>
     easyRun({
@@ -1058,6 +1174,7 @@ export function buildTemplatePlan(params: TemplatePlanParams): Plan {
           maxSingleRunKm,
           deloadCadence,
           level,
+          previousLongestKm,
           lastLoadingWeekKm,
           injuryReductionPct,
           redFlagReductionPct,
