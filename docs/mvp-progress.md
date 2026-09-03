@@ -93,14 +93,14 @@
   `https://pace-blueprint-production.i78979848.workers.dev` succeeded for `/api/auth/ok`,
   sign-up, and sign-in throughout. The client's `.env` had `EXPO_PUBLIC_API_BASE_URL` pointed at
   `http://localhost:8787`, and nothing was listening there (`wrangler dev` was not running) — the
-  third time this exact class of bug has hit this project (see the 2026-08-07 entry below). Each
-  prior fix corrected a developer's *local* `.env` but never the committed **template** those
-  `.env`s are copied from — `.env.example` still said the Worker was "not set yet" and defaulted
-  to a loopback address. Fixed `.env.example` to default `EXPO_PUBLIC_API_BASE_URL` to the
-  deployed Worker's `https://` URL for every device type (matching the 2026-08-07 ruling to deploy
-  rather than use a LAN address), so a fresh `.env` copied from the template now works out of the
-  box. No code changed — `src/lib/apiClient.ts` and the auth screens' error handling were already
-  correct from the 2026-08-07 fix.
+  second recorded hit of this exact class of bug (the first is the 2026-08-07 entry below). That
+  earlier fix corrected a developer's *local* `.env` and documented the trap, but never changed
+  the committed **template** those `.env`s are copied from — `.env.example` still said the Worker
+  was "not set yet" and defaulted to a loopback address. Fixed `.env.example` to default
+  `EXPO_PUBLIC_API_BASE_URL` to the deployed Worker's `https://` URL for every device type
+  (matching the 2026-08-07 ruling to deploy rather than use a LAN address), so a fresh `.env`
+  copied from the template now works out of the box. No code changed — `src/lib/apiClient.ts` and
+  the auth screens' error handling were already correct from the 2026-08-07 fix.
 - **Verified live, end to end, through the real client.** Built the app for web
   (`expo start --web`) against the corrected `.env`, loaded it in a real browser, and drove the
   actual sign-up form via its real React state (not a bypass): a new account
@@ -1036,8 +1036,8 @@ intact underneath.
 
 ### Standing
 
-- 🟡 **`EXPO_PUBLIC_API_BASE_URL` has drifted to a dead loopback address three times now** (2026-08-07,
-  and again by 2026-09-03) despite each prior fix, because those fixes corrected a developer's
+- 🟡 **`EXPO_PUBLIC_API_BASE_URL` has drifted to a dead loopback address twice on record** (2026-08-07,
+  and again by 2026-09-03) despite the earlier fix, because that fix corrected a developer's
   local, gitignored `.env` but not the committed `.env.example` template fresh `.env`s are copied
   from — the template itself defaulted to a loopback address / said "not deployed yet" long after
   the Worker was live. Fixed 2026-09-03: `.env.example` now defaults to the deployed Worker's

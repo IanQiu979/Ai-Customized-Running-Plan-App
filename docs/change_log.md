@@ -15,9 +15,9 @@ blocking him from testing the app at all.
   template (or a stale one left over from before deploy) pointed `EXPO_PUBLIC_API_BASE_URL` at
   `http://localhost:8787`, and nothing was listening there — `wrangler dev` was not running, and
   even if it had been, a loopback address is unreachable from a physical device regardless of
-  `--tunnel` (`--tunnel` forwards Metro, never the Worker). This is the third time this exact class
-  of bug has hit the project (see the 2026-08-07 entry) — the first two fixes each corrected a
-  developer's local `.env` but never the committed template it was copied from.
+  `--tunnel` (`--tunnel` forwards Metro, never the Worker). This is the second recorded hit of this
+  exact class of bug (see the 2026-08-07 entry) — that fix corrected a developer's local `.env`
+  and documented the trap, but never changed the committed template it was copied from.
 - **Fix: `.env.example` now defaults to the deployed Worker's URL**
   (`https://pace-blueprint-production.i78979848.workers.dev`) for every device type, matching the
   captain's 2026-08-07 ruling to deploy rather than use a LAN address against `wrangler dev`. No
