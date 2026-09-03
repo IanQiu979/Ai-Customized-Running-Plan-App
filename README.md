@@ -83,10 +83,11 @@ npm run lint     # expo lint
 copy it, don't edit it in place.
 
 - **Client variables** must be prefixed `EXPO_PUBLIC_`. Expo inlines these in plain text into
-  the compiled app bundle, so treat anything with this prefix as public. The two that exist
-  (`EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`) are **legacy**: nothing reads
-  them except `src/lib/supabase.ts`, which nothing imports. They go when the client is moved onto
-  `workers/`.
+  the compiled app bundle, so treat anything with this prefix as public. `EXPO_PUBLIC_API_BASE_URL`
+  is the `workers/` origin the app talks to; `.env.example` owns the per-device-type value and
+  defaults to the deployed Worker. The other two (`EXPO_PUBLIC_SUPABASE_URL`,
+  `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`) are **legacy**: nothing reads them except
+  `src/lib/supabase.ts`, which nothing imports. They go when that file is deleted.
 - **Server variables live in `workers/`, not here.** `workers/.dev.vars` (gitignored;
   `.dev.vars.example` is the template) for local development, `wrangler secret put NAME` for
   production. That covers `BETTER_AUTH_SECRET`, `ANTHROPIC_API_KEY`, and the Google OAuth pair.
