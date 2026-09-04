@@ -89,7 +89,7 @@
   `[vars]` of `workers/wrangler.toml` (the committed `[env.production.vars]` value is `"false"`),
   so the captain's test pass runs with every account Elite and the quota gate bypassed. Set the
   top-level value to `"false"` before real users arrive. Recorded in "Latest — 2026-08-09".
-- **Test counts:** 509 root tests across 31 suites on `fm/v22-redesign-theme-onboarding`, verified
+- **Test counts:** 511 root tests across 32 suites on `fm/v22-redesign-theme-onboarding`, verified
   by running `npm test` there on 2026-09-04; `main`'s figure is the 469 across 29 suites recorded
   in the 2026-09-01 and 2026-09-03 entries below. 139 `workers/` tests across 7 files
   (`npm --prefix workers test`, verified 2026-08-17 and untouched since — no `workers/` change has
@@ -148,7 +148,7 @@ the work. On `fm/v22-redesign-theme-onboarding`, **not merged**; full account in
   is a marked INTEGRATION POINT rendering the *static end state* of `<PulseTraceHero>`, the
   signature animation being built in parallel on `fm/v22-redesign-animation` — **that animation is
   not on this branch**, so nothing moves yet; the swap is one import line when it lands.
-- 509 root tests across 31 suites pass, typecheck and lint clean (re-verified 2026-09-04, after the
+- 511 root tests across 32 suites pass, typecheck and lint clean (re-verified 2026-09-04, after the
   review fix round below). No `workers/` change. **The three signed-out screens have been seen
   rendered** — onboarding, sign-in and sign-up, in both schemes, on Expo web at 430x932 — but no
   screen has been run on a device or simulator, and the signed-in screens have still never been

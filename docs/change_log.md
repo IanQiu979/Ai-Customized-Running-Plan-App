@@ -82,7 +82,7 @@ for colour, type, and ornament — the rest of that brief still governs — and 
   pre-auth screen except the OS back gesture.
 - **The Paywall's RECOMMENDED badge went monochrome**, so the recommended tier's button stays the
   screen's one signal.
-- **Verification, honestly.** `typecheck && lint && test` clean at **509 root tests across 31
+- **Verification, honestly.** `typecheck && lint && test` clean at **511 root tests across 32
   suites** (re-run 2026-09-04, after the fix round below); no `workers/` change. **The three
   signed-out screens have been seen rendered** — onboarding, sign-in and sign-up, screenshotted in
   both schemes on Expo **web** at 430x932, which is what caught the stretched waveform and the
@@ -107,7 +107,9 @@ Two behavior changes, both from the branch's first review pass.
 - **The four pre-auth links use `router.navigate`, not `router.push`.** Both "Back to the start"
   links and both sign-in ↔ sign-up swap links. `push` grew the stack by an entry every time, so a
   round trip walked the OS back gesture through a chain of duplicate, scroll-reset landing screens;
-  `navigate` pops to the existing route instead.
+  `navigate` pops to the existing route instead. Covered by
+  `src/app/(auth)/__tests__/auth-back-link.test.tsx`, which asserts the action each of the four
+  links dispatches — the second deliberate exception to "screens are not unit-tested".
 - **A doc overclaim, corrected as the author's own.** Four places (the contrast test, `theme.ts`,
   `AGENTS.md`, `docs/design/instrument-visual-system.md`) claimed the contrast test pinned
   `constants/pulseTrace.ts`'s duplicated hexes so the two files could not drift. It does not: that

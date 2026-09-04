@@ -145,7 +145,12 @@ clean `typecheck && lint && test`. Never force-push without explicit user approv
 ## Testing
 
 jest-expo is installed. New logic added to `src/lib/` gets a test alongside it (see
-`src/lib/__tests__/supabase.test.ts`). Screens are not unit-tested for now.
+`src/lib/__tests__/supabase.test.ts`). Screens are not unit-tested for now. The two rendered-screen
+suites in `src/app/(auth)/__tests__/` are deliberate exceptions (2026-09-04), both because the
+screen's whole behaviour is a dispatched action with no logic layer underneath it to test instead:
+`onboarding.test.tsx` (the CTA gate and its bounded ceiling) and `auth-back-link.test.tsx` (the
+four pre-auth links' navigation action). Each file's header states the reason; add a third only on
+the same grounds.
 
 ## Keep these docs updated — this is a standing rule, not a suggestion
 
