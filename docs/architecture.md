@@ -100,7 +100,7 @@ src/
     ui/                     # ActionButton (new 2026-09-03) — PrimaryAction / SecondaryAction /
                              # ActionDivider / LinkAction. PrimaryAction IS the signal, so "one
                              # accent per screen" is a question about imports, not about review
-    __tests__/              # render smoke tests: render, and pulseTraceHero (8 tests, new
+    __tests__/              # render smoke tests: render, and pulseTraceHero (9 tests, new
                              # 2026-09-04)
     inputs/                 # NumberField, SegmentedField, DateField, ClockField (new 2026-08-15) —
                              # every numeric/structured answer in the app. Keystrokes are filtered

@@ -255,7 +255,11 @@ export function scrollProgress(offsetY: number, contentHeight: number, viewportH
   return clamp(offsetY / range, 0, 1);
 }
 
+/** Also a worklet: `scrollProgress` calls it on the UI thread, and Reanimated only lets a worklet
+ * synchronously call another worklet — a plain captured function becomes a stub that throws
+ * there. The directive is inert on the JS thread, where `normalizeBeats` still calls it. */
 function clamp(value: number, min: number, max: number): number {
+  'worklet';
   return Math.min(max, Math.max(min, value));
 }
 

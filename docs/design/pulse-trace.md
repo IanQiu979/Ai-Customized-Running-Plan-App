@@ -115,7 +115,7 @@ Omit `progress`. Timeline, in ms, from `PulseTraceMotion`:
 | sweep / rest | 1600 / 1400, looped | A soft light travels the finished trace, pauses, travels again. |
 
 Gate a CTA on `onSettled` if the screen needs the hero settled before the button is live (the
-previous landing screen did). The fallback ceiling guarantees the gate resolves.
+previous landing screen did). The fallback ceiling resolves the gate for any hero that measures — it is timed from layout, so a hero mounted in a container that lays out at zero width never measures and therefore never settles.
 
 ## Tokens
 
