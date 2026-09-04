@@ -55,7 +55,9 @@ import {
  * - **Scroll-driven** (`progress`, a Reanimated `SharedValue` in 0..1): the head follows the
  *   value, so the trace draws as the runner scrolls, and a spike placed at a section boundary
  *   (`beats`, see `lib/pulseTrace.ts`'s `beatsAtMarks`) fires exactly as they cross it. The
- *   ambient sweep runs along whatever is drawn so far.
+ *   ambient sweep runs along whatever is drawn so far. `usePulseTraceScroll`, at the bottom of
+ *   this file, is the wiring: it hands back the value plus the three `ScrollView` props that keep
+ *   it honest on a page too short to scroll.
  *
  * Everything on the UI thread is a table lookup off the head's x-position — `lib/pulseTrace.ts`
  * explains why the geometry is x-monotonic and where the "rhythm" comes from with no per-spike
@@ -142,9 +144,11 @@ export function PulseTraceHero({
   style,
 }: {
   /**
-   * Drive the head from outside: 0 = nothing drawn, 1 = fully drawn. Give it the onboarding's
-   * scroll progress (`lib/pulseTrace.ts`'s `scrollProgress`, inside a `useDerivedValue`) and the
-   * trace draws as the runner scrolls. Omit it and the trace draws itself on mount.
+   * Drive the head from outside: 0 = nothing drawn, 1 = fully drawn. For a scrolling screen take
+   * it from `usePulseTraceScroll` (below), which both handles the scroll and seeds the value from
+   * layout and content size — a page shorter than its viewport emits no scroll event at all, so a
+   * handler-only wiring leaves the field blank. Full recipe: `docs/design/pulse-trace.md`. Omit
+   * this prop and the trace draws itself on mount.
    */
   progress?: SharedValue<number>;
   /** Where the spikes go and how tall. Defaults to the fixed house rhythm; a scroll-driven caller
