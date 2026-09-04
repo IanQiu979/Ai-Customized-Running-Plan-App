@@ -95,10 +95,10 @@ clean `typecheck && lint && test`. Never force-push without explicit user approv
   `docs/architecture.md`'s "Current — visual direction". **Never edit a hex there without
   re-verifying contrast** — and note that rule now has teeth:
   `src/constants/__tests__/theme.contrast.test.ts` recomputes every ratio from the hexes and
-  asserts it against its **floor** (and, for the two values that are deliberately below the floor,
-  against a ceiling), so a hex that breaks legibility fails the suite instead of shipping. It does
-  NOT pin the exact documented numbers — that is deliberate, so a legitimate re-tune is not a test
-  edit — which means re-running the table and updating the comments is still a human step (the
+  asserts it against its **floor** (and, for the three values that are deliberately below the
+  floor, against a ceiling), so a hex that breaks legibility fails the suite instead of shipping.
+  It does NOT pin the exact documented numbers — that is deliberate, so a legitimate re-tune is not
+  a test edit — which means re-running the table and updating the comments is still a human step (the
   ratios were documented-only under Trailhead and drifted anyway — issue #70).
 - The primary CTA's shape is `src/components/ui/ActionButton.tsx`'s `PrimaryAction`, and nothing
   else may spend the signal colour. "One accent per screen" is therefore a question about imports,

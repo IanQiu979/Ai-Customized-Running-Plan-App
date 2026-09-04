@@ -34,7 +34,9 @@ src/
       onboarding.tsx        # 2026-08-08 — the signed-out landing screen. Rebuilt 2026-09-03 as a
                             #   scroll-down read: pulse-trace cover (components/onboarding/), a
                             #   SCROLL cue, three numbered beats, then "Get started" -> sign-up and
-                            #   the sign-in skip. No form; the CTA is disabled until the hero settles
+                            #   the sign-in skip. No form; the CTA is disabled until the hero
+                            #   settles, bounded by a 4s ceiling so an onSettled that never
+                            #   arrives cannot strand the only forward action (2026-09-04)
       sign-in.tsx            # email/password sign-in + a "Continue with Google" button; Google
                               #   provider live in production since 2026-08-09. Since 2026-09-03 it
                               #   carries the same pulse-trace field at `band` height and a "Back to
@@ -80,6 +82,7 @@ src/
                              # The dusk-era DuskHero/DuskSpark were deleted 2026-09-03 with the
                              # gradient they drew on
     home/                   # LockedPanel, PlanContentTeaser — the Free-tier lock and its teaser
+    intake/                 # IntakeExitAction — the questionnaire's header "Skip for now" / "Done"
     layout/                 # ScreenHeader, GroupedRows (Group / Row / ActionRow)
     nav/                    # TabBarIcon — the four tab glyphs, drawn not shipped as assets
     plan/                   # WeekAccordion, WorkoutRow, EffortChip, ReadoutBracket,

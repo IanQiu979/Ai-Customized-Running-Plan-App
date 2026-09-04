@@ -15,10 +15,11 @@
 >
 > **The floors behind the contrast table are executable.**
 > `src/constants/__tests__/theme.contrast.test.ts` recomputes every ratio below from the hexes in
-> `theme.ts` and asserts it against its floor — and, for the handful that are deliberately *below*
-> a floor, against its ceiling. A hex edited into illegibility therefore fails the suite instead
-> of shipping. It deliberately does **not** pin the exact numbers printed here: that would turn
-> every legitimate re-tune into a test edit. So re-running the table and updating these rows
+> `theme.ts` and asserts it against its floor — and, for the three that are deliberately *below* a
+> floor (`progress.disabled`, the signal on a light page, the field on a dark one), against its
+> ceiling. A hex edited into illegibility therefore fails the suite instead of shipping. It
+> deliberately does **not** pin the exact numbers printed here: that would turn every legitimate
+> re-tune into a test edit. So re-running the table and updating these rows
 > remains a human step, and the standing `CLAUDE.md` rule still applies — what changed is that the
 > rule is now backed by a floor nobody can quietly fall through, which is what it lacked under
 > Trailhead (issue #70).
@@ -208,10 +209,11 @@ Steps: **13 / 15 / 17 / 20 / 24 / 32 / 44**.
   `surface.base` — ordinary for an adjacent-surface pair, fatal for a card whose whole job is to
   read as a distinct object.
 - **The route line** — kept. A contour/elevation polyline at `mark` weight in `grid.routeLine`,
-  three variants from one component (`src/components/brand/RouteLine.tsx`), generated from a fixed
-  seeded profile so the same screen always draws the same ridge. It survived the recolour because
-  it was only ever a thin monochrome stroke; it now reads as a plotted trace rather than a hiking
-  contour, which suits the system better than it suited Trailhead.
+  two variants (`header`, `card`) from one component (`src/components/brand/RouteLine.tsx`),
+  generated from a fixed seeded profile so the same screen always draws the same ridge. It
+  survived the recolour because it was only ever a thin monochrome stroke; it now reads as a
+  plotted trace rather than a hiking contour, which suits the system better than it suited
+  Trailhead. The third, `hero`-height variant went with the dusk field it was sized for.
 - **`LockedOpacity` (0.45)** — the resting dim of a Free-tier locked surface. Not `PressedOpacity`
   wearing a second hat: press feedback is a 100ms transient on a live control, this is the resting
   state of something the runner cannot use. Applied only to surfaces whose text is decorative.

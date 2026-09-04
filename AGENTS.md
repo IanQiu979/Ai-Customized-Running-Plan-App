@@ -248,10 +248,11 @@ Built-ins also available: `Explore`, `Plan`, `general-purpose`. Plugin agents ar
   [`docs/design/instrument-visual-system.md`](docs/design/instrument-visual-system.md).
 - **Contrast is enforced, not documented.** `src/constants/__tests__/theme.contrast.test.ts`
   recomputes every ratio in `theme.ts` from the hexes, asserts the effort ramp's Lab distance from
-  the signal colour, and asserts the two ratios that are deliberately *below* the floor
-  (`progress.disabled`; the dark-mode slab that the cyan edge exists to compensate for). Do not
-  "fix" a failing below-floor assertion — read what it is for first. A new colour token fails the
-  token count until it is given a floor on purpose.
+  the signal colour, and asserts the three ratios that are deliberately *below* the floor
+  (`progress.disabled`; the signal on a light page, which is why it is never a fill; the dark-mode
+  slab that the cyan edge exists to compensate for). Do not "fix" a failing below-floor assertion —
+  read what it is for first. A new colour token fails the token count until it is given a floor on
+  purpose.
 - **`Accent.field`/`Accent.signal` are duplicated in `src/constants/pulseTrace.ts`** (the
   onboarding animation's own palette, written in parallel with the token rewrite). The contrast
   test pins the `theme.ts` side only — `pulseTrace.ts` is not on this branch, so it cannot be
