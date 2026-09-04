@@ -18,12 +18,15 @@ parallel task that also replaces the token system). Integration guide, written f
 
 - **`src/components/brand/PulseTraceHero.tsx`.** A thin icy-cyan ECG-style trace draws itself
   across a near-black field: a beat of flat baseline, then the head crosses at constant paper
-  speed, snapping through four spikes that get taller and closer, then a soft light sweeps the
-  finished line on a slow loop. Two ways to drive it, one number underneath. Omit `progress` and
-  it draws itself on mount; `onSettled` fires when the draw completes, behind a fallback ceiling
-  of `lead + draw + settleSlack` so a CTA gated on it can never hang. Pass a Reanimated
-  `SharedValue` and the head follows the onboarding scroll instead, with `beatsAtMarks` placing a
-  spike at each section boundary so crossing into a section fires a beat. Two sizes: `cover`
+  speed, snapping through four spikes that build and quicken before the last one eases off, then a
+  soft light sweeps the finished line on a slow loop. Two ways to drive it, one number underneath.
+  Omit `progress` and it draws itself on mount; `onSettled` fires when the draw completes, behind a
+  fallback ceiling of `lead + draw + settleSlack` so a CTA gated on it can never hang. Drive it from
+  a scrolling screen with `usePulseTraceScroll` — the required integration point, since it seeds
+  `progress` from layout and content size as well as from the scroll handler, and a page shorter
+  than its viewport emits no scroll event at all — with `beatsAtMarks` placing a spike at each
+  section boundary so crossing into a section fires a beat. Recipe:
+  [`docs/design/pulse-trace.md`](design/pulse-trace.md). Two sizes: `cover`
   (256pt hero with a copy slot) and `band` (128pt header strip). It paints its own dark field in
   both colour schemes. Under reduced motion there is no self-draw and no sweep, `onSettled` fires
   at once, and a scroll-driven trace still follows the scroll. The trace band is announced as one labelled `image`; the copy above it is traversed like any other text.

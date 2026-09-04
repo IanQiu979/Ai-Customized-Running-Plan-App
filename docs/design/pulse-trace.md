@@ -8,8 +8,8 @@
 ## What it is
 
 A thin icy-cyan ECG-style waveform that draws itself across a near-black field. It stands for pace
-and effort: it idles along a flat baseline and snaps through each spike, each beat taller and closer
-than the last, then a soft light sweeps the finished line on a slow loop. It is the ONE deliberately
+and effort: it idles along a flat baseline and snaps through each spike, the beats building and
+quickening before the last one eases off, then a soft light sweeps the finished line on a slow loop. It is the ONE deliberately
 bold, expressive element in an otherwise near-monochrome app, and it is the same in light and dark
 mode — it paints its own dark field.
 
