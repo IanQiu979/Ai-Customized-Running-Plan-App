@@ -9,7 +9,7 @@ import {
 } from '../routeProfile';
 
 /**
- * Guards the route-line ornament's geometry (`docs/design/trailhead-visual-system.md` §4).
+ * Guards the route-line ornament's geometry (`docs/design/instrument-visual-system.md` §4).
  *
  * The failure this suite exists for: at a 1.5pt stroke, a spline that overshoots its own box, or
  * a profile that silently reshuffles, is invisible in a screenshot and obvious in an assertion.

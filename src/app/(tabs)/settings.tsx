@@ -19,8 +19,8 @@ import type { QuotaStatus } from '@/lib/planTypes';
  * delete-account success, an explicit `authClient.signOut()` invalidates the local session store
  * so `src/app/_layout.tsx`'s `Stack.Protected` guard bounces to `(auth)`.
  *
- * **Zero accent, no exception** (`docs/design/trailhead-visual-system.md` §1). This screen is flat
- * grouped rows and hairlines. The "Upgrade" row is deliberately not an ember button: the offer
+ * **Zero accent, no exception** (`docs/design/instrument-visual-system.md` §1). This screen is flat
+ * grouped rows and hairlines. The "Upgrade" row is deliberately not a signal-marked button: the offer
  * lives on the Paywall, and this is a door to it. `status.error` on Delete Account is a status
  * colour, not the accent.
  */

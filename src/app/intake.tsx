@@ -26,6 +26,7 @@ import {
   Tracking,
 } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { PrimaryAction } from '@/components/ui/ActionButton';
 import { API_BASE_URL, describeError, getIntake, putIntake } from '@/lib/apiClient';
 import {
   clockFieldError,
@@ -110,7 +111,7 @@ export default function IntakeScreen() {
     headerStyle: { backgroundColor: theme.surface.base },
     // The one place in the app that renders a native header *title*. The nav theme deliberately
     // leaves its `fonts` block stock (`constants/navigation-theme.ts` says why), so without this
-    // the word "Intake" would be the only San Francisco / Roboto glyphs in a Trailhead screen.
+    // the word "Intake" would be the only San Francisco / Roboto glyphs on the screen.
     headerTitleStyle: { fontFamily: FontFamily.body.semiBold, fontSize: FontSize.md },
     headerRight: () => (
       <IntakeExitAction
@@ -489,24 +490,12 @@ export default function IntakeScreen() {
 
           {error && <Text style={[styles.error, { color: theme.status.error }]}>{error}</Text>}
 
-          <Pressable
-            accessibilityRole="button"
+          <PrimaryAction
+            label="Save intake"
             disabled={submitting}
+            busy={submitting}
             onPress={handleSave}
-            style={({ pressed }) => [
-              styles.primaryButton,
-              { backgroundColor: theme.accent.ember },
-              (pressed || submitting) && styles.pressed,
-            ]}
-          >
-            {submitting ? (
-              <ActivityIndicator color={theme.accent.onEmber} />
-            ) : (
-              <Text style={[styles.primaryButtonText, { color: theme.accent.onEmber }]}>
-                Save intake
-              </Text>
-            )}
-          </Pressable>
+          />
         </ScrollView>
       </SafeAreaView>
     </View>
@@ -681,16 +670,6 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.body.medium,
     fontSize: FontSize.xs,
     marginTop: Spacing.half,
-  },
-  primaryButton: {
-    minHeight: Spacing.six,
-    borderRadius: Radius.control,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  primaryButtonText: {
-    fontFamily: FontFamily.body.semiBold,
-    fontSize: FontSize.sm,
   },
   pressed: {
     opacity: PressedOpacity,

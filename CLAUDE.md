@@ -86,10 +86,23 @@ clean `typecheck && lint && test`. Never force-push without explicit user approv
 
 - TypeScript strict everywhere (already on in `tsconfig.json`).
 - Theme tokens only — no hardcoded colors or spacing in components; use
-  `src/constants/theme.ts`. It holds the **"Instrument & Matter"** token system — live since
-  commit `145d7e0`, contrast-verified, and documented in `docs/design/frontend-design-brief.md`
-  (the source of truth for every value) and `docs/architecture.md`'s "Current — visual direction".
-  Never edit a hex there without re-verifying contrast and updating the brief.
+  `src/constants/theme.ts`. It holds the **"Instrument"** token system (2026-09-03, replacing
+  "Trailhead", which replaced "Instrument & Matter"): near-monochrome white/graphite and charcoal,
+  with a theme-invariant two-tier accent — a near-black `Accent.field` slab carrying ONE icy-cyan
+  `Accent.signal`, spent on exactly one call-to-action per screen and on the onboarding pulse
+  trace, never anywhere else. Source of truth for every value:
+  [`docs/design/instrument-visual-system.md`](docs/design/instrument-visual-system.md); see also
+  `docs/architecture.md`'s "Current — visual direction". **Never edit a hex there without
+  re-verifying contrast** — and note that rule now has teeth:
+  `src/constants/__tests__/theme.contrast.test.ts` recomputes every ratio from the hexes and
+  asserts it against its **floor** (and, for the three values that are deliberately below the
+  floor, against a ceiling), so a hex that breaks legibility fails the suite instead of shipping.
+  It does NOT pin the exact documented numbers — that is deliberate, so a legitimate re-tune is not
+  a test edit — which means re-running the table and updating the comments is still a human step (the
+  ratios were documented-only under Trailhead and drifted anyway — issue #70).
+- The primary CTA's shape is `src/components/ui/ActionButton.tsx`'s `PrimaryAction`, and nothing
+  else may spend the signal colour. "One accent per screen" is therefore a question about imports,
+  not a review of eight hand-rolled stylesheets.
 - No business rules in the client. Tier, quota, and plan generation are server-only (`workers/`);
   the client may display tier state but is never the authority for it. **D1 has no row-level
   security**, so every D1 statement must bind a `userId` from the verified session — see
@@ -132,7 +145,12 @@ clean `typecheck && lint && test`. Never force-push without explicit user approv
 ## Testing
 
 jest-expo is installed. New logic added to `src/lib/` gets a test alongside it (see
-`src/lib/__tests__/supabase.test.ts`). Screens are not unit-tested for now.
+`src/lib/__tests__/supabase.test.ts`). Screens are not unit-tested for now. The two rendered-screen
+suites in `src/app/(auth)/__tests__/` are deliberate exceptions (2026-09-04), both because the
+screen's whole behaviour is a dispatched action with no logic layer underneath it to test instead:
+`onboarding.test.tsx` (the CTA gate and its bounded ceiling) and `auth-back-link.test.tsx` (the
+four pre-auth links' navigation action). Each file's header states the reason; add a third only on
+the same grounds.
 
 ## Keep these docs updated — this is a standing rule, not a suggestion
 

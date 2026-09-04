@@ -8,18 +8,18 @@
  * them to paint chrome the app never styles directly: transition underlays, header defaults, and
  * the reveal behind an in-progress back-swipe. Handing the stock objects to `ThemeProvider` lets
  * that untokened gray leak through (a light-mode push flashing a cold `rgb(242, 242, 242)`
- * against Trailhead's warm chalk canvas is a visible seam, and a more obvious one than it was
+ * against this system's white canvas is a visible seam, and a more obvious one than it was
  * under the previous, cooler palette). Every value below is derived from `Colors` in
  * `./theme.ts` — never a re-typed hex — so this can never drift from the rest of the system.
  *
- * `primary` maps to `text.primary`, not the ember accent: Trailhead spends ember on the single
+ * `primary` maps to `text.primary`, not the signal colour: the system spends the signal on the single
  * forward-action per screen and explicitly bars it from nav/tab active states. The tab bar's own
  * active state is an ink tick, drawn in `(tabs)/_layout.tsx`.
  *
  * The `Theme`'s `fonts` block is deliberately left stock, and that is a choice, not an oversight:
  * nothing renders a header title today (`plan/[id].tsx` sets `headerTitle: ''`; every other screen
  * is `headerShown: false`), so there is no way to see it. The day a real header title lands, map
- * this to `FontFamily.body` — Trailhead mandates Public Sans for UI chrome, and the stock block
+ * this to `FontFamily.body` — the system mandates Public Sans for UI chrome, and the stock block
  * resolves to system San Francisco / Roboto.
  */
 

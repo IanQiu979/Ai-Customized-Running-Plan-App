@@ -16,8 +16,8 @@ import { RUN_TYPE_ABBREVIATIONS, STRUCTURE_SHORTHAND, UNABBREVIATED_RUN_TYPES } 
  * and Rest also live in `notation.ts` but aren't run *types* a workout is abbreviated from, so
  * they sit outside this screen's two sections.
  *
- * **Zero accent and zero ornament, no exception** (`docs/design/trailhead-visual-system.md` §1):
- * no route line in the header, no ember anywhere. This is a reference table, and a reference table
+ * **Zero accent and zero ornament, no exception** (`docs/design/instrument-visual-system.md` §1):
+ * no route line in the header, no signal colour anywhere. This is a reference table, and a reference table
  * that decorates itself is harder to read, not more appealing.
  *
  * It does not use `components/layout/GroupedRows.tsx` the way Settings does: a glossary row is a

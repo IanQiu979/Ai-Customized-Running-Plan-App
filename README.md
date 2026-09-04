@@ -107,7 +107,8 @@ src/
     _layout.tsx
     (auth)/
       index.tsx            # redirect anchor -> onboarding
-      onboarding.tsx        # animated week-ribbon hero, then "Get started" -> sign-up
+      onboarding.tsx        # scroll-down landing read: pulse-trace cover, three beats, then
+                             #   "Get started" -> sign-up
       sign-in.tsx, sign-up.tsx  # email/password + "Continue with Google"; provider live in
                                  #   production since 2026-08-09
     (tabs)/
@@ -122,9 +123,10 @@ src/
                             #  golden-fixture example
   components/
     plan/                  # plan-view UI: nameplate, effort chip, workout row, week accordion, ...
-    onboarding/            # HeroRibbon — the week-ribbon motif at hero scale, reduced-motion aware
+    onboarding/            # PulseTraceSlot — the integration point for the signature animation
+    ui/                     # ActionButton — the one implementation of the primary/secondary CTA
   constants/
-    theme.ts                # "Instrument & Matter" design tokens
+    theme.ts                # "Instrument" design tokens — see docs/design/instrument-visual-system.md
   hooks/
     use-color-scheme.ts, use-color-scheme.web.ts, use-theme.ts
   lib/

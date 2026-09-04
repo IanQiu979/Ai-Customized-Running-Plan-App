@@ -27,6 +27,7 @@ import {
   Tracking,
 } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { PrimaryAction } from '@/components/ui/ActionButton';
 import { API_BASE_URL, ApiError, describeError, generatePlan, getIntake, getQuotaStatus } from '@/lib/apiClient';
 import { mintIdempotencyKey } from '@/lib/idempotencyKey';
 import { assessGoalRealism } from '@/lib/paceDerivation';
@@ -55,10 +56,10 @@ const MAX_NOTES_LENGTH = 1000;
  * from `planTargetFromIntake`; the only field left is a plan length, and only when there is no
  * race date to derive one from. "Change" goes back to `/intake` — one place, one answer.
  *
- * Trailhead ships three states here, plus the two the network forces:
+ * Three states here, plus the two the network forces:
  *
  *  - **Empty** — no intake yet.
- *  - **Populated** — the target, the one ember "Generate plan", and a row pushing to My Plans.
+ *  - **Populated** — the target, the one signal-marked "Generate plan", and a row pushing to My Plans.
  *  - **Free tier** — the same, with Notes locked behind a dashed `LockedPanel` and a second panel
  *    teasing what a Pro/Elite plan actually contains.
  *  - Loading, and a load error that keeps the last known intake on screen.
@@ -259,19 +260,7 @@ export default function HomeScreen() {
                 </Text>
               </View>
 
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => router.push('/intake')}
-                style={({ pressed }) => [
-                  styles.primaryButton,
-                  { backgroundColor: theme.accent.ember },
-                  pressed && styles.pressed,
-                ]}
-              >
-                <Text style={[styles.primaryButtonText, { color: theme.accent.onEmber }]}>
-                  Start intake
-                </Text>
-              </Pressable>
+              <PrimaryAction label="Start intake" onPress={() => router.push('/intake')} />
             </View>
           ) : (
             <View style={styles.section}>
@@ -395,24 +384,12 @@ export default function HomeScreen() {
                 <Text style={[styles.error, { color: theme.status.error }]}>{generateError}</Text>
               )}
 
-              <Pressable
-                accessibilityRole="button"
+              <PrimaryAction
+                label="Generate plan"
                 disabled={generating}
+                busy={generating}
                 onPress={handleGenerate}
-                style={({ pressed }) => [
-                  styles.primaryButton,
-                  { backgroundColor: theme.accent.ember },
-                  (pressed || generating) && styles.pressed,
-                ]}
-              >
-                {generating ? (
-                  <ActivityIndicator color={theme.accent.onEmber} />
-                ) : (
-                  <Text style={[styles.primaryButtonText, { color: theme.accent.onEmber }]}>
-                    Generate plan
-                  </Text>
-                )}
-              </Pressable>
+              />
 
               {/* The push toward My Plans. A row, not a second button — this screen already spent
                   its one accent above, and a competing CTA is exactly what that rule prevents. */}
@@ -545,17 +522,6 @@ const styles = StyleSheet.create({
   error: {
     fontFamily: FontFamily.body.medium,
     fontSize: FontSize.xs,
-  },
-  primaryButton: {
-    minHeight: Spacing.six,
-    borderRadius: Radius.control,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: Spacing.two,
-  },
-  primaryButtonText: {
-    fontFamily: FontFamily.body.semiBold,
-    fontSize: FontSize.sm,
   },
   navRow: {
     flexDirection: 'row',

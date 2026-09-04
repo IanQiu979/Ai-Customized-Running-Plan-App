@@ -31,12 +31,18 @@ src/
       _layout.tsx          # stack layout for the signed-out route group
       index.tsx             # redirect anchor -> onboarding (2026-08-08; was sign-up). Note this is
                             #   the anchor for EVERY signed-out session, not just first install
-      onboarding.tsx        # 2026-08-08 — the signed-out landing screen. Animated week-ribbon hero
-                            #   (components/onboarding/), the pitch, then "Get started" -> sign-up.
-                            #   No form; the CTA is disabled until the hero settles
+      onboarding.tsx        # 2026-08-08 — the signed-out landing screen. Rebuilt 2026-09-03 as a
+                            #   scroll-down read: pulse-trace cover (components/onboarding/), a
+                            #   SCROLL cue, three numbered beats, then "Get started" -> sign-up and
+                            #   the sign-in skip. No form; the CTA is disabled until the hero
+                            #   settles, bounded by a 4s ceiling so an onSettled that never
+                            #   arrives cannot strand the only forward action (2026-09-04)
       sign-in.tsx            # email/password sign-in + a "Continue with Google" button; Google
-                              #   provider live in production since 2026-08-09
-      sign-up.tsx            # email/password sign-up + the same Google button
+                              #   provider live in production since 2026-08-09. Since 2026-09-03 it
+                              #   carries the same pulse-trace field at `band` height and a "Back to
+                              #   the start" link to onboarding
+      sign-up.tsx            # email/password sign-up + the same Google button, same treatment and
+                              #   the same link back
                             #   both auth screens scroll (KeyboardAvoidingView + ScrollView) as of
                             #   2026-08-08 — centred content used to be unreachable under a keyboard
     (tabs)/
@@ -71,23 +77,38 @@ src/
                               #  Settings or from Home's generate-plan 402 over_quota catch;
                               #  calls POST /api/purchase-tier, honest "test upgrade" copy
   components/
+    auth/                   # AuthField — the labelled text input both auth screens use
+    brand/                  # RouteLine — the in-app contour ornament, two variants (header, card).
+                             # The dusk-era DuskHero/DuskSpark were deleted 2026-09-03 with the
+                             # gradient they drew on
+    home/                   # LockedPanel, PlanContentTeaser — the Free-tier lock and its teaser
+    intake/                 # IntakeExitAction — the questionnaire's header "Skip for now" / "Done"
+    layout/                 # ScreenHeader, GroupedRows (Group / Row / ActionRow)
+    nav/                    # TabBarIcon — the four tab glyphs, drawn not shipped as assets
     plan/                   # WeekAccordion, WorkoutRow, EffortChip, ReadoutBracket,
                              # PlanNameplate, DisclaimerFooter, FallbackNotice, GoalRealismNotice
                              # (new 2026-08-05 — renders Plan.goalRealism), format.ts
-    onboarding/             # HeroRibbon (new 2026-08-08) — the week-ribbon motif at 2x hero scale,
-                             # building itself cell by cell then settling into an ambient pulse.
-                             # Reduced-motion aware; illustration only, never the user's data
+    onboarding/             # PulseTraceSlot (new 2026-09-03) — a marked INTEGRATION POINT. It
+                             # renders the static end state of <PulseTraceHero>, the signature
+                             # animation owned by a parallel branch; its props are a subset of that
+                             # component's, so the swap is one import line. Illustration only,
+                             # never the user's data
+    ui/                     # ActionButton (new 2026-09-03) — PrimaryAction / SecondaryAction /
+                             # ActionDivider / LinkAction. PrimaryAction IS the signal, so "one
+                             # accent per screen" is a question about imports, not about review
     inputs/                 # NumberField, SegmentedField, DateField, ClockField (new 2026-08-15) —
                              # every numeric/structured answer in the app. Keystrokes are filtered
                              # through src/lib/fieldInput.ts; dates and times are segmented boxes
                              # with the `-`/`:` printed, never typed. No screen uses a raw
                              # <TextInput keyboardType="..."> for a number
   constants/
-    theme.ts                # "Trailhead" token system — current, see below
+    theme.ts                # "Instrument" token system — current, see below
     navigation-theme.ts      # bridges theme.ts's tokens into @react-navigation/native's `Theme`
                              #  shape, so ThemeProvider never leaks the library's own stock
                              #  DefaultTheme/DarkTheme colors (fixes issue #27)
-    __tests__/                # navigation-theme (10 tests) — first suite under constants/
+    __tests__/                # navigation-theme, and theme.contrast (new 2026-09-03) — the latter
+                             #  recomputes every ratio in the design doc's tables from theme.ts's
+                             #  own hexes, so the contrast rule is enforced rather than documented
   hooks/                    # use-theme, use-color-scheme
   lib/
     supabase.ts             # LEGACY, unused — see below
@@ -586,56 +607,95 @@ The full list, with what was done instead, is the header of
 **Tier and quota are only ever written by the Worker** — the client has no database access at all,
 so it can never write its own tier or quota.
 
-## Current — visual direction ("Trailhead", `theme.ts`)
+## Current — visual direction ("Instrument", `theme.ts`)
 
-> **Source of truth: [`docs/design/trailhead-visual-system.md`](design/trailhead-visual-system.md)**
-> (captain-approved 2026-09-01). Every hex, the contrast tables, the type scale and the ornament
-> rules live there and in `src/constants/theme.ts`'s own header comment; this section is a summary
-> and never the authority. That document supersedes `docs/design/frontend-design-brief.md`
-> Parts 2 (tokens) and 3 (the ribbon/wave motif) — the rest of the brief still governs. Where the
-> two disagree about a *value*, Trailhead wins; about a *rule*, the brief wins.
+> **Source of truth: [`docs/design/instrument-visual-system.md`](design/instrument-visual-system.md)**
+> (captain-approved 2026-09-03, replacing "Trailhead"). Every hex, the full contrast tables, the
+> type scale and the ornament rules live there and in `src/constants/theme.ts`'s own header
+> comment; this section is a summary and never the authority — the tables in particular are not
+> duplicated here. That document supersedes `docs/design/frontend-design-brief.md` Parts 2 (tokens)
+> and 3 (the ribbon/wave motif) — the rest of the brief still governs. Where the two disagree about
+> a *value*, Instrument wins; about a *rule*, the brief wins.
 >
-> **Trailhead lives on `redesign/trailhead-2026-09-01` and is not merged to `main`.** On `main`,
-> `theme.ts` is still the previous "Instrument & Matter" system. This section describes the branch.
+> **Instrument lives on `fm/v22-redesign-theme-onboarding` and is not merged to `main`.** On
+> `main`, `theme.ts` is Trailhead (merged as PR #82, plus the fidelity follow-up #83); this section
+> describes the branch. **Only the three signed-out screens have been seen rendered** — onboarding,
+> sign-in and sign-up, in both schemes, on Expo web at phone size. No screen has been run on a
+> device or simulator, and the signed-in screens have never been seen rendered in either system.
 
-`src/constants/theme.ts` holds the Trailhead tokens: warm chalk paper and espresso ink, hairline
-rules instead of boxes, and numerals set like a printed table. `Spacing` runs half=2, one=4, two=8,
-three=16, four=24, five=32, **six=48**, seven=64; `MaxContentWidth = 800` is unchanged from the
-scaffold. `BottomTabInset`'s value is likewise unchanged, but as of 2026-07-12 (issue #32
-finding 8) it carries a docblock explaining why it still has zero call sites: it models a tab bar
-that *floats over* content, and the real tab bar (`(tabs)/_layout.tsx`) lays out in normal flow
-instead, so applying the inset today would add trailing void, not clearance — see
-`docs/mvp-progress.md`'s "Known debt" for the full reasoning.
+`src/constants/theme.ts` holds the Instrument tokens: a near-monochrome, cool-scientific field —
+white and graphite in light mode, deep charcoal in dark — carrying every button, rule and piece of
+chrome in near-black, with one much brighter highlight in it. It is a house style, shared with the
+sibling app V2.3 ("Pace AnalysisAI"). `Spacing` runs half=2, one=4, two=8, three=16, four=24,
+five=32, **six=48**, seven=64; `MaxContentWidth = 800` is unchanged from the scaffold.
+`BottomTabInset`'s value is likewise unchanged, but as of 2026-07-12 (issue #32 finding 8) it
+carries a docblock explaining why it still has zero call sites: it models a tab bar that *floats
+over* content, and the real tab bar (`(tabs)/_layout.tsx`) lays out in normal flow instead, so
+applying the inset today would add trailing void, not clearance — see `docs/mvp-progress.md`'s
+"Known debt" for the full reasoning.
 
-- **Bases**: chalk `#F4F1EA` (light) and espresso `#1E1815` (dark), plus a `surface.inverse` slab
-  used dark in *both* schemes — the Paywall's pricing cards, whose edge comes from
-  `grid.inverseHairline` rather than from lightness separation.
-- **Effort scale** — the palette *is* the information, not decoration; the ramp was re-picked in
-  Trailhead so every value clears 4:1 (the old light ramp sat at 3.00–3.06:1, with no headroom for
-  an opacity dip). `barHeight`, the mandatory non-hue accessibility channel, is still computed as
+- **Bases**: white `#FFFFFF` (light) and deep cool charcoal `#0E1317` (dark), plus a
+  `surface.inverse` slab used dark in *both* schemes — the Paywall's pricing cards, whose edge
+  comes from `grid.inverseHairline` rather than from lightness separation.
+- **Two-tier accent, theme-invariant.** `Accent.field` (`#0A0E13`) is a near-black slab;
+  `Accent.signal` (`#A8F0FF`) is the ONE bright highlight — icy cyan, locked — spent on exactly one
+  call to action per screen and on the onboarding pulse trace, **never in navigation**, and never
+  anywhere else. Several screens spend no accent at all: a destination is not a call to action.
+  **The cyan is never a fill**, and that is the single most load-bearing measurement in the system:
+  it is **1.27:1** against a white page, so a cyan button would have no visible boundary. The
+  primary action is therefore a near-black slab with a 1.5pt cyan edge and a cyan label, identical
+  in both schemes, and its boundary is carried by a different channel in each — **19.35:1** in
+  light (the slab against the page), **14.74:1** in dark (the cyan edge; the slab itself is only
+  **1.04:1** there, deliberately). Unlike Trailhead's scheme-keyed ember there is nothing to
+  resolve, so `useTheme()` returns `Accent` unresolved. `Accent.field` is also
+  `Colors.light.surface.inverse` and the same near-black as the pulse trace's own field: every dark
+  plane in the app is one plane, so a primary action on a pricing slab reads as an inset in it
+  rather than as a second, slightly different black.
+- **Effort scale** — the palette *is* the information, not decoration. Instrument re-tuned all ten
+  hues into a cooler key (steel blue / sea green / brass / rust / raspberry), each keeping its
+  identity and its place in the ordering. Two constraints bound the values: every one sits at
+  **4.92:1 or better against both `surface.base` and `surface.raised`** (Trailhead's light ramp sat
+  at 4.02–4.50 against `base` with nothing checked against `raised`, which is what issue #70
+  reported), and no hue may collide with `Accent.signal`, measured as CIE76 ΔE in Lab rather than
+  as a contrast ratio — a ratio is blind to hue and would pass an icy-cyan `recovery`. `barHeight`,
+  the mandatory non-hue accessibility channel, is still computed as
   `0.4 + 0.15 × EFFORT_ORDINAL[level]` against `planTypes.ts`'s ordinal rather than hand-written
   per level (issue #32 findings 4 and 7, 2026-07-12).
-- **One accent, ember**, reserved for the single primary forward-action of whatever screen you're
-  on — boldness spent in exactly one place, and **never in navigation**. Unlike the previous
-  system's theme-invariant `hivis`, it is scheme-aware (`Accent[scheme].ember`, resolved by
-  `useTheme()`), because no single ember clears AA on both chalk and espresso. Several screens
-  spend no accent at all: a destination is not a call to action.
+- **Contrast is enforced, not documented.** `src/constants/__tests__/theme.contrast.test.ts`
+  recomputes every ratio from the hexes in `theme.ts` and asserts it against that token's floor,
+  including the three values that are deliberately *below* it (`progress.disabled`, the signal on a
+  light page, the field on a dark one), asserted as upper bounds. A last check counts the opaque
+  tokens in `Colors`, so a new hex cannot be added without being given a floor.
 - **Interaction**: one `PressedOpacity` token (`0.7`) for every `Pressable`'s press-dim, added
   2026-07-12 (issue #32 finding 3) so the value can't fork across components the way it had in
   `index.tsx` and `WeekAccordion.tsx`. Distinct from `LockedOpacity` (`0.45`), which is the
   *resting* dim of a surface the runner cannot use, not press feedback.
-- Type: Big Shoulders Display for display and every numeral (running is numbers — distance, pace,
-  splits), Public Sans for body and UI chrome, Space Mono for pace, HR and all-caps labels. Scale
-  13/15/17/20/24/32/44.
+- Type: unchanged from Trailhead — Big Shoulders Display for display and every numeral (running is
+  numbers — distance, pace, splits), Public Sans for body and UI chrome, Space Mono for pace, HR
+  and all-caps labels. Scale 13/15/17/20/24/32/44. Radii tightened again (control 10→8, card 16→14):
+  an instrument panel is squarer than a paper metaphor.
+- **The accent rule is carried by the module graph, not by review.**
+  `src/components/ui/ActionButton.tsx` (`PrimaryAction`/`SecondaryAction`/`ActionDivider`/
+  `LinkAction`) is the one implementation of the treatment; `PrimaryAction` *is* the signal, so
+  "one accent per screen" reduces to how many of them a screen renders. It replaced eight
+  hand-rolled button stylesheets.
 - **Signature element — the route line**: a thin contour/elevation stroke
   (`src/components/brand/RouteLine.tsx`, geometry in `src/lib/routeProfile.ts`), carried through
-  Home, My Plans and Plan view in three variants. It replaced the ribbon/wave motif as the
-  signature. The **per-week effort ribbon** inside a plan is not ornament and stays
-  (`src/components/plan/WeekAccordion.tsx`) — it encodes real data; the macro periodization wave
-  (`mvp-blueprint.md` Part 3) is not built and is no longer planned.
-- **One deliberate exception**: the signed-out screens carry a plum→ember→amber dusk gradient and
-  an animated route line (`src/components/brand/DuskHero.tsx`). Everything past the session gate is
-  paper and ink.
+  Home, My Plans, Plan view and the Paywall in two variants (`header` and `card` — the third,
+  `hero`-height one went with the dusk field it was sized for, since the signed-out screens now
+  carry the pulse trace, which draws its own geometry). It survived the recolour — it was only ever
+  a thin monochrome stroke, and now reads as a plotted trace. The **per-week effort ribbon** inside a
+  plan is not ornament and stays (`src/components/plan/WeekAccordion.tsx`) — it encodes real data;
+  the macro periodization wave (`mvp-blueprint.md` Part 3) is not built and is no longer planned.
+- **One deliberate exception**: the signed-out screens carry a near-black pulse-trace field with an
+  icy-cyan ECG-style waveform — a tall `cover` on onboarding, the short `band` height on sign-in and
+  sign-up. The field carries only the mono wordmark; the headline sits on the page below it, since
+  the real animated component is fixed-height and display copy inside it would clip.
+  Everything past the session gate is near-monochrome. The waveform is currently
+  `src/components/onboarding/PulseTraceSlot.tsx`, a marked integration point rendering the animation's
+  *static end state*; the animation itself (`<PulseTraceHero>`) is being built on
+  `fm/v22-redesign-animation` and **is not on this branch**, so nothing moves yet. Its props are a
+  subset of the real component's, so the swap is one import line in `(auth)/onboarding.tsx`.
 - **React Navigation's own chrome is tokened too, not just the screens built on top of it.**
   `src/constants/navigation-theme.ts` bridges the same `Colors` tokens into the `Theme` shape
   `@react-navigation/native` expects (`background`→`surface.base`, `card`→`surface.raised`,
@@ -643,7 +703,8 @@ instead, so applying the inset today would add trailing void, not clearance — 
   `status.error`), so `_layout.tsx`'s `ThemeProvider` never falls back to the library's own stock
   `DefaultTheme`/`DarkTheme` palette for transition underlays, header defaults, or the back-swipe
   reveal (closes issue #27, a 2026-07-11 frontend-audit finding). `primary` deliberately maps to
-  `text.primary`, not the accent — ember stays reserved for the single per-screen forward-action.
+  `text.primary`, not the accent — the signal stays reserved for the single per-screen
+  forward-action.
 - Accessibility rule, non-negotiable: an effort color is never the only signal — always pair it
   with a text label, so the plan stays legible to color-blind users.
 - Standing rule (already in the engineering spec): theme tokens only, no hardcoded colors or
@@ -660,8 +721,12 @@ instead, so applying the inset today would add trailing void, not clearance — 
 - The v1 aesthetic is the blueprint's **Instrument & Matter** system
   (`docs/design/mvp-blueprint.md` Part 1). Its banned list — glow, glassmorphism, ambient/idle
   motion, frosted panels — applies to the future scroll-driven animations too, not just to v1.
-  **The aesthetic was replaced by Trailhead on 2026-09-01** (see "Current — visual direction"). The
-  banned list still governs everything past the session gate. The signed-out dusk hero is the one
-  sanctioned departure from it: `DuskHero.tsx`'s route line draws itself once and then settles into
-  a slow opacity-only ambient glow — never hue, position or scale — and under `reduceMotion` it is
-  simply present at full opacity with no draw and no loop.
+  **The aesthetic was replaced by Trailhead on 2026-09-01 and by Instrument on 2026-09-03** (see
+  "Current — visual direction"). The banned list still governs everything past the session gate.
+  The signed-out pulse trace is the one sanctioned departure from it — an icy-cyan waveform that
+  draws itself once on a near-black field, owned by `fm/v22-redesign-animation` and not yet on this
+  branch, where `PulseTraceSlot` renders its static end state instead.
+- **Onboarding is a scroll-down read, and its sections deliberately do not fade or rise on
+  scroll** (2026-09-03). That is not an oversight against the direction above: a second motion
+  moment on the same screen competes with the signature one, and the scroll itself is already the
+  mechanic. It is still a plain, Reanimated-compatible `ScrollView`, so nothing is precluded later.

@@ -33,9 +33,9 @@ import type { Plan } from '@/lib/planTypes';
  * `FallbackNotice`, `WeekAccordion`, and `DisclaimerFooter` only ever need a `Plan`-shaped object
  * and carry no opinion on where it came from.
  *
- * Trailhead adds a stat row under the nameplate — weeks, tier, and the plan's own engine, read
+ * A stat row sits under the nameplate — weeks, tier, and the plan's own engine, read
  * straight off the `Plan` — and the route-line motif between it and the week list, so the screen
- * opens like a document rather than a feed. No ember anywhere: this screen is a read, and its one
+ * opens like a document rather than a feed. No signal colour anywhere: this screen is a read, and its one
  * forward action (generate another) belongs to Home.
  *
  * Plain native scroll, one continuous surface — no per-row stagger and no scroll-driven

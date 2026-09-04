@@ -27,8 +27,8 @@ import { EXAMPLE_PLAN_ID } from '@/lib/fixtures/examplePlan';
  * `PlanSummary`. Every row pushes to `plan/[id]`, which knows to render the fixture for
  * `EXAMPLE_PLAN_ID` and fetch everything else.
  *
- * Trailhead's register here is the formal one — a stat-row header counting what the runner has
- * built, then rows that read like entries in a ledger rather than cards in a feed. No ember: the
+ * The register here is the formal one — a stat-row header counting what the runner has
+ * built, then rows that read like entries in a ledger rather than cards in a feed. No signal: the
  * screen's forward action is generating a plan, and that lives on Home. A row is a destination,
  * not a call to action.
  */

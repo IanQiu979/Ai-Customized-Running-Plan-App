@@ -3,13 +3,13 @@ import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { Spacing, Stroke } from '@/constants/theme';
 
 /**
- * The four tab icons (`docs/design/trailhead-visual-system.md` §1) — route, book, stacked cards,
- * gear. Before Trailhead the tab bar rendered `tabBarIcon: () => null`; there were no icons at
+ * The four tab icons (`docs/design/instrument-visual-system.md` §1) — route, book, stacked cards,
+ * gear. Before the 2026-09-01 redesign the tab bar rendered `tabBarIcon: () => null`; there were no icons at
  * all.
  *
  * All four are thin-stroke line drawings on a shared 24×24 grid, at `Stroke.mark` weight, with no
  * fills. They take their colour from the tab bar's active/inactive tint, which is `text.primary`
- * or `progress.informative` — **never the ember accent.** Ember is reserved for the single
+ * or `progress.informative` — **never the signal colour.** The signal is reserved for the single
  * forward-action on a screen and is barred from navigation.
  */
 

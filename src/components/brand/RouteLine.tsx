@@ -7,8 +7,8 @@ import { useTheme } from '@/hooks/use-theme';
 import { ROUTE_PROFILE, ROUTE_SUMMIT_INDEX, routePath, routePoints } from '@/lib/routeProfile';
 
 /**
- * Trailhead's signature ornament: a thin elevation/contour line
- * (`docs/design/trailhead-visual-system.md` §4). It carries through Home, My Plans, and Plan
+ * The app's in-app ornament: a thin elevation/contour line
+ * (`docs/design/instrument-visual-system.md` §4). It carries through Home, My Plans, and Plan
  * view, and replaces the previous system's ribbon-and-wave motif.
  *
  * It draws the SAME ridge everywhere, every launch — the profile is a fixed constant in
@@ -30,9 +30,10 @@ const VARIANT_HEIGHT = {
   header: Spacing.four,
   /** Inside a summary card, behind or beneath its numbers. */
   card: Spacing.six,
-  /** The dusk field on the signed-out screens. */
-  hero: Spacing.seven + Spacing.four,
 } as const;
+
+// There was a third, `hero`-height variant for the retired dusk field. It went with that field:
+// the signed-out screens carry the pulse trace now, which draws its own geometry.
 
 export type RouteLineVariant = keyof typeof VARIANT_HEIGHT;
 
@@ -43,7 +44,6 @@ const DASH_PATTERN = [Stroke.thin, Spacing.two] as const;
 
 export function RouteLine({
   variant = 'header',
-  color,
   strokeWidth = Stroke.mark,
   showSummit = false,
   baseline = false,
@@ -51,9 +51,6 @@ export function RouteLine({
   style,
 }: {
   variant?: RouteLineVariant;
-  /** Defaults to `grid.routeLine`. The dusk hero passes its own, since it draws on a gradient
-   * rather than on a themed surface. */
-  color?: string;
   strokeWidth?: number;
   /** A small open circle at the profile's high point. Reserved for the one place per screen that
    * wants the ridge to read as a summit rather than as a rule. */
@@ -69,7 +66,7 @@ export function RouteLine({
   const [width, setWidth] = useState(0);
 
   const height = VARIANT_HEIGHT[variant];
-  const stroke = color ?? theme.grid.routeLine;
+  const stroke = theme.grid.routeLine;
   // Absorbs the stroke's own half-width plus the spline's sub-pixel overshoot past its summit
   // vertex — see `routeProfile.test.ts`'s two bounds assertions for both numbers.
   const inset = strokeWidth / 2 + Stroke.thin;

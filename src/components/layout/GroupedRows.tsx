@@ -16,7 +16,7 @@ import { useTheme } from '@/hooks/use-theme';
  * The grouped-row primitive Glossary and Settings are built from.
  *
  * Those two screens are specified flat, hairline-ruled and **zero-accent, with no exception**
- * (`docs/design/trailhead-visual-system.md` §1). Ember never appears on either, not even on
+ * (`docs/design/instrument-visual-system.md` §1). The signal never appears on either, not even on
  * Settings' "Upgrade" row — the upgrade decision belongs to the Paywall, and this row is a door
  * to it, not the offer itself. Destructive actions still use `status.error`, which is a status
  * colour rather than the accent.

@@ -1,10 +1,8 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,31 +11,35 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AuthField } from '@/components/auth/AuthField';
-import { DuskHero } from '@/components/brand/DuskHero';
-import { DuskSpark } from '@/components/brand/DuskSpark';
+import { PulseTraceSlot } from '@/components/onboarding/PulseTraceSlot';
 import {
-  DuskGradient,
+  ActionDivider,
+  LinkAction,
+  PrimaryAction,
+  SecondaryAction,
+} from '@/components/ui/ActionButton';
+import {
+  Accent,
   FontFamily,
   FontSize,
-  PressedOpacity,
-  Radius,
+  MaxContentWidth,
   Spacing,
-  Stroke,
   Tracking,
 } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { API_BASE_URL, authClient, describeError, signInWithGoogle } from '@/lib/apiClient';
 
 /**
- * Sign-in. Trailhead gives it the mockup's own composition of the dusk exception: not the
- * landing screen's big headline, but an illustration — the spark glyph, the route line with its
- * terminal dots, and the "shape of the plan you're about to make" caption. The screen's title
- * lives below, on the paper, the way the mockup's cream card carries it. The form itself is
- * paper and ink, and the one ember element on the screen is the Sign in button.
+ * Sign-in. Same visual treatment as onboarding — the near-black pulse-trace field at the top, the
+ * form on the page below it, one signal-marked action — but the field is the short `band` variant
+ * and it does not gate anything. That is the deliberate difference: onboarding is a cover a runner
+ * is invited to read, this is a form they came here to fill in, so the bold moment is present as
+ * identity and never in the way. Nothing on this screen waits for an animation.
  *
- * The caption sits in the copy slot, in the hero's top band — NOT under the line the way the
- * mockup letterboxes it — because the amber tail carries no text by system rule
- * (`trailhead-visual-system.md` §2: 3.17:1 against chalk-coloured copy).
+ * The back link to onboarding is a peer of the sign-up link at the bottom. `(auth)/onboarding` is
+ * the only pre-auth screen there is — it IS home for a signed-out runner — and before this screen
+ * had a link there, a runner who tapped through from onboarding had no way back to it except the
+ * OS back gesture.
  *
  * `Stack.Protected` in the root layout does the actual navigation once a session exists; this
  * screen only needs to make the sign-in call.
@@ -103,12 +105,12 @@ export default function SignInScreen() {
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
           >
-            <DuskHero size="cover" showTerminals>
-              <DuskSpark />
-              <Text style={[styles.heroCaption, { color: DuskGradient.onDuskMuted }]}>
-                THE SHAPE OF THE PLAN YOU&apos;RE ABOUT TO MAKE
-              </Text>
-            </DuskHero>
+            {/* Wordmark only on the field; the screen's title lives on the page below it. Same
+                reason as onboarding — see that screen's header — plus this one has a keyboard to
+                fight, so every point of fixed hero height is one the form does not get. */}
+            <PulseTraceSlot size="band">
+              <Text style={[styles.eyebrow, { color: Accent.onFieldMuted }]}>PACE BLUEPRINT</Text>
+            </PulseTraceSlot>
 
             <View style={styles.form}>
               <View style={styles.formHeader}>
@@ -118,27 +120,14 @@ export default function SignInScreen() {
                 </Text>
               </View>
 
-              {/* Social first, then the divider, then email — the mockup's order. */}
-              <Pressable
-                accessibilityRole="button"
+              {/* Social first, then the divider, then email. */}
+              <SecondaryAction
+                label="Sign in with Google"
                 disabled={submitting}
                 onPress={handleGoogleSignIn}
-                style={({ pressed }) => [
-                  styles.secondaryButton,
-                  { borderColor: theme.text.primary },
-                  (pressed || submitting) && styles.pressed,
-                ]}
-              >
-                <Text style={[styles.secondaryButtonText, { color: theme.text.primary }]}>
-                  Sign in with Google
-                </Text>
-              </Pressable>
+              />
 
-              <View style={styles.divider}>
-                <View style={[styles.dividerRule, { backgroundColor: theme.hairline }]} />
-                <Text style={[styles.dividerLabel, { color: theme.text.secondary }]}>OR</Text>
-                <View style={[styles.dividerRule, { backgroundColor: theme.hairline }]} />
-              </View>
+              <ActionDivider />
 
               <AuthField
                 label="Email"
@@ -161,39 +150,23 @@ export default function SignInScreen() {
 
               {error && <Text style={[styles.error, { color: theme.status.error }]}>{error}</Text>}
 
-              <Pressable
-                accessibilityRole="button"
+              <PrimaryAction
+                label="Sign in"
                 disabled={disabled}
+                busy={submitting}
                 onPress={handleSignIn}
-                style={({ pressed }) => [
-                  styles.primaryButton,
-                  { backgroundColor: disabled ? theme.progress.disabled : theme.accent.ember },
-                  pressed && !disabled && styles.pressed,
-                ]}
-              >
-                {submitting ? (
-                  <ActivityIndicator color={theme.accent.onEmber} />
-                ) : (
-                  <Text
-                    style={[
-                      styles.primaryButtonText,
-                      { color: disabled ? theme.text.primary : theme.accent.onEmber },
-                    ]}
-                  >
-                    Sign in
-                  </Text>
-                )}
-              </Pressable>
+              />
 
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => router.push('/(auth)/sign-up')}
-                style={styles.linkButton}
-              >
-                <Text style={[styles.linkText, { color: theme.text.secondary }]}>
+              <View style={styles.links}>
+                <LinkAction onPress={() => router.navigate('/(auth)/sign-up')}>
                   No account? <Text style={{ color: theme.text.primary }}>Sign up</Text>
-                </Text>
-              </Pressable>
+                </LinkAction>
+                {/* Quieter than the sign-in/sign-up swap above it: this is the escape hatch back
+                    to the only pre-auth screen, not the thing most people came here to do. */}
+                <LinkAction onPress={() => router.navigate('/(auth)/onboarding')}>
+                  Back to the start
+                </LinkAction>
+              </View>
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
@@ -206,12 +179,16 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1 },
   keyboardAvoider: { flex: 1 },
-  scrollContent: { flexGrow: 1 },
-  heroCaption: {
+  scrollContent: {
+    flexGrow: 1,
+    alignSelf: 'center',
+    width: '100%',
+    maxWidth: MaxContentWidth,
+  },
+  eyebrow: {
     fontFamily: FontFamily.mono.regular,
     fontSize: FontSize.xs,
     letterSpacing: Tracking.label,
-    marginTop: Spacing.two,
   },
   formHeader: {
     gap: Spacing.one,
@@ -235,52 +212,7 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.body.medium,
     fontSize: FontSize.xs,
   },
-  primaryButton: {
-    minHeight: Spacing.six,
-    borderRadius: Radius.control,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: Spacing.one,
-  },
-  primaryButtonText: {
-    fontFamily: FontFamily.body.semiBold,
-    fontSize: FontSize.sm,
-  },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-  },
-  dividerRule: {
-    flex: 1,
-    height: Stroke.hairline,
-  },
-  dividerLabel: {
-    fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.xs,
-    letterSpacing: Tracking.label,
-  },
-  secondaryButton: {
-    minHeight: Spacing.six,
-    borderRadius: Radius.control,
-    borderWidth: Stroke.mark,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  secondaryButtonText: {
-    fontFamily: FontFamily.body.semiBold,
-    fontSize: FontSize.sm,
-  },
-  linkButton: {
-    alignItems: 'center',
-    minHeight: Spacing.six,
-    justifyContent: 'center',
-  },
-  linkText: {
-    fontFamily: FontFamily.body.regular,
-    fontSize: FontSize.xs,
-  },
-  pressed: {
-    opacity: PressedOpacity,
+  links: {
+    gap: Spacing.half,
   },
 });

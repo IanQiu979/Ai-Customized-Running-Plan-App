@@ -10,19 +10,19 @@ import { useTheme } from '@/hooks/use-theme';
  * The tab group — Home / Glossary / My Plans / Settings. `src/app/plan/[id].tsx` stays a Stack
  * route outside this group by design: the plan view is a full-screen destination, not a tab.
  *
- * Trailhead's bar (`docs/design/trailhead-visual-system.md`): flat `surface.raised`, one top
+ * The bar (`docs/design/instrument-visual-system.md`): flat `surface.raised`, one top
  * hairline, no shadow, and four thin-stroke line icons — the previous pass rendered
  * `tabBarIcon: () => null` and shipped no icons at all. The active tab draws its icon and label
  * in `text.primary` above an **ink tick**, a short hard rule rather than a filled pill or a
  * coloured dot; inactive tabs use `progress.informative`, a token that exists precisely because
  * this is a meaningful navigational state rather than decoration.
  *
- * **The ember accent never touches this bar.** One accent, one forward-action per screen, and
+ * **The signal colour never touches this bar.** One accent, one forward-action per screen, and
  * navigation is not that action.
  */
 /**
  * The bar has to be told how tall it is. React Navigation sizes it for a stock item — a compact
- * icon over a caption — and Trailhead's item is taller than that: `Spacing.two` of top padding, a
+ * icon over a caption — and this system's item is taller than that: `Spacing.two` of top padding, a
  * `Spacing.four` icon, the mono label, and the active tick beneath it. Left at the default the
  * extra ran off the bottom of the bar and the labels were sheared in half; measured in the web
  * build 2026-09-01, the item's content ended 19pt below the bar's own bottom edge.
@@ -83,7 +83,7 @@ function tabOptions(title: string, icon: TabIconName) {
 }
 
 /** The active state: a short ink tick beneath the label. Never a filled pill, never a coloured
- * dot, and never ember. */
+ * dot, and never the signal colour. */
 function TabLabel({ focused, color, children }: { focused: boolean; color: string; children: string }) {
   const theme = useTheme();
   return (
