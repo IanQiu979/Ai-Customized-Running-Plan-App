@@ -5,6 +5,55 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-09-04 — the pulse trace: the next redesign's signature animation, built ahead of the screen that carries it
+
+On branch `fm/v22-redesign-animation`, uncommitted as of this entry. The captain approved a new
+house style on 2026-09-03, shared with sibling app V2.3: near-monochrome "cool scientific", a
+two-tier accent where charcoal carries everything and ONE icy-cyan highlight is reserved for the
+primary CTA and a single signature animation. This entry is that animation and only that — the
+onboarding screen is untouched, `theme.ts` is untouched, and nothing mounts the component yet. It
+was built to drop into whatever the rebuilt onboarding becomes (`v22-redesign-theme-onboarding`, a
+parallel task that also replaces the token system). Integration guide, written for that worker:
+[`docs/design/pulse-trace.md`](design/pulse-trace.md).
+
+- **`src/components/brand/PulseTraceHero.tsx`.** A thin icy-cyan ECG-style trace draws itself
+  across a near-black field: a beat of flat baseline, then the head crosses at constant paper
+  speed, snapping through four spikes that get taller and closer, then a soft light sweeps the
+  finished line on a slow loop. Two ways to drive it, one number underneath. Omit `progress` and
+  it draws itself on mount; `onSettled` fires when the draw completes, behind a fallback ceiling
+  of `lead + draw + settleSlack` so a CTA gated on it can never hang. Pass a Reanimated
+  `SharedValue` and the head follows the onboarding scroll instead, with `beatsAtMarks` placing a
+  spike at each section boundary so crossing into a section fires a beat. Two sizes: `cover`
+  (256pt hero with a copy slot) and `band` (128pt header strip). It paints its own dark field in
+  both colour schemes. Under reduced motion there is no self-draw and no sweep, `onSettled` fires
+  at once, and a scroll-driven trace still follows the scroll. The trace band is announced as one labelled `image`; the copy above it is traversed like any other text.
+- **The geometry is pure and tested** (`src/lib/pulseTrace.ts`, 22 tests). Beats → strictly
+  x-monotonic polyline → SVG path plus the lookup tables the UI thread interpolates over, so every
+  frame is a table lookup off the head's x-position and the "rhythm" — idle along the flat, snap
+  through the spike — comes from arc length, not from a bespoke easing per spike. `normalizeBeats`
+  sanitises any caller's list (clamp, sort, drop overlaps), so a bad `beats` prop cannot produce a
+  broken trace; `scrollProgress` is a worklet so the preview and the real onboarding derive the
+  scroll fraction the same way. The default rhythm is a fixed constant — the same trace on every
+  launch.
+- **Its palette is deliberately NOT in `theme.ts`.** `src/constants/pulseTrace.ts` holds the
+  field (`#0A0E13`), the trace (`#A8F0FF`), glow, head, grid, baseline and on-field copy colours,
+  the timings, and the two field heights. `theme.ts` still holds the outgoing Trailhead system,
+  which the parallel task is replacing wholesale — building against tokens about to be deleted
+  would couple the animation to the wrong system, and editing `theme.ts` from this branch would
+  collide with that rewrite mid-flight. The intended end state is that `PulseTracePalette.trace`
+  becomes the new system's single bright highlight, shared with the true primary CTA and nothing
+  else, folded into or re-exported from the new tokens once they land. Only the
+  scheme-independent `Spacing` and `Stroke` are read from `theme.ts`.
+- **A dev-only preview**, `src/app/dev/pulse-trace.tsx`: `/dev/pulse-trace` in a dev build, a
+  redirect home in release, linked from nowhere. A Self-draw tab (cover and band, with Replay) and
+  a Scroll tab that is a working copy of the onboarding recipe — a sticky `band` header over four
+  sections, spikes at the section marks. Temporary: the onboarding rebuild worker may delete it or
+  keep it as the start of a component gallery.
+- **Verification.** Both modes seen rendered on web (Expo web in Chrome). Root gate clean:
+  typecheck, lint, 499 tests across 31 suites — 30 new, the geometry suite plus
+  `src/components/__tests__/pulseTraceHero.test.tsx`'s 8 render smoke tests. Not verified on a
+  device. No `workers/` change.
+
 ## 2026-09-03 — fix dead `EXPO_PUBLIC_API_BASE_URL` blocking all sign-in/sign-up; confirm the tunnel works
 
 The captain reported sign-in and sign-up "not working at all," and `expo start --tunnel` broken,
