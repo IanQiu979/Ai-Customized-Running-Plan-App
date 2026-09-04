@@ -88,7 +88,7 @@ src/
                              # spikes placeable at section marks, reduced-motion aware. Mounted by
                              # no screen yet; reads colour only from constants/pulseTrace.ts
     __tests__/              # render smoke tests: render (Trailhead components), pulseTraceHero
-                             # (9 tests, new 2026-09-04)
+                             # (11 tests, new 2026-09-04)
     inputs/                 # NumberField, SegmentedField, DateField, ClockField (new 2026-08-15) —
                              # every numeric/structured answer in the app. Keystrokes are filtered
                              # through src/lib/fieldInput.ts; dates and times are segmented boxes

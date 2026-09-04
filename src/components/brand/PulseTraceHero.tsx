@@ -15,6 +15,7 @@ import Animated, {
   runOnJS,
   useAnimatedProps,
   useAnimatedReaction,
+  useAnimatedScrollHandler,
   useDerivedValue,
   useReducedMotion,
   useSharedValue,
@@ -34,6 +35,7 @@ import {
   pulseTracePath,
   pulseTracePoints,
   pulseTraceTables,
+  scrollProgress,
   type PulseBeat,
 } from '@/lib/pulseTrace';
 
@@ -523,6 +525,62 @@ export function PulseTraceHero({
       </View>
     </View>
   );
+}
+
+/**
+ * Everything a scrolling screen needs to drive the hero: the `progress` value to hand it, plus the
+ * three `Animated.ScrollView` props that keep it truthful. Spread the props, pass `progress`, done.
+ *
+ * The seeding on layout and content size is the point of the hook, not a detail. React Native
+ * emits no initial `onScroll`, and a page whose content is shorter than its viewport emits none at
+ * all — so a handler-only integration leaves `progress` at 0 forever and the runner sees an empty
+ * field on a tablet or a short page. Measuring both sides and re-deriving through the same
+ * `scrollProgress` resolves that case to a finished trace, which is what `scrollProgress`'s
+ * "nothing to scroll" branch has always promised. Owning it here rather than in the recipe is what
+ * stops the next screen from copying the broken half.
+ */
+export function usePulseTraceScroll(): {
+  progress: SharedValue<number>;
+  onScroll: ReturnType<typeof useAnimatedScrollHandler>;
+  onLayout: (event: LayoutChangeEvent) => void;
+  onContentSizeChange: (width: number, height: number) => void;
+} {
+  const progress = useSharedValue(0);
+  const offsetY = useSharedValue(0);
+  const viewportHeight = useRef(0);
+  const contentHeight = useRef(0);
+
+  const reseed = useCallback(() => {
+    if (viewportHeight.current <= 0 || contentHeight.current <= 0) return;
+    progress.value = scrollProgress(offsetY.value, contentHeight.current, viewportHeight.current);
+  }, [offsetY, progress]);
+
+  const onScroll = useAnimatedScrollHandler((event) => {
+    offsetY.value = event.contentOffset.y;
+    progress.value = scrollProgress(
+      event.contentOffset.y,
+      event.contentSize.height,
+      event.layoutMeasurement.height
+    );
+  });
+
+  const onLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      viewportHeight.current = event.nativeEvent.layout.height;
+      reseed();
+    },
+    [reseed]
+  );
+
+  const onContentSizeChange = useCallback(
+    (_width: number, height: number) => {
+      contentHeight.current = height;
+      reseed();
+    },
+    [reseed]
+  );
+
+  return { progress, onScroll, onLayout, onContentSizeChange };
 }
 
 const styles = StyleSheet.create({

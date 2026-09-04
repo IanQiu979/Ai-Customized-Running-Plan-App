@@ -66,23 +66,18 @@ The concept is "draws itself as part of the onboarding scroll, spiking at sectio
 recipe, which the dev preview's **Scroll** tab is a working copy of:
 
 ```tsx
-import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
-import { beatsAtMarks, scrollProgress } from '@/lib/pulseTrace';
+import Animated from 'react-native-reanimated';
+import { PulseTraceHero, usePulseTraceScroll } from '@/components/brand/PulseTraceHero';
+import { beatsAtMarks } from '@/lib/pulseTrace';
 
-// Where, as a fraction of the scrollable range, each section hands over to the next.
-const SECTION_MARKS = [0.24, 0.5, 0.76, 0.98];
+// Where, as a fraction of the scrollable range, each section hands over to the next. Keep every
+// mark within `BEAT_MARGIN` of the edges (0.074 … 0.926) or `normalizeBeats` moves it inward.
+const SECTION_MARKS = [0.24, 0.5, 0.76, 0.92];
 const beats = beatsAtMarks(SECTION_MARKS); // amplitude ramps 0.5 → 1 across the marks
 
-const progress = useSharedValue(0);
-const onScroll = useAnimatedScrollHandler((e) => {
-  progress.value = scrollProgress(
-    e.contentOffset.y,
-    e.contentSize.height,
-    e.layoutMeasurement.height
-  );
-});
+const { progress, ...scroll } = usePulseTraceScroll();
 
-<Animated.ScrollView onScroll={onScroll} scrollEventThrottle={16} stickyHeaderIndices={[0]}>
+<Animated.ScrollView {...scroll} scrollEventThrottle={16} stickyHeaderIndices={[0]}>
   <PulseTraceHero progress={progress} beats={beats} size="band" />
   {/* sections… */}
 </Animated.ScrollView>
@@ -90,9 +85,12 @@ const onScroll = useAnimatedScrollHandler((e) => {
 
 Notes:
 
-- `scrollProgress` is a worklet, so it can be called inside the scroll handler. It returns 1 when
-  there is nothing to scroll (content shorter than the viewport), so a short page shows a finished
-  trace rather than a flat line.
+- `usePulseTraceScroll` hands back `onScroll`, `onLayout` and `onContentSizeChange` — spread all
+  three. `onScroll` alone is not enough: React Native emits no initial scroll event, and a page
+  whose content is shorter than its viewport emits none at all, so the other two are what let
+  `scrollProgress`'s "nothing to scroll" branch return 1 and a short page show a finished trace
+  rather than a flat line. `scrollProgress` itself is a worklet, so the handler can call it
+  directly if you ever need to drive `progress` from somewhere else.
 - The head moves with the *x-position*, not with arc length, so scrolling through the flat parts
   advances the baseline and crossing a mark fires the whole spike in a few points of scroll. That
   is the "punctuation" — no separate trigger is needed.
