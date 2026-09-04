@@ -523,17 +523,6 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.body.medium,
     fontSize: FontSize.xs,
   },
-  primaryButton: {
-    minHeight: Spacing.six,
-    borderRadius: Radius.control,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: Spacing.two,
-  },
-  primaryButtonText: {
-    fontFamily: FontFamily.body.semiBold,
-    fontSize: FontSize.sm,
-  },
   navRow: {
     flexDirection: 'row',
     alignItems: 'center',

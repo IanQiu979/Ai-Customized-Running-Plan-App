@@ -358,10 +358,6 @@ const styles = StyleSheet.create({
   tierButton: {
     marginTop: Spacing.one,
   },
-  tierButtonText: {
-    fontFamily: FontFamily.body.semiBold,
-    fontSize: FontSize.sm,
-  },
   disclaimer: {
     borderWidth: Stroke.hairline,
     borderRadius: Radius.card,

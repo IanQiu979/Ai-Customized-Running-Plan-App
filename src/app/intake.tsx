@@ -671,16 +671,6 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
     marginTop: Spacing.half,
   },
-  primaryButton: {
-    minHeight: Spacing.six,
-    borderRadius: Radius.control,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  primaryButtonText: {
-    fontFamily: FontFamily.body.semiBold,
-    fontSize: FontSize.sm,
-  },
   pressed: {
     opacity: PressedOpacity,
   },
