@@ -669,7 +669,7 @@ instead, so applying the inset today would add trailing void, not clearance — 
 - **One deliberate exception**: the signed-out screens carry a plum→ember→amber dusk gradient and
   an animated route line (`src/components/brand/DuskHero.tsx`). Everything past the session gate is
   paper and ink.
-- **Built ahead of the next system — the pulse trace (2026-09-04, `fm/v22-redesign-animation`).**
+- **Built ahead of the next system — the pulse trace (2026-09-04, `fm/v22-redesign-animation-r2`).**
   The captain approved a successor house style on 2026-09-03, shared with sibling app V2.3:
   near-monochrome "cool scientific", a two-tier accent where charcoal carries everything and ONE
   icy-cyan highlight is reserved for the primary CTA and a single signature animation. The

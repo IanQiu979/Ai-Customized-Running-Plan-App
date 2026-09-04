@@ -71,7 +71,7 @@
   EXPO_PUBLIC_API_BASE_URL` and never hydrates), and it has had no review pass. Its gate is clean
   at 469 root tests across 29 suites; the 433/26 figure below is `main`'s.
 - **The pulse trace — the next redesign's signature animation — is built but mounted nowhere
-  (2026-09-04, `fm/v22-redesign-animation`, uncommitted).** The captain approved a successor house
+  (2026-09-04, `fm/v22-redesign-animation-r2`).** The captain approved a successor house
   style on 2026-09-03, shared with V2.3: near-monochrome "cool scientific", charcoal carrying
   everything, ONE icy-cyan highlight reserved for the primary CTA and one animation. That animation
   is `src/components/brand/PulseTraceHero.tsx` — an ECG-style trace drawing itself across its own
@@ -768,7 +768,7 @@ screen in scope and clean on its own gate, but unmerged and unfinished in two sp
 screen has been seen rendered (browser or device), and it has had no review pass. Detail in
 "Current state" above and `change_log.md`, 2026-09-01.
 
-**The pulse trace, on `fm/v22-redesign-animation` (2026-09-04).** The component, its geometry,
+**The pulse trace, on `fm/v22-redesign-animation-r2` (2026-09-04).** The component, its geometry,
 palette, tests and dev preview are done and green; what remains is not this branch's to do.
 Mounting it is the onboarding rebuild's job — `v22-redesign-theme-onboarding`, a separate task that
 also replaces `theme.ts` — and when that token system lands, `src/constants/pulseTrace.ts`'s
