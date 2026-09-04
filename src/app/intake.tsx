@@ -111,7 +111,7 @@ export default function IntakeScreen() {
     headerStyle: { backgroundColor: theme.surface.base },
     // The one place in the app that renders a native header *title*. The nav theme deliberately
     // leaves its `fonts` block stock (`constants/navigation-theme.ts` says why), so without this
-    // the word "Intake" would be the only San Francisco / Roboto glyphs in a Trailhead screen.
+    // the word "Intake" would be the only San Francisco / Roboto glyphs on the screen.
     headerTitleStyle: { fontFamily: FontFamily.body.semiBold, fontSize: FontSize.md },
     headerRight: () => (
       <IntakeExitAction

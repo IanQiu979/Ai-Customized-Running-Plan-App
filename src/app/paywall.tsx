@@ -27,9 +27,9 @@ import type { QuotaStatus, Tier } from '@/lib/planTypes';
  * `purchaseTier()` (`workers/`'s dummy purchase route) flips the tier in the ledger with no
  * payment collected, and the copy says so plainly rather than implying a real charge.
  *
- * Trailhead's pricing-page register: dark vertical slabs on `surface.inverse`, which is dark in
+ * The pricing-page register: dark vertical slabs on `surface.inverse`, which is dark in
  * BOTH colour schemes — the inversion is the whole gesture, and a card that quietly becomes
- * ordinary `raised` in dark mode loses it. Elite is the one ember element on the screen; Pro is
+ * ordinary `raised` in dark mode loses it. Elite is the one signal-marked element on the screen; Pro is
  * an outline. That is what "one accent, one action" buys — a genuine recommendation instead of
  * two equally loud buttons.
  *
@@ -166,7 +166,7 @@ function PaywallCloseButton({ color }: { color: string }) {
 }
 
 /**
- * One dark pricing slab. `recommended` is what earns the ember fill on the action; the other card
+ * One dark pricing slab. `recommended` is what earns the signal on the action; the other card
  * gets an outline on the same dark ground.
  *
  * The whole card is NOT the press target: a `Pressable` wrapping a feature list means every

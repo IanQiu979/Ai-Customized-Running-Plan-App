@@ -1,6 +1,6 @@
 /**
- * The geometry behind Trailhead's signature ornament — the elevation/contour "route line"
- * (`docs/design/trailhead-visual-system.md` §4).
+ * The geometry behind the app's in-app ornament — the elevation/contour "route line"
+ * (`docs/design/instrument-visual-system.md` §4).
  *
  * Pure: no React, no react-native, no SVG. It turns a normalized elevation profile into an SVG
  * path string, and `components/brand/RouteLine.tsx` is the only thing that renders it. Keeping

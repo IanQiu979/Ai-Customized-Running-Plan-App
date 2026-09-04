@@ -56,10 +56,10 @@ const MAX_NOTES_LENGTH = 1000;
  * from `planTargetFromIntake`; the only field left is a plan length, and only when there is no
  * race date to derive one from. "Change" goes back to `/intake` — one place, one answer.
  *
- * Trailhead ships three states here, plus the two the network forces:
+ * Three states here, plus the two the network forces:
  *
  *  - **Empty** — no intake yet.
- *  - **Populated** — the target, the one ember "Generate plan", and a row pushing to My Plans.
+ *  - **Populated** — the target, the one signal-marked "Generate plan", and a row pushing to My Plans.
  *  - **Free tier** — the same, with Notes locked behind a dashed `LockedPanel` and a second panel
  *    teasing what a Pro/Elite plan actually contains.
  *  - Loading, and a load error that keeps the last known intake on screen.

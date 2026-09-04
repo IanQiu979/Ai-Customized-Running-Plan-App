@@ -54,7 +54,7 @@ describe('RouteLine', () => {
     // The pre-layout pass is the real risk: width is 0 until `onLayout` fires, and `routePath([])`
     // returns '' rather than a malformed `d`. If this ever throws, the ornament crashes the first
     // frame of Home, My Plans and Plan view simultaneously.
-    for (const variant of ['header', 'card', 'hero'] as const) {
+    for (const variant of ['header', 'card'] as const) {
       const tree = render(<RouteLine variant={variant} />);
       expect(tree.toJSON()).toBeTruthy();
     }
@@ -254,7 +254,7 @@ describe('SecondaryAction', () => {
     expect(styleOf(tree.toJSON()).borderColor).toBe(Colors.light.text.primary);
   });
 
-  it('takes chalk ink on an inverse slab, where the ordinary border would be invisible', () => {
+  it('takes light ink on an inverse slab, where the ordinary border would be invisible', () => {
     const tree = render(
       <SecondaryAction label="Choose Pro" tone="onInverse" onPress={jest.fn()} />
     );

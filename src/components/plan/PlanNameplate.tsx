@@ -10,7 +10,7 @@ import { formatPlanDate } from './format';
  * The plan's masthead: the title at display scale, and beneath it a small mono metadata line
  * that reads like a serial plate rather than a caption.
  *
- * The title takes `FontSize.hero`, the step Trailhead added for exactly this — Big Shoulders
+ * The title takes `FontSize.hero`, the step added for exactly this — Big Shoulders
  * Display is optically much smaller than the Barlow Condensed it replaced, so the old `xxl` no
  * longer carried the top of a screen.
  */

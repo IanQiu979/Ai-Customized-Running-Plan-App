@@ -8,10 +8,10 @@ import { useTheme } from '@/hooks/use-theme';
  * The masthead every tab screen opens with: an optional mono eyebrow, a display title, optional
  * supporting copy, and a rule underneath.
  *
- * That rule is where Trailhead's screen hierarchy actually lives. `routeLine` draws the contour
+ * That rule is where the screen hierarchy actually lives. `routeLine` draws the contour
  * motif — reserved for Home, My Plans, and Plan view. Glossary and Settings pass `false` and get
  * a plain hairline instead, because those two screens are specified flat, grouped-row and
- * zero-ornament with no exception (`docs/design/trailhead-visual-system.md` §1). A route line
+ * zero-ornament with no exception (`docs/design/instrument-visual-system.md` §1). A route line
  * there would be the first crack in that rule.
  */
 export function ScreenHeader({
