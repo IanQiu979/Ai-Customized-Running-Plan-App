@@ -156,13 +156,13 @@ export default function SignUpScreen() {
               />
 
               <View style={styles.links}>
-                <LinkAction onPress={() => router.push('/(auth)/sign-in')}>
+                <LinkAction onPress={() => router.navigate('/(auth)/sign-in')}>
                   Already have an account?{' '}
                   <Text style={{ color: theme.text.primary }}>Sign in</Text>
                 </LinkAction>
                 {/* Quieter than the sign-in/sign-up swap above it: this is the escape hatch back
                     to the only pre-auth screen, not the thing most people came here to do. */}
-                <LinkAction onPress={() => router.push('/(auth)/onboarding')}>
+                <LinkAction onPress={() => router.navigate('/(auth)/onboarding')}>
                   Back to the start
                 </LinkAction>
               </View>

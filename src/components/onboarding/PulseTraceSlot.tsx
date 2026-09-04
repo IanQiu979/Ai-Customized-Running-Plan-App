@@ -22,7 +22,14 @@ import { Accent, Spacing, Stroke } from '@/constants/theme';
  *
  *     import { PulseTraceHero as PulseTraceSlot } from '@/components/brand/PulseTraceHero';
  *
- * Nothing else changes. This component's props are a deliberate subset of that one's, with the
+ * **And in the same pass, close the one-sided colour pin.** `constants/pulseTrace.ts` duplicates
+ * `Accent.field` / `Accent.signal` as `PulseTracePalette.field` / `.trace`, and
+ * `constants/__tests__/theme.contrast.test.ts` can only assert the `theme.ts` side while that
+ * file is absent. Once it exists, import `PulseTracePalette` there and assert
+ * `trace === Accent.signal` and `field === Accent.field`, so the two files genuinely cannot
+ * drift into shipping two different cyans.
+ *
+ * Nothing else changes about the call site. This component's props are a deliberate subset of that one's, with the
  * same names and the same meanings, so the swap is an import line and no call-site edits:
  *
  *   - `progress?: SharedValue<number>` — 0..1, drives the trace's head from the caller's scroll.

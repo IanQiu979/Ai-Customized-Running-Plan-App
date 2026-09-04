@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -61,6 +61,13 @@ const SECTIONS = [
   },
 ] as const;
 
+/**
+ * The ceiling on waiting for the hero to settle. `<PulseTraceHero>` settles at roughly lead 400ms
+ * + draw 2200ms + slack 400ms = 3000ms, so 4s sits comfortably past a healthy draw and only ever
+ * fires when something has actually gone wrong.
+ */
+const HERO_SETTLE_CEILING_MS = 4000;
+
 export default function OnboardingScreen() {
   const theme = useTheme();
   const router = useRouter();
@@ -68,13 +75,25 @@ export default function OnboardingScreen() {
 
   /**
    * The captain's constraint, carried over from the previous system: the hero must already be
-   * settled, not mid-draw, by the time the CTA is interactive. The trace component raises this
-   * from its own draw-completion callback with a token-derived ceiling behind it, so this can
-   * never strand the runner on a disabled button — and the CTA is below the fold anyway, so on a
-   * real device the draw has finished long before the button is on screen.
+   * settled, not mid-draw, by the time the CTA is interactive. The trace component raises that
+   * from its own draw-completion callback — and the CTA is below the fold anyway, so on a real
+   * device the draw has finished long before the button is on screen.
+   *
+   * The constraint stands; the ceiling below is only so it cannot hang forever. This screen owns
+   * that ceiling itself rather than trusting the trace component to have one, because "Get
+   * started" is the ONLY forward action out of the signed-out landing screen: a callback that
+   * never arrives — an interrupted draw, an unmount mid-draw, a reduced-motion branch that misses
+   * — is a silent, total dead end, and that failure must not depend on another component's
+   * internals.
    */
   const [heroSettled, setHeroSettled] = useState(false);
   const handleSettled = useCallback(() => setHeroSettled(true), []);
+
+  useEffect(() => {
+    if (heroSettled) return;
+    const ceiling = setTimeout(() => setHeroSettled(true), HERO_SETTLE_CEILING_MS);
+    return () => clearTimeout(ceiling);
+  }, [heroSettled]);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.surface.base }]}>

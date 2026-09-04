@@ -133,9 +133,12 @@ special case — the cyan edge is the whole control there.
 
 **The one duplicated hex.** `src/constants/pulseTrace.ts` (`PulseTracePalette.field` / `.trace`)
 carries `#0A0E13` and `#A8F0FF` independently, because the animation was built in parallel with
-this system and could not depend on tokens that were mid-rewrite. The contrast test pins both
-values, so the two files cannot drift; folding `pulseTrace.ts`'s palette into a re-export from
-`theme.ts` is the tidy-up to do once both branches have landed.
+this system and could not depend on tokens that were mid-rewrite. The contrast test pins the
+values on **this** side only: `pulseTrace.ts` is not on this branch, so the test cannot import it
+and an edit to `PulseTracePalette` would ship a second cyan without failing anything. The pin
+becomes two-sided once `fm/v22-redesign-animation` lands and the palette can be imported and
+asserted equal; folding `pulseTrace.ts`'s palette into a re-export from `theme.ts` is the tidy-up
+to do once both branches have landed.
 
 ### The effort ramp
 

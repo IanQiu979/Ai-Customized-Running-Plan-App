@@ -173,8 +173,10 @@ export type ThemeColors = (typeof Colors)[ColorScheme];
 // mean to be worth having.
 //
 // `field` and `signal` are duplicated in `src/constants/pulseTrace.ts` (`PulseTracePalette.field`
-// / `.trace`), which the onboarding animation owns and which was written before this file. They
-// are asserted equal in the contrast test, so the two cannot drift.
+// / `.trace`), which the onboarding animation owns and which was written before this file. The
+// contrast test pins THESE values only — that file is not on this branch and cannot be imported,
+// so nothing yet stops the animation's copy drifting away from them. The pin becomes two-sided
+// once `fm/v22-redesign-animation` lands and the palette can be asserted equal.
 // ---------------------------------------------------------------------------------------------
 
 export const Accent = {
@@ -379,7 +381,7 @@ export const Motion = {
   duration: {
     instant: 100, // press feedback
     quick: 180, // state crossfades, toggles
-    standard: 250, // the default; entrances, the onboarding sections' scroll reveal
+    standard: 250, // the default; entrances. No consumer in `src/` yet — nothing reads `Motion`.
     slow: 350, // full-screen pushes
   },
   curve: {

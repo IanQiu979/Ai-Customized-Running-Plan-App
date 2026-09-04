@@ -254,8 +254,10 @@ Built-ins also available: `Explore`, `Plan`, `general-purpose`. Plugin agents ar
   token count until it is given a floor on purpose.
 - **`Accent.field`/`Accent.signal` are duplicated in `src/constants/pulseTrace.ts`** (the
   onboarding animation's own palette, written in parallel with the token rewrite). The contrast
-  test pins both so they cannot drift; folding that palette into a re-export from `theme.ts` is
-  the tidy-up once both branches have landed.
+  test pins the `theme.ts` side only — `pulseTrace.ts` is not on this branch, so it cannot be
+  imported or asserted against, and the animation's copy can still drift. The pin becomes
+  two-sided once `fm/v22-redesign-animation` lands; folding that palette into a re-export from
+  `theme.ts` is the tidy-up once both branches have landed.
 - **AI output validation is structural, not strict-content.** `ai-feature-builder` and
   `prompt-engineer` follow [`docs/reference/plan-generation.md`](docs/reference/plan-generation.md):
   validate shape, retry once, fall back to a template.

@@ -119,8 +119,11 @@ describe('Instrument contrast — docs/design/instrument-visual-system.md §2', 
   describe('the accent — theme-invariant, and legible in both schemes', () => {
     it('the signal is the locked icy cyan, and the field the locked near-black', () => {
       // Both are duplicated in `constants/pulseTrace.ts` (`PulseTracePalette.trace` / `.field`),
-      // which the onboarding animation owns. Pinning them here is what keeps the CTA and the
-      // hero the same colour after either file is edited.
+      // which the onboarding animation owns. This pin is ONE-SIDED today: that file is not on
+      // this branch, so it cannot be imported here, and these assertions catch a drift in
+      // `theme.ts` only — an edit to `PulseTracePalette` would still ship two different cyans.
+      // The pin becomes two-sided once `fm/v22-redesign-animation` lands and the palette can be
+      // imported and asserted equal; see the swap checklist in `PulseTraceSlot.tsx`.
       expect(Accent.signal).toBe('#A8F0FF');
       expect(Accent.field).toBe('#0A0E13');
     });
