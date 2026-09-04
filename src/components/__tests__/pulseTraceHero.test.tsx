@@ -196,9 +196,13 @@ describe('PulseTraceHero', () => {
     expect(JSON.stringify(tree.toJSON())).toContain('Your training plan, built around you.');
 
     // Exactly one image element, and the copy is not inside it: on iOS an `accessible` container
-    // swallows its descendants, which is the defect this guards against.
+    // swallows its descendants, which is the defect this guards against. Host instances only —
+    // `findAll` walks composites too, so a single `<View>` matches twice (`composite:View` and
+    // the `host:View` it renders) and an unfiltered count would read as two elements.
     const images = tree.root.findAll(
-      (node) => (node.props as { accessibilityRole?: string }).accessibilityRole === 'image'
+      (node) =>
+        typeof node.type === 'string' &&
+        (node.props as { accessibilityRole?: string }).accessibilityRole === 'image'
     );
     expect(images).toHaveLength(1);
     expect(images[0].findAllByType(Text)).toHaveLength(0);
