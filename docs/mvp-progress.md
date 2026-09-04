@@ -55,7 +55,6 @@
   a deload; a past race date is refused on both screens (race day and a blank date remain valid);
   numeric inputs are structured (`src/components/inputs/` + `src/lib/fieldInput.ts`). Full
   account: the "Last updated" entry below.
-<<<<<<< HEAD
 - **The design system is now "Instrument" — live in a branch; `main` carries Trailhead.**
   Trailhead *did* land on `main` (PR #82, plus the fidelity follow-up #83), so `main`'s
   `src/constants/theme.ts` is warm chalk and espresso ink with a scheme-aware ember accent, a
@@ -98,35 +97,6 @@
   The auth screens still render `PulseTraceSlot`'s static end state; swapping it is one import line
   (see that file's header). Seen rendered on web in both modes; the dev-only `/dev/pulse-trace`
   preview shows both drive modes. Guide for the worker who mounts it:
-=======
-- **The design system is now "Trailhead" — live in a branch, not on `main`.** All of
-  `redesign/trailhead-2026-09-01` is **unreleased**: `src/constants/theme.ts` on `main` is still
-  "Instrument & Matter", and everything in this bullet describes the branch only. There, the token
-  system, the fonts, the signature motif and every screen were replaced — warm chalk and espresso
-  ink, one scheme-aware ember accent spent on exactly one action per screen and barred from
-  navigation, a route-line contour as the only ornament, and a dusk gradient on the signed-out
-  screens as the single deliberate exception. Free-tier Notes are now shown locked, which is a UI
-  correction and not new enforcement: Free is template-only, so those notes were already discarded
-  server-side. Source of truth for every value:
-  [`docs/design/trailhead-visual-system.md`](design/trailhead-visual-system.md), which supersedes
-  `frontend-design-brief.md` Parts 2 and 3. Full account: `change_log.md`, 2026-09-01. **Two things
-  are not done on that branch** — no screen has been seen rendered in a browser or on a device (the
-  web export does not inline the root `.env`, so the bundle throws `Missing
-  EXPO_PUBLIC_API_BASE_URL` and never hydrates), and it has had no review pass. Its gate is clean
-  at 469 root tests across 29 suites; the 433/26 figure below is `main`'s.
-- **The pulse trace — the next redesign's signature animation — is built but mounted nowhere
-  (2026-09-04, `fm/v22-redesign-animation-r2`).** The captain approved a successor house
-  style on 2026-09-03, shared with V2.3: near-monochrome "cool scientific", charcoal carrying
-  everything, ONE icy-cyan highlight reserved for the primary CTA and one animation. That animation
-  is `src/components/brand/PulseTraceHero.tsx` — an ECG-style trace drawing itself across its own
-  near-black field, self-drawing on mount or driven by a scroll `SharedValue`, reduced-motion
-  aware, with its geometry pure and tested in `src/lib/pulseTrace.ts`. Its colours, timings and
-  field heights live in `src/constants/pulseTrace.ts`, deliberately outside `theme.ts`, which still
-  holds the outgoing Trailhead tokens that the parallel `v22-redesign-theme-onboarding` task is
-  replacing. The onboarding screen is unchanged; the dev-only `/dev/pulse-trace` preview is the
-  only place the component renders. Seen rendered on web in both modes; its branch's gate is clean
-  at 502 root tests across 31 suites (33 new). Guide for the worker who mounts it:
->>>>>>> 25df25c (no-mistakes(review): fix: seed scroll-driven pulse trace progress from layout)
   [`docs/design/pulse-trace.md`](design/pulse-trace.md); full account: `change_log.md`,
   2026-09-04.
 - **Test-mode override:** `ALL_USERS_UNLIMITED_ACCESS = "true"` still sits in the top-level
@@ -562,12 +532,8 @@ from 82. Issue #22 remains open.)
 ### Code
 - [x] **The pulse trace animation is built (2026-09-04).** `src/components/brand/PulseTraceHero.tsx`
       (self-drawing or scroll-driven, reduced-motion aware, paints its own dark field), pure
-      geometry in `src/lib/pulseTrace.ts` (22 tests), its own palette/timings in
-<<<<<<< HEAD
-      `src/constants/pulseTrace.ts` (not `theme.ts` — see "In flight"), 8 render smoke tests in
-=======
+      geometry in `src/lib/pulseTrace.ts` (23 tests), its own palette/timings in
       `src/constants/pulseTrace.ts` (not `theme.ts` — see "In flight"), 11 render smoke tests in
->>>>>>> 25df25c (no-mistakes(review): fix: seed scroll-driven pulse trace progress from layout)
       `src/components/__tests__/pulseTraceHero.test.tsx`, and a dev-only preview at
       `src/app/dev/pulse-trace.tsx`. Built to be dropped into the rebuilt onboarding; mounts
       nowhere yet. Full account in `docs/change_log.md`'s 2026-09-04 entry

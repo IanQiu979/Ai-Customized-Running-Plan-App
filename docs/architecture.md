@@ -92,7 +92,6 @@ src/
     plan/                   # WeekAccordion, WorkoutRow, EffortChip, ReadoutBracket,
                              # PlanNameplate, DisclaimerFooter, FallbackNotice, GoalRealismNotice
                              # (new 2026-08-05 — renders Plan.goalRealism), format.ts
-<<<<<<< HEAD
     onboarding/             # PulseTraceSlot (new 2026-09-03) — a marked INTEGRATION POINT. It
                              # renders the static end state of <PulseTraceHero>, the signature
                              # animation owned by a parallel branch; its props are a subset of that
@@ -101,25 +100,8 @@ src/
     ui/                     # ActionButton (new 2026-09-03) — PrimaryAction / SecondaryAction /
                              # ActionDivider / LinkAction. PrimaryAction IS the signal, so "one
                              # accent per screen" is a question about imports, not about review
-    __tests__/              # render smoke tests: render, and pulseTraceHero (9 tests, new
+    __tests__/              # render smoke tests: render, and pulseTraceHero (11 tests, new
                              # 2026-09-04)
-=======
-    onboarding/             # HeroRibbon (new 2026-08-08) — the week-ribbon motif at 2x hero scale,
-                             # building itself cell by cell then settling into an ambient pulse.
-                             # Reduced-motion aware; illustration only, never the user's data
-    brand/                  # RouteLine, DuskHero, DuskSpark (Trailhead, 2026-09-01) and
-                             # PulseTraceHero (new 2026-09-04) — the NEXT system's signature: an
-                             # ECG-style icy-cyan trace on its own near-black field, self-drawing
-                             # on mount (onSettled) or driven by a scroll SharedValue (progress),
-                             # spikes placeable at section marks, reduced-motion aware. A scrolling
-                             # screen takes that value from usePulseTraceScroll, exported alongside
-                             # it — the required integration point, since it seeds progress from
-                             # layout and content size as well as the scroll handler, so a page too
-                             # short to scroll still draws (docs/design/pulse-trace.md). Mounted by
-                             # no screen yet; reads colour only from constants/pulseTrace.ts
-    __tests__/              # render smoke tests: render (Trailhead components), pulseTraceHero
-                             # (11 tests, new 2026-09-04)
->>>>>>> 25df25c (no-mistakes(review): fix: seed scroll-driven pulse trace progress from layout)
     inputs/                 # NumberField, SegmentedField, DateField, ClockField (new 2026-08-15) —
                              # every numeric/structured answer in the app. Keystrokes are filtered
                              # through src/lib/fieldInput.ts; dates and times are segmented boxes

@@ -53,7 +53,7 @@ parallel task that also replaces the token system). Integration guide, written f
   sections, spikes at the section marks. Temporary: the onboarding rebuild worker may delete it or
   keep it as the start of a component gallery.
 - **Verification.** Both modes seen rendered on web (Expo web in Chrome). Root gate clean:
-  typecheck, lint, 503 tests across 31 suites — 34 new, the geometry suite plus
+  typecheck, lint, 545 tests across 34 suites — 34 new, the geometry suite plus
   `src/components/__tests__/pulseTraceHero.test.tsx`'s 11 render smoke tests. Not verified on a
   device. No `workers/` change.
 
