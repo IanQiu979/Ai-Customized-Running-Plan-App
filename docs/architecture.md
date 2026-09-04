@@ -70,6 +70,10 @@ src/
     paywall.tsx              # dummy paywall (new 2026-08-05) — a Stack route, reached from
                               #  Settings or from Home's generate-plan 402 over_quota catch;
                               #  calls POST /api/purchase-tier, honest "test upgrade" copy
+    dev/pulse-trace.tsx      # DEV-ONLY preview of PulseTraceHero (new 2026-09-04) — reachable at
+                              #  /dev/pulse-trace in a dev build, redirects home in release, linked
+                              #  from nowhere. Self-draw tab + a scroll rehearsal with a sticky
+                              #  band. Temporary: the onboarding rebuild may delete or keep it
   components/
     plan/                   # WeekAccordion, WorkoutRow, EffortChip, ReadoutBracket,
                              # PlanNameplate, DisclaimerFooter, FallbackNotice, GoalRealismNotice
@@ -77,6 +81,14 @@ src/
     onboarding/             # HeroRibbon (new 2026-08-08) — the week-ribbon motif at 2x hero scale,
                              # building itself cell by cell then settling into an ambient pulse.
                              # Reduced-motion aware; illustration only, never the user's data
+    brand/                  # RouteLine, DuskHero, DuskSpark (Trailhead, 2026-09-01) and
+                             # PulseTraceHero (new 2026-09-04) — the NEXT system's signature: an
+                             # ECG-style icy-cyan trace on its own near-black field, self-drawing
+                             # on mount (onSettled) or driven by a scroll SharedValue (progress),
+                             # spikes placeable at section marks, reduced-motion aware. Mounted by
+                             # no screen yet; reads colour only from constants/pulseTrace.ts
+    __tests__/              # render smoke tests: render (Trailhead components), pulseTraceHero
+                             # (8 tests, new 2026-09-04)
     inputs/                 # NumberField, SegmentedField, DateField, ClockField (new 2026-08-15) —
                              # every numeric/structured answer in the app. Keystrokes are filtered
                              # through src/lib/fieldInput.ts; dates and times are segmented boxes
@@ -84,6 +96,9 @@ src/
                              # <TextInput keyboardType="..."> for a number
   constants/
     theme.ts                # "Trailhead" token system — current, see below
+    pulseTrace.ts            # the pulse trace's OWN palette, timings and field heights (new
+                              #  2026-09-04) — deliberately not in theme.ts until the successor
+                              #  token system lands; see "Current — visual direction" below
     navigation-theme.ts      # bridges theme.ts's tokens into @react-navigation/native's `Theme`
                              #  shape, so ThemeProvider never leaks the library's own stock
                              #  DefaultTheme/DarkTheme colors (fixes issue #27)
@@ -120,6 +135,9 @@ src/
                               #  src/lib/ notes below
     fieldInput.ts            # pure (new 2026-08-15) — the digit/decimal filters and clock/date part
                               #  parsers behind src/components/inputs/
+    pulseTrace.ts            # pure (new 2026-09-04) — the pulse trace's geometry: beats -> strictly
+                              #  x-monotonic polyline -> SVG path + lookup tables, `normalizeBeats`,
+                              #  `beatsAtMarks`, and the `scrollProgress` worklet. 22 unit tests
     goalRealismDisclosure.ts # pure, app-only copy helper (new 2026-08-15) — the ONE place that
                               #  decides whether a realism notice shows and what it says
                               #  ('plan' vs 'preview' tense); classification and cap arithmetic
@@ -131,7 +149,8 @@ src/
     __tests__/               # supabase, loadRules, notation, examplePlan.fixture, tierLimits,
                               # quotaPeriod, planTemplates (golden + general + noRace),
                               # paceDerivation, quotaDisplay (6 tests, new 2026-08-05),
-                              # goalRealismDisclosure, planRequest, fieldInput (new 2026-08-15)
+                              # goalRealismDisclosure, planRequest, fieldInput (new 2026-08-15),
+                              # pulseTrace (22 tests, new 2026-09-04)
                               # — the two engine contracts included
 ```
 
@@ -302,6 +321,8 @@ src/app/
                          #  example-plan id
   paywall                # exists today (2026-08-05) — dummy purchase-tier UI, a Stack route
                          #  reached from Settings or from Home's 402 over_quota catch
+  dev/pulse-trace        # exists today (2026-09-04) — DEV-ONLY preview of the pulse trace;
+                         #  redirects home in a release build, linked from nowhere. Temporary
 ```
 
 **Decision 1 (2026-07-10):** the paywall and a settings-lite screen (sign out, tier display,
@@ -365,6 +386,18 @@ src/lib/
                             #          parsers behind `src/components/inputs/`. Its header records
                             #          why `keyboardType` alone is not enough (it restricts nothing;
                             #          a letter reached a number-pad field on device).
+  pulseTrace.ts            # exists (2026-09-04) — the geometry behind
+                            #          `components/brand/PulseTraceHero.tsx`: a beat list becomes a
+                            #          strictly x-monotonic polyline, an SVG path, and the lookup
+                            #          tables (x, y, arc length) the UI thread interpolates over, so
+                            #          the whole animation is driven by one number — the head's
+                            #          x-position — and the "idle, then snap through the spike"
+                            #          rhythm falls out of arc length rather than a bespoke easing.
+                            #          `normalizeBeats()` sanitises any caller's beats;
+                            #          `beatsAtMarks()` places spikes at scroll-section boundaries;
+                            #          `scrollProgress()` is a worklet so the dev preview and the
+                            #          real onboarding derive the same 0..1 from a scroll event.
+                            #          Pure — no React, no SVG, no Reanimated.
   quotaDisplay.ts          # exists (2026-08-05) — `formatQuotaLine()`, pure display phrasing for
                             #          `QuotaStatus`. There is no separate `subscription.ts`; the
                             #          tier-read/dummy-purchase ground it would have covered is
@@ -636,6 +669,25 @@ instead, so applying the inset today would add trailing void, not clearance — 
 - **One deliberate exception**: the signed-out screens carry a plum→ember→amber dusk gradient and
   an animated route line (`src/components/brand/DuskHero.tsx`). Everything past the session gate is
   paper and ink.
+- **Built ahead of the next system — the pulse trace (2026-09-04, `fm/v22-redesign-animation`).**
+  The captain approved a successor house style on 2026-09-03, shared with sibling app V2.3:
+  near-monochrome "cool scientific", a two-tier accent where charcoal carries everything and ONE
+  icy-cyan highlight is reserved for the primary CTA and a single signature animation. The
+  animation landed first: `src/components/brand/PulseTraceHero.tsx`, an ECG-style trace that
+  draws itself across its own near-black field — self-drawing on mount (`onSettled`, with a
+  fallback ceiling) or driven by a scroll `SharedValue` with spikes at section boundaries,
+  reduced-motion aware, identical in light and dark mode — with its geometry pure and tested in
+  `src/lib/pulseTrace.ts`. **Its palette, timings and field heights live in
+  `src/constants/pulseTrace.ts`, not `theme.ts`, on purpose**: the Trailhead tokens above are
+  being replaced wholesale by a parallel task (`v22-redesign-theme-onboarding`), and building the
+  animation against tokens about to be deleted, or editing `theme.ts` from a second branch, would
+  couple it to the wrong system or collide with that rewrite. When the new tokens land,
+  `PulseTracePalette.trace` (`#A8F0FF`) is meant to become the system's single bright highlight —
+  shared with the primary CTA and nothing else, never a link, chart or badge colour — and the
+  constants fold into, or re-export from, the new token file. It reads only the scheme-independent
+  `Spacing` and `Stroke` from `theme.ts`. Nothing mounts it yet: the onboarding screen is unchanged,
+  and `/dev/pulse-trace` (dev builds only) is the only place it renders. Integration guide:
+  [`docs/design/pulse-trace.md`](design/pulse-trace.md).
 - **React Navigation's own chrome is tokened too, not just the screens built on top of it.**
   `src/constants/navigation-theme.ts` bridges the same `Colors` tokens into the `Theme` shape
   `@react-navigation/native` expects (`background`→`surface.base`, `card`→`surface.raised`,
@@ -664,4 +716,8 @@ instead, so applying the inset today would add trailing void, not clearance — 
   banned list still governs everything past the session gate. The signed-out dusk hero is the one
   sanctioned departure from it: `DuskHero.tsx`'s route line draws itself once and then settles into
   a slow opacity-only ambient glow — never hue, position or scale — and under `reduceMotion` it is
-  simply present at full opacity with no draw and no loop.
+  simply present at full opacity with no draw and no loop. The pulse trace (2026-09-04, above)
+  is scoped the same way, as its own named exceptions in `src/constants/pulseTrace.ts`'s
+  `PulseTraceMotion`: the draw runs once, the sweep runs only along an already-drawn trace, neither
+  may be borrowed by another component, and under reduced motion only a scroll-driven trace still
+  moves — because that motion is the runner's own scrolling.
