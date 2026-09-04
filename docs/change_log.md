@@ -50,8 +50,8 @@ parallel task that also replaces the token system). Integration guide, written f
   sections, spikes at the section marks. Temporary: the onboarding rebuild worker may delete it or
   keep it as the start of a component gallery.
 - **Verification.** Both modes seen rendered on web (Expo web in Chrome). Root gate clean:
-  typecheck, lint, 499 tests across 31 suites — 30 new, the geometry suite plus
-  `src/components/__tests__/pulseTraceHero.test.tsx`'s 8 render smoke tests. Not verified on a
+  typecheck, lint, 500 tests across 31 suites — 31 new, the geometry suite plus
+  `src/components/__tests__/pulseTraceHero.test.tsx`'s 9 render smoke tests. Not verified on a
   device. No `workers/` change.
 
 ## 2026-09-03 — fix dead `EXPO_PUBLIC_API_BASE_URL` blocking all sign-in/sign-up; confirm the tunnel works
