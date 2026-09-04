@@ -76,6 +76,15 @@ describe('beatsAtMarks', () => {
     expect(beats.map((b) => b.amplitude)).toEqual([0.5, 0.75, 1]);
   });
 
+  it('crescendos by position on the trace, not by the caller\'s array order', () => {
+    const beats = beatsAtMarks([0.8, 0.2, 0.5]);
+    expect(beats).toEqual([
+      { at: 0.2, amplitude: 0.5 },
+      { at: 0.5, amplitude: 0.75 },
+      { at: 0.8, amplitude: 1 },
+    ]);
+  });
+
   it('gives a single mark full amplitude', () => {
     expect(beatsAtMarks([0.5])).toEqual([{ at: 0.5, amplitude: 1 }]);
   });
