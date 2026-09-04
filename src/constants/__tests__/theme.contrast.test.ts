@@ -64,7 +64,8 @@ const SCHEMES: ColorScheme[] = ['light', 'dark'];
 
 /** Every token in `theme.ts` is a 6-digit hex or an `rgba()` string; only the former is measurable
  * without compositing, and only the former is ever put on a surface as opaque colour. */
-const isOpaqueHex = (value: string) => /^#[0-9A-Fa-f]{6}$/.test(value);
+const isOpaqueHex = (value: unknown): value is string =>
+  typeof value === 'string' && /^#[0-9A-Fa-f]{6}$/.test(value);
 
 describe('Instrument contrast — docs/design/instrument-visual-system.md §2', () => {
   describe.each(SCHEMES)('%s scheme', (scheme) => {
