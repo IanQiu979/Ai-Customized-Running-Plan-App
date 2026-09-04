@@ -174,7 +174,7 @@ src/
                               #  x-monotonic polyline -> SVG path + lookup tables, `normalizeBeats`,
                               #  `beatsAtMarks`, and the `scrollProgress` worklet (the hook that
                               #  drives it from a ScrollView is usePulseTraceScroll, in
-                              #  components/brand/PulseTraceHero.tsx). 22 unit tests
+                              #  components/brand/PulseTraceHero.tsx). 23 unit tests
     goalRealismDisclosure.ts # pure, app-only copy helper (new 2026-08-15) — the ONE place that
                               #  decides whether a realism notice shows and what it says
                               #  ('plan' vs 'preview' tense); classification and cap arithmetic
@@ -187,7 +187,7 @@ src/
                               # quotaPeriod, planTemplates (golden + general + noRace),
                               # paceDerivation, quotaDisplay (6 tests, new 2026-08-05),
                               # goalRealismDisclosure, planRequest, fieldInput (new 2026-08-15),
-                              # pulseTrace (22 tests, new 2026-09-04)
+                              # pulseTrace (23 tests, new 2026-09-04)
                               # — the two engine contracts included
 ```
 

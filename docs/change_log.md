@@ -30,7 +30,7 @@ parallel task that also replaces the token system). Integration guide, written f
   (256pt hero with a copy slot) and `band` (128pt header strip). It paints its own dark field in
   both colour schemes. Under reduced motion there is no self-draw and no sweep, `onSettled` fires
   at once, and a scroll-driven trace still follows the scroll. The trace band is announced as one labelled `image`; the copy above it is traversed like any other text.
-- **The geometry is pure and tested** (`src/lib/pulseTrace.ts`, 22 tests). Beats → strictly
+- **The geometry is pure and tested** (`src/lib/pulseTrace.ts`, 23 tests). Beats → strictly
   x-monotonic polyline → SVG path plus the lookup tables the UI thread interpolates over, so every
   frame is a table lookup off the head's x-position and the "rhythm" — idle along the flat, snap
   through the spike — comes from arc length, not from a bespoke easing per spike. `normalizeBeats`
@@ -53,7 +53,7 @@ parallel task that also replaces the token system). Integration guide, written f
   sections, spikes at the section marks. Temporary: the onboarding rebuild worker may delete it or
   keep it as the start of a component gallery.
 - **Verification.** Both modes seen rendered on web (Expo web in Chrome). Root gate clean:
-  typecheck, lint, 502 tests across 31 suites — 33 new, the geometry suite plus
+  typecheck, lint, 503 tests across 31 suites — 34 new, the geometry suite plus
   `src/components/__tests__/pulseTraceHero.test.tsx`'s 11 render smoke tests. Not verified on a
   device. No `workers/` change.
 
