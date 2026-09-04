@@ -130,8 +130,11 @@ const TRAIL = { fraction: 0.14, opacity: 0.55 } as const;
 /** The reveal's cursor — a hairline standing at the head's x, like a strip chart's stylus. */
 const CURSOR_OPACITY = 0.12;
 
-/** The inset that keeps the widest pass (the bloom) inside the trace band at the tallest spike. */
-const TRACE_INSET = STROKE.bloom / 2 + Stroke.thin;
+/** The inset that keeps the LARGEST thing drawn at the tallest spike inside the trace band — not
+ * just the bloom stroke's half-width, but the head's halo at full kick, which is bigger and is
+ * centred on the peak vertex itself. Size it from whichever is larger, or the signature beat's
+ * halo gets a flat top exactly as the head crests the spike. */
+const TRACE_INSET = Math.max(STROKE.bloom / 2, HEAD.haloRest + HEAD.haloKick) + Stroke.thin;
 
 const EASE_IN_OUT = Easing.inOut(Easing.cubic);
 

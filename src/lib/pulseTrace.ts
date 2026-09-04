@@ -125,12 +125,17 @@ export function normalizeBeats(beats: readonly PulseBeat[]): PulseBeat[] {
  */
 export function beatsAtMarks(marks: readonly number[], amplitudes?: readonly number[]): PulseBeat[] {
   const count = marks.length;
+  const ramp = (index: number) =>
+    count <= 1 ? 1 : 0.5 + (0.5 * index) / Math.max(1, count - 1);
+  if (amplitudes) {
+    return normalizeBeats(
+      marks.map((at, index) => ({ at, amplitude: amplitudes[index] ?? ramp(index) }))
+    );
+  }
   return normalizeBeats(
-    marks.map((at, index) => ({
-      at,
-      amplitude:
-        amplitudes?.[index] ?? (count <= 1 ? 1 : 0.5 + (0.5 * index) / Math.max(1, count - 1)),
-    }))
+    [...marks]
+      .sort((a, b) => a - b)
+      .map((at, index) => ({ at, amplitude: ramp(index) }))
   );
 }
 
