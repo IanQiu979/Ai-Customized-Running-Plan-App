@@ -260,9 +260,13 @@ describe('usePulseTraceScroll', () => {
     act(() => tree.unmount());
   });
 
-  it('leaves a scrollable page at the top until it is actually scrolled', () => {
+  it('re-derives when a short page later grows past its viewport', () => {
     const tree = render(<Probe />);
-    measure(800, 2400);
+    measure(800, 400);
+    expect(scroll!.progress.value).toBe(1);
+    // Growing the content makes the page scrollable again, so the head belongs back at the top —
+    // which only happens if the content-size path really recomputes rather than seeding once.
+    act(() => scroll!.onContentSizeChange(360, 2400));
     expect(scroll!.progress.value).toBe(0);
     act(() => tree.unmount());
   });
