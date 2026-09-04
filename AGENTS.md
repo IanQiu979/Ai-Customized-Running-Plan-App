@@ -237,6 +237,25 @@ Built-ins also available: `Explore`, `Plan`, `general-purpose`. Plugin agents ar
   Every numeric input goes through `src/components/inputs/`, which filters keystrokes via
   `src/lib/fieldInput.ts`; dates and times are segmented boxes with the `-`/`:` printed, never
   typed. Do not add a raw `<TextInput keyboardType="...">` for a numeric answer.
+- **The design system is "Instrument", and its accent has exactly one legal shape.** Near-
+  monochrome white/graphite and charcoal, with a theme-invariant two-tier accent: a near-black
+  `Accent.field` slab carrying ONE icy-cyan `Accent.signal`, spent on one call-to-action per
+  screen and on the onboarding pulse trace. **The cyan is never a fill** — it measures 1.27:1
+  against a white page, so a cyan button would have no boundary at all; that measurement, not
+  taste, is why the primary CTA is a dark slab with a cyan edge and label. Render it through
+  `src/components/ui/ActionButton.tsx`'s `PrimaryAction` and never hand-roll it, so "one accent
+  per screen" stays a question about imports. Values and reasoning:
+  [`docs/design/instrument-visual-system.md`](docs/design/instrument-visual-system.md).
+- **Contrast is enforced, not documented.** `src/constants/__tests__/theme.contrast.test.ts`
+  recomputes every ratio in `theme.ts` from the hexes, asserts the effort ramp's Lab distance from
+  the signal colour, and asserts the two ratios that are deliberately *below* the floor
+  (`progress.disabled`; the dark-mode slab that the cyan edge exists to compensate for). Do not
+  "fix" a failing below-floor assertion — read what it is for first. A new colour token fails the
+  token count until it is given a floor on purpose.
+- **`Accent.field`/`Accent.signal` are duplicated in `src/constants/pulseTrace.ts`** (the
+  onboarding animation's own palette, written in parallel with the token rewrite). The contrast
+  test pins both so they cannot drift; folding that palette into a re-export from `theme.ts` is
+  the tidy-up once both branches have landed.
 - **AI output validation is structural, not strict-content.** `ai-feature-builder` and
   `prompt-engineer` follow [`docs/reference/plan-generation.md`](docs/reference/plan-generation.md):
   validate shape, retry once, fall back to a template.
