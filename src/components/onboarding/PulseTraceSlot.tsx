@@ -37,12 +37,20 @@ import { Accent, Spacing } from '@/constants/theme';
  * contrast are already correct against the real thing, and swapping the import changes only
  * whether the line draws itself.
  *
+ * **One difference to check at swap time.** This slot treats `size` as a *minimum* height and
+ * grows with its copy; `<PulseTraceHero>` treats it as a fixed height. Every caller here
+ * therefore keeps its field copy to a single short mono line and puts headings on the page below,
+ * so neither component can clip at large Dynamic Type sizes — but if a future caller puts tall
+ * copy in the field, verify it against the real component's fixed height rather than this one's.
+ *
  * ===========================================================================
  */
 
 export type PulseTraceSlotSize = 'cover' | 'band';
 
-const HEIGHT: Record<PulseTraceSlotSize, number> = { cover: 256, band: 128 };
+/** `cover` is a landing hero, `band` a header-height strip. A floor rather than a fixed height:
+ * see the swap note in the header. */
+const MIN_HEIGHT: Record<PulseTraceSlotSize, number> = { cover: 256, band: 128 };
 
 /**
  * The static waveform, in a 0..100 × 0..40 viewBox stretched to the band. Flat baseline, three
@@ -72,18 +80,22 @@ export function PulseTraceSlot({
     if (progress === undefined) onSettled?.();
   }, [progress, onSettled]);
 
-  const height = HEIGHT[size];
+  const minHeight = MIN_HEIGHT[size];
 
   return (
-    <View
-      style={[styles.field, { height, backgroundColor: Accent.field }, style]}
-      // One node to VoiceOver: the field is a picture, and the copy over it is the label. Without
-      // this the waveform is announced as an unlabelled image between the eyebrow and the heading.
-      accessible={false}
-    >
+    <View style={[styles.field, { minHeight, backgroundColor: Accent.field }, style]}>
       <View style={styles.copy}>{children}</View>
 
-      <View style={styles.band} pointerEvents="none">
+      {/* The waveform is decoration and carries no information the copy does not. Hidden from
+          assistive tech on both platforms so it is not announced as an unlabelled graphic between
+          the eyebrow and whatever follows — and NOT by making the field itself one accessible
+          node, which would swallow the copy instead. */}
+      <View
+        style={styles.band}
+        pointerEvents="none"
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+      >
         <Svg width="100%" height="100%" viewBox="0 0 100 40" preserveAspectRatio="none">
           <Line
             x1="0"
@@ -116,7 +128,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.four,
     paddingTop: Spacing.five,
     paddingBottom: Spacing.three,
-    overflow: 'hidden',
   },
   copy: {
     gap: Spacing.two,

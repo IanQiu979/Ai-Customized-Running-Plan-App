@@ -82,22 +82,29 @@ export default function OnboardingScreen() {
           side and bottom insets. */}
       <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator>
+          {/* The field carries the wordmark and nothing else. The headline sits on the page below
+              it, not over it: at large Dynamic Type sizes a 44pt condensed headline is taller than
+              the hero's own height, and `<PulseTraceHero>` is a fixed-height component — copy that
+              tall inside it would clip rather than push. It is also the better composition, since
+              the dark field is then a graphic and the page carries the words. */}
           <PulseTraceSlot onSettled={handleSettled}>
             <Text style={[styles.eyebrow, { color: Accent.onFieldMuted }]}>PACE BLUEPRINT</Text>
-            <Text style={[styles.coverHeading, { color: Accent.onField }]}>
-              Your training plan, built around you.
-            </Text>
-            <Text style={[styles.coverSupporting, { color: Accent.onFieldMuted }]}>
-              No monthly coaching fees, no bloated app — just your plan, week by week.
-            </Text>
           </PulseTraceSlot>
 
-          {/* The scroll cue. A mono label and a hairline, not a bouncing chevron: this system does
-              not animate to ask for attention. It sits directly under the cover so it is the first
-              thing on the paper. */}
-          <View style={styles.cue}>
-            <Text style={[styles.cueLabel, { color: theme.text.secondary }]}>SCROLL</Text>
-            <View style={[styles.cueRule, { backgroundColor: theme.hairline }]} />
+          <View style={styles.cover}>
+            <Text style={[styles.coverHeading, { color: theme.text.primary }]}>
+              Your training plan, built around you.
+            </Text>
+            <Text style={[styles.coverSupporting, { color: theme.text.secondary }]}>
+              No monthly coaching fees, no bloated app — just your plan, week by week.
+            </Text>
+
+            {/* The scroll cue. A mono label and a hairline, not a bouncing chevron: this system
+                does not animate to ask for attention. */}
+            <View style={styles.cue}>
+              <Text style={[styles.cueLabel, { color: theme.text.secondary }]}>SCROLL</Text>
+              <View style={[styles.cueRule, { backgroundColor: theme.hairline }]} />
+            </View>
           </View>
 
           <View style={styles.sections}>
@@ -175,12 +182,16 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.body.regular,
     fontSize: FontSize.sm,
   },
+  cover: {
+    paddingHorizontal: Spacing.four,
+    paddingTop: Spacing.four,
+    gap: Spacing.three,
+  },
   cue: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
-    paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.three,
+    paddingTop: Spacing.two,
   },
   cueLabel: {
     fontFamily: FontFamily.mono.regular,
@@ -192,7 +203,7 @@ const styles = StyleSheet.create({
     height: Stroke.hairline,
   },
   sections: {
-    paddingTop: Spacing.five,
+    paddingTop: Spacing.four,
   },
   section: {
     borderTopWidth: Stroke.hairline,

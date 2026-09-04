@@ -101,13 +101,15 @@ export default function SignUpScreen() {
           >
             <PulseTraceSlot size="band">
               <Text style={[styles.eyebrow, { color: Accent.onFieldMuted }]}>PACE BLUEPRINT</Text>
-              <Text style={[styles.fieldTitle, { color: Accent.onField }]}>Create account</Text>
             </PulseTraceSlot>
 
             <View style={styles.form}>
-              <Text style={[styles.subtitle, { color: theme.text.secondary }]}>
-                Ten questions, then your first plan.
-              </Text>
+              <View style={styles.formHeader}>
+                <Text style={[styles.title, { color: theme.text.primary }]}>Create account</Text>
+                <Text style={[styles.subtitle, { color: theme.text.secondary }]}>
+                  Ten questions, then your first plan.
+                </Text>
+              </View>
 
               <AuthField
                 label="Name"
@@ -187,7 +189,10 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
     letterSpacing: Tracking.label,
   },
-  fieldTitle: {
+  formHeader: {
+    gap: Spacing.one,
+  },
+  title: {
     fontFamily: FontFamily.display.extraBold,
     fontSize: FontSize.xxl,
     letterSpacing: Tracking.display,

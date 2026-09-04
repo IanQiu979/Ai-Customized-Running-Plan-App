@@ -105,15 +105,20 @@ export default function SignInScreen() {
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
           >
+            {/* Wordmark only on the field; the screen's title lives on the page below it. Same
+                reason as onboarding — see that screen's header — plus this one has a keyboard to
+                fight, so every point of fixed hero height is one the form does not get. */}
             <PulseTraceSlot size="band">
               <Text style={[styles.eyebrow, { color: Accent.onFieldMuted }]}>PACE BLUEPRINT</Text>
-              <Text style={[styles.fieldTitle, { color: Accent.onField }]}>Sign in</Text>
             </PulseTraceSlot>
 
             <View style={styles.form}>
-              <Text style={[styles.subtitle, { color: theme.text.secondary }]}>
-                Pick up where you left off.
-              </Text>
+              <View style={styles.formHeader}>
+                <Text style={[styles.title, { color: theme.text.primary }]}>Sign in</Text>
+                <Text style={[styles.subtitle, { color: theme.text.secondary }]}>
+                  Pick up where you left off.
+                </Text>
+              </View>
 
               {/* Social first, then the divider, then email. */}
               <SecondaryAction
@@ -183,7 +188,10 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
     letterSpacing: Tracking.label,
   },
-  fieldTitle: {
+  formHeader: {
+    gap: Spacing.one,
+  },
+  title: {
     fontFamily: FontFamily.display.extraBold,
     fontSize: FontSize.xxl,
     letterSpacing: Tracking.display,
