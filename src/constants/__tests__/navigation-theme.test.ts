@@ -42,7 +42,7 @@ describe('NavigationLightTheme', () => {
 
   it('does not route the nav-active color through the ember accent', () => {
     expect(NavigationLightTheme.colors.primary).toBe(Colors.light.text.primary);
-    expect(NavigationLightTheme.colors.primary).not.toBe(Accent.light.ember);
+    expect(NavigationLightTheme.colors.primary).not.toBe(Accent.signal);
   });
 });
 
@@ -73,7 +73,7 @@ describe('NavigationDarkTheme', () => {
 
   it('does not route the nav-active color through the ember accent', () => {
     expect(NavigationDarkTheme.colors.primary).toBe(Colors.dark.text.primary);
-    expect(NavigationDarkTheme.colors.primary).not.toBe(Accent.dark.ember);
+    expect(NavigationDarkTheme.colors.primary).not.toBe(Accent.signal);
   });
 });
 

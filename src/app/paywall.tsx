@@ -1,6 +1,6 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { RouteLine } from '@/components/brand/RouteLine';
@@ -14,6 +14,7 @@ import {
   Tracking,
 } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { PrimaryAction, SecondaryAction } from '@/components/ui/ActionButton';
 import { API_BASE_URL, describeError, purchaseTier } from '@/lib/apiClient';
 import { formatQuotaLine } from '@/lib/quotaDisplay';
 import { TIER_PLAN_LIMITS } from '@/lib/tierLimits';
@@ -200,8 +201,10 @@ function TierCard({
       <View style={styles.tierHeader}>
         <Text style={[styles.tierTitle, { color: theme.text.onInverse }]}>{title}</Text>
         {recommended ? (
-          <View style={[styles.badge, { backgroundColor: theme.accent.ember }]}>
-            <Text style={[styles.badgeText, { color: theme.accent.onEmber }]}>RECOMMENDED</Text>
+          // Monochrome on purpose. The recommended tier's signal is its button, one element
+          // below; a cyan badge beside it would be a second signal on the same screen.
+          <View style={[styles.badge, { borderColor: theme.text.onInverse }]}>
+            <Text style={[styles.badgeText, { color: theme.text.onInverse }]}>RECOMMENDED</Text>
           </View>
         ) : null}
       </View>
@@ -224,32 +227,28 @@ function TierCard({
         ))}
       </View>
 
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`Upgrade to ${title}`}
-        disabled={disabled}
-        onPress={onPress}
-        style={({ pressed }) => [
-          styles.tierButton,
-          recommended
-            ? { backgroundColor: theme.accent.ember }
-            : { borderWidth: Stroke.mark, borderColor: theme.text.onInverse },
-          (pressed || disabled) && styles.pressed,
-        ]}
-      >
-        {pending ? (
-          <ActivityIndicator color={recommended ? theme.accent.onEmber : theme.text.onInverse} />
-        ) : (
-          <Text
-            style={[
-              styles.tierButtonText,
-              { color: recommended ? theme.accent.onEmber : theme.text.onInverse },
-            ]}
-          >
-            Choose {title}
-          </Text>
-        )}
-      </Pressable>
+      {recommended ? (
+        // On a `surface.inverse` slab the primary action's fill matches the slab exactly, so the
+        // cyan edge IS the control. No special case needed — see `ActionButton.tsx`'s header.
+        <PrimaryAction
+          label={`Choose ${title}`}
+          accessibilityLabel={`Upgrade to ${title}`}
+          disabled={disabled}
+          busy={pending}
+          onPress={onPress}
+          style={styles.tierButton}
+        />
+      ) : (
+        <SecondaryAction
+          label={`Choose ${title}`}
+          accessibilityLabel={`Upgrade to ${title}`}
+          tone="onInverse"
+          disabled={disabled}
+          busy={pending}
+          onPress={onPress}
+          style={styles.tierButton}
+        />
+      )}
     </View>
   );
 }
@@ -311,6 +310,7 @@ const styles = StyleSheet.create({
   },
   badge: {
     borderRadius: Radius.pill,
+    borderWidth: Stroke.thin,
     paddingHorizontal: Spacing.two,
     paddingVertical: Spacing.half,
   },
@@ -354,11 +354,8 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.body.regular,
     fontSize: FontSize.sm,
   },
+  // The button's own shape lives in `ActionButton.tsx`; this only places it in the card.
   tierButton: {
-    minHeight: Spacing.six,
-    borderRadius: Radius.control,
-    alignItems: 'center',
-    justifyContent: 'center',
     marginTop: Spacing.one,
   },
   tierButtonText: {

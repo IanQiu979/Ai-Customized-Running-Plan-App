@@ -27,6 +27,7 @@ import {
   Tracking,
 } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { PrimaryAction } from '@/components/ui/ActionButton';
 import { API_BASE_URL, ApiError, describeError, generatePlan, getIntake, getQuotaStatus } from '@/lib/apiClient';
 import { mintIdempotencyKey } from '@/lib/idempotencyKey';
 import { assessGoalRealism } from '@/lib/paceDerivation';
@@ -259,19 +260,7 @@ export default function HomeScreen() {
                 </Text>
               </View>
 
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => router.push('/intake')}
-                style={({ pressed }) => [
-                  styles.primaryButton,
-                  { backgroundColor: theme.accent.ember },
-                  pressed && styles.pressed,
-                ]}
-              >
-                <Text style={[styles.primaryButtonText, { color: theme.accent.onEmber }]}>
-                  Start intake
-                </Text>
-              </Pressable>
+              <PrimaryAction label="Start intake" onPress={() => router.push('/intake')} />
             </View>
           ) : (
             <View style={styles.section}>
@@ -395,24 +384,12 @@ export default function HomeScreen() {
                 <Text style={[styles.error, { color: theme.status.error }]}>{generateError}</Text>
               )}
 
-              <Pressable
-                accessibilityRole="button"
+              <PrimaryAction
+                label="Generate plan"
                 disabled={generating}
+                busy={generating}
                 onPress={handleGenerate}
-                style={({ pressed }) => [
-                  styles.primaryButton,
-                  { backgroundColor: theme.accent.ember },
-                  (pressed || generating) && styles.pressed,
-                ]}
-              >
-                {generating ? (
-                  <ActivityIndicator color={theme.accent.onEmber} />
-                ) : (
-                  <Text style={[styles.primaryButtonText, { color: theme.accent.onEmber }]}>
-                    Generate plan
-                  </Text>
-                )}
-              </Pressable>
+              />
 
               {/* The push toward My Plans. A row, not a second button — this screen already spent
                   its one accent above, and a competing CTA is exactly what that rule prevents. */}

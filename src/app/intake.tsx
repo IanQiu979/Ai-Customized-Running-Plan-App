@@ -26,6 +26,7 @@ import {
   Tracking,
 } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { PrimaryAction } from '@/components/ui/ActionButton';
 import { API_BASE_URL, describeError, getIntake, putIntake } from '@/lib/apiClient';
 import {
   clockFieldError,
@@ -489,24 +490,12 @@ export default function IntakeScreen() {
 
           {error && <Text style={[styles.error, { color: theme.status.error }]}>{error}</Text>}
 
-          <Pressable
-            accessibilityRole="button"
+          <PrimaryAction
+            label="Save intake"
             disabled={submitting}
+            busy={submitting}
             onPress={handleSave}
-            style={({ pressed }) => [
-              styles.primaryButton,
-              { backgroundColor: theme.accent.ember },
-              (pressed || submitting) && styles.pressed,
-            ]}
-          >
-            {submitting ? (
-              <ActivityIndicator color={theme.accent.onEmber} />
-            ) : (
-              <Text style={[styles.primaryButtonText, { color: theme.accent.onEmber }]}>
-                Save intake
-              </Text>
-            )}
-          </Pressable>
+          />
         </ScrollView>
       </SafeAreaView>
     </View>

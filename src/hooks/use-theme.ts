@@ -25,10 +25,11 @@ export function useTheme() {
     scheme,
     ...Colors[scheme],
     effort,
-    // Scheme-resolved, unlike the previous system's theme-invariant accent: no single ember
-    // clears AA on both chalk and espresso, so `Accent` is keyed by scheme the same way `Effort`
-    // is. Call sites read `theme.accent.ember` / `theme.accent.onEmber` and never index a scheme
-    // themselves.
-    accent: Accent[scheme],
+    // Theme-INVARIANT, unlike Trailhead's scheme-keyed ember: the signal cyan is locked (it is the
+    // pulse trace's own colour) and is never a fill, so it has no per-scheme variant to resolve.
+    // It is spread here rather than left as a bare import so that every call site reads colour the
+    // same way — `theme.accent.field` / `theme.accent.signal` — and nothing has to know which
+    // tokens happen to depend on the scheme.
+    accent: Accent,
   };
 }
