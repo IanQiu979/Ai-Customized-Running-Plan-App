@@ -616,8 +616,9 @@ so it can never write its own tier or quota.
 >
 > **Instrument lives on `fm/v22-redesign-theme-onboarding` and is not merged to `main`.** On
 > `main`, `theme.ts` is Trailhead (merged as PR #82, plus the fidelity follow-up #83); this section
-> describes the branch. **No screen has been seen rendered** in either system, in a browser or on a
-> device.
+> describes the branch. **Only the three signed-out screens have been seen rendered** — onboarding,
+> sign-in and sign-up, in both schemes, on Expo web at phone size. No screen has been run on a
+> device or simulator, and the signed-in screens have never been seen rendered in either system.
 
 `src/constants/theme.ts` holds the Instrument tokens: a near-monochrome, cool-scientific field —
 white and graphite in light mode, deep charcoal in dark — carrying every button, rule and piece of

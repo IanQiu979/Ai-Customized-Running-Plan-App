@@ -26,7 +26,7 @@
 | M3 — Plan engine (3 tiers produce valid plans) | **In progress.** Pure template/pace engine wired into the Worker's `generate-plan` route and the client's generate-plan action; the plan view renders a real generated plan (via `GET /api/plans/:id`) alongside the permanent static golden fixture. Paid tiers still serve the quota-exempt template fallback — see "How it is now" |
 | M4 — Tiers & quotas (server-side, unbypassable) | **In progress.** The quota ledger, atomic gate, fallback exemption, `quota-status` and `purchase-tier` are built and tested server-side; a Settings tab now displays tier/quota and a dummy paywall now lets a runner call `purchase-tier` (2026-08-05) |
 | M5 — My Plans (history) | **In progress.** A My Plans tab lists plans off `GET /api/plans` |
-| M6 — Polish & TestFlight | **In progress.** The visual system has been replaced twice. **Trailhead is on `main`** (PR #82, plus the fidelity follow-up #83); **Instrument replaced it on 2026-09-03 and is on `fm/v22-redesign-theme-onboarding`, not merged**. No screen has been seen rendered in either system. See "How it is now". No EAS build exists |
+| M6 — Polish & TestFlight | **In progress.** The visual system has been replaced twice. **Trailhead is on `main`** (PR #82, plus the fidelity follow-up #83); **Instrument replaced it on 2026-09-03 and is on `fm/v22-redesign-theme-onboarding`, not merged**. The three signed-out screens (onboarding, sign-in, sign-up) have been rendered and visually checked in both schemes on Expo **web** at phone size (430x932); no screen has ever been run on a real iOS or Android device or simulator, and the signed-in screens (Home, My Plans, Plan view, Settings, Glossary, Paywall) have still never been seen rendered in either system. See "How it is now". No EAS build exists |
 
 ### How it is now
 
@@ -77,16 +77,20 @@
   already discarded server-side. Source of truth for every value:
   [`docs/design/instrument-visual-system.md`](design/instrument-visual-system.md), which supersedes
   `frontend-design-brief.md` Parts 2 and 3 and replaces the deleted `trailhead-visual-system.md`.
-  Full account: `change_log.md`, 2026-09-03 (later). **Two things are not done, and were not done
-  under Trailhead either** — no screen has been seen rendered in a browser or on a device (the web
-  export does not inline the root `.env`, so the bundle throws `Missing EXPO_PUBLIC_API_BASE_URL`
-  and never hydrates), and this branch has had no review pass.
+  Full account: `change_log.md`, 2026-09-03 (later). **What has and has not been looked at:** the
+  three signed-out screens (onboarding, sign-in, sign-up) were rendered and checked in both schemes
+  against the Expo **web dev server** at 430x932 on 2026-09-03, which is the only screen-rendering
+  verification this project has ever had; no screen has been run on a real iOS or Android device or
+  simulator, and the signed-in screens have still never been seen at all. Note this is the dev
+  server, not `npx expo export` — the static export does not inline the root `.env`, so that bundle
+  throws `Missing EXPO_PUBLIC_API_BASE_URL` and never hydrates. The branch has now had a review
+  pass, and its findings were fixed (`change_log.md`, 2026-09-04).
 - **Test-mode override:** `ALL_USERS_UNLIMITED_ACCESS = "true"` still sits in the top-level
   `[vars]` of `workers/wrangler.toml` (the committed `[env.production.vars]` value is `"false"`),
   so the captain's test pass runs with every account Elite and the quota gate bypassed. Set the
   top-level value to `"false"` before real users arrive. Recorded in "Latest — 2026-08-09".
-- **Test counts:** 508 root tests across 30 suites on `fm/v22-redesign-theme-onboarding`, verified
-  by running `npm test` there on 2026-09-03; `main`'s figure is the 469 across 29 suites recorded
+- **Test counts:** 509 root tests across 31 suites on `fm/v22-redesign-theme-onboarding`, verified
+  by running `npm test` there on 2026-09-04; `main`'s figure is the 469 across 29 suites recorded
   in the 2026-09-01 and 2026-09-03 entries below. 139 `workers/` tests across 7 files
   (`npm --prefix workers test`, verified 2026-08-17 and untouched since — no `workers/` change has
   landed). Typecheck clean on both sides and root lint clean (`workers/` has no lint script — its
@@ -144,8 +148,19 @@ the work. On `fm/v22-redesign-theme-onboarding`, **not merged**; full account in
   is a marked INTEGRATION POINT rendering the *static end state* of `<PulseTraceHero>`, the
   signature animation being built in parallel on `fm/v22-redesign-animation` — **that animation is
   not on this branch**, so nothing moves yet; the swap is one import line when it lands.
-- 508 root tests across 30 suites pass, typecheck and lint clean. No `workers/` change. **No screen
-  has been seen rendered** — unchanged from Trailhead — and this branch has had no review pass.
+- 509 root tests across 31 suites pass, typecheck and lint clean (re-verified 2026-09-04, after the
+  review fix round below). No `workers/` change. **The three signed-out screens have been seen
+  rendered** — onboarding, sign-in and sign-up, in both schemes, on Expo web at 430x932 — but no
+  screen has been run on a device or simulator, and the signed-in screens have still never been
+  looked at. This branch has now had a review pass, and its findings were fixed (see
+  `change_log.md`'s 2026-09-04 addendum).
+- **2026-09-04 — review fix round, two behavior changes.** Onboarding's "Get started" now releases
+  on a bounded 4s ceiling if `<PulseTraceHero>`'s `onSettled` never fires, so the only forward
+  action out of the signed-out landing screen cannot hang forever on a component that lives on
+  another branch; the captain's standing constraint that the hero settles *before* the CTA is
+  interactive is unchanged — the ceiling only bounds the wait. And the four pre-auth links inside
+  `(auth)` moved from `router.push` to `router.navigate`, so a sign-in ↔ sign-up ↔ onboarding round
+  trip pops to the existing route instead of pushing a duplicate, scroll-reset copy of it.
 
 Previous entry: 2026-09-03 — the captain reported sign-in/sign-up "not working at all" and
 `expo start --tunnel` broken, blocking him from testing the app at all. Both diagnosed and fixed.
@@ -806,8 +821,10 @@ view to `buildTemplatePlan()` instead of the static fixture; intake and server w
 
 **The Instrument redesign, on `fm/v22-redesign-theme-onboarding`.** The token system, onboarding,
 the two auth screens and the Paywall's badge are rebuilt and the branch is clean on its own gate,
-but it is unmerged and unfinished in three specific ways: no screen has been seen rendered (browser
-or device), it has had no review pass, and the signature pulse-trace animation it was designed
+but it is unmerged and unfinished in three specific ways: only the three signed-out screens have
+been seen rendered (Expo web at phone size, both schemes) — nothing on a device or simulator, and
+none of the signed-in screens; its review pass is done and its findings fixed, but it has not been
+re-reviewed since; and the signature pulse-trace animation it was designed
 around is on a parallel branch (`fm/v22-redesign-animation`) that has not landed —
 `PulseTraceSlot.tsx` renders that animation's static end state until it does. Detail in "Current
 state" above and `change_log.md`, 2026-09-03 (later). Trailhead, its predecessor, is already on

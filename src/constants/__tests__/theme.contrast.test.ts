@@ -7,8 +7,11 @@ import { Accent, Colors, Effort, EffortOrder, type ColorScheme } from '../theme'
  * `theme.ts` has always carried the ratios as comments. Comments do not fail a build: issue #70
  * ("light-mode effort hexes have no contrast headroom, and dark `interval` is below 3:1") is
  * exactly what a documented-but-unenforced table produces after a few edits. This file recomputes
- * every ratio from the hexes themselves, so a value changed in `theme.ts` without re-running the
- * table fails here instead of shipping.
+ * every ratio from the hexes themselves and asserts it against its FLOOR — and, for the two values
+ * that are deliberately below the floor, against a ceiling. So a hex edited into illegibility
+ * fails here instead of shipping. It does NOT pin the exact numbers written in `theme.ts`'s
+ * comments, which is deliberate: pinning them would make every legitimate re-tune a test edit.
+ * Re-running the table and updating those comments therefore remains a human step.
  *
  * The floors, from `docs/design/instrument-visual-system.md` §2:
  *   - text on the surface it sits on: >= 4.5:1 (WCAG AA)

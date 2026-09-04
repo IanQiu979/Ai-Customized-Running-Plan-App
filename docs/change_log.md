@@ -82,9 +82,38 @@ for colour, type, and ornament — the rest of that brief still governs — and 
   pre-auth screen except the OS back gesture.
 - **The Paywall's RECOMMENDED badge went monochrome**, so the recommended tier's button stays the
   screen's one signal.
-- **Verification, honestly.** `typecheck && lint && test` clean at **508 root tests across 30
-  suites**; no `workers/` change. As with Trailhead, **no screen has been seen rendered**, in a
-  browser or on a device, and this branch has had no review pass.
+- **Verification, honestly.** `typecheck && lint && test` clean at **509 root tests across 31
+  suites** (re-run 2026-09-04, after the fix round below); no `workers/` change. **The three
+  signed-out screens have been seen rendered** — onboarding, sign-in and sign-up, screenshotted in
+  both schemes on Expo **web** at 430x932, which is what caught the stretched waveform and the
+  over-loud back link fixed the same day. No screen has been run on a real iOS or Android device or
+  simulator, and the signed-in screens (Home, My Plans, Plan view, Settings, Glossary, Paywall) have
+  still never been seen rendered at all.
+
+### 2026-09-04 — addendum: review fix round
+
+Two behavior changes, both from the branch's first review pass.
+
+- **Onboarding's CTA gate is now bounded.** "Get started" was gated purely on `onSettled` from
+  `<PulseTraceHero>`, a component that lives on another branch — so a callback that never arrived
+  (an interrupted draw, an unmount mid-draw, a reduced-motion branch that misses) left the ONLY
+  forward action out of the signed-out landing screen permanently disabled, with no timeout behind
+  it. The screen now owns a 4s ceiling of its own and releases the CTA if the hero has not settled
+  by then. The captain's standing constraint is unchanged — the hero still settles before the CTA
+  is interactive; the ceiling only stops that wait hanging forever. `<PulseTraceHero>` settles at
+  roughly lead 400ms + draw 2200ms + slack 400ms = 3000ms, so 4s only ever fires when something is
+  actually wrong. Covered by `src/app/(auth)/__tests__/onboarding.test.tsx`, which fails if either
+  the gate or the ceiling is removed.
+- **The four pre-auth links use `router.navigate`, not `router.push`.** Both "Back to the start"
+  links and both sign-in ↔ sign-up swap links. `push` grew the stack by an entry every time, so a
+  round trip walked the OS back gesture through a chain of duplicate, scroll-reset landing screens;
+  `navigate` pops to the existing route instead.
+- **A doc overclaim, corrected as the author's own.** Four places (the contrast test, `theme.ts`,
+  `AGENTS.md`, `docs/design/instrument-visual-system.md`) claimed the contrast test pinned
+  `constants/pulseTrace.ts`'s duplicated hexes so the two files could not drift. It does not: that
+  file is not on this branch and cannot be imported, so the pin is one-sided today. All four now
+  say so, and `PulseTraceSlot.tsx`'s swap checklist carries the step that makes it two-sided when
+  `fm/v22-redesign-animation` lands.
 
 ## 2026-09-03 — fix dead `EXPO_PUBLIC_API_BASE_URL` blocking all sign-in/sign-up; confirm the tunnel works
 
