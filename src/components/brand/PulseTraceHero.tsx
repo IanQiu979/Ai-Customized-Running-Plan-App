@@ -43,8 +43,8 @@ import {
  * The pulse trace — the redesign's signature onboarding animation and the ONE deliberately bold,
  * expressive element in an otherwise near-monochrome app (captain-approved concept, 2026-09-03).
  * A thin icy-cyan ECG-style waveform draws itself across a near-black field, standing for pace
- * and effort: it idles along a flat baseline and snaps through each spike, each beat taller and
- * closer than the last.
+ * and effort: it idles along a flat baseline and snaps through each spike, the beats building and
+ * quickening, then easing off.
  *
  * Two ways to drive it, one number underneath:
  *
@@ -449,7 +449,7 @@ export function PulseTraceHero({
         onLayout={handleTraceLayout}
         accessible
         accessibilityRole="image"
-        accessibilityLabel="Illustration: a pulse trace drawing itself across a dark field, each beat taller and closer than the last."
+        accessibilityLabel="Illustration: a pulse trace drawing itself across a dark field, the beats building and quickening, then easing off."
       >
         {hasGeometry ? (
           <Svg width={traceWidth} height={traceHeight} style={styles.noPointer}>

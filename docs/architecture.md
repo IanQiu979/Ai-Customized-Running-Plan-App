@@ -85,7 +85,11 @@ src/
                              # PulseTraceHero (new 2026-09-04) — the NEXT system's signature: an
                              # ECG-style icy-cyan trace on its own near-black field, self-drawing
                              # on mount (onSettled) or driven by a scroll SharedValue (progress),
-                             # spikes placeable at section marks, reduced-motion aware. Mounted by
+                             # spikes placeable at section marks, reduced-motion aware. A scrolling
+                             # screen takes that value from usePulseTraceScroll, exported alongside
+                             # it — the required integration point, since it seeds progress from
+                             # layout and content size as well as the scroll handler, so a page too
+                             # short to scroll still draws (docs/design/pulse-trace.md). Mounted by
                              # no screen yet; reads colour only from constants/pulseTrace.ts
     __tests__/              # render smoke tests: render (Trailhead components), pulseTraceHero
                              # (11 tests, new 2026-09-04)
@@ -137,7 +141,9 @@ src/
                               #  parsers behind src/components/inputs/
     pulseTrace.ts            # pure (new 2026-09-04) — the pulse trace's geometry: beats -> strictly
                               #  x-monotonic polyline -> SVG path + lookup tables, `normalizeBeats`,
-                              #  `beatsAtMarks`, and the `scrollProgress` worklet. 22 unit tests
+                              #  `beatsAtMarks`, and the `scrollProgress` worklet (the hook that
+                              #  drives it from a ScrollView is usePulseTraceScroll, in
+                              #  components/brand/PulseTraceHero.tsx). 22 unit tests
     goalRealismDisclosure.ts # pure, app-only copy helper (new 2026-08-15) — the ONE place that
                               #  decides whether a realism notice shows and what it says
                               #  ('plan' vs 'preview' tense); classification and cap arithmetic
