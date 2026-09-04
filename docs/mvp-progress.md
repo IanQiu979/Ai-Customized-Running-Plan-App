@@ -81,7 +81,7 @@
   holds the outgoing Trailhead tokens that the parallel `v22-redesign-theme-onboarding` task is
   replacing. The onboarding screen is unchanged; the dev-only `/dev/pulse-trace` preview is the
   only place the component renders. Seen rendered on web in both modes; its branch's gate is clean
-  at 502 root tests across 31 suites (33 new). Guide for the worker who mounts it:
+  at 503 root tests across 31 suites (34 new). Guide for the worker who mounts it:
   [`docs/design/pulse-trace.md`](design/pulse-trace.md); full account: `change_log.md`,
   2026-09-04.
 - **Test-mode override:** `ALL_USERS_UNLIMITED_ACCESS = "true"` still sits in the top-level
@@ -455,7 +455,7 @@ from 82. Issue #22 remains open.)
 ### Code
 - [x] **The pulse trace animation is built (2026-09-04).** `src/components/brand/PulseTraceHero.tsx`
       (self-drawing or scroll-driven, reduced-motion aware, paints its own dark field), pure
-      geometry in `src/lib/pulseTrace.ts` (22 tests), its own palette/timings in
+      geometry in `src/lib/pulseTrace.ts` (23 tests), its own palette/timings in
       `src/constants/pulseTrace.ts` (not `theme.ts` — see "In flight"), 11 render smoke tests in
       `src/components/__tests__/pulseTraceHero.test.tsx`, and a dev-only preview at
       `src/app/dev/pulse-trace.tsx`. Built to be dropped into the rebuilt onboarding; mounts
