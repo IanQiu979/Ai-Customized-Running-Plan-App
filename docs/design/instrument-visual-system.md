@@ -13,11 +13,15 @@
 > The implementing token module is `src/constants/theme.ts`. Every hex here appears there and
 > nowhere else — with one deliberate exception, `src/constants/pulseTrace.ts`, covered in §2.
 >
-> **The contrast table below is executable.** `src/constants/__tests__/theme.contrast.test.ts`
-> recomputes every ratio from the hexes in `theme.ts`, so a value edited without re-running the
-> table fails the suite instead of shipping. That test is why the old "never change a hex without
-> re-verifying contrast" rule now has teeth: it was documented under Trailhead and drifted anyway
-> (issue #70).
+> **The floors behind the contrast table are executable.**
+> `src/constants/__tests__/theme.contrast.test.ts` recomputes every ratio below from the hexes in
+> `theme.ts` and asserts it against its floor — and, for the handful that are deliberately *below*
+> a floor, against its ceiling. A hex edited into illegibility therefore fails the suite instead
+> of shipping. It deliberately does **not** pin the exact numbers printed here: that would turn
+> every legitimate re-tune into a test edit. So re-running the table and updating these rows
+> remains a human step, and the standing `CLAUDE.md` rule still applies — what changed is that the
+> rule is now backed by a floor nobody can quietly fall through, which is what it lacked under
+> Trailhead (issue #70).
 
 ## 1. The idea
 

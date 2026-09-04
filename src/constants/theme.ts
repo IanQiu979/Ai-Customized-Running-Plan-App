@@ -2,11 +2,14 @@
  * V2.2 design tokens — **"Instrument"** (captain-approved 2026-09-03, replacing "Trailhead").
  *
  * Source of truth: `docs/design/instrument-visual-system.md`, which records every hex below
- * together with the contrast ratio it was verified at. Those ratios are also *enforced*, not just
- * documented: `src/constants/__tests__/theme.contrast.test.ts` recomputes every one of them from
- * the hexes in this file, so a value edited here without re-running the table fails the suite
- * rather than shipping. That test is the standing rule from `CLAUDE.md` made executable — it is
- * what issue #70 ("light-mode effort hexes have no contrast headroom") was missing.
+ * together with the contrast ratio it was verified at. The *floors* behind those ratios are
+ * enforced rather than merely documented: `src/constants/__tests__/theme.contrast.test.ts`
+ * recomputes each ratio from the hexes in this file and asserts it against its floor (and, for
+ * the values that are deliberately sub-floor, against its ceiling), so a hex edited into
+ * illegibility fails the suite instead of shipping. It does NOT pin the exact documented numbers,
+ * on purpose — that would make every legitimate re-tune a test edit. Re-running the table and
+ * updating the comments below is still a human step, and still the standing rule in `CLAUDE.md`.
+ * That test is what issue #70 ("light-mode effort hexes have no contrast headroom") was missing.
  *
  * The system in one line: a near-monochrome, cool-scientific field — white and graphite in light
  * mode, deep charcoal in dark — carrying every button, rule and piece of chrome in near-black,

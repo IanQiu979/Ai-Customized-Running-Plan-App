@@ -26,7 +26,7 @@
 | M3 — Plan engine (3 tiers produce valid plans) | **In progress.** Pure template/pace engine wired into the Worker's `generate-plan` route and the client's generate-plan action; the plan view renders a real generated plan (via `GET /api/plans/:id`) alongside the permanent static golden fixture. Paid tiers still serve the quota-exempt template fallback — see "How it is now" |
 | M4 — Tiers & quotas (server-side, unbypassable) | **In progress.** The quota ledger, atomic gate, fallback exemption, `quota-status` and `purchase-tier` are built and tested server-side; a Settings tab now displays tier/quota and a dummy paywall now lets a runner call `purchase-tier` (2026-08-05) |
 | M5 — My Plans (history) | **In progress.** A My Plans tab lists plans off `GET /api/plans` |
-| M6 — Polish & TestFlight | **In progress.** The whole visual system was replaced with **Trailhead** and every screen rebuilt on it — but **on `redesign/trailhead-2026-09-01`, not merged to `main`**, and no screen has been seen rendered yet. See "How it is now". No EAS build exists |
+| M6 — Polish & TestFlight | **In progress.** The visual system has been replaced twice. **Trailhead is on `main`** (PR #82, plus the fidelity follow-up #83); **Instrument replaced it on 2026-09-03 and is on `fm/v22-redesign-theme-onboarding`, not merged**. No screen has been seen rendered in either system. See "How it is now". No EAS build exists |
 
 ### How it is now
 
@@ -55,29 +55,43 @@
   a deload; a past race date is refused on both screens (race day and a blank date remain valid);
   numeric inputs are structured (`src/components/inputs/` + `src/lib/fieldInput.ts`). Full
   account: the "Last updated" entry below.
-- **The design system is now "Trailhead" — live in a branch, not on `main`.** All of
-  `redesign/trailhead-2026-09-01` is **unreleased**: `src/constants/theme.ts` on `main` is still
-  "Instrument & Matter", and everything in this bullet describes the branch only. There, the token
-  system, the fonts, the signature motif and every screen were replaced — warm chalk and espresso
-  ink, one scheme-aware ember accent spent on exactly one action per screen and barred from
-  navigation, a route-line contour as the only ornament, and a dusk gradient on the signed-out
-  screens as the single deliberate exception. Free-tier Notes are now shown locked, which is a UI
-  correction and not new enforcement: Free is template-only, so those notes were already discarded
-  server-side. Source of truth for every value:
-  [`docs/design/trailhead-visual-system.md`](design/trailhead-visual-system.md), which supersedes
-  `frontend-design-brief.md` Parts 2 and 3. Full account: `change_log.md`, 2026-09-01. **Two things
-  are not done on that branch** — no screen has been seen rendered in a browser or on a device (the
-  web export does not inline the root `.env`, so the bundle throws `Missing
-  EXPO_PUBLIC_API_BASE_URL` and never hydrates), and it has had no review pass. Its gate is clean
-  at 469 root tests across 29 suites; the 433/26 figure below is `main`'s.
+- **The design system is now "Instrument" — live in a branch; `main` carries Trailhead.**
+  Trailhead *did* land on `main` (PR #82, plus the fidelity follow-up #83), so `main`'s
+  `src/constants/theme.ts` is warm chalk and espresso ink with a scheme-aware ember accent, a
+  route-line contour, and a dusk gradient on the signed-out screens. **Instrument replaced it on
+  2026-09-03 and is unreleased**, on `fm/v22-redesign-theme-onboarding`: near-monochrome and
+  cool-scientific — white and graphite in light mode, deep charcoal in dark — adopted as a house
+  style shared with the sibling app V2.3. Its accent is two-tier and theme-invariant: a near-black
+  slab (`Accent.field`) carrying one locked icy-cyan signal (`Accent.signal`) that is spent on
+  exactly one call to action per screen and on the onboarding pulse trace, and **is never a fill**
+  (it measures 1.27:1 against a white page, so a cyan button would have no visible edge — the
+  primary action is a near-black slab with a cyan edge and label instead). The effort ramp was
+  re-tuned cooler with real headroom (tightest 4.92:1, against *both* `surface.base` and
+  `surface.raised`), and the floors are now **enforced by a test** that recomputes every ratio from
+  `theme.ts`'s own hexes — the enforcement issue #70 was missing. The dusk gradient is retired; the
+  bold moment is now the pulse trace, whose animation lives on a parallel branch and is not here
+  yet. Onboarding is rebuilt as a scroll-down read, sign-in and sign-up carry the same field at
+  `band` height and finally have a link back to onboarding, and one `ActionButton` module replaces
+  eight hand-rolled button stylesheets. Free-tier Notes stay locked in the UI, as under Trailhead —
+  a display correction, not new enforcement, since Free is template-only and those notes were
+  already discarded server-side. Source of truth for every value:
+  [`docs/design/instrument-visual-system.md`](design/instrument-visual-system.md), which supersedes
+  `frontend-design-brief.md` Parts 2 and 3 and replaces the deleted `trailhead-visual-system.md`.
+  Full account: `change_log.md`, 2026-09-03 (later). **Two things are not done, and were not done
+  under Trailhead either** — no screen has been seen rendered in a browser or on a device (the web
+  export does not inline the root `.env`, so the bundle throws `Missing EXPO_PUBLIC_API_BASE_URL`
+  and never hydrates), and this branch has had no review pass.
 - **Test-mode override:** `ALL_USERS_UNLIMITED_ACCESS = "true"` still sits in the top-level
   `[vars]` of `workers/wrangler.toml` (the committed `[env.production.vars]` value is `"false"`),
   so the captain's test pass runs with every account Elite and the quota gate bypassed. Set the
   top-level value to `"false"` before real users arrive. Recorded in "Latest — 2026-08-09".
-- **Test counts, verified by running the suites (2026-08-17):** 433 root tests across 26 suites
-  (`npm test`), 139 `workers/` tests across 7 files (`npm --prefix workers test`). Typecheck clean
-  on both sides and root lint clean (`workers/` has no lint script — its gate is typecheck + test).
-  The dated entries below record each point in time's counts — this line is the current one.
+- **Test counts:** 508 root tests across 30 suites on `fm/v22-redesign-theme-onboarding`, verified
+  by running `npm test` there on 2026-09-03; `main`'s figure is the 469 across 29 suites recorded
+  in the 2026-09-01 and 2026-09-03 entries below. 139 `workers/` tests across 7 files
+  (`npm --prefix workers test`, verified 2026-08-17 and untouched since — no `workers/` change has
+  landed). Typecheck clean on both sides and root lint clean (`workers/` has no lint script — its
+  gate is typecheck + test). The dated entries below record each point in time's counts — this line
+  is the current one.
 - **Verified by hand on an iOS 26.5 simulator**, scoped to the 2026-08-15 check: Home in both the
   race and no-race states, and the keyboard each numeric field raises. Android is unverified — no
   Android SDK on this machine, so the `number-pad`/`decimal-pad` choice rests on the React Native
@@ -85,7 +99,55 @@
 
 ---
 
-**Last updated:** 2026-09-03 — the captain reported sign-in/sign-up "not working at all" and
+**Last updated:** 2026-09-03 (later) — the visual system was replaced again. **Instrument** — a
+near-monochrome, cool-scientific house style shared with V2.3 ("Pace AnalysisAI") — supersedes
+Trailhead, two days after Trailhead merged to `main`. Captain-approved and grilled in detail before
+the work. On `fm/v22-redesign-theme-onboarding`, **not merged**; full account in
+[`change_log.md`](change_log.md), 2026-09-03 (later), and every value in the new
+[`docs/design/instrument-visual-system.md`](design/instrument-visual-system.md).
+
+- **The accent is two-tier and theme-invariant, and the cyan is never a fill.** `Accent.field`
+  (`#0A0E13`) is a near-black slab; `Accent.signal` (`#A8F0FF`) is the one bright highlight, locked,
+  spent on exactly one call to action per screen and on the onboarding pulse trace. The cyan
+  measures **1.27:1** against a white page, so a cyan button would have no visible boundary at all
+  — the primary action is a near-black slab with a 1.5pt cyan edge and a cyan label, identical in
+  both schemes, whose boundary comes from a different channel in each (**19.35:1** in light, the
+  slab against the page; **14.74:1** in dark, the cyan edge, since the slab itself is **1.04:1**
+  there on purpose). `Accent.field` is also `Colors.light.surface.inverse` and the pulse trace's own
+  field, so every dark plane in the app is one plane.
+- **The effort ramp was re-tuned cooler, with headroom, and the ratios are now enforced by test.**
+  Steel blue / sea green / brass / rust / raspberry — hue identity and ordering held, only hue-angle
+  and lightness moved. Tightest value is **4.92:1 against both `surface.base` and `surface.raised`**
+  (Trailhead's light ramp sat at 4.02–4.50 against `base` with nothing checked against `raised`,
+  which is what **issue #70** reported), and collision with the signal colour is measured as CIE76
+  ΔE in Lab — floor 25, tightest 28.3 — because a contrast ratio is blind to hue and would pass an
+  icy-cyan `recovery`. New `src/constants/__tests__/theme.contrast.test.ts` recomputes every ratio
+  from `theme.ts`'s hexes and asserts it against that token's floor — the deliberately sub-floor
+  values as upper bounds, plus a guard that no opaque token escapes the table. That is the
+  enforcement issue #70 was missing. **Issue #70 is not claimed closed** — it has not been verified
+  closed on GitHub.
+- **Retired:** `DuskGradient`, `DuskHero`, `DuskSpark`, `Motion.duration.reveal`/`.ambient`,
+  `RouteLine`'s dusk-only `hero` variant, and the scheme-keyed `Accent`; `accent.ember`/`onEmber`
+  are now `accent.field`/`accent.signal`. Radii tightened again (control 10→8, card 16→14). `docs/design/trailhead-visual-system.md` is deleted,
+  superseded by the Instrument doc.
+- **Onboarding is rebuilt as a scroll-down flow** — pulse-trace cover, a "SCROLL" cue, three
+  numbered hairline-separated beats (the intake / the plan / the price), then the single CTA with
+  the sign-in skip as its peer. Not swipeable cards, and **the sections deliberately do not fade or
+  rise on scroll**: a second motion moment competes with the signature one, and the scroll itself is
+  already the mechanic. Sign-in and sign-up take the same treatment at `band` height and both gained
+  a "Back to the start" link — there was previously no way back to the only pre-auth screen except
+  the OS back gesture. The Paywall's RECOMMENDED badge went monochrome so the recommended tier's
+  button stays the screen's only signal.
+- **Two new components carry rules review used to carry.**
+  `src/components/ui/ActionButton.tsx` collapses eight hand-rolled button stylesheets into one
+  module, so "one accent per screen" is a question about imports. `src/components/onboarding/PulseTraceSlot.tsx`
+  is a marked INTEGRATION POINT rendering the *static end state* of `<PulseTraceHero>`, the
+  signature animation being built in parallel on `fm/v22-redesign-animation` — **that animation is
+  not on this branch**, so nothing moves yet; the swap is one import line when it lands.
+- 508 root tests across 30 suites pass, typecheck and lint clean. No `workers/` change. **No screen
+  has been seen rendered** — unchanged from Trailhead — and this branch has had no review pass.
+
+Previous entry: 2026-09-03 — the captain reported sign-in/sign-up "not working at all" and
 `expo start --tunnel` broken, blocking him from testing the app at all. Both diagnosed and fixed.
 
 - **Root cause of the auth failure: a stale `.env.example`, not the backend.** The deployed Worker
@@ -742,10 +804,14 @@ view to `buildTemplatePlan()` instead of the static fixture; intake and server w
 
 ## In flight
 
-**The Trailhead redesign, on `redesign/trailhead-2026-09-01`.** Functionally complete across every
-screen in scope and clean on its own gate, but unmerged and unfinished in two specific ways: no
-screen has been seen rendered (browser or device), and it has had no review pass. Detail in
-"Current state" above and `change_log.md`, 2026-09-01.
+**The Instrument redesign, on `fm/v22-redesign-theme-onboarding`.** The token system, onboarding,
+the two auth screens and the Paywall's badge are rebuilt and the branch is clean on its own gate,
+but it is unmerged and unfinished in three specific ways: no screen has been seen rendered (browser
+or device), it has had no review pass, and the signature pulse-trace animation it was designed
+around is on a parallel branch (`fm/v22-redesign-animation`) that has not landed —
+`PulseTraceSlot.tsx` renders that animation's static end state until it does. Detail in "Current
+state" above and `change_log.md`, 2026-09-03 (later). Trailhead, its predecessor, is already on
+`main` (PR #82, #83) and carries the same "never seen rendered" caveat.
 
 Nothing else is in flight. The one remaining critical-path item — `ANTHROPIC_API_KEY`, without which
 paid-tier requests serve the quota-exempt template fallback — is a captain-only action, not work
@@ -1018,21 +1084,25 @@ intact underneath.
   `src/lib/apiClient.ts` maps an authoritative `403 unauthenticated` response to a best-effort
   `authClient.signOut()` before returning the original `ApiError`, so a foregrounded app no longer
   remains visually signed in after server revocation.
-- 🟠 **The effort hexes have no contrast headroom — tracked as [issue #70](https://github.com/IanQiu979/WorkoutGenerationv2.2/issues/70).**
-  Four of the five light effort hexes sit barely above the brief's 3:1 floor *at full opacity*
-  (`easy` is 3.0045:1), so there is no headroom for an opacity dip; and dark `interval` (#C6402F on
-  #14171C) is 3.57:1 at full opacity and **2.32:1 at the 0.7 dark floor**, so the dark floor is not
-  justified by the numbers either. Both want `design-system` to revisit the effort scale, which
-  ripples into plan view (`WeekAccordion.tsx`, the scale's primary consumer) — hence its own issue
-  rather than a bullet here. Neither was introduced by the 2026-08-08 change.
-  **Not open for the onboarding hero:** the captain ruled 2026-08-08 that its shimmer is
-  dark-mode-only and final, with the contrast floor untouched. That behaviour is settled; only the
-  palette question above is outstanding.
+- 🟢 **Addressed in code, not verified closed on GitHub: the effort hexes' contrast headroom —
+  [issue #70](https://github.com/IanQiu979/WorkoutGenerationv2.2/issues/70).** The hexes it reported
+  (light values barely above 3:1 at full opacity; dark `interval` `#C6402F` on `#14171C`) no longer
+  exist: the ramp was re-picked under Trailhead and re-tuned again under Instrument on 2026-09-03,
+  where every value sits at **4.92:1 or better against both `surface.base` and `surface.raised`** —
+  the headroom the issue asked for, and now measured against `raised` as well, which neither
+  earlier system ever checked even though the tab bar and every card sit on it. The rule is also
+  enforced rather than restated: `src/constants/__tests__/theme.contrast.test.ts` recomputes every
+  ratio from `theme.ts`'s hexes and holds it to a floor. **Two caveats:** that
+  work is on `fm/v22-redesign-theme-onboarding`, unmerged, and nobody has confirmed the GitHub issue
+  is closed. **Not open for the signed-out hero:** the captain ruled 2026-08-08 that its shimmer is
+  dark-mode-only and final, with the contrast floor untouched; that hero has since been replaced
+  twice over regardless.
 - 🟡 **Onboarding replays on every signed-out session, not just first install.** `(auth)/index.tsx`
   is the anchor for all of them, so a returning user who signed out sees the hero again. Deliberate
   for now — the sign-in link on that screen is the skip — but persisting a "has seen onboarding"
-  flag is an open product decision, and there is precedent for the pattern (the wave's stroke-draw
-  is gated on a persisted set of plan IDs).
+  flag is an open product decision. This bullet used to cite the periodization wave's stroke-draw
+  as precedent for the pattern; that motif was deleted with the Trailhead redesign and there is no
+  persisted "already seen" state anywhere in the app today, so the flag would be the first.
 
 ### Standing
 

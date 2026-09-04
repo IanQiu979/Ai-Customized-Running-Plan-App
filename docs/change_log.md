@@ -5,6 +5,87 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-09-03 (later) — "Instrument": the visual system replaced again, onboarding and the auth screens rebuilt
+
+On branch `fm/v22-redesign-theme-onboarding`, **not merged to `main`** — nothing below is
+released. Trailhead *is* on `main` (PR #82, plus the fidelity follow-up #83), and this replaces it
+after two days: the captain approved **Instrument**, a near-monochrome, cool-scientific system
+adopted as a house style shared with the sibling app V2.3 ("Pace AnalysisAI"), and grilled its
+structure in detail before the work started. It is recorded in the new
+[`docs/design/instrument-visual-system.md`](design/instrument-visual-system.md), which supersedes
+`frontend-design-brief.md` Parts 2 (tokens) and 3 (the ribbon/wave motif) as the source of truth
+for colour, type, and ornament — the rest of that brief still governs — and which replaces
+`trailhead-visual-system.md`, deleted in the same pass.
+
+- **The palette is new, not re-tuned** (`src/constants/theme.ts`). Light mode is paper white
+  `#FFFFFF` over graphite; dark mode is a deep cool charcoal `#0E1317`. Every token's contrast
+  ratio was recomputed against **both** `surface.base` and `surface.raised` — the full tables live
+  in the design doc and are not duplicated anywhere else.
+- **The accent is two-tier and theme-invariant**, where Trailhead's ember was scheme-keyed.
+  `Accent.field` (`#0A0E13`) is a near-black slab; `Accent.signal` (`#A8F0FF`) is the ONE bright
+  highlight — icy cyan, locked, because it is the colour the onboarding pulse trace is drawn in —
+  spent on exactly one call to action per screen and on that trace, nowhere else. **The cyan is
+  never a fill**, and that is measurement rather than taste: it is **1.27:1** against a white page,
+  so a cyan button would have no visible boundary at all. The primary action is therefore a
+  near-black slab with a 1.5pt cyan edge and a cyan label, identical in both schemes, whose
+  boundary is carried by a different channel in each — **19.35:1** in light (the slab against the
+  page) and **14.74:1** in dark (the cyan edge, since the slab itself is only **1.04:1** there, on
+  purpose). Every one of those relationships is asserted in the contrast test, the two deliberately
+  sub-floor ones included.
+- **`Accent.field` is also `Colors.light.surface.inverse`**, and the same near-black as the pulse
+  trace's own field. Every dark plane in the app is one plane, so a primary action on the Paywall's
+  pricing slab reads as an inset in it rather than as a second, slightly different black.
+- **The effort ramp was re-tuned into a cooler key** (captain's explicit call — left warm, it would
+  read as a leftover from Trailhead): steel blue / sea green / brass / rust / raspberry. Each hue
+  keeps its identity and its place in the ordering; only hue-angle and lightness moved. Two
+  constraints bound the values. **Headroom:** Trailhead's light ramp sat at 4.02–4.50:1 against
+  `base` with nothing checked against `raised` at all, which is what **issue #70** reported; the
+  tightest value now is **4.92:1**, against both surfaces. **No collision with the signal:**
+  measured as CIE76 ΔE in Lab rather than as a contrast ratio, because a ratio is blind to hue and
+  would happily pass an icy-cyan `recovery`. Floor 25, tightest 28.3 (dark `recovery`) — the same
+  order as the ramp's own tightest adjacent pair. Issue #70 is *not* claimed closed here; it has
+  not been verified closed on GitHub.
+- **Contrast is now enforced, not documented.** New `src/constants/__tests__/theme.contrast.test.ts`
+  recomputes every ratio from the hexes in `theme.ts` and asserts it against the floor that token
+  is held to — including the three deliberately *below* the floor (`progress.disabled`, the signal
+  on a light page, the field on a dark one), which are asserted as upper bounds so a later edit
+  cannot "fix" them without seeing what they were for. A final guard counts the opaque tokens in
+  `Colors`, so a new hex added without a floor fails the suite rather than quietly escaping the
+  table. This is the enforcement issue #70 was missing: the "never change a hex without re-checking
+  contrast" rule was already written down under Trailhead, and drifted anyway.
+- **Retired:** `DuskGradient`, `src/components/brand/DuskHero.tsx`, `src/components/brand/DuskSpark.tsx`,
+  `Motion.duration.reveal`, `Motion.duration.ambient`, `RouteLine`'s `hero` variant and its `color`
+  override (both existed only for the dusk field — the signed-out screens now carry the pulse
+  trace, which draws its own geometry), and the scheme-keyed `Accent`
+  (`useTheme()` now returns it unresolved). `accent.ember`/`accent.onEmber` are renamed
+  `accent.field`/`accent.signal` — the old names were appearance-named and described a warm orange
+  the system no longer contains, the same mistake `hivis` made before them. Radii tightened again:
+  control 10 → 8, card 16 → 14.
+- **Two new components carry rules that used to be carried by review.**
+  `src/components/ui/ActionButton.tsx` (`PrimaryAction`, `SecondaryAction`, `ActionDivider`,
+  `LinkAction`) collapses eight hand-rolled button stylesheets across Home, intake, the Paywall and
+  the three auth screens into one module — `PrimaryAction` *is* the signal, so "one accent per
+  screen" reduces to a question about imports. `src/components/onboarding/PulseTraceSlot.tsx` is a
+  clearly marked **INTEGRATION POINT**: it renders the *static end state* of `<PulseTraceHero>`,
+  the signature animation being built in parallel on branch `fm/v22-redesign-animation`, with a
+  prop subset matching it exactly so the swap is one import line in `(auth)/onboarding.tsx`. **That
+  animation is not on this branch**, so nothing in the app moves yet.
+- **Onboarding is rebuilt as a scroll-down flow** — not swipeable cards, not a static screen: the
+  pulse-trace cover, a "SCROLL" cue, three numbered hairline-separated beats (the intake / the plan
+  / the price), then the single CTA with the sign-in skip as its peer. **The sections deliberately
+  do not fade or rise on scroll.** A second motion moment competes with the signature one, and the
+  scroll itself is already the mechanic. The field carries only the mono wordmark and the headline
+  sits on the page below it: `<PulseTraceHero>` is fixed-height, so a 44pt condensed headline inside
+  it would have clipped rather than pushed the moment the placeholder was swapped out.
+- **Sign-in and sign-up take the same treatment at the short `band` height**, and both gained a
+  "Back to the start" link to `(auth)/onboarding`. There was previously no way back to the only
+  pre-auth screen except the OS back gesture.
+- **The Paywall's RECOMMENDED badge went monochrome**, so the recommended tier's button stays the
+  screen's one signal.
+- **Verification, honestly.** `typecheck && lint && test` clean at **508 root tests across 30
+  suites**; no `workers/` change. As with Trailhead, **no screen has been seen rendered**, in a
+  browser or on a device, and this branch has had no review pass.
+
 ## 2026-09-03 — fix dead `EXPO_PUBLIC_API_BASE_URL` blocking all sign-in/sign-up; confirm the tunnel works
 
 The captain reported sign-in and sign-up "not working at all," and `expo start --tunnel` broken,
@@ -57,10 +138,15 @@ On branch `redesign/trailhead-2026-09-01`, **not merged to `main`** — nothing 
 The captain's audit pass over the shipped app returned one complaint, twice: it looked cluttered,
 and no screen said what it was for. The response was not a tidy-up. The whole visual system was
 replaced with **Trailhead** (approved 2026-09-01 from a Claude Design mockup), recorded in the new
-[`docs/design/trailhead-visual-system.md`](design/trailhead-visual-system.md), which supersedes
+`docs/design/trailhead-visual-system.md` (deleted 2026-09-03, superseded by
+[`instrument-visual-system.md`](design/instrument-visual-system.md)), which supersedes
 `frontend-design-brief.md` Parts 2 (tokens) and 3 (the ribbon/wave motif) as the source of truth
 for colour, type, and ornament. The rest of that brief — Part 0's law, the tier table, the screen
 inventory, the accessibility floors, the copy rulings — is untouched and still governs.
+
+*(Correction, 2026-09-03: it merged to `main` the same day it was written, as PR #82 with the
+fidelity follow-up #83. Later docs kept repeating "not merged to `main`" long after it was — fixed
+in `mvp-progress.md` and `architecture.md` on 2026-09-03.)*
 
 - **The token system is new, not re-tuned** (`src/constants/theme.ts`). Warm chalk paper and
   espresso ink, hairline rules instead of boxes. `Accent.hivis` (`#D8F14A`) is gone in favour of a
