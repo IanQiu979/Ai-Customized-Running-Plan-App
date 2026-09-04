@@ -3,8 +3,9 @@
  *
  * The regression these cover: an unreachable backend used to reach the runner as "Could not load
  * your plans." — a message that sends you looking at plans instead of at the base URL. A physical
- * device pointed at `http://localhost:8787` (the default in `.env.example`, and unreachable from
- * anything but web or a simulator) is the everyday way to produce it.
+ * device pointed at `http://localhost:8787` (the `wrangler dev` origin, unreachable from anything
+ * but web or a simulator — `.env.example` defaults to the deployed Worker for that reason) is the
+ * everyday way to produce it.
  */
 
 import {

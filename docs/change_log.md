@@ -5,6 +5,52 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-09-03 — fix dead `EXPO_PUBLIC_API_BASE_URL` blocking all sign-in/sign-up; confirm the tunnel works
+
+The captain reported sign-in and sign-up "not working at all," and `expo start --tunnel` broken,
+blocking him from testing the app at all.
+
+- **Root cause: `.env.example` still defaulted to a loopback address and claimed the Worker was
+  "not deployed yet"**, which has been false since 2026-08-09. A fresh `.env` copied from the
+  template (or a stale one left over from before deploy) pointed `EXPO_PUBLIC_API_BASE_URL` at
+  `http://localhost:8787`, and nothing was listening there — `wrangler dev` was not running, and
+  even if it had been, a loopback address is unreachable from a physical device regardless of
+  `--tunnel` (`--tunnel` forwards Metro, never the Worker). This is the second recorded hit of this
+  exact class of bug (see the 2026-08-07 entry) — that fix corrected a developer's local `.env`
+  and documented the trap, but never changed the committed template it was copied from.
+- **Fix: `.env.example` now defaults to the deployed Worker's URL**
+  (`https://pace-blueprint-production.i78979848.workers.dev`) for every device type, matching the
+  captain's 2026-08-07 ruling to deploy rather than use a LAN address against `wrangler dev`. No
+  application code changed — `src/lib/apiClient.ts`'s error handling and the auth screens were
+  already correct from the 2026-08-07 fix; the defect was purely in the committed config template.
+- **Verified live, through the real client, not a bypass.** Ran `expo start --web` against the
+  corrected `.env`, loaded the build in a real browser (Safari), and drove the actual sign-up form
+  through its real React state to create a new account, then signed in with the same credentials —
+  both against the live deployed Worker. Both succeeded (`200`, real session token, real user row).
+  Confirmed separately by inspecting the compiled bundle that `EXPO_PUBLIC_API_BASE_URL` now bakes
+  in as the deployed Worker's URL rather than the old loopback value. A true device/simulator run
+  via Expo Go was attempted but blocked by an unrelated environment issue on this machine (its
+  installed Expo Go build is for SDK 57; this project is SDK 54) — not a defect in this fix.
+- **The tunnel itself was not found broken.** `expo start --tunnel` was run and monitored for
+  several minutes at a time across multiple sessions: it connected immediately and stayed
+  connected with no observed disconnect/reconnect churn, and a real device flow (iOS Simulator +
+  Expo Go) fetched the Metro manifest through the live tunnel URL successfully. One earlier
+  observation contradicts this and is kept on the record: the diagnosis-only session on this
+  branch (commit `77cd1c0`, its since-deleted `docs/wip-auth-tunnel-diagnosis.md`) saw the tunnel
+  drop and reconnect during one run (`Tunnel connection has been closed…` then `Tunnel connected.`
+  again). This session's re-testing did not reproduce it, and no repo change separates the two
+  runs, so it reads as occasional flakiness on Expo's shared tunnel backend, not a defect here —
+  logged as a residual risk in `docs/mvp-progress.md`. The most likely explanation for the
+  original report is the same root cause as above, indistinguishable from "the
+  tunnel doesn't work" from the captain's seat: a working tunnel still can't let a phone sign in
+  while the API base URL points at a dead loopback address. For the record: the tunnel runs on
+  `@expo/ngrok`'s bundled legacy `ngrok-bin@2.3.42` against Expo's own shared `exp.direct` backend
+  (a fixed authtoken baked into `@expo/cli`, not the captain's personal ngrok account) — external
+  to this repo. If it becomes flaky in practice, `EXPO_PACKAGER_PROXY_URL` pointed at a
+  self-run tunnel is the supported escape hatch (the captain already has an authenticated `ngrok`
+  v3 install ready); not implemented since the shared tunnel tested stable.
+- 469 root tests pass, typecheck and lint clean. No `workers/` change.
+
 ## 2026-09-01 — "Trailhead": the visual system replaced, every screen rebuilt
 
 On branch `redesign/trailhead-2026-09-01`, **not merged to `main`** — nothing below is released.
