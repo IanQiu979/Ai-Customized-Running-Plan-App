@@ -1,16 +1,13 @@
 import { Redirect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import Animated, {
-  useAnimatedScrollHandler,
-  useSharedValue,
-} from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { PulseTraceHero } from '@/components/brand/PulseTraceHero';
+import { PulseTraceHero, usePulseTraceScroll } from '@/components/brand/PulseTraceHero';
 import { PulseTracePalette } from '@/constants/pulseTrace';
 import { FontSize, PressedOpacity, Radius, Spacing, Stroke, Tracking } from '@/constants/theme';
-import { beatsAtMarks, scrollProgress } from '@/lib/pulseTrace';
+import { beatsAtMarks } from '@/lib/pulseTrace';
 
 /**
  * DEV-ONLY preview for the pulse trace — a place to see and tune `PulseTraceHero` before the
@@ -38,7 +35,7 @@ const SECTIONS = [
   { title: 'What to respect', body: 'Injuries and constraints shape volume and intensity — nothing else does.' },
   { title: 'Your plan', body: 'Week by week, Day 1 to Day 7, built from a coach-authored template.' },
 ] as const;
-const SECTION_MARKS = [0.24, 0.5, 0.76, 0.98];
+const SECTION_MARKS = [0.24, 0.5, 0.76, 0.92];
 // Built once: a fresh `beats` array on every render would rebuild the trace's geometry each time.
 const SECTION_BEATS = beatsAtMarks(SECTION_MARKS);
 
@@ -85,18 +82,11 @@ function Preview() {
 }
 
 function ScrollRehearsal() {
-  const progress = useSharedValue(0);
-  const onScroll = useAnimatedScrollHandler((event) => {
-    progress.value = scrollProgress(
-      event.contentOffset.y,
-      event.contentSize.height,
-      event.layoutMeasurement.height
-    );
-  });
+  const { progress, ...scroll } = usePulseTraceScroll();
 
   return (
     <Animated.ScrollView
-      onScroll={onScroll}
+      {...scroll}
       scrollEventThrottle={16}
       stickyHeaderIndices={[0]}
       contentContainerStyle={styles.scrollContent}

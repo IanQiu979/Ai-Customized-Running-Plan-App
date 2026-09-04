@@ -1,10 +1,10 @@
 import type { ReactElement } from 'react';
-import { Text } from 'react-native';
+import { Text, type LayoutChangeEvent } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import { PulseTracePalette } from '@/constants/pulseTrace';
 
-import { PulseTraceHero } from '../brand/PulseTraceHero';
+import { PulseTraceHero, usePulseTraceScroll } from '../brand/PulseTraceHero';
 
 /**
  * A render smoke test for the pulse trace hero, in the spirit of `render.test.tsx`: it proves the
@@ -227,5 +227,43 @@ describe('PulseTraceHero', () => {
     act(() => tree.unmount());
     // Both owned shared values (the clock and the sweep) are cancelled on the way out.
     expect(cancelAnimation).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('usePulseTraceScroll', () => {
+  let scroll: ReturnType<typeof usePulseTraceScroll> | null = null;
+
+  function Probe() {
+    scroll = usePulseTraceScroll();
+    return null;
+  }
+
+  function measure(viewportHeight: number, contentHeight: number) {
+    act(() => {
+      scroll!.onContentSizeChange(360, contentHeight);
+      scroll!.onLayout({
+        nativeEvent: { layout: { width: 360, height: viewportHeight, x: 0, y: 0 } },
+      } as LayoutChangeEvent);
+    });
+  }
+
+  beforeEach(() => {
+    scroll = null;
+  });
+
+  it('resolves a page with nothing to scroll to a fully drawn trace', () => {
+    const tree = render(<Probe />);
+    // A page shorter than its viewport never emits an `onScroll`, so measurement is the only
+    // signal there is: without it `progress` would sit at 0 and the field would stay blank.
+    measure(800, 400);
+    expect(scroll!.progress.value).toBe(1);
+    act(() => tree.unmount());
+  });
+
+  it('leaves a scrollable page at the top until it is actually scrolled', () => {
+    const tree = render(<Probe />);
+    measure(800, 2400);
+    expect(scroll!.progress.value).toBe(0);
+    act(() => tree.unmount());
   });
 });
