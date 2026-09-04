@@ -262,6 +262,13 @@ Built-ins also available: `Explore`, `Plan`, `general-purpose`. Plugin agents ar
 - **AI output validation is structural, not strict-content.** `ai-feature-builder` and
   `prompt-engineer` follow [`docs/reference/plan-generation.md`](docs/reference/plan-generation.md):
   validate shape, retry once, fall back to a template.
+- **The pulse trace owns its palette, and the icy cyan is not a decoration colour.**
+  `src/components/brand/PulseTraceHero.tsx` (the redesign's signature onboarding animation) reads
+  colour ONLY from `src/constants/pulseTrace.ts`, never from `theme.ts` — see that file's header
+  for why, and `docs/design/pulse-trace.md` for how to mount it. Under the redesigned house style
+  the cyan is reserved for the true primary CTA and this animation; do not reuse it for links,
+  charts or badges, and do not give the animation a light-mode variant — it paints its own dark
+  field in both schemes.
 - **Docs are part of the change.** After a behavior-changing commit, `doc-writer` updates
   `docs/mvp-progress.md`, `docs/change_log.md`, and `docs/architecture.md`.
 - **Coaching content is never invented.** `docs/reference/coaching/` is a port of Ian's

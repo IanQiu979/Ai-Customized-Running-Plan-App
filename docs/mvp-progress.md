@@ -85,6 +85,20 @@
   server, not `npx expo export` — the static export does not inline the root `.env`, so that bundle
   throws `Missing EXPO_PUBLIC_API_BASE_URL` and never hydrates. The branch has now had a review
   pass, and its findings were fixed (`change_log.md`, 2026-09-04).
+- **The pulse trace — the redesign's signature animation — is built, and the screens do not mount
+  it yet (2026-09-04, `fm/v22-redesign-animation-r2`).** `src/components/brand/PulseTraceHero.tsx`:
+  an ECG-style icy-cyan trace drawing itself across its own near-black field, self-drawing on mount
+  or driven by a scroll `SharedValue` (through `usePulseTraceScroll`, which seeds from layout as
+  well as scroll — a handler-only integration is blank on any page shorter than its viewport),
+  reduced-motion aware, with its geometry pure and tested in `src/lib/pulseTrace.ts`. Its colours,
+  timings and field heights live in `src/constants/pulseTrace.ts` rather than `theme.ts` because
+  the two were written in parallel; the hexes agree with `Accent.field`/`Accent.signal`, and
+  folding them into a re-export — which also closes the one-sided contrast pin — is the follow-up.
+  The auth screens still render `PulseTraceSlot`'s static end state; swapping it is one import line
+  (see that file's header). Seen rendered on web in both modes; the dev-only `/dev/pulse-trace`
+  preview shows both drive modes. Guide for the worker who mounts it:
+  [`docs/design/pulse-trace.md`](design/pulse-trace.md); full account: `change_log.md`,
+  2026-09-04.
 - **Test-mode override:** `ALL_USERS_UNLIMITED_ACCESS = "true"` still sits in the top-level
   `[vars]` of `workers/wrangler.toml` (the committed `[env.production.vars]` value is `"false"`),
   so the captain's test pass runs with every account Elite and the quota gate bypassed. Set the
@@ -516,6 +530,13 @@ from 82. Issue #22 remains open.)
   captain — provisioned and verified in local dev 2026-08-05 (see that entry below).
 
 ### Code
+- [x] **The pulse trace animation is built (2026-09-04).** `src/components/brand/PulseTraceHero.tsx`
+      (self-drawing or scroll-driven, reduced-motion aware, paints its own dark field), pure
+      geometry in `src/lib/pulseTrace.ts` (23 tests), its own palette/timings in
+      `src/constants/pulseTrace.ts` (not `theme.ts` — see "In flight"), 11 render smoke tests in
+      `src/components/__tests__/pulseTraceHero.test.tsx`, and a dev-only preview at
+      `src/app/dev/pulse-trace.tsx`. Built to be dropped into the rebuilt onboarding; mounts
+      nowhere yet. Full account in `docs/change_log.md`'s 2026-09-04 entry
 - [x] **Sign-up no longer blanks itself mid-typing, and onboarding exists (2026-08-08).** Two
       defects on the auth screens plus a new screen in front of them — full account in
       `docs/change_log.md`'s 2026-08-08 entry. In short: `_layout.tsx` gated render on better-auth's
@@ -829,6 +850,15 @@ around is on a parallel branch (`fm/v22-redesign-animation`) that has not landed
 `PulseTraceSlot.tsx` renders that animation's static end state until it does. Detail in "Current
 state" above and `change_log.md`, 2026-09-03 (later). Trailhead, its predecessor, is already on
 `main` (PR #82, #83) and carries the same "never seen rendered" caveat.
+
+**The pulse trace, on `fm/v22-redesign-animation` (2026-09-04).** The component, its geometry,
+palette, tests and dev preview are done and green; what remains is not this branch's to do.
+Mounting it is the onboarding rebuild's job — `v22-redesign-theme-onboarding`, a separate task that
+also replaces `theme.ts` — and when that token system lands, `src/constants/pulseTrace.ts`'s
+palette should be folded into it (or re-exported from it), with `PulseTracePalette.trace`
+becoming the system's single bright highlight shared only with the primary CTA. The
+`/dev/pulse-trace` route is that worker's to delete or keep as a component gallery. Recipe for
+both modes: [`docs/design/pulse-trace.md`](design/pulse-trace.md).
 
 Nothing else is in flight. The one remaining critical-path item — `ANTHROPIC_API_KEY`, without which
 paid-tier requests serve the quota-exempt template fallback — is a captain-only action, not work
