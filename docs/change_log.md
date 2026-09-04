@@ -7,7 +7,7 @@ make a behavior-changing commit, add a bullet under today's date — create a ne
 
 ## 2026-09-04 — the pulse trace: the next redesign's signature animation, built ahead of the screen that carries it
 
-On branch `fm/v22-redesign-animation`, uncommitted as of this entry. The captain approved a new
+On branch `fm/v22-redesign-animation-r2`. The captain approved a new
 house style on 2026-09-03, shared with sibling app V2.3: near-monochrome "cool scientific", a
 two-tier accent where charcoal carries everything and ONE icy-cyan highlight is reserved for the
 primary CTA and a single signature animation. This entry is that animation and only that — the
