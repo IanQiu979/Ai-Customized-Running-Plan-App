@@ -4,7 +4,7 @@ import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import type { SharedValue } from 'react-native-reanimated';
 import Svg, { Line, Path } from 'react-native-svg';
 
-import { Accent, Spacing } from '@/constants/theme';
+import { Accent, Spacing, Stroke } from '@/constants/theme';
 
 /**
  * ============================ INTEGRATION POINT ============================
@@ -57,8 +57,9 @@ const MIN_HEIGHT: Record<PulseTraceSlotSize, number> = { cover: 256, band: 128 }
  * spikes growing left to right — the shape the animated component settles into.
  */
 const TRACE =
-  'M 0 20 L 14 20 L 17 20 L 19 13 L 21 26 L 23 20 L 40 20 L 43 20 L 45 9 L 47 29 L 49 20 ' +
-  'L 66 20 L 70 20 L 72 3 L 74 33 L 76 20 L 100 20';
+  'M 0 20 L 17 20 L 18 22.5 L 19 10 L 20 25 L 21 20 ' +
+  'L 44 20 L 45 23 L 46 6.5 L 47 26.5 L 48 20 ' +
+  'L 71 20 L 72 23.5 L 73 2.5 L 74 28 L 75 20 L 100 20';
 
 export function PulseTraceSlot({
   progress,
@@ -104,13 +105,13 @@ export function PulseTraceSlot({
             y2="20"
             stroke={Accent.signal}
             strokeOpacity={0.18}
-            strokeWidth={0.3}
+            strokeWidth={Stroke.hairline}
           />
           <Path
             d={TRACE}
             fill="none"
             stroke={Accent.signal}
-            strokeWidth={0.6}
+            strokeWidth={Stroke.mark}
             strokeLinecap="round"
             strokeLinejoin="round"
             vectorEffect="non-scaling-stroke"
