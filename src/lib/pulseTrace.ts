@@ -237,6 +237,19 @@ export function pulseTraceTables(points: readonly Point[]): PulseTraceTables {
   return { xs, ys, arcs, total: length };
 }
 
+/** Also a worklet: `scrollProgress` calls it on the UI thread, and Reanimated only lets a worklet
+ * synchronously call another worklet — a plain captured function becomes a stub that throws
+ * there. The directive is inert on the JS thread, where `normalizeBeats` still calls it.
+ *
+ * It has to sit ABOVE `scrollProgress`: the worklets Babel plugin rewrites a module-scope
+ * workletized function declaration into a `const` and passes its captured closure values at the
+ * factory call site, so hoisting is gone and declaration order is load-bearing — declared after
+ * its caller, this file throws a `ReferenceError` at import. */
+function clamp(value: number, min: number, max: number): number {
+  'worklet';
+  return Math.min(max, Math.max(min, value));
+}
+
 /**
  * How far a scroll position is through its scrollable range, 0..1 — the number a scroll-driven
  * caller hands the hero as `progress`. Defined here rather than in a screen so both the preview
@@ -253,14 +266,6 @@ export function scrollProgress(offsetY: number, contentHeight: number, viewportH
   const range = contentHeight - viewportHeight;
   if (!(range > 0)) return 1;
   return clamp(offsetY / range, 0, 1);
-}
-
-/** Also a worklet: `scrollProgress` calls it on the UI thread, and Reanimated only lets a worklet
- * synchronously call another worklet — a plain captured function becomes a stub that throws
- * there. The directive is inert on the JS thread, where `normalizeBeats` still calls it. */
-function clamp(value: number, min: number, max: number): number {
-  'worklet';
-  return Math.min(max, Math.max(min, value));
 }
 
 /** Two decimals is well below a physical pixel at every size this is drawn at, and it keeps the
