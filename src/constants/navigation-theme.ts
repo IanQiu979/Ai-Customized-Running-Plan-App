@@ -21,10 +21,16 @@
  * is `headerShown: false`), so there is no way to see it. The day a real header title lands, map
  * this to `FontFamily.body` — the system mandates Public Sans for UI chrome, and the stock block
  * resolves to system San Francisco / Roboto.
+ *
+ * SDK 56: `expo-router` forked away from `@react-navigation/*` (most direct imports of those
+ * packages stop resolving once expo-router no longer pulls them in transitively). `DarkTheme`,
+ * `DefaultTheme`, and the `Theme` type are re-exported from `expo-router/react-navigation`
+ * instead — verified identical to the react-navigation originals (`expo-router`'s own
+ * `build/react-navigation` module re-exports them unmodified). Applied by Expo's own codemod,
+ * `npx expo-codemod sdk-56-expo-router-react-navigation-replace`.
  */
 
-import type { Theme } from '@react-navigation/native';
-import { DarkTheme, DefaultTheme } from '@react-navigation/native';
+import { type Theme, DarkTheme, DefaultTheme } from 'expo-router/react-navigation';
 
 import { Colors, ColorScheme } from './theme';
 
