@@ -77,8 +77,16 @@ const webStorage = {
   // The Expo plugin intentionally does nothing with its storage on web; the browser owns the
   // HttpOnly session cookie. Supplying a no-op adapter avoids calling SecureStore's absent web
   // implementation while preserving the documented native adapter unchanged.
+  //
+  // All four methods are required, not just the sync pair: `@better-auth/expo`'s `getCookie()`
+  // (used unconditionally, including on web — see the module header) calls `getItemAsync`
+  // regardless of platform, verified by reading the installed `@better-auth/expo/dist/client.js`.
+  // A sync-only stub type-checked under `@better-auth/expo@1.6.25` but would throw
+  // `storage.getItemAsync is not a function` on web at runtime under `1.7.2`.
   getItem: (_key: string) => null,
   setItem: (_key: string, _value: string) => undefined,
+  getItemAsync: async (_key: string) => null,
+  setItemAsync: async (_key: string, _value: string) => undefined,
 };
 
 const AUTH_COOKIE_STORAGE_KEY = 'paceblueprint_cookie';
