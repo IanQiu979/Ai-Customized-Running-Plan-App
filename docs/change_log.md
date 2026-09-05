@@ -5,6 +5,59 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-09-05 — Expo SDK 54 → 57 upgrade
+
+Client-only, one major version at a time (54→55→56→57) per this repo's upgrade etiquette
+(`AGENTS.md`'s SDK-bump chain). `workers/` (the Cloudflare backend) was out of scope and untouched.
+Current versions per `package.json`: `expo ^57.0.20`, `react-native 0.86.3`, `react 19.2.3`,
+`expo-router ~57.0.19`, `react-native-reanimated 4.5.1`/`react-native-worklets 0.10.1`. Commits, in
+order: `92b7d85` (54→55), `22b943b` (55→56), `7fea751` (SDK 56 fallout unrelated to
+react-navigation), `ad49f61` (the react-navigation fork migration), `d1c2a27` (56→57). `expo-doctor`
+21/21, and `npm run typecheck && npm run lint && npm test` clean (34 suites, 545 tests) after every
+step.
+
+- **The one structural break, handled by Expo's own codemod.** SDK 56's expo-router forks away from
+  `@react-navigation/*` ("most code imported directly from `@react-navigation/*` packages will no
+  longer work out of the box alongside expo-router" — Expo's SDK 56 changelog).
+  `npx expo-codemod sdk-56-expo-router-react-navigation-replace .` rewrote the two call sites
+  (`src/app/_layout.tsx`'s `ThemeProvider`, `src/constants/navigation-theme.ts`'s
+  `DarkTheme`/`DefaultTheme`/`Theme`) to import from `expo-router/react-navigation` instead —
+  verified as an identical re-export of expo-router's own fork. This also retires the
+  V2.2-specific landmine that `@react-navigation/native` was never a declared dependency here, only
+  resolved transitively through expo-router under SDK 54/55; nothing in `src/` imports
+  `@react-navigation/*` directly anymore.
+- **Non-obvious fixes the scout report (`v22-v23-sdk57-upgrade-scout`) didn't and couldn't flag**,
+  since it never ran an install:
+  - `scripts/generate-router-types.js` called expo-router's private `regenerateDeclarations`
+    export, removed outright in SDK 55 with no replacement. Swapped for Expo's documented,
+    CI-safe `expo customize tsconfig.json` (stdin closed to skip the interactive overwrite prompt).
+  - RN 0.85 removed `StyleSheet.absoluteFillObject`; `absoluteFill` is the same frozen style object
+    under its new name. Updated `PulseTraceHero.tsx`'s one use.
+  - `eslint-config-expo`'s SDK 56 bump ships `eslint-plugin-react-hooks` 7's new React
+    Compiler-readiness rules, which false-positive on Reanimated's documented shared-value `.value`
+    mutation and on this app's two deliberate "synchronize not derive" setState-in-effect latches
+    (`_layout.tsx`'s session-settled latch, `plan/[id].tsx`'s id-driven sync). Fixed with scoped,
+    documented `eslint-disable` comments on each site, not a blanket rule change — this app has
+    `reactCompiler: true` in `app.json`, so these rules still matter elsewhere.
+  - `@better-auth/expo`'s `^1.6.25` range picked up `1.7.2` mid-upgrade; its `getCookie()` now calls
+    `getItemAsync`/`setItemAsync` unconditionally, including on web. The web storage stub only had
+    the sync pair, which would have thrown at runtime on web, not just failed typecheck. Added the
+    async no-ops.
+  - This project's deliberate `typescript ~5.9.2` pin (documented in `src/lib/apiClient.ts`'s
+    header — bumping breaks `expo/tsconfig.base`'s ambient `@types/jest` resolution project-wide)
+    had `expo install --fix` re-flag it wanting `~6.0.3` at two separate steps. Added
+    `"expo": {"install": {"exclude": ["typescript"]}}` to `package.json` so this stops recurring
+    every future SDK bump.
+- **What this does NOT prove.** This repo's own testing notes already record that Reanimated
+  animations don't advance under Jest, so a clean suite says nothing about whether the onboarding
+  pulse trace (`PulseTraceHero.tsx`) or any other Reanimated-driven motion still looks right after
+  the reanimated 4.1→4.5 / worklets 0.5→0.10 jump across three SDK majors. Nobody has launched the
+  app in Expo Go or a simulator since the upgrade landed — still outstanding, tracked in
+  `docs/mvp-progress.md`'s "Known debt."
+- **Not touched, not needed.** `app.json` needed zero changes — this app never set
+  `newArchEnabled`, so SDK 55's schema removal of that key had nothing to remove. `workers/` is
+  untouched.
+
 ## 2026-09-04 — the pulse trace: the next redesign's signature animation, built ahead of the screen that carries it
 
 On branch `fm/v22-redesign-animation-r2`. The captain approved a new

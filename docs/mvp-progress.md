@@ -519,6 +519,18 @@ from 82. Issue #22 remains open.)
       gitignored and untracked; no secret is committed; `ANTHROPIC_API_KEY` is server-side only and
       read in exactly one file, `workers/src/lib/model.ts`
 - [x] `gh` 2.96.0 installed; `wrangler` 4.118 available via `npx`
+- [x] **Expo SDK 54 → 57 upgrade — done 2026-09-05.** Client-only (`workers/` untouched), one major
+      version at a time (54→55→56→57) per this repo's upgrade etiquette. Now on `expo ^57.0.20`,
+      `react-native 0.86.3`, `react 19.2.3`, `expo-router ~57.0.19`, `react-native-reanimated
+      4.5.1`/`react-native-worklets 0.10.1` — `package.json` is the source of truth. SDK 56's
+      expo-router fork away from `@react-navigation/*` was handled with Expo's own codemod, which
+      also retired the V2.2-specific landmine of `@react-navigation/native` never being a declared
+      dependency. `expo-doctor` 21/21; typecheck/lint/all 545 tests clean. Full account, including
+      the non-obvious fixes (removed `regenerateDeclarations`, `absoluteFillObject` →
+      `absoluteFill`, React Compiler-readiness lint false positives, `@better-auth/expo`'s web
+      storage stub, the `typescript` pin defended via `expo.install.exclude`): `docs/change_log.md`,
+      2026-09-05. **Not proven by this work:** no Reanimated-driven animation (the onboarding pulse
+      trace included) has been visually checked since the version jump — see "Known debt" below.
 - [x] **Cloudflare account resources created.** `wrangler login`, `wrangler d1 create`,
       `wrangler deploy`, and the `BETTER_AUTH_SECRET` / Google OAuth `wrangler secret put`s have all
       run; `ANTHROPIC_API_KEY` has not. "Blocked / awaiting a decision" below is the row-by-row
@@ -547,7 +559,8 @@ from 82. Issue #22 remains open.)
       screen (fixed with `KeyboardAvoidingView` + `ScrollView`). New: `(auth)/onboarding.tsx` and
       `src/components/onboarding/HeroRibbon.tsx`, an animated build of the app's own week-ribbon
       motif, reduced-motion aware, built entirely from existing `theme.ts` tokens
-- [x] Expo SDK 54 scaffold — TypeScript strict, expo-router, `@/*` path alias
+- [x] Expo SDK 54 scaffold — TypeScript strict, expo-router, `@/*` path alias (superseded by the
+      SDK 54 → 57 upgrade, 2026-09-05 — see "Infrastructure" above)
 - [x] **`workers/` — the Cloudflare backend spine (2026-08-02).** better-auth on D1 (email/password,
       Bearer sessions), `migrations/` for both better-auth's tables and the app's, the quota ledger
       with its atomic gate and reserve→settle/release lifecycle, and the routes `generate-plan`,
@@ -1153,6 +1166,14 @@ intact underneath.
 
 ### Standing
 
+- 🟡 **No Reanimated-driven animation has been visually verified since the SDK 54 → 57
+  upgrade (2026-09-05).** That upgrade carried `react-native-reanimated`/`react-native-worklets`
+  across three SDK majors (4.1→4.5 / 0.5→0.10). `expo-doctor`, typecheck, lint, and all 545 Jest
+  tests are clean, but this repo's own testing notes already record that Reanimated animations
+  don't advance under Jest, so a clean suite proves nothing about whether the onboarding pulse
+  trace (`PulseTraceHero.tsx`) or any other Reanimated-driven motion still looks right. Nobody has
+  launched the app in Expo Go or a simulator since the upgrade landed — say so plainly rather than
+  assume it's fine. Full account: `docs/change_log.md`, 2026-09-05.
 - 🟡 **`EXPO_PUBLIC_API_BASE_URL` has drifted to a dead loopback address twice on record** (2026-08-07,
   and again by 2026-09-03) despite the earlier fix, because that fix corrected a developer's
   local, gitignored `.env` but not the committed `.env.example` template fresh `.env`s are copied
