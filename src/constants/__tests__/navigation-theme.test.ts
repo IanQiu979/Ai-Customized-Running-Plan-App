@@ -8,7 +8,8 @@ import { Accent, Colors } from '../theme';
  *
  * React Navigation's stock `DefaultTheme`/`DarkTheme` ship their own untokened colors — a light
  * grey `rgb(242, 242, 242)` background and a near-black `rgb(1, 1, 1)` dark background (see
- * `@react-navigation/native`'s `theming/DefaultTheme.js` / `theming/DarkTheme.js`), plus their own
+ * expo-router's forked `build/react-navigation/native/theming/DefaultTheme.js` /
+ * `DarkTheme.js`), plus their own
  * `card`/`text`/`border`/`primary`/`notification`. If `NavigationLightTheme` /
  * `NavigationDarkTheme` ever stop overriding `colors` — e.g. someone "simplifies" the module back
  * to `export const NavigationLightTheme = DefaultTheme` — these stock values would leak straight
@@ -28,9 +29,10 @@ describe('NavigationLightTheme', () => {
   });
 
   it('does not leak React Navigation\'s stock light-mode background', () => {
-    // The literal is the actual value shipped by the installed @react-navigation/native version
-    // (theming/DefaultTheme.js) — hardcoded deliberately, since this is the third-party stock
-    // value we're asserting absence of, not a design-system token we'd otherwise derive.
+    // The literal is the actual value shipped by the installed expo-router fork
+    // (build/react-navigation/native/theming/DefaultTheme.js) — hardcoded deliberately, since
+    // this is the third-party stock value we're asserting absence of, not a design-system token
+    // we'd otherwise derive.
     expect(NavigationLightTheme.colors.background).not.toBe('rgb(242, 242, 242)');
     expect(NavigationLightTheme.colors.background).not.toBe(DefaultTheme.colors.background);
   });
@@ -57,8 +59,9 @@ describe('NavigationDarkTheme', () => {
   });
 
   it('does not leak React Navigation\'s stock dark-mode background', () => {
-    // Same rationale as the light-mode test above. The installed @react-navigation/native
-    // version's theming/DarkTheme.js literal is `rgb(1, 1, 1)` (equivalent to hex #010101, but
+    // Same rationale as the light-mode test above. The installed expo-router fork's
+    // build/react-navigation/native/theming/DarkTheme.js literal is `rgb(1, 1, 1)` (equivalent
+    // to hex #010101, but
     // that is not the string the library actually produces — asserting against the real literal
     // is what makes this a meaningful regression guard rather than a string that could never
     // match either way).

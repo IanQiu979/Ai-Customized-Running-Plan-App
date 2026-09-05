@@ -48,7 +48,9 @@
     "typescript": "~5.9.2"
   },
   "overrides": {
-    "@better-auth/core": "1.6.25"
+    "@better-auth/expo": {
+      "@better-auth/core": "1.6.25"
+    }
   },
   "scripts": {
     "start": "expo start",

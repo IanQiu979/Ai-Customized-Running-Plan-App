@@ -1,6 +1,7 @@
 /**
  * React Navigation theme objects — bridges the design system's tokens (`./theme.ts`) into the
- * `Theme` shape `@react-navigation/native` expects.
+ * `Theme` shape `expo-router` expects (see the import note below: expo-router forked
+ * react-navigation at SDK 56 and re-exports these from its own package root).
  *
  * Why this exists: React Navigation's stock `DefaultTheme`/`DarkTheme` ship their own colors
  * (`rgb(242, 242, 242)` light background, `rgb(1, 1, 1)` dark, plus their own `card`/`text`/
