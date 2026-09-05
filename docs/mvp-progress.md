@@ -519,6 +519,21 @@ from 82. Issue #22 remains open.)
       gitignored and untracked; no secret is committed; `ANTHROPIC_API_KEY` is server-side only and
       read in exactly one file, `workers/src/lib/model.ts`
 - [x] `gh` 2.96.0 installed; `wrangler` 4.118 available via `npx`
+- [x] **Expo SDK 54 → 57 upgrade — done 2026-09-05.** Client-only (`workers/` untouched), one major
+      version at a time (54→55→56→57) per this repo's upgrade etiquette. Now on `expo ^57.0.20`,
+      `react-native 0.86.3`, `react 19.2.3`, `expo-router ~57.0.19`, `react-native-reanimated
+      4.5.1`/`react-native-worklets 0.10.1` — `package.json` is the source of truth. SDK 56's
+      expo-router fork away from `@react-navigation/*` was handled with Expo's own codemod, which
+      also retired the V2.2-specific landmine of `@react-navigation/native` never being a declared
+      dependency. `expo-doctor` 21/21; typecheck/lint/all 545 tests clean. Full account, including
+      the non-obvious fixes (removed `regenerateDeclarations`, `absoluteFillObject` →
+      `absoluteFill`, React Compiler-readiness lint false positives, `@better-auth/expo`'s web
+      storage stub, the `typescript` pin defended via `expo.install.exclude`): `docs/change_log.md`,
+      2026-09-05. **Verified beyond the suite:** launched in real Expo Go 57.0.9 (self-reporting
+      SDK 57.0.0) on an iOS Simulator — reaches the signed-out landing screen with the pulse-trace
+      hero rendering correctly, zero Metro errors. **Still not exercised:** the sign-in submission
+      tap-through (no touch automation installed, and no `wrangler dev` running) — see "Known debt"
+      below.
 - [x] **Cloudflare account resources created.** `wrangler login`, `wrangler d1 create`,
       `wrangler deploy`, and the `BETTER_AUTH_SECRET` / Google OAuth `wrangler secret put`s have all
       run; `ANTHROPIC_API_KEY` has not. "Blocked / awaiting a decision" below is the row-by-row
@@ -547,7 +562,8 @@ from 82. Issue #22 remains open.)
       screen (fixed with `KeyboardAvoidingView` + `ScrollView`). New: `(auth)/onboarding.tsx` and
       `src/components/onboarding/HeroRibbon.tsx`, an animated build of the app's own week-ribbon
       motif, reduced-motion aware, built entirely from existing `theme.ts` tokens
-- [x] Expo SDK 54 scaffold — TypeScript strict, expo-router, `@/*` path alias
+- [x] Expo SDK 54 scaffold — TypeScript strict, expo-router, `@/*` path alias (superseded by the
+      SDK 54 → 57 upgrade, 2026-09-05 — see "Infrastructure" above)
 - [x] **`workers/` — the Cloudflare backend spine (2026-08-02).** better-auth on D1 (email/password,
       Bearer sessions), `migrations/` for both better-auth's tables and the app's, the quota ledger
       with its atomic gate and reserve→settle/release lifecycle, and the routes `generate-plan`,
@@ -1153,6 +1169,38 @@ intact underneath.
 
 ### Standing
 
+- 🟡 **The client's and the Worker's `better-auth` versions must match, and only the lockfile
+  holds them together (2026-09-05).** They are two separate npm projects sharing one wire format
+  (cookie envelope, `/sign-in/social` state, session payload). During the
+  SDK 54 → 57 upgrade the app's lockfile regen floated to 1.7.2 while `workers/` stayed at 1.6.25 —
+  a skew nothing in that run exercised, since no real sign-in was performed. Resolved by pinning
+  the app to exact `1.6.25` on both packages (no caret — the caret is what let it drift, and a
+  from-scratch install re-floats to 1.7.2 with it in place) plus
+  `"overrides": {"@better-auth/core": "1.6.25"}`, which is needed because `@better-auth/expo`
+  declares core as a peer at `^1.6.25` and npm otherwise hoists the newest match. Residual risk:
+  `workers/` still declares its own `^1.6.25`, so the server side can still float independently,
+  and no test asserts the two agree.
+  Moving the server forward is a separate change with its own review chain, and should be paired
+  with an end-to-end sign-in check.
+- 🟡 **The SDK 54 → 57 upgrade launches and renders in real Expo Go 57; the sign-in
+  tap-through is the part still unproven (2026-09-05).** That upgrade carried
+  `react-native-reanimated`/`react-native-worklets` across three SDK majors (4.1→4.5 / 0.5→0.10).
+  `expo-doctor`, typecheck, lint, and all 545 Jest tests are clean, but this repo's own testing
+  notes already record that Reanimated animations don't advance under Jest, so the suite proves
+  nothing about motion. That gap was closed by hand: Expo Go **57.0.9** was installed fresh on an
+  iOS Simulator (via Expo's versions API plus the matching GitHub release asset) and Metro run
+  against the upgrade worktree. Screenshot-confirmed — Expo Go self-reports "SDK version: 57.0.0",
+  the app reaches the genuine signed-out landing screen ("Your training plan, built around you."),
+  and the pulse-trace hero (`PulseTraceHero.tsx`) renders correctly, across multiple bundle/reload
+  cycles with zero errors in the Metro log. A true cold start first required
+  `xcrun simctl keychain reset` — a real signed-in session from unrelated prior testing was still
+  in the simulator's Keychain, and `expo-secure-store` is Keychain-backed, so it survives an app
+  uninstall/reinstall. **What remains unverified is narrower than "nobody has launched it", and
+  should not be overstated in either direction: the sign-in submission tap-through was never
+  performed.** Neither blocker is about the SDK — no touch-input automation (`idb` or equivalent)
+  is installed here to tap through the native Expo Go dev-menu overlay sitting over the CTA, and
+  `wrangler dev` wasn't running, so a real sign-in would have failed on network grounds regardless.
+  Full account: `docs/change_log.md`, 2026-09-05.
 - 🟡 **`EXPO_PUBLIC_API_BASE_URL` has drifted to a dead loopback address twice on record** (2026-08-07,
   and again by 2026-09-03) despite the earlier fix, because that fix corrected a developer's
   local, gitignored `.env` but not the committed `.env.example` template fresh `.env`s are copied

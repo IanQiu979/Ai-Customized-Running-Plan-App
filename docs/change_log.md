@@ -5,6 +5,93 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-09-05 — Expo SDK 54 → 57 upgrade
+
+Client-only, one major version at a time (54→55→56→57) per this repo's upgrade etiquette
+(`AGENTS.md`'s SDK-bump chain). `workers/` (the Cloudflare backend) was out of scope and untouched.
+Current versions per `package.json`: `expo ^57.0.20`, `react-native 0.86.3`, `react 19.2.3`,
+`expo-router ~57.0.19`, `react-native-reanimated 4.5.1`/`react-native-worklets 0.10.1`. Commits, in
+order: `92b7d85` (54→55), `22b943b` (55→56), `7fea751` (SDK 56 fallout unrelated to
+react-navigation), `ad49f61` (the react-navigation fork migration), `d1c2a27` (56→57). `expo-doctor`
+21/21, and `npm run typecheck && npm run lint && npm test` clean (34 suites, 545 tests) after every
+step.
+
+- **The one structural break, handled by Expo's own codemod.** SDK 56's expo-router forks away from
+  `@react-navigation/*` ("most code imported directly from `@react-navigation/*` packages will no
+  longer work out of the box alongside expo-router" — Expo's SDK 56 changelog).
+  `npx expo-codemod sdk-56-expo-router-react-navigation-replace .` rewrote the two call sites
+  (`src/app/_layout.tsx`'s `ThemeProvider`, `src/constants/navigation-theme.ts`'s
+  `DarkTheme`/`DefaultTheme`/`Theme`) to import from `expo-router/react-navigation` instead;
+  those imports were then moved to the `expo-router` package root, which re-exports the identical
+  bindings and is the path SDK 57 documents (the subpath marks all three deprecated) —
+  verified as an identical re-export of expo-router's own fork. This also retires the
+  V2.2-specific landmine that `@react-navigation/native` was never a declared dependency here, only
+  resolved transitively through expo-router under SDK 54/55; nothing in `src/` imports
+  `@react-navigation/*` directly anymore.
+- **Non-obvious fixes the scout report (`v22-v23-sdk57-upgrade-scout`) didn't and couldn't flag**,
+  since it never ran an install:
+  - `scripts/generate-router-types.js` called expo-router's private `regenerateDeclarations`
+    export, removed outright in SDK 55 with no replacement. Swapped for Expo's documented,
+    CI-safe `expo customize tsconfig.json` (stdin closed to skip the interactive overwrite prompt).
+  - RN 0.85 removed `StyleSheet.absoluteFillObject`; `absoluteFill` is the same frozen style object
+    under its new name. Updated `PulseTraceHero.tsx`'s one use.
+  - `eslint-config-expo`'s SDK 56 bump ships `eslint-plugin-react-hooks` 7's new React
+    Compiler-readiness rules, which false-positive on Reanimated's documented shared-value `.value`
+    mutation and on this app's two deliberate "synchronize not derive" setState-in-effect latches
+    (`_layout.tsx`'s session-settled latch, `plan/[id].tsx`'s id-driven sync). Fixed with scoped,
+    documented `eslint-disable` comments on each site, not a blanket rule change — this app has
+    `reactCompiler: true` in `app.json`, so these rules still matter elsewhere.
+  - `@better-auth/expo`'s `^1.6.25` range picked up `1.7.2` mid-upgrade; its `getCookie()` now calls
+    `getItemAsync`/`setItemAsync` unconditionally, including on web. The web storage stub only had
+    the sync pair, which would have thrown at runtime on web, not just failed typecheck. Added the
+    async no-ops.
+  - This project's deliberate `typescript ~5.9.2` pin (documented in `src/lib/apiClient.ts`'s
+    header — bumping breaks `expo/tsconfig.base`'s ambient `@types/jest` resolution project-wide)
+    had `expo install --fix` re-flag it wanting `~6.0.3` at two separate steps. Added
+    `"expo": {"install": {"exclude": ["typescript"]}}` to `package.json` so this stops recurring
+    every future SDK bump.
+- **The client's better-auth is held at the version the deployed Worker runs.** Regenerating the
+  lockfile let the app's `^1.6.25` range float to `better-auth`/`@better-auth/expo` **1.7.2** while
+  `workers/` (out of scope, untouched) stays on 1.6.25 — a client/server skew across the whole auth
+  wire format (cookie envelope, `/sign-in/social` state, session payload), and 1.7.2's `getCookie()`
+  change is in exactly that area. Nothing in this upgrade exercised a real sign-in, so the skew was
+  never tested. Both are now pinned **exactly** — `"better-auth": "1.6.25"`,
+  `"@better-auth/expo": "1.6.25"`, no caret. The caret is what let it drift, and a from-scratch
+  `npm install` re-floats to 1.7.2 with it in place, so dropping it is the fix rather than a style
+  choice. One more pin is needed on top: `@better-auth/expo` declares `@better-auth/core` as a
+  **peer** at `^1.6.25`, so npm satisfies it with the newest match (1.7.2) and hoists that, while
+  `better-auth`'s exact `1.6.25` core dependency nests underneath — a split that survives any clean
+  reinstall. `"overrides": {"@better-auth/core": "1.6.25"}` collapses it to one hoisted copy.
+  `workers/` was not touched; bumping the server is a separate change with its own review chain. `src/lib/apiClient.ts`'s web storage stub keeps all four
+  methods — the async pair is unused under 1.6.25 but is what 1.7.2 needs on web, so it stays
+  correct whichever side of the range wins next; the reasoning is written down there.
+
+- **What a clean suite does NOT prove, and what an actual launch since did.** This repo's own
+  testing notes already record that Reanimated animations don't advance under Jest, so the green
+  suite says nothing about whether the onboarding pulse trace (`PulseTraceHero.tsx`) or any other
+  Reanimated-driven motion still looks right after the reanimated 4.1→4.5 / worklets 0.5→0.10 jump
+  across three SDK majors. So the app was launched for real, after the headless work finished:
+  Expo Go **57.0.9** installed fresh on an iOS Simulator (downloaded via Expo's versions API plus
+  the matching GitHub release asset — `expo start --ios`'s interactive version-upgrade prompt
+  can't be driven non-interactively), Metro run against this worktree. Screenshot-confirmed: Expo
+  Go self-reports "SDK version: 57.0.0", the app reaches the genuine signed-out landing screen
+  ("Your training plan, built around you."), and the pulse-trace hero renders correctly — across
+  multiple bundle/reload cycles with zero errors in the Metro log. Reaching a true cold-start
+  signed-out state first needed `xcrun simctl keychain reset`: a real signed-in session from
+  unrelated prior testing was still in the simulator's Keychain, and `expo-secure-store` is
+  Keychain-backed, so it survives an app uninstall/reinstall. **Still not exercised: the sign-in
+  submission tap-through.** Two reasons, neither about the SDK bump — no touch-input automation
+  (`idb` or equivalent) is installed here to tap through the native Expo Go dev-menu overlay
+  covering the CTA, and `wrangler dev` wasn't running, so a real sign-in would have failed on
+  network grounds anyway. Tracked as the narrowed gap in `docs/mvp-progress.md`'s "Known debt."
+- **`app.json`: three plugin registrations across the range, nothing hand-written.** The final
+  56→57 step needed zero `app.json` changes, and no step needed a `newArchEnabled` edit — this app
+  never set that key, so SDK 55's schema removal of it had nothing to remove. What did change is
+  the `plugins` array: routine `expo install --fix` config-plugin registration added `expo-image`
+  and `expo-secure-store` at the 54→55 step and `expo-status-bar` at 55→56. All three packages
+  ship real config plugins; only `expo-image`'s writes anything (a Podfile property). `workers/` is
+  untouched.
+
 ## 2026-09-04 — the pulse trace: the next redesign's signature animation, built ahead of the screen that carries it
 
 On branch `fm/v22-redesign-animation-r2`. The captain approved a new

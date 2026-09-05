@@ -634,10 +634,14 @@ crossfade on Android when the flag is set. Consistency beats platform-idiom puri
 
 ## Part 11 — Implementation prerequisites
 
-**Install with `npx expo install`, never `npm install`.** npm pulls latest; Expo pins the version SDK 54
-was tested against. Getting this wrong is exactly the trap `AGENTS.md` warns about.
+**Install with `npx expo install`, never `npm install`.** npm pulls latest; Expo pins the version
+whatever SDK the app is currently on was tested against. Getting this wrong is exactly the trap
+`AGENTS.md` warns about. None of the packages below are installed yet (this section is still
+speculative design, not built work); the pins below were captured against SDK 54 and are stale
+now that the app is on SDK 57 (`docs/change_log.md`, 2026-09-05) — re-resolve them via
+`npx expo install` at implementation time rather than trusting these numbers.
 
-| Package | Expo SDK 54 pin | Needed for | v1? |
+| Package | Expo SDK 54 pin (stale — re-verify) | Needed for | v1? |
 |---|---|---|---|
 | `@shopify/react-native-skia` | **2.2.12** | The wave, and (v2) the sand-man | Only if the wave ships |
 | `expo-haptics` | **~15.0.8** | Every tick and the success beat | Fast-follow |

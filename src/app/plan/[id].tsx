@@ -56,7 +56,14 @@ export default function PlanScreen() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // This effect as a whole synchronizes state with the `id` route param (React's own
+    // documented valid useEffect use — data fetching below, with cancellation) rather than
+    // deriving it once; the `isExample` branch is the same synchronization for the id param
+    // changing to/from the fixture id, not a mount-only initializer, so it belongs in the effect
+    // alongside the fetch it can also fall back to. `react-hooks/set-state-in-effect` (new in this
+    // SDK's eslint-config-expo bump) can't tell that apart from the anti-pattern it targets.
     if (isExample) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPlan(examplePlan);
       setLoading(false);
       setError(null);

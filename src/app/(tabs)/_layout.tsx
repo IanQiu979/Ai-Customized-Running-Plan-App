@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, type ColorValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { TabBarIcon, type TabIconName } from '@/components/nav/TabBarIcon';
@@ -73,9 +73,21 @@ export default function TabLayout() {
 function tabOptions(title: string, icon: TabIconName) {
   return {
     title,
-    tabBarIcon: ({ color }: { color: string }) => <TabBarIcon name={icon} color={color} />,
-    tabBarLabel: ({ focused, color, children }: { focused: boolean; color: string; children: string }) => (
-      <TabLabel focused={focused} color={color}>
+    // React Navigation's bottom-tabs types this callback's `color` as `ColorValue`, which also
+    // covers platform-color objects; this app's theme tokens (`theme.text.primary`,
+    // `theme.progress.informative`) are always plain hex strings, never `PlatformColor()`, so the
+    // cast down to `string` for `TabBarIcon`'s SVG stroke is safe.
+    tabBarIcon: ({ color }: { color: ColorValue }) => <TabBarIcon name={icon} color={color as string} />,
+    tabBarLabel: ({
+      focused,
+      color,
+      children,
+    }: {
+      focused: boolean;
+      color: ColorValue;
+      children: string;
+    }) => (
+      <TabLabel focused={focused} color={color as string}>
         {children}
       </TabLabel>
     ),

@@ -114,7 +114,7 @@ src/
                               #  PulseTracePalette.field/.trace — same hexes, verified; folding it
                               #  into a re-export from theme.ts is the follow-up once both branches
                               #  have landed
-    navigation-theme.ts      # bridges theme.ts's tokens into @react-navigation/native's `Theme`
+    navigation-theme.ts      # bridges theme.ts's tokens into expo-router's re-exported `Theme`
                              #  shape, so ThemeProvider never leaks the library's own stock
                              #  DefaultTheme/DarkTheme colors (fixes issue #27)
     __tests__/                # navigation-theme, and theme.contrast (new 2026-09-03) — the latter
@@ -744,7 +744,7 @@ applying the inset today would add trailing void, not clearance — see `docs/mv
   [`docs/design/pulse-trace.md`](design/pulse-trace.md).
 - **React Navigation's own chrome is tokened too, not just the screens built on top of it.**
   `src/constants/navigation-theme.ts` bridges the same `Colors` tokens into the `Theme` shape
-  `@react-navigation/native` expects (`background`→`surface.base`, `card`→`surface.raised`,
+  `expo-router` re-exports (`background`→`surface.base`, `card`→`surface.raised`,
   `text`→`text.primary`, `border`→`hairline`, `primary`→`text.primary`, `notification`→
   `status.error`), so `_layout.tsx`'s `ThemeProvider` never falls back to the library's own stock
   `DefaultTheme`/`DarkTheme` palette for transition underlays, header defaults, or the back-swipe

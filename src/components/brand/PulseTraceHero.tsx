@@ -249,6 +249,9 @@ export function PulseTraceHero({
   // prop updates to an invisible path every frame.
   const startSweep = useCallback(
     (wait: number) => {
+      // Known upstream false positive on Reanimated's shared-value mutation pattern — see the
+      // comment on the same rule in `usePulseTraceScroll` below.
+      // eslint-disable-next-line react-hooks/immutability
       sweep.value = 0;
       sweep.value = withDelay(
         wait,
@@ -559,11 +562,21 @@ export function usePulseTraceScroll(): {
 
   const reseed = useCallback(() => {
     if (viewportHeight.current <= 0 || contentHeight.current <= 0) return;
+    // Known upstream false positive on Reanimated's shared-value mutation pattern — see the
+    // comment in the `onScroll` handler below.
+    // eslint-disable-next-line react-hooks/immutability
     progress.value = scrollProgress(offsetY.value, contentHeight.current, viewportHeight.current);
   }, [offsetY, progress]);
 
   const onScroll = useAnimatedScrollHandler((event) => {
+    // `react-hooks/immutability` (new in the eslint-plugin-react-hooks bumped by the SDK 56
+    // upgrade) flags mutating a shared value's `.value` inside a `useAnimatedScrollHandler`
+    // worklet as if it were mutating a hook argument. That is Reanimated's documented, required
+    // pattern for shared values, not a bug — a known upstream false positive, still open:
+    // https://github.com/facebook/react/issues/29641 (and #35158, #35167, #34776).
+    // eslint-disable-next-line react-hooks/immutability
     offsetY.value = event.contentOffset.y;
+    // eslint-disable-next-line react-hooks/immutability
     progress.value = scrollProgress(
       event.contentOffset.y,
       event.contentSize.height,
@@ -610,7 +623,7 @@ const styles = StyleSheet.create({
   },
   // `pointerEvents` as a style, not a prop: the prop form is deprecated on web and warns.
   gridLayer: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     pointerEvents: 'none',
   },
   noPointer: {

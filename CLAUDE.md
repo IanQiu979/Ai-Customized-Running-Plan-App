@@ -10,7 +10,7 @@ linked brainstorm / product / engineering docs it indexes.
 
 ## Architecture at a glance
 
-Client: Expo SDK 54, expo-router, TypeScript strict. **Backend: Cloudflare — D1 + Workers +
+Client: Expo SDK 57, expo-router, TypeScript strict. **Backend: Cloudflare — D1 + Workers +
 better-auth, in [`workers/`](workers/README.md)** (captain's decision, 2026-08-02; `supabase/` and
 `src/lib/supabase.ts` are dead scaffold, kept but unused). AI: Claude (`claude-sonnet-5`), called
 only from the `generate-plan` route, never from the client. The backend spine works end to end

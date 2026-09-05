@@ -1,6 +1,7 @@
 /**
  * React Navigation theme objects — bridges the design system's tokens (`./theme.ts`) into the
- * `Theme` shape `@react-navigation/native` expects.
+ * `Theme` shape `expo-router` expects (see the import note below: expo-router forked
+ * react-navigation at SDK 56 and re-exports these from its own package root).
  *
  * Why this exists: React Navigation's stock `DefaultTheme`/`DarkTheme` ship their own colors
  * (`rgb(242, 242, 242)` light background, `rgb(1, 1, 1)` dark, plus their own `card`/`text`/
@@ -21,10 +22,19 @@
  * is `headerShown: false`), so there is no way to see it. The day a real header title lands, map
  * this to `FontFamily.body` — the system mandates Public Sans for UI chrome, and the stock block
  * resolves to system San Francisco / Roboto.
+ *
+ * SDK 56: `expo-router` forked away from `@react-navigation/*` (most direct imports of those
+ * packages stop resolving once expo-router no longer pulls them in transitively). `DarkTheme`,
+ * `DefaultTheme`, and the `Theme` type are re-exported from the `expo-router` package root
+ * instead — verified identical to the react-navigation originals (`expo-router`'s own
+ * `build/react-navigation` modules, re-exported unmodified through `build/exports`). Expo's
+ * codemod (`npx expo-codemod sdk-56-expo-router-react-navigation-replace`) writes the
+ * `expo-router/react-navigation` subpath, but SDK 57 marks these three bindings deprecated there
+ * ("Import `DarkTheme` from `expo-router` instead. Will be removed in a future SDK.") — the root
+ * is the supported path.
  */
 
-import type { Theme } from '@react-navigation/native';
-import { DarkTheme, DefaultTheme } from '@react-navigation/native';
+import { type Theme, DarkTheme, DefaultTheme } from 'expo-router';
 
 import { Colors, ColorScheme } from './theme';
 
