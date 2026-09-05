@@ -339,25 +339,49 @@ describe('distance-aware ceilings and the curves that feed them', () => {
     // used to report as its biggest week (a 3-day, 50 km/week marathon: 69 km race week against a
     // 66 km peak).
     //
-    // The allowance is race day plus a minimum real shakeout per pre-race day: where the race
-    // alone already outweighs the peak (a low-volume runner's own goal race), no taper can hold
-    // the week under it, and the overshoot is the race, never budget the engine chose.
-    const cases: { raceDistance: RaceDistance; durationWeeks: number }[] = [
+    // The assertion is on race week's *training* component — its total minus race day — because
+    // race day is the one cost no taper can shrink. The allowance is built only from the plan's
+    // own peak training week and race day itself, deliberately borrowing no term from
+    // `preRaceBudgetKm` (not its ratio, not its floor, not `MIN_PRE_RACE_RUN_KM`): an allowance
+    // that re-derives the function's own floor cannot fail in the region that floor governs,
+    // which is exactly the region that regressed. Where the peak has room above race day, the
+    // training component must fit in that room; where race day alone already meets or outweighs
+    // the peak (a 12 km/week runner's own 5K), no taper can hold the total under the peak, so the
+    // bound falls back to the peak itself — the week may not also out-train the biggest week.
+    //
+    // The matrix stays on runners whose peak has real room above race day. Below that — a runner
+    // whose race is most of their biggest week — `preRaceBudgetKm`'s shakeout floor deliberately
+    // outranks the peak headroom, because bounding by the headroom there reinstates the §1.4 bug
+    // (verified: it breaks the three low-volume race-week profiles in
+    // `planTemplates.genericLongRun.test.ts`). That regime is bounded by the taper ratio instead,
+    // which this test cannot reference without becoming circular.
+    const cases: {
+      raceDistance: RaceDistance;
+      durationWeeks: number;
+      weeklyKm?: number;
+      dayCounts?: number[];
+    }[] = [
       { raceDistance: '5k', durationWeeks: 12 },
       { raceDistance: '10k', durationWeeks: 14 },
       { raceDistance: 'half', durationWeeks: 16 },
       { raceDistance: 'marathon', durationWeeks: 16 },
       { raceDistance: 'marathon', durationWeeks: 24 },
     ];
-    for (const { raceDistance, durationWeeks } of cases) {
-      for (const daysPerWeek of [3, 4, 5, 6]) {
+    for (const { raceDistance, durationWeeks, weeklyKm, dayCounts } of cases) {
+      for (const daysPerWeek of dayCounts ?? [3, 4, 5, 6]) {
         for (const experience of ['some', 'experienced', 'competitive'] as const) {
           // The 12-week/4-day 5K is the byte-pinned golden fixture (`buildCanonicalFiveKWeek`),
           // which assembles race week by the literal subtraction the captain approved. It is not
           // the generic path this bound belongs to and must not be re-shaped to satisfy it.
           if (raceDistance === '5k' && durationWeeks === 12 && daysPerWeek === 4) continue;
           const plan = buildTemplatePlan({
-            intake: { ...RUNNER, daysPerWeek, experience, raceDistance },
+            intake: {
+              ...RUNNER,
+              daysPerWeek,
+              experience,
+              raceDistance,
+              ...(weeklyKm !== undefined ? { weeklyKm } : {}),
+            },
             goalType: 'race',
             durationWeeks,
             raceDistance,
@@ -372,23 +396,81 @@ describe('distance-aware ceilings and the curves that feed them', () => {
           const raceDayKm = raceWeek.days
             .filter(isWorkout)
             .reduce((max, run) => Math.max(max, run.distanceKm ?? 0), 0);
-          const preRaceDays = Math.max(0, Math.min(7, Math.max(3, Math.round(daysPerWeek))) - 1);
-          const ceilingKm = Math.max(peakTrainingKm, raceDayKm + preRaceDays * 2);
+          const trainingKm = raceWeek.volumeKm - raceDayKm;
+          const allowanceKm =
+            peakTrainingKm > raceDayKm ? peakTrainingKm - raceDayKm : peakTrainingKm;
           expect({
             raceDistance,
             durationWeeks,
             daysPerWeek,
+            weeklyKm: weeklyKm ?? RUNNER.weeklyKm,
             experience,
-            raceWeekKm: raceWeek.volumeKm,
+            trainingKm,
           }).toEqual({
             raceDistance,
             durationWeeks,
             daysPerWeek,
+            weeklyKm: weeklyKm ?? RUNNER.weeklyKm,
             experience,
-            raceWeekKm: Math.min(raceWeek.volumeKm, ceilingKm),
+            trainingKm: Math.min(trainingKm, allowanceKm),
           });
         }
       }
+    }
+  });
+
+  it("sizes race week's pre-race running from the taper, not from how many days the runner trains", () => {
+    // The pre-race budget is a share of the taper curve's own race-week target, which does not
+    // depend on day count — so two otherwise identical runners must not get more pre-race volume
+    // just for training more often. A per-day shakeout floor that outranked that share broke this:
+    // a 12 km/week runner racing a 5K got 4/6/8/10 km of pre-race running at 3/4/5/6 days a week,
+    // climbing past both the taper's prescription and their own peak week.
+    //
+    // Comparing two generated plans against each other, rather than against a bound rebuilt from
+    // the budget function's own constants, is what keeps this able to fail.
+    const trainingKmAt = (daysPerWeek: number) => {
+      const plan = buildTemplatePlan({
+        intake: { ...RUNNER, daysPerWeek, weeklyKm: 12, raceDistance: '5k' },
+        goalType: 'race',
+        durationWeeks: 10,
+        raceDistance: '5k',
+        raceDate: '2026-12-25',
+        tierAtGeneration: 'pro',
+        density: 'paid',
+      });
+      const raceWeek = plan.weeks[plan.weeks.length - 1];
+      const raceDayKm = raceWeek.days
+        .filter(isWorkout)
+        .reduce((max, run) => Math.max(max, run.distanceKm ?? 0), 0);
+      return raceWeek.volumeKm - raceDayKm;
+    };
+    const atFourDays = trainingKmAt(4);
+    expect(trainingKmAt(5)).toBe(atFourDays);
+    expect(trainingKmAt(6)).toBe(atFourDays);
+  });
+
+  it('does not let a canonical curve dip land on an unflagged week of a no-race plan either', () => {
+    // Same defect as the marathon case below, on the path that serves every general-fitness plan:
+    // `curvesForDistance` hands `undefined` the 5K shape, whose dips sat at fixed array positions
+    // while `deloadEveryWeeks` returns 3 for this 55-year-old — so weeks 4 and 5 were both
+    // suppressed without being flagged `isDeload`, and week 4 became the growth base for the rest.
+    const plan = buildTemplatePlan({
+      intake: {
+        ...RUNNER,
+        age: 55,
+        experience: 'regular',
+        daysPerWeek: 4,
+        weeklyKm: 30,
+        raceDistance: undefined,
+      },
+      goalType: 'duration',
+      durationWeeks: 12,
+      tierAtGeneration: 'pro',
+      density: 'paid',
+    });
+    const loading = plan.weeks.filter((week) => !week.isDeload);
+    for (let i = 1; i < loading.length; i += 1) {
+      expect(loading[i].volumeKm).toBeGreaterThanOrEqual(loading[i - 1].volumeKm);
     }
   });
 

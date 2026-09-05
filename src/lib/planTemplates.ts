@@ -109,9 +109,26 @@ const UNDER_18_DISCLAIMER =
   'training load and has the right to pause or stop the plan at any time. This plan does not ' +
   "account for individual medical history, injuries, or a coach's in-person supervision.";
 
-/** Ian-approved 12-week 5K load shape, normalized to the 35 km worked-example baseline. */
+/** Ian-approved 12-week 5K load shape, normalized to the 35 km worked-example baseline. Read by
+ * `buildCanonicalFiveKWeek` only — that path is byte-pinned to the fixture and owns its own
+ * recovery weeks (4 and 8) by reading these dips directly. */
 const FIVE_K_WEEKLY_LOAD = [34, 35, 38, 23, 41, 45, 48, 30, 45, 48, 40, 28] as const;
 const FIVE_K_LONG_RUNS = [10, 11, 12, 8, 13, 14, 15, 10, 14, 15, 12] as const;
+
+/**
+ * The same 12-week shape — same 34 km baseline, same 48 km peak, same 40/28 taper tail — with the
+ * interior recovery dips at indices 3 and 7 smoothed into a monotonic ramp, for the generic path.
+ *
+ * `buildGenericWeek` serves every 5K plan that is not the byte-pinned 12-week/4-day fixture, and
+ * every no-race/duration plan (`curvesForDistance` returns the 5K shape for `undefined` too). That
+ * path derives recovery weeks from `deloadEveryWeeks` and sizes them with `deloadVolume`, so a
+ * dip encoded at a fixed array position collides with it exactly as it did for the other three
+ * distances: the dip lands on a week that is not flagged `isDeload`, becomes `lastLoadingWeekKm`,
+ * and throttles every week after it off an artificially low base. Same defect, same fix as
+ * `TEN_K_/HALF_/MARATHON_WEEKLY_LOAD`; `FIVE_K_WEEKLY_LOAD` above is left untouched because the
+ * golden path reads its dips deliberately and is pinned to them.
+ */
+const FIVE_K_WEEKLY_LOAD_GENERIC = [34, 35, 37, 38, 40, 41, 43, 44, 46, 48, 40, 28] as const;
 
 /**
  * Distance-specific canonical shapes for 10K, half marathon, and marathon — replacing the bug
@@ -180,9 +197,19 @@ const MARATHON_LONG_RUNS = [
   10, 11, 12, 9, 13, 14, 15, 11, 16, 17, 18, 14, 19, 20, 21, 16, 22, 23, 24, 22, 25, 18, 14,
 ] as const;
 
-/** Picks the canonical shape for a distance. Absent distance (no target named at all) keeps the
- * only shape that ever existed before this file — the 5K curve — matching prior behavior exactly. */
-function curvesForDistance(raceDistance: RaceDistance | undefined): {
+/**
+ * Picks the canonical shape for a distance. Absent distance (no target named at all) keeps the
+ * shape that is closest to what existed before this file — the 5K curve.
+ *
+ * `goldenFiveKShape` distinguishes the only two callers that pass `'5k'`: `buildCanonicalFiveKWeek`
+ * (true) needs the byte-pinned, dipped `FIVE_K_WEEKLY_LOAD`, while `buildGenericWeek` (false, the
+ * default) needs the de-dipped generic curve because it owns recovery through `deloadEveryWeeks`.
+ * The distance argument alone cannot tell them apart — both pass `'5k'`.
+ */
+function curvesForDistance(
+  raceDistance: RaceDistance | undefined,
+  goldenFiveKShape = false,
+): {
   weeklyLoad: readonly number[];
   longRuns: readonly number[];
 } {
@@ -195,7 +222,10 @@ function curvesForDistance(raceDistance: RaceDistance | undefined): {
       return { weeklyLoad: MARATHON_WEEKLY_LOAD, longRuns: MARATHON_LONG_RUNS };
     case '5k':
     case undefined:
-      return { weeklyLoad: FIVE_K_WEEKLY_LOAD, longRuns: FIVE_K_LONG_RUNS };
+      return {
+        weeklyLoad: goldenFiveKShape ? FIVE_K_WEEKLY_LOAD : FIVE_K_WEEKLY_LOAD_GENERIC,
+        longRuns: FIVE_K_LONG_RUNS,
+      };
   }
 }
 const FIVE_K_TEMPO_KM: Record<number, number> = {
@@ -379,7 +409,11 @@ const RACE_DAY_PADDING_KM = 5;
  *
  * At the golden fixture's own 35 km baseline the two agree exactly (28 - 10 = 18 = 28 × 18/28),
  * which is why `buildCanonicalFiveKWeek` is deliberately left on the subtraction: that path is
- * byte-locked to the fixture, and a 5K race day is small enough that the bug never bites there.
+ * byte-locked to the fixture, and at *that one intake* — 35 km/week, 4 days — a 5K race day is
+ * small enough that the subtraction never collapses the pre-race days. This says nothing about 5K
+ * plans in general: every 5K that is not the pinned 12-week/4-day shape is built by
+ * `buildGenericWeek` and gets this ratio, and a low-volume 5K runner's race week is in fact the
+ * tightest case the ratio has to handle (their 10 km race day can be most of their biggest week).
  *
  * The ratio alone is not enough for a long race, because it is read off a race-*inclusive* 5K
  * total and the race day is then stacked on top of it uncounted: a marathon's 47 km race day is
@@ -408,9 +442,11 @@ const MIN_PRE_RACE_RUN_KM = 2;
  *
  * The floor is `MIN_PRE_RACE_RUN_KM` per pre-race day: where race day alone already eats the
  * peak — a 10 km/week runner's 5K, where the race is most of the week whatever the taper does —
- * no budget satisfies the bound, and the honest output is a real shakeout rather than the 1 km
- * filler the §1.4 race-week bug produced. The overshoot in that case is race day itself, never
- * training volume the engine chose to add.
+ * the peak-relative bound alone would collapse the pre-race days to the 1 km filler the §1.4
+ * race-week bug produced, so a real shakeout is preferred instead. The floor is itself capped at
+ * the ratio, so it can only ever raise the budget back towards what the taper curve already
+ * prescribes, never past it: the tapered component is `min(ratio, …)` under every branch, and any
+ * overshoot of the peak is race day itself, never training volume the engine chose to add.
  */
 function preRaceBudgetKm(args: {
   desiredVolumeKm: number;
@@ -421,7 +457,10 @@ function preRaceBudgetKm(args: {
   const { desiredVolumeKm, raceDayKm, peakTrainingWeekKm, easyCount } = args;
   const ratioKm = Math.round(desiredVolumeKm * RACE_WEEK_PRE_RACE_SHARE);
   const headroomKm = peakTrainingWeekKm > 0 ? peakTrainingWeekKm - raceDayKm : ratioKm;
-  return Math.max(easyCount * MIN_PRE_RACE_RUN_KM, Math.min(ratioKm, headroomKm));
+  return Math.max(
+    Math.min(ratioKm, headroomKm),
+    Math.min(ratioKm, easyCount * MIN_PRE_RACE_RUN_KM),
+  );
 }
 
 function raceDayWorkout(distance: RaceDistance): Workout {
@@ -612,9 +651,10 @@ function interpolateCanonical(values: readonly number[], weekIndex: number, tota
 }
 
 /**
- * `FIVE_K_WEEKLY_LOAD` and `FIVE_K_LONG_RUNS` are a **race** shape: their last two entries are the
- * 12-week 5K plan's taper, the deliberate wind-down into race day. Every plan's volume curve is
- * interpolated from them, which meant a plan with no race still wound down at the end — a runner
+ * Every canonical curve in this file is a **race** shape: its last entries are that distance's
+ * taper, the deliberate wind-down into race day. When `FIVE_K_WEEKLY_LOAD`/`FIVE_K_LONG_RUNS` were
+ * the only curves, every plan's volume was interpolated from them, which meant a plan with no race
+ * still wound down at the end — a runner
  * whose goal was "get fitter" finished a 12-week block at 24 km off a 35 km baseline, below where
  * they started, tapering for a start line that did not exist. (Reproduced against `wrangler dev`
  * on 2026-08-15, before and after: `[…, 45, 48, 40, 28]`.)
@@ -627,6 +667,8 @@ function interpolateCanonical(values: readonly number[], weekIndex: number, tota
 const TAPER_ENTRIES: ReadonlyMap<readonly number[], number> = new Map<readonly number[], number>([
   // Weeks 11 and 12 of the 12-week 5K plan.
   [FIVE_K_WEEKLY_LOAD, 2],
+  // Same two weeks — the generic curve keeps the taper tail unchanged.
+  [FIVE_K_WEEKLY_LOAD_GENERIC, 2],
   // The same two weeks, minus race week, which has no long run of its own.
   [FIVE_K_LONG_RUNS, 1],
   // 10K: weeks 13 (taper) and 14 (race).
@@ -657,9 +699,10 @@ function targetVolumeKm(
   durationWeeks: number,
   includeTaper: boolean,
   raceDistance: RaceDistance | undefined,
+  goldenFiveKShape = false,
 ): number {
   const canonical = interpolateCanonical(
-    taperAwareCurve(curvesForDistance(raceDistance).weeklyLoad, includeTaper),
+    taperAwareCurve(curvesForDistance(raceDistance, goldenFiveKShape).weeklyLoad, includeTaper),
     weekIndex,
     durationWeeks,
   );
@@ -728,13 +771,14 @@ function targetLongRunKm(
   maxSingleRunKm: number,
   includeTaper: boolean,
   raceDistance: RaceDistance | undefined,
+  goldenFiveKShape = false,
 ): number {
   // A race plan's final week is race day, so it has no scheduled long run; a no-race plan trains
   // through to the end and does.
   const scheduledLongRunWeeks = Math.max(1, includeTaper ? durationWeeks - 1 : durationWeeks);
   const longRunWeekIndex = Math.min(weekIndex, scheduledLongRunWeeks - 1);
   const canonical = interpolateCanonical(
-    taperAwareCurve(curvesForDistance(raceDistance).longRuns, includeTaper),
+    taperAwareCurve(curvesForDistance(raceDistance, goldenFiveKShape).longRuns, includeTaper),
     longRunWeekIndex,
     scheduledLongRunWeeks,
   );
@@ -900,7 +944,7 @@ function buildCanonicalFiveKWeek(args: {
     ? [4, 8, 12].includes(weekNumber)
     : !isRaceWeek && phase !== 'taper' && weekNumber % deloadCadence === 0;
   const desiredVolumeKm = applyInjuryVolumeAdjustment(
-    targetVolumeKm(intake.weeklyKm, weekIndex, durationWeeks, true, '5k'),
+    targetVolumeKm(intake.weeklyKm, weekIndex, durationWeeks, true, '5k', true),
     weekNumber,
     injuryReductionPct,
     redFlagReductionPct,
@@ -990,7 +1034,7 @@ function buildCanonicalFiveKWeek(args: {
     maxSingleRunKm,
     Math.max(
       minimumLongRunKm,
-      targetLongRunKm(intake.weeklyKm, weekIndex, durationWeeks, maxSingleRunKm, true, '5k'),
+      targetLongRunKm(intake.weeklyKm, weekIndex, durationWeeks, maxSingleRunKm, true, '5k', true),
     ),
   );
 

@@ -5,6 +5,71 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-09-06 (final) — the 5K/no-race curve loses its dips too, and the pre-race floor is bounded
+
+Two defects the previous round's own fixes left behind, plus a sweep for the error shape that
+produced the first one.
+
+- **`FIVE_K_WEEKLY_LOAD_GENERIC`: the de-dipping fix reached only three of the four curves.** The
+  previous round removed the fixed-position recovery dips from the 10K, half and marathon curves
+  but left `FIVE_K_WEEKLY_LOAD` dipped, on the reasoning that the 5K path "reads its dips directly
+  and never calls `deloadVolume`". That is true of `buildCanonicalFiveKWeek` only — which runs at
+  exactly one intake (race + 5K + 12 weeks + 4 days). Every other 5K plan, **and every no-race
+  duration plan** (`curvesForDistance` hands `undefined` the 5K shape), goes through
+  `buildGenericWeek` and hit the identical defect. The generic path now reads a separate,
+  de-dipped 12-week array — same 34 km baseline, same 48 km peak, same 40/28 taper tail — selected
+  by a new `goldenFiveKShape` flag threaded through `curvesForDistance`/`targetVolumeKm`/
+  `targetLongRunKm` and set true only by `buildCanonicalFiveKWeek`, so the byte-pinned fixture and
+  `RACE_WEEK_PRE_RACE_SHARE`'s derivation are untouched. `FIVE_K_LONG_RUNS` keeps its dips, as the
+  other three long-run curves do.
+
+  Profile E (general fitness, age 55, `regular`, 4 days/week, 30 km/week, 12 weeks, no race —
+  deload cadence 3, curve dips at 4 and 8, so the two disagree):
+
+  | | week-by-week volume (D = flagged deload) |
+  |---|---|
+  | before | 29, 30, **24D**, **27**, **24**, **19D**, 26, 29, 23D, 30, 33, 36 |
+  | after | 29, 30, 24D, 32, 33, 26D, 35, 36, 29D, 38, 39, 39 |
+
+  Before, weeks 4 and 5 were suppressed without being flagged as recovery, week 4's 27 km became
+  the growth base, and the block never recovered — three consecutive down weeks and a plan that
+  ends below where a clean progression starts. After, every loading week climbs and the deloads are
+  the only dips. Regression: a no-race profile-E case in `planTemplates.distanceSpecific.test.ts`,
+  verified red before the fix.
+
+- **`preRaceBudgetKm`'s shakeout floor is now bounded by the taper ratio.** The floor could
+  override both the ratio and the peak-relative bound and *raise* race-week volume: a 12 km/week
+  runner racing a 5K got 4/6/8/10 km of pre-race running at 3/4/5/6 days a week — more taper volume
+  purely for training more often, past their own peak week. Both terms are now individually capped
+  at the ratio, so the result cannot exceed it; that profile now plateaus at 6 km from 4 days
+  upward. The floor deliberately still outranks the peak headroom for runners whose race is most of
+  their biggest week — bounding it there instead reinstates the §1.4 filler-day bug (verified: it
+  breaks the three low-volume race-week profiles in `planTemplates.genericLongRun.test.ts`).
+
+- **The race-week regression test's allowance was circular** — it re-derived the budget function's
+  own `MIN_PRE_RACE_RUN_KM` floor, so it could not fail in the region that just regressed. It is
+  rebuilt from the plan's own peak training week and race day alone, and asserts the training
+  component rather than the total. The floor regression is covered separately by comparing two
+  generated plans against each other (pre-race volume must not grow with day count), which needs no
+  constant from the function under test.
+
+- **Sweep for over-generalized "the 5K path" claims** (the shape of error behind the first item —
+  a statement true only at the pinned fixture, written as if it covered the distance). Checked
+  every `golden`/`5K path`/`canonical 5K` reference in `planTemplates.ts` and `loadRules.ts`:
+  - `RACE_WEEK_PRE_RACE_SHARE`'s "a 5K race day is small enough that the bug never bites there" —
+    **corrected**: true only at the pinned 35 km/4-day intake, and a low-volume 5K on the generic
+    path is in fact the ratio's tightest case.
+  - `TAPER_ENTRIES`' "every plan's volume curve is interpolated from them" — **corrected**: that
+    was true before this branch added three distance curves and, now, the generic 5K array.
+  - Quality-distance scaling ("generic scales by the week's own volume, golden by declared
+    `weeklyKm`") — checked, both halves accurate, no fix.
+  - Long-run ceiling ("the canonical 5K path keeps its own literal `longDistanceKm * 0.8`") —
+    checked, both literals are inside `buildCanonicalFiveKWeek`, no fix.
+  - 50+ deload weeks 4/8/12 "on this golden path" — checked, inside `buildCanonicalFiveKWeek`,
+    which only ever runs at the pinned intake, no fix.
+  - `loadRules.ts`'s run-count-scaled share cap and `shareCapOverride` notes — checked, both name
+    `buildCanonicalFiveKWeek` explicitly as the exception, no fix.
+
 ## 2026-09-06 (latest) — review-round corrections to the distance-specific plan work
 
 Five defects found reviewing the two entries below, each confirmed against generated plan output
