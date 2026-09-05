@@ -23,9 +23,19 @@ export const WEEKLY_INCREASE_REJECT_ABOVE = 0.15;
 /** What a rejected week is recalculated at. */
 export const WEEKLY_INCREASE_RECALC_AT = 0.10;
 
-/** Deload reduction band. Ian's decision, superseding the source's 20–30% table. */
-export const DELOAD_REDUCTION_MIN = 0.35;
-export const DELOAD_REDUCTION_MAX = 0.45;
+/**
+ * Deload reduction band. **15–25%, targeting 20% — Ian's ruling, 2026-09-06, superseding the
+ * 35–45% figure that stood here from 2026-07-10.** The V2.2 distance-specific-plans research
+ * (`report-source.md`) surfaced that McMillan's own public marathon guide recommends a down week
+ * every third or fourth week at roughly 15–25% lower load, conflicting with the 35–45% figure
+ * this project had been using (itself from Ian's imported worked examples, not from that public
+ * guide). Asked to choose rather than have the conflict resolved silently, Ian chose the
+ * published McMillan figure over his own earlier ruling — a deliberate reversal, not drift. Full
+ * history and the resulting interaction with the long-run-cap deload-validity check:
+ * `docs/reference/coaching/load-rules.md` § Deload trigger.
+ */
+export const DELOAD_REDUCTION_MIN = 0.15;
+export const DELOAD_REDUCTION_MAX = 0.25;
 
 /** No long run may exceed this multiple of the plan's own previous longest. */
 export const LONG_RUN_SPIKE_MULTIPLE = 1.10;

@@ -223,6 +223,18 @@ never removed for a deload week; it is measured against the last loading week's 
 the deload week's own reduced total. See `load-rules.md` § "Long-run cap, by level" for the full
 rule and why it changed.
 
+**Superseded 2026-09-06 — weeks 4/8's actual generated/rendered long runs are now 7 km and 9 km,
+not the 8 km and 10 km this table (and the analysis above) still shows.** Ian's ruling that day
+reversed the deload reduction band from 35–45% to McMillan's public 15–25%
+(`load-rules.md` § "Deload trigger"). This week's own **−39.5%** and week 8's **−37.5%** no longer
+qualify as "a genuine deload" under that narrower band, so R1c's "measured against the last
+loading week" treatment above no longer applies to either week — the cap now measures against
+each week's own (smaller) volume instead, tightening from 12.16 km/15.36 km down to 7.36 km/
+9.6 km, floored to 7 km and 9 km. `weeklyLoad` (the row above) is unchanged; only the two long-run
+cells and the note text are stale. Not corrected in place, so this table stays a legible record of
+what R1c actually analyzed — see `src/lib/fixtures/examplePlan.ts` and
+`src/lib/__tests__/planTemplates.golden.test.ts` for the numbers actually shipped.
+
 **Three things to flag for Ian, all a direct, arithmetic consequence of ruling 1 — not separate
 new rules:**
 

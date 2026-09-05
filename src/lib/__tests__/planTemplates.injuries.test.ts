@@ -121,8 +121,14 @@ describe('intake.injuries drives plan generation (Bug 1)', () => {
   it('also drives the generic (non-golden) plan-building path, not just the golden 5K shape', () => {
     const none = genericPlanWithInjuries(['none']);
     const knee = genericPlanWithInjuries(['knee']);
-    expect(none.weeks[0].volumeKm).toBe(29); // round(34 * 30/35)
-    expect(knee.weeks[0].volumeKm).toBe(25); // round(29 * 0.85)
+    // Was 29/25 (`round(34 * 30/35)`/`round(29 * 0.85)`) — the 5K curve's own week-1 value (34),
+    // scaled by this test's 10K intake. That number was itself the bug this task fixed
+    // (`v22-distance-specific-plans`): every distance but the byte-pinned golden 5K fixture read
+    // `FIVE_K_WEEKLY_LOAD` regardless of the runner's actual target. This intake now correctly
+    // reads `TEN_K_WEEKLY_LOAD`'s own week-1 value (30, not 34) — the two curves are deliberately
+    // no longer identical, which is the fix, not a regression here.
+    expect(none.weeks[0].volumeKm).toBe(26); // round(30 * 30/35)
+    expect(knee.weeks[0].volumeKm).toBe(22); // round(26 * 0.85)
   });
 });
 

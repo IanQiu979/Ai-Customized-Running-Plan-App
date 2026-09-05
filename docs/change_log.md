@@ -5,6 +5,64 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-09-06 — distance-specific plans, deload ruling reversed to 15-25%
+
+Closes the core-purpose audit's headline finding: every distance except the byte-pinned golden
+5K fixture read `FIVE_K_WEEKLY_LOAD`/`FIVE_K_LONG_RUNS`, scaled by the runner's own weekly km — so
+a marathon, half, or 10K plan was a 5K plan's curve wearing that distance's phase weights. Rebased
+onto, and builds on top of, the 2026-09-05 (later) long-run-cap/race-week fixes below.
+`npm run typecheck && npm run lint && npm test` (37 suites, 617 tests) and
+`npm --prefix workers run typecheck && npm --prefix workers test` (7 suites, 141 tests) both clean.
+
+- **Distance-specific weekly-volume and long-run curves.** New `TEN_K_WEEKLY_LOAD`/
+  `TEN_K_LONG_RUNS`, `HALF_WEEKLY_LOAD`/`HALF_LONG_RUNS`, `MARATHON_WEEKLY_LOAD`/
+  `MARATHON_LONG_RUNS` in `planTemplates.ts`, selected by `curvesForDistance()` and normalized to
+  the same 35 km/week reference runner as the existing 5K arrays. Shapes follow the research's
+  already-resolved architecture (`plan-blueprint-examples.md` §§ 5, 11–14: canonical durations
+  12/14/16/24, recovery-week positions) with peak long-run shares climbing from ~31% (5K) to ~33%
+  (10K), ~40% (half), ~50%+ (marathon) — Examples B/C/D and the long-run ladder (§ 9). Exact
+  per-week workout content from that same document (§§ 11–14's dose tables) is deliberately NOT
+  implemented — that document's own status is "coach-review source... not yet application
+  behavior," Ian's review still unchecked. Only the volume/long-run shape moved; workout selection
+  is unchanged (phase-based tempo/interval logic already in `buildGenericWeek`).
+  - Verified: a 50 km/week, 16-week marathon plan (3 days/week) now peaks at 25 km, up from an old
+    (reconstructed) 19 km at the same inputs and past the audit's own cited ~21 km ceiling. New
+    regression suite `planTemplates.distanceSpecific.test.ts` compares distances directly against
+    each other and against a literal reconstruction of the old output — the
+    already-existing `clampLongRun`-replay style oracle (`genericLongRun.test.ts`) cannot catch
+    this class of bug, since it passes equally on a genuine target and a stretched one.
+  - **Known gap, not silently reconciled:** `loadRules.ts`'s `longRunShareCap`/`MAX_SINGLE_RUN_KM`
+    are level-based, not distance-based. At higher weekly run counts (5-6, also common for
+    marathon training) the run-count-scaled share cap becomes the dominant ceiling and can leave a
+    marathon long run *below* even the old bug's output (surveyed: an intermediate 6-day/week, 50
+    km/week marathon runner peaks at 8-9 km). This is a distance-vs-level safety-cap gap flagged
+    for the captain, not fixed here — see the task's `needs-decision` status line.
+- **Readiness path (first-timer vs prepared runner entering a race-specific block).** New
+  `deriveReadinessPath()`: a first-timer (weekly km below this file's own reasonable read of
+  Examples A-D's illustrative intake ranges, or — for marathon specifically — no recent
+  performance at 10K or longer as a proxy for "longest run in the last 30 days," since intake has
+  no dedicated longest-run field) gets a phase-weight shift from `peak` into `base` — more
+  aerobic foundation, less race-specific work, for the same plan length. Driven only by
+  `weeklyKm`/`recentPerformance`, never `goalTimeSec` (task's explicit requirement, mirroring how
+  `deriveTrainingPaces` already reads capacity, not ambition). Applies only to an actual race
+  entry (`isRacePlan === true`) — a no-race/duration block has no "entering a race-specific block"
+  decision to make.
+- **Deload reduction band reversed to 15-25% (Ian's ruling, 2026-09-06), superseding 35-45%.**
+  The research (`report-source.md`) found McMillan's own public marathon guide uses 15-25% down
+  weeks, conflicting with V2.2's imported-examples-derived 35-45% figure. Asked to choose rather
+  than have it resolved silently, Ian chose the published figure — recovery weeks are shallower
+  across every generated plan now, not just marathon ones. Full history:
+  `docs/reference/coaching/load-rules.md` § Deload trigger.
+  - **Confirmed interaction with the 2026-09-05 long-run-cap work, surfaced per the captain's
+    explicit instruction rather than quietly reconciled:** the byte-pinned golden 12-week/4-day 5K
+    fixture's own weeks 4/8 dips (~39.5%/~37.5%, from `example-plan-5k-pro.md`) no longer count as
+    "a genuine deload" under the tighter band, which flips `clampLongRun`'s weekly-share
+    denominator from the prior loading week to the deload week's own (smaller) volume for those
+    two weeks — tightening their long runs from 8/10 km to 7/9 km. Both the generated golden
+    fixture's tests and the hand-built `src/lib/fixtures/examplePlan.ts` screen fixture were
+    updated to the new, correctly-computed numbers; neither curve's own authored weekly-volume
+    values changed.
+
 ## 2026-09-05 (later) — long-run cap and race-week fixes, core-purpose audit §1.2/§1.4
 
 Closes the audit's two pure rule-enforcement findings

@@ -44,12 +44,15 @@
   **not redeployed**, so those code fixes are not live until the captain runs `wrangler deploy
   --env production`. The `paceblueprint://` deep-link scheme matches `app.json` but has never been
   exercised by a real built app.
-- **Plan engine is fully wired.** The pure template/pace engine (`src/lib/planTemplates.ts` +
-  `src/lib/paceDerivation.ts`) is bound into `generate-plan` via `workers/src/deps.ts`; the plan
-  view renders real generated plans. The Pro/Elite personalization prompt is built, bound, and
-  tested (2026-08-10) but has **never made a live model call**: `ANTHROPIC_API_KEY` is unset
-  everywhere, so paid-tier requests still serve the honest, quota-exempt template fallback. That
-  key is the **only** remaining critical-path item — detail in "Known debt" 🔴 and "Blocked".
+- **Plan engine is fully wired, and every distance now gets its own training shape.** The pure
+  template/pace engine (`src/lib/planTemplates.ts` + `src/lib/paceDerivation.ts`) is bound into
+  `generate-plan` via `workers/src/deps.ts`; the plan view renders real generated plans. As of
+  2026-09-06, 10K/half/marathon each have their own weekly-volume and long-run curves instead of a
+  scaled 5K curve — see "Decided (2026-09-06)" below; a distance-vs-level long-run-ceiling gap
+  remains open in "Blocked". The Pro/Elite personalization prompt is built, bound, and tested
+  (2026-08-10) but has **never made a live model call**: `ANTHROPIC_API_KEY` is unset everywhere,
+  so paid-tier requests still serve the honest, quota-exempt template fallback. That key is the
+  **only** remaining critical-path item — detail in "Known debt" 🔴 and "Blocked".
 - **Intake is asked once and a race target is optional.** Home reads the target off the saved
   intake and asks only for a plan length when there is no race date. A no-race plan never ends on
   a deload; a past race date is refused on both screens (race day and a blank date remain valid);
@@ -996,6 +999,7 @@ to "Decided" below.
 | **Decided 2026-08-07: deploy the Worker.** How a phone reaches the backend — LAN against `wrangler dev` was the alternative and was declined; on-device testing waits on `wrangler deploy` (the row above) rather than a same-Wi-Fi workaround | all on-device testing; caused the 2026-08-07 `Network request failed` report | **Ian — ruled.** A loopback base URL is unreachable from a phone by construction, tunnel or not (see `.env.example`); once deployed, `EXPO_PUBLIC_API_BASE_URL` becomes the Worker's `https://` URL. The app now reports the unreachable case clearly instead of crashing, but cannot fix it |
 | `wrangler deploy --env production` for the 2026-08-10 (later) `INVALID_ORIGIN`/`INVALID_CALLBACK_URL` fix | email sign-up and Google sign-in against the deployed Worker | **Ian.** The fix (`workers/src/auth.ts`, `workers/wrangler.toml`) is merged and tested but not live until redeployed — see the "Last updated" entry above |
 | Google OAuth consent screen publishing status (Testing vs. production) — does it block real users, not just listed test accounts | Google sign-in for anyone other than a listed test user | **Ian**, in Google Cloud Console → OAuth consent screen. Not checkable or changeable by an agent |
+| Long-run ceilings are level-based, not distance-based (`v22-distance-specific-plans`) — `loadRules.ts`'s `longRunShareCap`/`MAX_SINGLE_RUN_KM` were calibrated without marathon-length long runs in mind. Surveyed: an intermediate, 6-day/week, 50 km/week marathon runner's peak long run is capped at 8-9 km by the run-count-scaled share cap — *below* the pre-fix (stretched-5K-curve) output at that same run count, even after the 2026-09-06 distance-specific curve fix | marathon (and to a lesser extent half) plans at typical 5-6 day/week training frequencies genuinely reaching a distance-appropriate long run | **Ian.** Whether to introduce a distance-aware dimension to these ceilings, raise the existing level-based numbers for marathon specifically, or accept the current level-based ceiling as marathon's real-world limit. The research itself (`report-source.md`) flags both "maximum long-run share of weekly volume" and "absolute maximum long-run duration" as coaching-policy calls with no universal research-backed number |
 
 None of the above blocks local work: everything in `workers/` runs offline against `wrangler dev`'s
 Miniflare emulation with no account. The list is the exact Cloudflare counterpart of what the audit
@@ -1120,6 +1124,20 @@ guidelines scout (`/Users/Guestyyyyyyyy/firstmate/data/v22-apple-kids-guidelines
 | `plantar-arch-injury-flag` | **Already shipped** in the 2026-08-03 batch above — confirmed still wired through `planTypes.ts`, `workers/src/routes.ts` validation, `src/app/intake.tsx`'s picker, and `loadRules.ts`'s reduction table. No further change needed. |
 | `fifty-plus-golden-deload-weeks` | **Weeks 4, 8, and 12** are deload weeks for 50+ runners on the golden 12-week 5K path — not the generic every-3-weeks modulo (which would land on 3/6/9). This is a golden-path-only override; the generic path's every-3-weeks-for-50+ cadence is unchanged. Week 12 (the race week) is flagged `isDeload: true` in addition to its existing race-day structure. Implementation: `buildCanonicalFiveKWeek()` in `planTemplates.ts`. |
 | `age-floor` (App Store declared minimum age) | **13**, unified with the backend intake validator. The two were briefly treated as separate (the backend floor had been raised to 13 in an earlier, unrelated commit — `8acc27c` — while a prior ruling had separately declined touching it), but the captain resolved that tension mid-task: both the backend validator (`workers/src/routes.ts:210`, already `age < 13`) and the App Store Connect age-rating questionnaire answer are 13. There is no in-repo App Store Connect config to edit — `eas init` has never been run (`docs/apple-dev-blocked.md`) — so the declared floor is recorded here as the value to use once submission is set up; the questionnaire itself remains a captain's-account action at submission time. |
+
+## Decided (2026-09-06) — distance-specific plans and the deload-band reversal
+
+Closes the core-purpose audit's headline finding: every distance except the byte-pinned golden 5K
+fixture read `FIVE_K_WEEKLY_LOAD`/`FIVE_K_LONG_RUNS`, scaled by the runner's own weekly km — a
+marathon, half, or 10K plan was a 5K plan's curve wearing that distance's phase weights. Full
+detail: `docs/change_log.md`'s 2026-09-06 entry.
+
+| Item | Decision |
+|---|---|
+| No marathon/half/10K training content — every distance stretched the 5K curve | **Fixed.** New per-distance weekly-load/long-run curves (`TEN_K_*`, `HALF_*`, `MARATHON_*` in `planTemplates.ts`), shaped from the research's already-resolved architecture (canonical durations, recovery-week positions) with peak long-run shares climbing from ~31% (5K) to ~50%+ (marathon). A 50 km/week, 16-week marathon plan (3 days/week) now peaks at 25 km, up from an old (reconstructed) 19 km — past the audit's own cited ~21 km ceiling. Regression: `planTemplates.distanceSpecific.test.ts`. |
+| Plan selection ignoring readiness (first-timer vs. prepared runner entering a race block) | **Fixed.** New `deriveReadinessPath()`, driven only by `weeklyKm`/`recentPerformance` — never `goalTimeSec` — shifts phase weighting toward more aerobic foundation for a runner who hasn't demonstrated a race block's prerequisites. Applies only to actual race entries, not no-race/duration plans. |
+| Down-week reduction: McMillan's public 15–25% vs. V2.2's imported-examples 35–45% (flagged by `report-source.md`, escalated per this task's brief) | **Ian ruled, 2026-09-06, before being asked: use the published 15–25% figure, superseding the 35–45% ruling.** Recovery weeks are shallower across every generated plan now. See `docs/reference/coaching/load-rules.md` § Deload trigger for the full history and the confirmed interaction with the 2026-09-05 long-run-cap work (below) — the golden fixture's own weeks 4/8 long runs tightened from 8/10 km to 7/9 km as a direct, documented consequence, not a silent side effect. |
+| Long-run ceilings (`loadRules.ts`'s `longRunShareCap`/`MAX_SINGLE_RUN_KM`) are level-based, not distance-based | **Open — captain-only, see "Blocked / awaiting a decision" below.** At higher weekly run counts (5-6, common for marathon training) the run-count-scaled share cap becomes the dominant ceiling and can leave a marathon long run *below* the pre-fix output. |
 
 ## Decided (2026-09-05) — long-run cap and race-week fixes, `v22-core-purpose-audit-r1` §1.2/§1.4
 

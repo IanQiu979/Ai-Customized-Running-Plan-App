@@ -1,6 +1,18 @@
 import { buildTemplatePlan } from '../planTemplates';
-import { WEEKLY_INCREASE_REJECT_ABOVE } from '../loadRules';
+import { DELOAD_REDUCTION_MAX, DELOAD_REDUCTION_MIN, WEEKLY_INCREASE_REJECT_ABOVE } from '../loadRules';
 import type { Day, ExperienceAnswer, GoalType, IntakeResponses, Plan, RaceDistance, Workout } from '../planTypes';
+
+/**
+ * A deload week is generated at `deloadVolume()`'s midpoint of the deload band, not its shallow
+ * edge — so the ceiling this suite checks a deload week against is the midpoint reduction, not
+ * `1 - DELOAD_REDUCTION_MAX`. Ian's ruling, 2026-09-06, superseded the 35–45% band (midpoint 40%,
+ * ceiling 0.60) with McMillan's public 15–25% figure (midpoint 20%, ceiling 0.80) —
+ * `docs/reference/coaching/load-rules.md` § Deload trigger — shallower recovery weeks
+ * everywhere. This replaces the file's old hardcoded `0.75`, which assumed the old band's
+ * midpoint ceiling (0.60) with slack to spare and would now reject every correctly-computed
+ * deload week in this suite.
+ */
+const DELOAD_CEILING_OF_PRIOR_WEEK = 1 - (DELOAD_REDUCTION_MIN + DELOAD_REDUCTION_MAX) / 2 + 0.03;
 
 const BASE_INTAKE: IntakeResponses = {
   goal: 'Build fitness',
@@ -151,7 +163,7 @@ describe('buildTemplatePlan — parametric inputs', () => {
     let lastLoadingWeekKm = 0;
     for (const week of plan.weeks) {
       if (week.isDeload && lastLoadingWeekKm > 0) {
-        expect(week.volumeKm).toBeLessThan(lastLoadingWeekKm * 0.75);
+        expect(week.volumeKm).toBeLessThan(lastLoadingWeekKm * DELOAD_CEILING_OF_PRIOR_WEEK);
       }
       if (!week.isDeload) lastLoadingWeekKm = week.volumeKm;
     }
@@ -176,7 +188,7 @@ describe('buildTemplatePlan — parametric inputs', () => {
       for (const week of plan.weeks) {
         if (week.isDeload) {
           if (lastLoadingWeekKm > 0) {
-            expect(week.volumeKm).toBeLessThan(lastLoadingWeekKm * 0.75);
+            expect(week.volumeKm).toBeLessThan(lastLoadingWeekKm * DELOAD_CEILING_OF_PRIOR_WEEK);
           }
         } else {
           assertWeekGrowthCapCompliance(week, lastLoadingWeekKm);

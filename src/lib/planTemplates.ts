@@ -34,6 +34,7 @@ import {
   type HrZone,
   type IntakeResponses,
   type Pace,
+  type Performance,
   type Phase,
   type Plan,
   type RaceDistance,
@@ -110,6 +111,85 @@ const UNDER_18_DISCLAIMER =
 /** Ian-approved 12-week 5K load shape, normalized to the 35 km worked-example baseline. */
 const FIVE_K_WEEKLY_LOAD = [34, 35, 38, 23, 41, 45, 48, 30, 45, 48, 40, 28] as const;
 const FIVE_K_LONG_RUNS = [10, 11, 12, 8, 13, 14, 15, 10, 14, 15, 12] as const;
+
+/**
+ * Distance-specific canonical shapes for 10K, half marathon, and marathon — replacing the bug
+ * fixed here (core-purpose audit, `v22-distance-specific-plans`): every distance except the
+ * byte-pinned golden 5K fixture read `FIVE_K_WEEKLY_LOAD`/`FIVE_K_LONG_RUNS`, scaled by the
+ * runner's own weekly km. A 50 km/week marathon runner was never asked to run beyond ~21 km
+ * (`15 × 50/35`, `FIVE_K_LONG_RUNS`'s own peak) because there was no marathon curve — only a 5K
+ * curve wearing a marathon's phase weights.
+ *
+ * Each array is normalized to the same 35 km/week reference runner as the 5K arrays above — not a
+ * distance-specific baseline — so `targetVolumeKm`/`targetLongRunKm`'s existing
+ * `canonical * (startingWeeklyKm / 35)` scaling needs no second parameter. What actually
+ * distinguishes a distance is the *shape*: canonical week count (12/14/16/24, `plan-blueprint-
+ * examples.md` § "Resolved for the V1 library"), and — the part that fixes the bug — the long
+ * run's share of weekly volume at its peak, which the research's long-run ladder
+ * (`plan-blueprint-examples.md` § 9) and worked Examples B/C/D put at roughly 33% (10K), 40%
+ * (half), and over 50% (marathon), climbing well past the 5K fixture's own ~31%. That share is
+ * intentionally above what `loadRules.ts`'s level-based `LONG_RUN_SHARE_CAP`/`MAX_SINGLE_RUN_KM`
+ * ultimately allow for a sub-advanced runner — those ceilings are level-based, not
+ * distance-based, and this file does not loosen them (CLAUDE.md: "do not undo the caps"). The
+ * curve sets an honest, distance-appropriate *target*; `clampLongRun` still has the final word,
+ * exactly as it already does for the 5K curve. Where that ceiling still leaves a marathon long run
+ * short of the research's own numbers for a sub-advanced runner, that is a distance-vs-level
+ * safety-cap gap, not something to silently paper over here — see the `needs-decision` note this
+ * task's status line raises about it.
+ *
+ * Every week-type/position (ENTRY, LOAD-1/2/3, HOLD, RECOVERY, TAPER, RACE-WEEK) below follows
+ * `plan-blueprint-examples.md` §§ 5, 11–14's already-resolved architecture (canonical durations
+ * and recovery-week positions are in the "Resolved for the V1 library" list). The exact per-week
+ * *workout content* in that same document (§§ 11–14's Q1/Q2 dose tables) is explicitly NOT
+ * implemented here — that document's own status line marks it "coach-review source... not yet
+ * application behavior" with Ian's review and "translation into code" both still unchecked. Only
+ * the volume/long-run shape is taken from it; workout selection still comes from this file's
+ * existing phase-based tempo/interval logic, unchanged.
+ */
+const TEN_K_WEEKLY_LOAD = [30, 33, 36, 27, 37, 40, 43, 32, 42, 45, 47, 35, 36, 26] as const;
+/** No entry for week 14 (race week has no scheduled long run) — same convention as `FIVE_K_LONG_RUNS`. */
+const TEN_K_LONG_RUNS = [9, 10, 11, 8, 12, 13, 14, 10, 14, 16, 17, 12, 11] as const;
+
+const HALF_WEEKLY_LOAD = [30, 33, 36, 27, 37, 40, 43, 32, 42, 45, 47, 35, 48, 49, 37, 27] as const;
+const HALF_LONG_RUNS = [10, 11, 12, 9, 13, 14, 15, 11, 16, 17, 18, 14, 19, 20, 15] as const;
+
+/**
+ * The peak sits in a several-week-wide plateau (weeks 17–21, indices 16–20: 22/23/24/22/25)
+ * rather than a single spike. `interpolateCanonical` linearly samples this array at whatever
+ * position a plan's actual `durationWeeks` maps to — a race date can produce anything from a
+ * handful of weeks to well over 24 — and a single-week spike is a near-miss for almost every
+ * duration except the canonical one itself. A wide plateau means a compressed or stretched plan
+ * still lands its final long runs inside the genuinely-marathon-specific range instead of
+ * skimming past it. (An earlier revision of this file used single-week spikes for all three new
+ * curves and shipped a 16-week/50 km-a-week marathon plan whose peak long run undercut even the
+ * 5K curve it was replacing — caught before merge by generating and inspecting real plan output,
+ * not by the unit tests alone; see `docs/change_log.md`.)
+ */
+const MARATHON_WEEKLY_LOAD = [
+  29, 32, 35, 24, 36, 39, 42, 28, 41, 44, 46, 31, 45, 48, 50, 34, 49, 51, 52, 40, 53, 40, 32, 24,
+] as const;
+const MARATHON_LONG_RUNS = [
+  10, 11, 12, 9, 13, 14, 15, 11, 16, 17, 18, 14, 19, 20, 21, 16, 22, 23, 24, 22, 25, 18, 14,
+] as const;
+
+/** Picks the canonical shape for a distance. Absent distance (no target named at all) keeps the
+ * only shape that ever existed before this file — the 5K curve — matching prior behavior exactly. */
+function curvesForDistance(raceDistance: RaceDistance | undefined): {
+  weeklyLoad: readonly number[];
+  longRuns: readonly number[];
+} {
+  switch (raceDistance) {
+    case '10k':
+      return { weeklyLoad: TEN_K_WEEKLY_LOAD, longRuns: TEN_K_LONG_RUNS };
+    case 'half':
+      return { weeklyLoad: HALF_WEEKLY_LOAD, longRuns: HALF_LONG_RUNS };
+    case 'marathon':
+      return { weeklyLoad: MARATHON_WEEKLY_LOAD, longRuns: MARATHON_LONG_RUNS };
+    case '5k':
+    case undefined:
+      return { weeklyLoad: FIVE_K_WEEKLY_LOAD, longRuns: FIVE_K_LONG_RUNS };
+  }
+}
 const FIVE_K_TEMPO_KM: Record<number, number> = {
   1: 8,
   2: 8,
@@ -357,14 +437,73 @@ function generalPhaseWeights(raceDistance: RaceDistance | undefined): number[] {
   return racePhaseWeights(raceDistance).slice(0, 3);
 }
 
+/**
+ * The research's two race-entry paths (`report-source.md`'s Executive Answer): a first-timer
+ * needs more aerobic foundation before race-specific work, a prepared runner can spend more of
+ * the same block on it. `racePhaseWeights` is already tuned against Examples A–D, each an
+ * explicitly "prepared intermediate" runner — so `prepared` leaves it untouched, and only
+ * `first-timer` reallocates weight from `peak` into `base`. The 0.4 shift factor is this file's
+ * own reasonable read of "extend the foundation" (the research gives no exact figure), not a
+ * sourced coaching number.
+ */
+export type ReadinessPath = 'first-timer' | 'prepared';
+
+function readinessAdjustedWeights(weights: number[], readiness: ReadinessPath): number[] {
+  if (readiness === 'prepared') return weights;
+  const [base, build, peak, taper] = weights;
+  const shift = peak * 0.4;
+  return [base + shift, build, peak - shift, taper];
+}
+
+/**
+ * Whether the runner has already demonstrated what the research's "prepared runner entering a
+ * race-specific block" examples assume (Examples A–D's illustrative intakes), or needs the
+ * longer "first timer / base not yet established" path instead. Driven only by current
+ * demonstrated capacity — `weeklyKm` and, for marathon, whether `recentPerformance` shows a
+ * distance that implies the long-run base a marathon block assumes (Example D: "longest run in
+ * the last 30 days at least 16–20 km"; intake has no dedicated longest-run field, so a recent
+ * performance at 10K or longer is this file's best available proxy for it) — **never
+ * `goalTimeSec`**, per this task's explicit requirement (mirrors `deriveTrainingPaces` already
+ * reading capacity, never ambition, for pace). The exact km thresholds are this implementation's
+ * own reasonable read of Examples A–D's illustrative intake ranges, not a sourced coaching
+ * number — the research gives ranges, not cutoffs.
+ */
+const READINESS_WEEKLY_KM_THRESHOLD: Record<RaceDistance, number> = {
+  '5k': 15,
+  '10k': 25,
+  half: 35,
+  marathon: 45,
+};
+
+function hasMarathonLongRunEvidence(recentPerformance: Performance | undefined): boolean {
+  if (!recentPerformance) return false;
+  return (
+    recentPerformance.distance === '10k' ||
+    recentPerformance.distance === 'half' ||
+    recentPerformance.distance === 'marathon'
+  );
+}
+
+function deriveReadinessPath(intake: IntakeResponses, raceDistance: RaceDistance): ReadinessPath {
+  if (intake.weeklyKm < READINESS_WEEKLY_KM_THRESHOLD[raceDistance]) return 'first-timer';
+  if (raceDistance === 'marathon' && !hasMarathonLongRunEvidence(intake.recentPerformance)) {
+    return 'first-timer';
+  }
+  return 'prepared';
+}
+
 function allocatePhaseCounts(
   durationWeeks: number,
   raceDistance: RaceDistance | undefined,
   isRacePlan: boolean,
+  readiness: ReadinessPath,
 ): number[] {
-  const weights = isRacePlan && raceDistance
+  const baseWeights = isRacePlan && raceDistance
     ? racePhaseWeights(raceDistance)
     : generalPhaseWeights(raceDistance);
+  // Readiness only applies to an actual race entry — a no-race/duration block has no "entering a
+  // race-specific block" decision to make, so it keeps the unadjusted weights untouched.
+  const weights = isRacePlan ? readinessAdjustedWeights(baseWeights, readiness) : baseWeights;
   const totalWeight = weights.reduce((sum, value) => sum + value, 0);
 
   if (durationWeeks < 4) {
@@ -409,10 +548,11 @@ function phasesForPlan(
   durationWeeks: number,
   raceDistance: RaceDistance | undefined,
   isRacePlan: boolean,
+  readiness: ReadinessPath,
 ): Phase[] {
   const names: Phase[] = ['base', 'build', 'peak', 'taper'];
-  return allocatePhaseCounts(durationWeeks, raceDistance, isRacePlan).flatMap((count, index) =>
-    Array.from({ length: count }, () => names[index]),
+  return allocatePhaseCounts(durationWeeks, raceDistance, isRacePlan, readiness).flatMap(
+    (count, index) => Array.from({ length: count }, () => names[index]),
   );
 }
 
@@ -443,6 +583,17 @@ const TAPER_ENTRIES: ReadonlyMap<readonly number[], number> = new Map<readonly n
   [FIVE_K_WEEKLY_LOAD, 2],
   // The same two weeks, minus race week, which has no long run of its own.
   [FIVE_K_LONG_RUNS, 1],
+  // 10K: weeks 13 (taper) and 14 (race).
+  [TEN_K_WEEKLY_LOAD, 2],
+  [TEN_K_LONG_RUNS, 1],
+  // Half: weeks 15 (taper) and 16 (race).
+  [HALF_WEEKLY_LOAD, 2],
+  [HALF_LONG_RUNS, 1],
+  // Marathon: weeks 22/23 (two-week disciplined taper, `plan-blueprint-examples.md` § "Resolved
+  // for the V1 library") and 24 (race).
+  [MARATHON_WEEKLY_LOAD, 3],
+  // Both taper weeks still carry a (reduced) long run — only race week has none — so 2, not 3.
+  [MARATHON_LONG_RUNS, 2],
 ]);
 
 function taperAwareCurve(values: readonly number[], includeTaper: boolean): readonly number[] {
@@ -459,9 +610,10 @@ function targetVolumeKm(
   weekIndex: number,
   durationWeeks: number,
   includeTaper: boolean,
+  raceDistance: RaceDistance | undefined,
 ): number {
   const canonical = interpolateCanonical(
-    taperAwareCurve(FIVE_K_WEEKLY_LOAD, includeTaper),
+    taperAwareCurve(curvesForDistance(raceDistance).weeklyLoad, includeTaper),
     weekIndex,
     durationWeeks,
   );
@@ -529,13 +681,14 @@ function targetLongRunKm(
   durationWeeks: number,
   maxSingleRunKm: number,
   includeTaper: boolean,
+  raceDistance: RaceDistance | undefined,
 ): number {
   // A race plan's final week is race day, so it has no scheduled long run; a no-race plan trains
   // through to the end and does.
   const scheduledLongRunWeeks = Math.max(1, includeTaper ? durationWeeks - 1 : durationWeeks);
   const longRunWeekIndex = Math.min(weekIndex, scheduledLongRunWeeks - 1);
   const canonical = interpolateCanonical(
-    taperAwareCurve(FIVE_K_LONG_RUNS, includeTaper),
+    taperAwareCurve(curvesForDistance(raceDistance).longRuns, includeTaper),
     longRunWeekIndex,
     scheduledLongRunWeeks,
   );
@@ -695,7 +848,7 @@ function buildCanonicalFiveKWeek(args: {
     ? [4, 8, 12].includes(weekNumber)
     : !isRaceWeek && phase !== 'taper' && weekNumber % deloadCadence === 0;
   const desiredVolumeKm = applyInjuryVolumeAdjustment(
-    targetVolumeKm(intake.weeklyKm, weekIndex, durationWeeks, true),
+    targetVolumeKm(intake.weeklyKm, weekIndex, durationWeeks, true, '5k'),
     weekNumber,
     injuryReductionPct,
     redFlagReductionPct,
@@ -785,7 +938,7 @@ function buildCanonicalFiveKWeek(args: {
     maxSingleRunKm,
     Math.max(
       minimumLongRunKm,
-      targetLongRunKm(intake.weeklyKm, weekIndex, durationWeeks, maxSingleRunKm, true),
+      targetLongRunKm(intake.weeklyKm, weekIndex, durationWeeks, maxSingleRunKm, true, '5k'),
     ),
   );
 
@@ -924,7 +1077,13 @@ function buildGenericWeek(args: {
     !endsOnForcedLoadingWeek &&
     phase !== 'taper' &&
     weekNumber % deloadCadence === 0;
-  const rawVolumeKm = targetVolumeKm(intake.weeklyKm, weekNumber - 1, durationWeeks, isRacePlan);
+  const rawVolumeKm = targetVolumeKm(
+    intake.weeklyKm,
+    weekNumber - 1,
+    durationWeeks,
+    isRacePlan,
+    raceDistance,
+  );
   const desiredVolumeKm = applyInjuryVolumeAdjustment(
     isDeload
       ? lastLoadingWeekKm > 0
@@ -1019,7 +1178,14 @@ function buildGenericWeek(args: {
   );
   const longRunFromCurve = Math.max(
     longRunStartFloor,
-    targetLongRunKm(intake.weeklyKm, weekNumber - 1, durationWeeks, maxSingleRunKm, isRacePlan),
+    targetLongRunKm(
+      intake.weeklyKm,
+      weekNumber - 1,
+      durationWeeks,
+      maxSingleRunKm,
+      isRacePlan,
+      raceDistance,
+    ),
   );
   const longRunVolumeBudget = Math.max(
     longRunStartFloor,
@@ -1137,7 +1303,9 @@ export function buildTemplatePlan(params: TemplatePlanParams): Plan {
           recent: params.intake.recentPerformance,
         })
       : undefined;
-  const phases = phasesForPlan(durationWeeks, raceDistance, isRacePlan);
+  const readiness: ReadinessPath =
+    isRacePlan && raceDistance ? deriveReadinessPath(params.intake, raceDistance) : 'prepared';
+  const phases = phasesForPlan(durationWeeks, raceDistance, isRacePlan, readiness);
   const maxSingleRunKm = MAX_SINGLE_RUN_KM[level];
   const deloadCadence = deloadEveryWeeks(level, params.intake.age);
   const injuryReductionPct = injuryVolumeReductionPct(params.intake.injuries);

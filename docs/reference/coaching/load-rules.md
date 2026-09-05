@@ -150,22 +150,52 @@ land on 3, 6, 9 and drop off the plan by week 9). This aligns with the natural v
 week — as a deload for 50+ runners specifically, on top of its existing taper/race structure. The
 generic (non-golden) path is unaffected and still uses the every-3-weeks modulo above.
 
-**Reduction: 35–45% of volume** during a deload week — authoritative (Ian's decision, 2026-07-10,
-**superseding an earlier 20–30% call the same day**).
+**Reduction: 15–25% of volume** during a deload week — authoritative (**Ian's ruling, 2026-09-06,
+superseding the 35–45% figure below**).
 
-Why the change. The source disagrees with itself three ways: the Deload Trigger table says 20–30%;
-the separate "Exception — Recovery Weeks" clause (`load_rules.md § Rule 1`) says volume "can
-decrease by any amount… even 50% reduction is fine"; and `workout_library.md`'s own three worked
-deload examples reduce by ~40% (beginner), ~45% (intermediate), and ~35–40% (advanced). Ian ruled
-that the worked examples reflect what he actually does. 35–45% sits inside the Exception clause and
-matches all three examples, so it reconciles the source rather than contradicting it.
+**What changed and why.** The number in this section was **35–45%, targeting 40%**, from 2026-07-10
+until 2026-09-06. The V2.2 distance-specific-plans research (`report-source.md`) surfaced that
+McMillan's own public marathon guide recommends a down week every third or fourth week at roughly
+**15–25%** lower load — directly conflicting with the imported-examples figure below. Ian was asked
+to pick rather than have the conflict resolved silently, and on 2026-09-06 he chose the published
+McMillan figure over his own earlier ruling: **use 15–25%, targeting 20%,** everywhere in the
+engine. This is a deliberate reversal, not drift — a future reader should not assume the 2026-07-10
+reasoning below still holds; it is kept for history, not as the current rule.
+
+Why the *old* number had been chosen (2026-07-10, superseding an earlier 20–30% call the same day):
+the source disagreed with itself three ways — the Deload Trigger table said 20–30%; the separate
+"Exception — Recovery Weeks" clause (`load_rules.md § Rule 1`) said volume "can decrease by any
+amount… even 50% reduction is fine"; and `workout_library.md`'s own three worked deload examples
+reduced by ~40% (beginner), ~45% (intermediate), and ~35–40% (advanced). Ian ruled at the time that
+the worked examples reflected what he actually did. 35–45% sat inside the Exception clause and
+matched all three examples, so it reconciled the source rather than contradicting it.
 
 The fact-check found no direct RCT evidence for *any* specific deload magnitude — it is coaching
-convention either way, which is why the coach's own practice is the tiebreak.
+convention either way, which is why the coach's own choice is the tiebreak, then and now.
 
 The engine enforces a band with both a floor and a ceiling, not a "no minimum" allowance:
-`isValidDeload()` in `src/lib/loadRules.ts` accepts a reduction in `[0.35, 0.45]` and rejects
-anything shallower or deeper. Generation uses the 40% midpoint.
+`isValidDeload()` in `src/lib/loadRules.ts` accepts a reduction in `[0.15, 0.25]` and rejects
+anything shallower or deeper. Generation uses the 20% midpoint.
+
+**Known interaction with the long-run cap work (flagged per the captain's instruction, not quietly
+reconciled):** `clampLongRun()`'s weekly-share ceiling measures a deload week's long run against the
+*last loading week's* volume, but only when `isValidDeload(lastLoadingWeekKm, weeklyKm)` agrees the
+week is a genuine deload under the currently-configured band (R1c, 2026-07-12, issue #34). The
+byte-pinned golden 12-week/4-day 5K fixture (`example-plan-5k-pro.md`, `FIVE_K_WEEKLY_LOAD` /
+`FIVE_K_LONG_RUNS` in `src/lib/planTemplates.ts`) has its own literal, separately-approved dip at
+weeks 4 and 8 — roughly **37–40%** off the prior loading week. That figure was authored years before
+this ruling and was never itself a `deloadVolume()` output, so tightening the band to 15–25% does
+not change the fixture's literal weekly-volume numbers, but it **does** flip `isValidDeload()` to
+`false` for those two weeks (37–40% no longer qualifies as "a genuine deload" under the new
+narrower band), which flips `clampLongRun()`'s denominator from the prior loading week back to the
+deload week's own (smaller) volume — tightening the share ceiling and shrinking the golden fixture's
+weeks 4/8 long runs by one kilometre each (8→7, 10→9). This is two coaching rules disagreeing, not a
+bug: the golden fixture's own dip depth was never brought into line with this ruling (that would be
+a separate, explicit edit to `example-plan-5k-pro.md`'s content, which nothing here authorizes), so
+it now reads as "not a real deload" by the newly-tightened definition purely because it dips deeper
+than the new 25% ceiling allows. The golden fixture's test expectations were updated to the new,
+correctly-computed numbers rather than left pinned to pre-ruling output; the fixture's own
+`FIVE_K_WEEKLY_LOAD`/`FIVE_K_LONG_RUNS` values were left untouched.
 
 **Still an error, not an alternative:** the 5K example plan's Week 4 is labelled a deload while its
 volume *rises* (~17–19 km → ~18–19 km). See `plan-structure.md`.

@@ -88,9 +88,15 @@ describe('golden 5K path — long-run weekly-share cap holds at any baseline (sc
     },
   );
 
-  it('still keeps the 35 km baseline (the golden fixture\'s own) byte-identical to the doc\'s long-run schedule', () => {
+  it('still keeps the 35 km baseline (the golden fixture\'s own) at the doc\'s long-run schedule, weeks 4/8 tightened by the 2026-09-06 deload ruling', () => {
+    // Weeks 4 and 8 were 8/10 km against the doc's schedule; Ian's 2026-09-06 ruling tightened
+    // the deload band from 35–45% to 15–25%, which flips `isValidDeload` to `false` for this
+    // fixture's own ~39.5%/~37.5% dips and tightens `clampLongRun`'s share ceiling for those two
+    // weeks from the prior loading week to the deload week's own (smaller) volume — see
+    // `planTemplates.golden.test.ts`'s equivalent assertion and `docs/reference/coaching/
+    // load-rules.md` § Deload trigger for the full account.
     const plan = buildGoldenPlanAt(35);
-    const expected = [10, 11, 12, 8, 13, 14, 15, 10, 14, 15, 12];
+    const expected = [10, 11, 12, 7, 13, 14, 15, 9, 14, 15, 12];
     plan.weeks.slice(0, 11).forEach((week, index) => {
       expect(findLongRun(week)?.distanceKm).toBe(expected[index]);
     });
