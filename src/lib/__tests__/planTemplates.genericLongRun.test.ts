@@ -35,6 +35,7 @@ import type { TemplatePlanParams } from '../planTemplates';
 import {
   clampLongRun,
   DELOAD_REDUCTION_MIN,
+  isValidDeload,
   longRunShareCap,
   LONG_RUN_SPIKE_MULTIPLE,
   MAX_SINGLE_RUN_KM,
@@ -430,6 +431,80 @@ describe('generic path — no run outgrows the week\'s safety-clamped long run',
       }
     }
   });
+});
+
+describe('generic path — volume reconciliation may not re-open the share cap', () => {
+  // The clamp loop closed the cap against the week's *assembled* sum, which
+  // `distributeDistance`'s 1 km-per-session floor can push above the target;
+  // `reconcileVolumeToTarget` then trimmed the week back down and the rendered share climbed back
+  // over the ceiling. This profile is not in `PROFILES` because none of those ten reach the shape:
+  // it needs enough quality sessions to crowd the easy days onto their floor.
+  const RECONCILE_PROFILE: Profile = {
+    name: 'L — general fitness, advanced, 20 km/wk, 5 days',
+    experience: 'competitive',
+    age: 30,
+    daysPerWeek: 5,
+    weeklyKm: 20,
+    durationWeeks: 6,
+    goalType: 'duration',
+  };
+
+  it('keeps the rendered long run inside the share cap once the week has been trimmed to target', () => {
+    // Before: week 5 settled a 7 km long run against an assembled 20 km, then rendered
+    // ER 1 | TR 4 | ER 1 | INT 5 | LR 6 — a 6 km long run in a 17 km week, 35.3% of a 35.0% cap.
+    const plan = buildFor(RECONCILE_PROFILE);
+    const cap = longRunShareCap('advanced', 5);
+    const breaches: string[] = [];
+    let lastLoadingWeekKm = 0;
+    for (const week of plan.weeks) {
+      const longRun = findLongRun(week);
+      if (longRun) {
+        const useLastLoading =
+          week.isDeload && lastLoadingWeekKm > 0 && isValidDeload(lastLoadingWeekKm, week.volumeKm);
+        const denomKm = useLastLoading ? lastLoadingWeekKm : week.volumeKm;
+        const share = (longRun.distanceKm ?? 0) / denomKm;
+        if (share > cap + 1e-9) {
+          breaches.push(
+            `week ${week.weekNumber}: ${longRun.distanceKm} km of ${denomKm} km = ` +
+              `${(share * 100).toFixed(2)}% against a ${(cap * 100).toFixed(2)}% cap`,
+          );
+        }
+      }
+      if (!week.isDeload) lastLoadingWeekKm = week.volumeKm;
+    }
+    expect(breaches).toEqual([]);
+  });
+
+  it('lands that week exactly on its target rather than undershooting it', () => {
+    // The trim removes only the overshoot, so the week keeps the volume the growth clamp allowed
+    // it — 19 km, not the 17 km an independent per-workout floor produced.
+    const plan = buildFor(RECONCILE_PROFILE);
+    expect(plan.weeks[4].volumeKm).toBe(19);
+    expect(findLongRun(plan.weeks[4])?.distanceKm).toBe(6);
+  });
+
+  it.each(PROFILES.map((profile) => [profile.name, profile] as const))(
+    'holds %s inside the share cap using clampLongRun\'s own deload denominator',
+    (_name, profile) => {
+      const plan = buildFor(profile);
+      const cap = longRunShareCap(toExperienceLevel(profile.experience), runCountFor(profile.daysPerWeek));
+      const breaches: string[] = [];
+      let lastLoadingWeekKm = 0;
+      for (const week of plan.weeks) {
+        const longRun = findLongRun(week);
+        if (longRun) {
+          const useLastLoading =
+            week.isDeload && lastLoadingWeekKm > 0 && isValidDeload(lastLoadingWeekKm, week.volumeKm);
+          const denomKm = useLastLoading ? lastLoadingWeekKm : week.volumeKm;
+          if ((longRun.distanceKm ?? 0) / denomKm > cap + 1e-9) {
+            breaches.push(`week ${week.weekNumber}: ${longRun.distanceKm} km of ${denomKm} km`);
+          }
+        }
+        if (!week.isDeload) lastLoadingWeekKm = week.volumeKm;
+      }
+      expect(breaches).toEqual([]);
+    },
+  );
 });
 
 describe('generic path — race week is a taper, not budget math around the race (audit §1.4)', () => {

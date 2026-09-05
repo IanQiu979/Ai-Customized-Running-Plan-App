@@ -289,9 +289,13 @@ const RACE_DAY_PADDING_KM = 5;
  * day", reported as the second-biggest week of the taper. Sizing the pre-race days from the
  * taper instead, and letting race day sit on top of them, is what a taper week actually is.
  *
- * At the golden fixture's own 35 km baseline the two agree exactly (28 - 10 = 18 = 28 × 18/28),
- * which is why `buildCanonicalFiveKWeek` is deliberately left on the subtraction: that path is
- * byte-locked to the fixture, and a 5K race day is small enough that the bug never bites there.
+ * Both paths use it. At the golden fixture's own 35 km baseline the share and the old subtraction
+ * agree exactly (28 - 10 = 18 = 28 × 18/28), so that byte-locked plan is unchanged — but away from
+ * that baseline the subtraction bit `buildCanonicalFiveKWeek` too, and the claim that a 5K race day
+ * is small enough for it never to matter was simply wrong: a 12 km/wk beginner's 5K race week
+ * rendered `1 km | 1 km | 1 km | Race Day 10 km`, the same 1 km-filler signature the audit reported
+ * for the marathon. The share is what makes the fixture's own race week reproducible at every other
+ * declared volume instead of only at 35 km.
  */
 const RACE_WEEK_PRE_RACE_SHARE =
   (FIVE_K_WEEKLY_LOAD[FIVE_K_WEEKLY_LOAD.length - 1] -
@@ -506,20 +510,46 @@ function scaleQualityDistanceKm(nominalKm: number, volumeKm: number): number {
 }
 
 /**
- * Per-workout structural floors (a quality session's own minimum, the long run's "longest run
- * of the week" floor, `distributeDistance`'s 1 km/session floor) can each be individually
- * reasonable yet still stack past `targetKm`. This is the last-mile guarantee that the assembled,
- * user-visible total never exceeds the clamped target: scale every running workout down together,
- * never below 1 km each, rather than trusting the sum of independently floored pieces.
+ * Per-workout structural floors (a quality session's own minimum, the long run's own candidate,
+ * `distributeDistance`'s 1 km/session floor) can each be individually reasonable yet still stack
+ * past `targetKm`. This is the last-mile guarantee that the assembled, user-visible total never
+ * exceeds the clamped target.
+ *
+ * It must not re-open the share cap the clamp loop just closed, which a proportional rescale did:
+ * flooring each workout independently overshot downward, so the week's total fell further than the
+ * long run did and the long run's share of it climbed back over the ceiling (a 5-day advanced
+ * 20 km/wk week rendered a 6 km long run in a 17 km week — 35.3% against a 35.0% cap). So it
+ * removes whole kilometres one at a time, largest first, from everything that is not the long run,
+ * and only starts on the long run once every other session is down to its 1 km floor. Removing
+ * exactly the overshoot lands the week on `targetKm` rather than under it, which is what keeps the
+ * ratio the loop measured intact.
  */
 function reconcileVolumeToTarget(workouts: Workout[], targetKm: number): Workout[] {
-  const total = workouts.reduce((sum, workout) => sum + (workout.distanceKm ?? 0), 0);
+  const distances = workouts.map((workout) => workout.distanceKm ?? 0);
+  let total = distances.reduce((sum, km) => sum + km, 0);
   if (total <= targetKm) return workouts;
-  const scale = targetKm / total;
-  return workouts.map((workout) =>
-    workout.distanceKm === undefined
-      ? workout
-      : { ...workout, distanceKm: Math.max(1, Math.floor(workout.distanceKm * scale)) },
+
+  const trimLargest = (eligible: (index: number) => boolean): boolean => {
+    let pick = -1;
+    for (let i = 0; i < workouts.length; i += 1) {
+      if (workouts[i].distanceKm === undefined || !eligible(i)) continue;
+      if (distances[i] > 1 && (pick === -1 || distances[i] > distances[pick])) pick = i;
+    }
+    if (pick === -1) return false;
+    distances[pick] -= 1;
+    total -= 1;
+    return true;
+  };
+
+  while (total > targetKm && trimLargest((i) => workouts[i].isLongRun !== true)) {
+    // Non-long-run sessions absorb the overshoot first.
+  }
+  while (total > targetKm && trimLargest(() => true)) {
+    // Only once everything else sits on its floor does the long run give ground.
+  }
+
+  return workouts.map((workout, index) =>
+    workout.distanceKm === undefined ? workout : { ...workout, distanceKm: distances[index] },
   );
 }
 
@@ -709,7 +739,7 @@ function buildCanonicalFiveKWeek(args: {
 
   if (isRaceWeek) {
     const race = raceDayWorkout('5k');
-    const nonRaceKm = Math.max(3, desiredVolumeKm - (race.distanceKm ?? 0));
+    const nonRaceKm = Math.max(3, Math.round(desiredVolumeKm * RACE_WEEK_PRE_RACE_SHARE));
     const easyDistances = distributeDistance(nonRaceKm, 3, Math.max(1, nonRaceKm));
     const workouts = [
       easyRun({ distanceKm: easyDistances[0], pace: easyPace, density, age: intake.age }),
@@ -1072,7 +1102,15 @@ function buildGenericWeek(args: {
       easyCount,
       easyRunCapKm(longDistanceKm),
     ).reduce((sum, distanceKm) => sum + distanceKm, 0);
-    const assembledVolumeKm = longDistanceKm + qualityKm + easyTotalKm;
+    // Capped at `desiredVolumeKm`, because that is the total the week will actually render:
+    // `distributeDistance`'s 1 km-per-session floor can push the assembled sum above the target,
+    // and `reconcileVolumeToTarget` then trims it back down. Closing the cap against the inflated
+    // pre-reconcile sum left the rendered week over the ceiling — a 5-day advanced 20 km/wk week
+    // settled a 7 km long run against an assembled 20 km, then rendered it in a 19 km week.
+    const assembledVolumeKm = Math.min(
+      desiredVolumeKm,
+      longDistanceKm + qualityKm + easyTotalKm,
+    );
     const { km } = clampLongRun({
       proposedKm: longDistanceKm,
       weeklyKm: assembledVolumeKm,

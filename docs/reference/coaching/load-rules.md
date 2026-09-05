@@ -127,7 +127,7 @@ intermediate, 5 runs/week) week 8 deload was reported at 20/25 km = 80% of its o
 60 km/wk, same level/frequency) week 8 was 24/30 = 80%, now 16/50 km = 32.0% against 32%; profile C
 (half, 80 km/wk, advanced, 6 runs/week) week 6 was 30/35 = 86%, now 20/58 km = 34.5% against the
 unchanged 35% cap; week 9 was 32/41 = 78%, now 24/69 km = 34.8% against 35%. The plans these
-produce still build: B peaks at an 18 km long run, K at 22 km, C at 27 km. Every profile in the
+produce still build: B peaks at a 19 km long run, K at 22 km, C at 27 km. Every profile in the
 regression suite (`planTemplates.genericLongRun.test.ts`) — not just these four — now holds inside
 its scaled cap on every loading and deload week.
 
@@ -135,8 +135,28 @@ its scaled cap on every loading and deload week.
 them.** That path is coach-authored, so nothing clamps or rewrites its numbers; instead
 `planTemplates.longRunCap.test.ts` replays the same share, spike and absolute-ceiling checks over
 its output across every level, age band and declared volume it can be reached with. The share,
-spike and absolute ceilings all hold, on every week of every one of those intakes, measured against
-the last un-reduced loading week rather than a collapsed week's own total.
+spike and absolute ceilings all hold, on every week of every one of those intakes, measured with
+`clampLongRun`'s own denominator — the last loading week when the week is a genuine deload against
+it (`isValidDeload`), otherwise the week's own volume.
+
+An earlier revision claimed that denominator had been *tightened* by taking `max(own volume, last
+loading week)`. That was wrong, and the claim is withdrawn: taking the larger of the two can only
+shrink the measured share, so it was strictly weaker. The denominator is back to what
+`clampLongRun` uses. **What no ratio-based share check can detect, whichever denominator it
+uses:** a week where the long run and the week's total collapse *together*. The golden 12 km/wk
+beginner's week-4 "deload" is a 4 km total made of four 1 km runs; 1/4 = 25.0% sits exactly on the
+beginner cap and passes. The share is fine; the absolute numbers are not. Catching that needs an
+assertion about absolute degeneracy, which this suite does not have.
+
+**Race week is built from the taper on both paths now.** `RACE_WEEK_PRE_RACE_SHARE` was first
+applied only to the generic path, on the reasoning that a 5K race day is small enough that charging
+it against the race week's budget never bites. That reasoning was wrong away from the fixture's own
+35 km baseline: a golden 12 km/wk beginner's race week rendered `1 km | 1 km | 1 km | Race Day
+10 km`, the audit's own §1.4 signature. Race-week budget arithmetic is not coaching content, so the
+golden path now uses the same share. At the 35 km fixture the two agree exactly (28 − 10 = 18 =
+28 × 18/28), so that plan is unchanged; across 480 golden intakes the eleven training weeks are
+value-for-value identical to the pre-branch engine, and the 90 intakes that used to render a 1 km
+filler race week now render none.
 
 **Progression on that path is a separate, open question, and it is Ian's.** Three beginner intakes
 never raise the long run at all across twelve weeks and never reach the volume the runner declared:
@@ -168,6 +188,20 @@ problem was an integer-rounding artifact.
 Observed effect on the generic path: profile E (general fitness, 30 km/wk, 4 days) stopped
 finishing on the same 9 km long run it started with and now closes at 11 km. The golden path is
 untouched by it, by design.
+
+**The clamp must be closed against the volume the week actually renders.** The convergence loop
+measured the long run's share against the *assembled* sum of its sessions, which
+`distributeDistance`'s 1 km-per-session floor can push above the week's target — and
+`reconcileVolumeToTarget` then trimmed the week back down to the target, so the rendered share
+climbed back over the ceiling the loop had just satisfied. A 5-day advanced 20 km/wk runner's
+week 5 settled a 7 km long run against an assembled 20 km, then rendered `ER 1 | TR 4 | ER 1 |
+INT 5 | LR 6` — a 6 km long run in a 17 km week, 35.3% against a 35.0% cap. Two changes close it:
+the loop now measures against `min(assembled, target)`, and `reconcileVolumeToTarget` removes the
+overshoot a whole kilometre at a time from the largest non-long-run session — only touching the
+long run once every other session is at its 1 km floor — so the week lands exactly on the target
+instead of undershooting it. That week now reads `ER 1 | TR 5 | ER 1 | INT 6 | LR 6`, 19 km,
+31.6%. Across the same 5,625-intake sweep, share-cap breaches go from 47,183 on the pre-branch
+engine to 0.
 
 **The cap bounds the week's longest run, not the session labelled `LR`.** Wiring `clampLongRun`
 into `buildGenericWeek` first shipped with the easy-day ceiling frozen at the *pre*-clamp long-run

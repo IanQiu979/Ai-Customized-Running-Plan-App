@@ -15,6 +15,7 @@ import { buildTemplatePlan } from '../planTemplates';
 import type { TemplatePlanParams } from '../planTemplates';
 import {
   clampLongRun,
+  isValidDeload,
   LONG_RUN_SHARE_CAP,
   LONG_RUN_SPIKE_MULTIPLE,
   longRunShareCap,
@@ -199,12 +200,20 @@ describe('golden 5K path — the coach-authored plan is verified against the cap
       for (const week of plan.weeks) {
         const longRun = findLongRun(week);
         if (longRun) {
-          // The larger of the two, never `isValidDeload`-gated. Gating on it let a *collapsed* week
-          // launder itself: a golden 12 km/wk beginner's week-4 "deload" is a 4 km total, which
-          // fails `isValidDeload`, so the denominator fell back to that same 4 km and the ratio
-          // was inside the cap by construction. R1c's intent is to measure against the week's
-          // un-reduced reference volume, so take whichever of the two is bigger.
-          const denomKm = week.isDeload ? Math.max(week.volumeKm, lastLoadingWeekKm) : week.volumeKm;
+          // Exactly `clampLongRun`'s own denominator: the last loading week only when this week
+          // is a genuine deload against it, otherwise the week's own volume.
+          //
+          // Known limit of any ratio-based check, stated so nobody reads a green run as more than
+          // it is: it cannot catch a week where the long run and the week's total collapse
+          // together. A golden 12 km/wk beginner's week-4 "deload" is a 4 km total made of four
+          // 1 km runs; 1/4 = 25.0% sits exactly on the beginner cap and passes, and no choice of
+          // denominator changes that — the share is fine, the absolute numbers are not. Measuring
+          // against the last loading week instead (max(own, lastLoading)) does not fix it either;
+          // it only lowers the ratio further. Absolute degeneracy needs its own assertion, which
+          // this suite does not yet have.
+          const useLastLoading =
+            week.isDeload && lastLoadingWeekKm > 0 && isValidDeload(lastLoadingWeekKm, week.volumeKm);
+          const denomKm = useLastLoading ? lastLoadingWeekKm : week.volumeKm;
           const share = (longRun.distanceKm ?? 0) / denomKm;
           if (share > cap + 1e-9) {
             breaches.push(`week ${week.weekNumber}: ${longRun.distanceKm} km of ${denomKm} km = ${(share * 100).toFixed(1)}%`);
@@ -278,14 +287,46 @@ describe('golden 5K path — the coach-authored plan is verified against the cap
     }).toEqual(PROGRESSION[name]);
   });
 
+  it.each(CASES)('builds %s a race week from the taper, not from the race-day budget', (_name, profile) => {
+    // Audit §1.4's signature on the coach-authored path: charging the 10 km race-day line item
+    // against a 13 km race-week budget left three days on `distributeDistance`'s 1 km floor.
+    // 90 of the 480 golden intakes rendered that; none do now.
+    const raceWeek = buildGoldenPlanFor(profile).weeks[11];
+    const preRace = raceWeek.days.filter(isWorkout).filter((day) => day.label !== 'Race Day');
+    expect(preRace.length).toBeGreaterThan(0);
+    expect(preRace.every((day) => (day.distanceKm ?? 0) <= 1)).toBe(false);
+  });
+
+  it('leaves the byte-pinned 35 km fixture race week exactly where it was', () => {
+    // The share and the old subtraction agree exactly at this baseline (28 - 10 = 18 = 28 x 18/28),
+    // which is what makes the fix safe to apply to the coach-authored path at all.
+    const plan = buildGoldenPlanAt(35);
+    const raceWeek = plan.weeks[11];
+    expect(raceWeek.volumeKm).toBe(28);
+    expect(raceWeek.days.filter(isWorkout).map((day) => day.distanceKm)).toEqual([6, 6, 6, 10]);
+  });
+
   it('names the intakes where that progression is a coaching question, not a passing grade', () => {
     // Open, and deliberately not fixed here: three beginner intakes never grow the long run at
     // all, and their biggest week never reaches the volume the runner said they already run.
-    // Ian's call — the plan those numbers come from is his, not the engine's.
-    const stalled = CASES.filter(([name]) => PROGRESSION[name].peakLongRunKm === PROGRESSION[name].firstLongRunKm)
-      .map(([name]) => name);
-    const shortOfDeclared = CASES.filter(([name, profile]) => PROGRESSION[name].peakLoadingWeekKm < profile.weeklyKm)
-      .map(([name]) => name);
+    // Ian's call — the plan those numbers come from is his, not the engine's. Derived from the
+    // generated plans, not from `PROGRESSION`, so this fails when the engine changes rather than
+    // only when someone edits the table next to it.
+    const measured = CASES.map(([name, profile]) => {
+      const plan = buildGoldenPlanFor(profile);
+      const longRuns = plan_longRuns(plan);
+      const loadingWeeks = plan.weeks.slice(0, -1).filter((week) => !week.isDeload);
+      return {
+        name,
+        declaredKm: profile.weeklyKm,
+        stalled: Math.max(...longRuns) === longRuns[0],
+        peakLoadingWeekKm: Math.max(...loadingWeeks.map((week) => week.volumeKm)),
+      };
+    });
+    const stalled = measured.filter((row) => row.stalled).map((row) => row.name);
+    const shortOfDeclared = measured
+      .filter((row) => row.peakLoadingWeekKm < row.declaredKm)
+      .map((row) => row.name);
     expect(stalled).toEqual([
       'beginner — brand new, 12 km/wk, 30 y/o',
       'beginner — brand new, 20 km/wk, 16 y/o (youth, RPE not HR)',

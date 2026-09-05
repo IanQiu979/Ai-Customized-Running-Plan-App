@@ -17,7 +17,7 @@ was written before the review rounds below and was not true while they were in f
 review rounds added assertions that failed (the golden path's beginner progression checks) until
 the spike-ceiling fix landed. As of that fix: `tsc --noEmit` clean, ESLint clean on every touched
 file, and the whole plan-engine suite — `src/lib/__tests__`, which is where all of this change
-lives — green at 26 suites / 585 tests. The repository-wide `npm test` and the `workers/` gate are
+lives — green at 26 suites / 606 tests. The repository-wide `npm test` and the `workers/` gate are
 run by the pipeline's own test step, not restated here.
 
 - **§1.2 — `buildGenericWeek` never called `clampLongRun()`.** Every 10K, half, marathon and
@@ -53,9 +53,14 @@ run by the pipeline's own test step, not restated here.
   day"). Pre-race days are now sized from `RACE_WEEK_PRE_RACE_SHARE`, a share of the taper-curve
   target read straight off the approved 12-week 5K fixture's own race week (18 of its 28 km is
   pre-race running) — no new coaching content, the race day sits on top instead of competing with
-  it for budget. The golden 5K path is untouched (still the literal subtraction, byte-identical at
-  its own baseline where the bug never bit). Verified live for a 50 km/wk, 16-week marathon and an
-  80 km/wk, 12-week half: both now show real taper distances before the race, not filler.
+  it for budget. **Both paths use it.** The golden 5K path was first left on the literal
+  subtraction, on the reasoning that a 5K race day is too small for the bug to bite there — which
+  was false away from the fixture's own 35 km baseline (a 12 km/wk beginner's golden race week
+  rendered `1 km | 1 km | 1 km | Race Day 10 km`). At 35 km the share and the subtraction agree
+  exactly, so the pinned fixture is unchanged; across 480 golden intakes the eleven training weeks
+  are value-for-value identical to `adc3aa0`, and the 90 intakes that rendered a 1 km filler race
+  week now render none. Verified live for a 50 km/wk, 16-week marathon and an 80 km/wk, 12-week
+  half: both show real taper distances before the race, not filler.
 - **Review follow-up (same day): the ladder is floored at the flat table.** The first revision of
   `longRunShareCap` was a bare `margin / runCount`, which raised the cap at low run counts as the
   ruling required but also *lowered* it at high run counts — advanced 35% → 23.3% at six runs a
@@ -71,14 +76,32 @@ run by the pipeline's own test step, not restated here.
   `planTemplates.longRunCap.test.ts` gains a sweep of that coach-authored path across every level,
   age band and declared volume it is reachable with. Nothing clamps or rewrites its numbers — the
   share, spike and absolute ceilings are simply asserted over its output, and all three hold. The
-  share denominator no longer lets a collapsed week launder itself: a deload's long run is measured
-  against the larger of that week's own volume and the last loading week, rather than falling back
-  to the collapsed total whenever `isValidDeload` happened to be false.
+  share is measured with `clampLongRun`'s own denominator — the last loading week when the week is a
+  genuine deload against it (`isValidDeload`), otherwise the week's own volume. An earlier revision
+  of this entry claimed that denominator had been *tightened* to `max(own, last loading)`; that
+  claim is withdrawn as false. Taking the larger of the two can only shrink the measured share, so
+  it was strictly weaker, and it has been reverted. **No ratio-based share check can catch a week
+  where the long run and the week's total collapse together** — the golden 12 km/wk beginner's
+  week-4 "deload" is a 4 km total of four 1 km runs, and 1/4 = 25.0% sits exactly on the beginner
+  cap whichever denominator is used. That needs an assertion about absolute degeneracy, which this
+  suite does not have.
   **Still open, and Ian's to rule on:** that path never grows the long run for three beginner
   intakes, whose biggest week also stays under the volume the runner declared (12 km/wk → 2 km long
   run in a 10 km week; 20 km/wk → 3 km / 17 km; 30 km/wk → 5 km / 27 km). Those figures are pinned
   by test so the gap is visible and any drift fails, rather than silently fixed by reshaping a plan
   that is the captain's own coaching.
+- **Review follow-up: the clamp is closed against the volume the week actually renders.** The
+  convergence loop measured the long run's share against the *assembled* sum of its sessions, which
+  `distributeDistance`'s 1 km-per-session floor can push above the week's target;
+  `reconcileVolumeToTarget` then trimmed the week back to the target and the rendered share climbed
+  back over the ceiling the loop had just satisfied. A 5-day advanced 20 km/wk runner's week 5
+  settled a 7 km long run against an assembled 20 km and rendered `ER 1 | TR 4 | ER 1 | INT 5 |
+  LR 6` — 6 km of a 17 km week, 35.3% against a 35.0% cap. The loop now measures against
+  `min(assembled, target)`, and `reconcileVolumeToTarget` removes the overshoot one whole kilometre
+  at a time from the largest non-long-run session, only reaching the long run once everything else
+  is at its 1 km floor — so the week lands exactly on target rather than undershooting it. That week
+  now reads `ER 1 | TR 5 | ER 1 | INT 6 | LR 6`, 19 km, 31.6%. Share-cap breaches across the
+  5,625-intake sweep: 47,183 on `adc3aa0` → 0.
 - **Review follow-up: the cap bounds the week's longest run, not the session labelled `LR`.**
   Wiring the clamp in first shipped with the easy-day ceiling frozen at the *pre*-clamp long-run
   candidate and reduced by a kilometre. That cured the volume spiral but left the easy days bounded
