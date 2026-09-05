@@ -610,7 +610,7 @@ const styles = StyleSheet.create({
   },
   // `pointerEvents` as a style, not a prop: the prop form is deprecated on web and warns.
   gridLayer: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     pointerEvents: 'none',
   },
   noPointer: {
