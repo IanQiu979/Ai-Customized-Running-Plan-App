@@ -50,6 +50,12 @@ export default function RootLayout() {
   // See `sessionGate.ts`'s header for the quoted mechanism.
   const [sessionSettled, setSessionSettled] = useState(false);
   useEffect(() => {
+    // The deliberate latch `sessionGate.ts` documents at length: `sessionPending` is re-raised by
+    // better-auth on every background refetch while signed out, so this has to synchronize local
+    // state with an external source (the auth client) across renders, not derive it — the case
+    // `react-hooks/set-state-in-effect` (new in this SDK's eslint-config-expo bump) is meant to
+    // catch. See `sessionGate.ts`'s header for the incident this pattern exists to prevent.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSessionSettled((settled) => hasSessionSettled(settled, sessionPending));
   }, [sessionPending]);
 

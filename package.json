@@ -58,5 +58,12 @@
     "typecheck": "npm run routes:generate && tsc --noEmit",
     "test": "jest"
   },
-  "private": true
+  "private": true,
+  "expo": {
+    "install": {
+      "exclude": [
+        "typescript"
+      ]
+    }
+  }
 }
