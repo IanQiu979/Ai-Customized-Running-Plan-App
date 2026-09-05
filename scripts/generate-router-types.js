@@ -26,16 +26,28 @@ const { readFileSync, writeFileSync } = require('node:fs');
 const tsconfigPath = 'tsconfig.json';
 const before = readFileSync(tsconfigPath);
 
-execFileSync('npx', ['expo', 'customize', 'tsconfig.json'], {
-  stdio: ['ignore', 'inherit', 'inherit'],
-});
+let commandError;
+try {
+  execFileSync('npx', ['expo', 'customize', 'tsconfig.json'], {
+    stdio: ['ignore', 'inherit', 'inherit'],
+  });
+} catch (error) {
+  commandError = error;
+} finally {
+  const after = readFileSync(tsconfigPath);
+  if (!before.equals(after)) {
+    writeFileSync(tsconfigPath, before);
 
-const after = readFileSync(tsconfigPath);
-if (!before.equals(after)) {
-  writeFileSync(tsconfigPath, before);
-  throw new Error(
-    `\`expo customize tsconfig.json\` overwrote ${tsconfigPath}. This script runs it only to ` +
-      'emit .expo/types/router.d.ts and requires tsconfig.json to be left alone. The original ' +
-      'contents have been restored; find another way to generate the router types.',
-  );
+    if (!commandError) {
+      throw new Error(
+        `\`expo customize tsconfig.json\` overwrote ${tsconfigPath}. This script runs it only to ` +
+          'emit .expo/types/router.d.ts and requires tsconfig.json to be left alone. The original ' +
+          'contents have been restored; find another way to generate the router types.',
+      );
+    }
+  }
+}
+
+if (commandError) {
+  throw commandError;
 }
