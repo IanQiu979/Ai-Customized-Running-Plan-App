@@ -24,13 +24,24 @@ suite; every test in it fails against the pre-fix code.
   3-day/50 km-week/16-week marathon plan shipped a 31 km "easy run" beside a 28 km long run. The
   convergence loop is unchanged; only the final distribution is now additionally bounded by the
   long run the clamp settled on.
-- **Race week's pre-race budget is now also bounded by the runner's own last loading week** —
-  `min(desiredVolumeKm × RACE_WEEK_PRE_RACE_SHARE, lastLoadingWeekKm × 0.6)`. That share is read
-  off the 5K fixture's race-inclusive total, so for a long race it sized the pre-race days against
-  a week that already contained a much larger race day. 0.6 is the upper end of the taper research
-  already cited in `report-source.md` (reduce volume ~41–60% while maintaining intensity), not a
-  new number. 5K and 10K race weeks are unaffected — the ratio is already the smaller of the two
-  there.
+- **Race week's pre-race budget is now bounded by the plan's own peak training week minus race
+  day** (`preRaceBudgetKm`). `RACE_WEEK_PRE_RACE_SHARE` is read off the 5K fixture's
+  race-*inclusive* total, and race day is then stacked on top of it uncounted — for a marathon the
+  47 km race day is larger than the entire scaled race-week entry, so the final week of a plan
+  labelled `taper` reported as its biggest week. Race day is a fixed cost, so it is subtracted
+  from the peak first and the tapered training component takes what is left. The floor is a 2 km
+  shakeout per pre-race day, which keeps the §1.4 fix (no 1 km filler days) intact for a
+  low-volume runner whose race alone already outweighs their peak week — there the overshoot is
+  the race itself, never budget the engine chose. 5K and 10K race weeks at realistic volumes are
+  unaffected (the ratio is already the smaller term), and the byte-pinned golden 12-week/4-day 5K
+  path keeps its own literal subtraction. Regression:
+  `planTemplates.distanceSpecific.test.ts`'s race-week-versus-peak case, verified red against the
+  pre-fix engine.
+
+  An earlier revision of this fix bounded the budget by `lastLoadingWeekKm × 0.6` instead. That
+  guard was inert — `lastLoadingWeekKm` at race week is the preceding taper week, always well
+  above the threshold at which the term could bind — so it has been removed rather than kept as
+  dead code shaped like protection.
 - **The three new weekly-load curves no longer encode their own recovery dips.**
   `TEN_K_WEEKLY_LOAD`, `HALF_WEEKLY_LOAD` and `MARATHON_WEEKLY_LOAD` had dips on a fixed 4-week
   cadence, while `buildGenericWeek` derives deload weeks independently from `deloadEveryWeeks` (3

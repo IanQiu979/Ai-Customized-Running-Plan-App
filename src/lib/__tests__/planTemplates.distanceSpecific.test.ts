@@ -322,9 +322,71 @@ describe('distance-aware ceilings and the curves that feed them', () => {
         const runs = week.days.filter(isWorkout);
         const long = runs.find((run) => run.isLongRun === true);
         if (!long) continue;
+        // Easy runs only. A quality session may legitimately exceed the long run — the captain's
+        // `longrun-share-cap-floor` ruling makes the safety cap win even when that costs the long
+        // run its "longest run of the week" status.
         for (const run of runs) {
-          if (run === long) continue;
+          if (run.isLongRun === true || run.effort !== 'easy') continue;
           expect(run.distanceKm ?? 0).toBeLessThanOrEqual(long.distanceKm ?? 0);
+        }
+      }
+    }
+  });
+
+  it("never lets race week's total — pre-race running plus race day — exceed the plan's own peak training week", () => {
+    // Race day is a fixed, unshrinkable cost stacked on top of a pre-race budget derived from a
+    // race-inclusive ratio, so for a long race the final week of a plan whose phase is `taper`
+    // used to report as its biggest week (a 3-day, 50 km/week marathon: 69 km race week against a
+    // 66 km peak).
+    //
+    // The allowance is race day plus a minimum real shakeout per pre-race day: where the race
+    // alone already outweighs the peak (a low-volume runner's own goal race), no taper can hold
+    // the week under it, and the overshoot is the race, never budget the engine chose.
+    const cases: { raceDistance: RaceDistance; durationWeeks: number }[] = [
+      { raceDistance: '5k', durationWeeks: 12 },
+      { raceDistance: '10k', durationWeeks: 14 },
+      { raceDistance: 'half', durationWeeks: 16 },
+      { raceDistance: 'marathon', durationWeeks: 16 },
+      { raceDistance: 'marathon', durationWeeks: 24 },
+    ];
+    for (const { raceDistance, durationWeeks } of cases) {
+      for (const daysPerWeek of [3, 4, 5, 6]) {
+        for (const experience of ['some', 'experienced', 'competitive'] as const) {
+          // The 12-week/4-day 5K is the byte-pinned golden fixture (`buildCanonicalFiveKWeek`),
+          // which assembles race week by the literal subtraction the captain approved. It is not
+          // the generic path this bound belongs to and must not be re-shaped to satisfy it.
+          if (raceDistance === '5k' && durationWeeks === 12 && daysPerWeek === 4) continue;
+          const plan = buildTemplatePlan({
+            intake: { ...RUNNER, daysPerWeek, experience, raceDistance },
+            goalType: 'race',
+            durationWeeks,
+            raceDistance,
+            raceDate: '2026-12-25',
+            tierAtGeneration: 'pro',
+            density: 'paid',
+          });
+          const raceWeek = plan.weeks[plan.weeks.length - 1];
+          const peakTrainingKm = Math.max(
+            ...plan.weeks.slice(0, -1).map((week) => week.volumeKm),
+          );
+          const raceDayKm = raceWeek.days
+            .filter(isWorkout)
+            .reduce((max, run) => Math.max(max, run.distanceKm ?? 0), 0);
+          const preRaceDays = Math.max(0, Math.min(7, Math.max(3, Math.round(daysPerWeek))) - 1);
+          const ceilingKm = Math.max(peakTrainingKm, raceDayKm + preRaceDays * 2);
+          expect({
+            raceDistance,
+            durationWeeks,
+            daysPerWeek,
+            experience,
+            raceWeekKm: raceWeek.volumeKm,
+          }).toEqual({
+            raceDistance,
+            durationWeeks,
+            daysPerWeek,
+            experience,
+            raceWeekKm: Math.min(raceWeek.volumeKm, ceilingKm),
+          });
         }
       }
     }

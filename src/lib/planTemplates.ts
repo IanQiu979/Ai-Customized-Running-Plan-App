@@ -138,9 +138,16 @@ const FIVE_K_LONG_RUNS = [10, 11, 12, 8, 13, 14, 15, 10, 14, 15, 12] as const;
  * the `loadRules.ts` layer, not here — see `longRunShareCap`'s and `maxSingleRunKm`'s own comments
  * for the distance-aware mechanism and its still-open, captain-pending calibration.
  *
- * Every week-type/position (ENTRY, LOAD-1/2/3, HOLD, RECOVERY, TAPER, RACE-WEEK) below follows
- * `plan-blueprint-examples.md` §§ 5, 11–14's already-resolved architecture (canonical durations
- * and recovery-week positions are in the "Resolved for the V1 library" list). The exact per-week
+ * The week-type/position architecture below (ENTRY, LOAD-1/2/3, HOLD, TAPER, RACE-WEEK) follows
+ * `plan-blueprint-examples.md` §§ 5, 11–14's already-resolved canonical durations. RECOVERY is
+ * deliberately NOT among them: these three weekly-volume curves carry no recovery dips of their
+ * own, because the generic path already derives recovery weeks independently from
+ * `deloadEveryWeeks` and sizes them with `deloadVolume`. A second, fixed-cadence dip pattern
+ * inside the curve collided with that whenever a runner's real cadence (3 weeks for advanced and
+ * for 50+, 4 otherwise) did not line up with the array's positions — the dip landed on a week
+ * that was not flagged `isDeload`, became the growth base, and throttled the rest of the plan.
+ * The LONG_RUN arrays keep their dips: there is no separate deload formula for the long run the
+ * way `deloadVolume` is one for weekly volume. The exact per-week
  * *workout content* in that same document (§§ 11–14's Q1/Q2 dose tables) is explicitly NOT
  * implemented here — that document's own status line marks it "coach-review source... not yet
  * application behavior" with Ian's review and "translation into code" both still unchecked. Only
@@ -154,21 +161,21 @@ const TEN_K_LONG_RUNS = [9, 10, 11, 8, 12, 13, 14, 10, 14, 16, 17, 12, 11] as co
 const HALF_WEEKLY_LOAD = [30, 32, 34, 36, 38, 40, 41, 43, 44, 45, 46, 47, 48, 49, 37, 27] as const;
 const HALF_LONG_RUNS = [10, 11, 12, 9, 13, 14, 15, 11, 16, 17, 18, 14, 19, 20, 15] as const;
 
-/**
- * The peak sits in a several-week-wide plateau (weeks 17–21, indices 16–20: 22/23/24/22/25)
- * rather than a single spike. `interpolateCanonical` linearly samples this array at whatever
- * position a plan's actual `durationWeeks` maps to — a race date can produce anything from a
- * handful of weeks to well over 24 — and a single-week spike is a near-miss for almost every
- * duration except the canonical one itself. A wide plateau means a compressed or stretched plan
- * still lands its final long runs inside the genuinely-marathon-specific range instead of
- * skimming past it. (An earlier revision of this file used single-week spikes for all three new
- * curves and shipped a 16-week/50 km-a-week marathon plan whose peak long run undercut even the
- * 5K curve it was replacing — caught before merge by generating and inspecting real plan output,
- * not by the unit tests alone; see `docs/change_log.md`.)
- */
 const MARATHON_WEEKLY_LOAD = [
   29, 30, 32, 33, 34, 36, 37, 38, 40, 41, 42, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 40, 32, 24,
 ] as const;
+/**
+ * `MARATHON_LONG_RUNS`' peak sits in a several-week-wide plateau (weeks 17–21, indices 16–20:
+ * 22/23/24/22/25) rather than a single spike. `interpolateCanonical` linearly samples this array
+ * at whatever position a plan's actual `durationWeeks` maps to — a race date can produce anything
+ * from a handful of weeks to well over 24 — and a single-week spike is a near-miss for almost
+ * every duration except the canonical one itself. A wide plateau means a compressed or stretched
+ * plan still lands its final long runs inside the genuinely-marathon-specific range instead of
+ * skimming past it. (An earlier revision of this file used single-week spikes for all three new
+ * long-run curves and shipped a 16-week/50 km-a-week marathon plan whose peak long run undercut
+ * even the 5K curve it was replacing — caught before merge by generating and inspecting real plan
+ * output, not by the unit tests alone; see `docs/change_log.md`.)
+ */
 const MARATHON_LONG_RUNS = [
   10, 11, 12, 9, 13, 14, 15, 11, 16, 17, 18, 14, 19, 20, 21, 16, 22, 23, 24, 22, 25, 18, 14,
 ] as const;
@@ -373,19 +380,49 @@ const RACE_DAY_PADDING_KM = 5;
  * At the golden fixture's own 35 km baseline the two agree exactly (28 - 10 = 18 = 28 × 18/28),
  * which is why `buildCanonicalFiveKWeek` is deliberately left on the subtraction: that path is
  * byte-locked to the fixture, and a 5K race day is small enough that the bug never bites there.
+ *
+ * The ratio alone is not enough for a long race, because it is read off a race-*inclusive* 5K
+ * total and the race day is then stacked on top of it uncounted: a marathon's 47 km race day is
+ * larger than the whole scaled race-week entry, so the assembled week outgrew the block it is
+ * meant to taper from. `RACE_WEEK_HEADROOM` below is the bound that actually holds that line —
+ * the pre-race training budget is additionally capped at the plan's own peak training week minus
+ * race day, so pre-race running plus race day together never exceed the peak.
  */
 const RACE_WEEK_PRE_RACE_SHARE =
   (FIVE_K_WEEKLY_LOAD[FIVE_K_WEEKLY_LOAD.length - 1] -
     (RACE_DISTANCE_KM['5k'] + RACE_DAY_PADDING_KM)) /
   FIVE_K_WEEKLY_LOAD[FIVE_K_WEEKLY_LOAD.length - 1];
 
+/** Shortest distance that still reads as a real shakeout rather than `distributeDistance` filler. */
+const MIN_PRE_RACE_RUN_KM = 2;
+
 /**
- * Upper end of the taper volume reduction the research supplies (Wang et al. meta-analysis, cited
- * in `report-source.md`: reduce volume roughly 41-60% while maintaining intensity). Used only as a
- * second, runner-relative bound on race week's pre-race running, so a long race's race week can
- * never total more than the block it is tapering from.
+ * The pre-race training budget, bounded so race week's *total* — pre-race running plus race day —
+ * cannot exceed the plan's own peak training week. Race day is a fixed cost the runner cannot
+ * shrink, so it is subtracted from the peak first and the tapered training component takes what
+ * is left, never more than the race-inclusive ratio already prescribes.
+ *
+ * `peakTrainingWeekKm` is the largest week the plan has already assembled; race week is always
+ * the plan's last week, so by the time this runs it is the true peak. It is 0 only for a
+ * one-week plan, where there is no peak to measure against and the ratio governs alone.
+ *
+ * The floor is `MIN_PRE_RACE_RUN_KM` per pre-race day: where race day alone already eats the
+ * peak — a 10 km/week runner's 5K, where the race is most of the week whatever the taper does —
+ * no budget satisfies the bound, and the honest output is a real shakeout rather than the 1 km
+ * filler the §1.4 race-week bug produced. The overshoot in that case is race day itself, never
+ * training volume the engine chose to add.
  */
-const RACE_WEEK_TAPER_VOLUME_SHARE = 0.6;
+function preRaceBudgetKm(args: {
+  desiredVolumeKm: number;
+  raceDayKm: number;
+  peakTrainingWeekKm: number;
+  easyCount: number;
+}): number {
+  const { desiredVolumeKm, raceDayKm, peakTrainingWeekKm, easyCount } = args;
+  const ratioKm = Math.round(desiredVolumeKm * RACE_WEEK_PRE_RACE_SHARE);
+  const headroomKm = peakTrainingWeekKm > 0 ? peakTrainingWeekKm - raceDayKm : ratioKm;
+  return Math.max(easyCount * MIN_PRE_RACE_RUN_KM, Math.min(ratioKm, headroomKm));
+}
 
 function raceDayWorkout(distance: RaceDistance): Workout {
   const raceKm = RACE_DISTANCE_KM[distance];
@@ -717,7 +754,13 @@ function distributeDistance(totalKm: number, count: number, capKm: number): numb
 }
 
 /**
- * Per-easy-run ceiling on the generic path: one kilometre under the long run.
+ * Per-easy-run ceiling on the generic path, sized one kilometre under the long-run candidate.
+ *
+ * It is a volume-shaping bound, not a "the long run must be strictly longest" rule — the captain
+ * ruled against any such rule: every run is capped at the same ceiling and the week's volume is
+ * distributed beneath it, ties allowed. The final distribution below the convergence loop is
+ * bounded by the settled long run itself (not by this function of it) for exactly that reason, so
+ * an easy run equal to the long run is correct output, not a defect.
  *
  * Originally chosen to keep the long run the week's strictly-longest run; the captain's ruling on
  * `longrun-share-cap-floor` (2026-09-05) means that's no longer guaranteed — the safety cap can
@@ -1051,6 +1094,7 @@ function buildGenericWeek(args: {
   level: ExperienceLevel;
   previousLongestKm: number;
   lastLoadingWeekKm: number;
+  peakTrainingWeekKm: number;
   injuryReductionPct: number;
   redFlagReductionPct: number;
 }): Week {
@@ -1071,6 +1115,7 @@ function buildGenericWeek(args: {
     level,
     previousLongestKm,
     lastLoadingWeekKm,
+    peakTrainingWeekKm,
     injuryReductionPct,
     redFlagReductionPct,
   } = args;
@@ -1129,19 +1174,15 @@ function buildGenericWeek(args: {
     const requestedRuns = normalizedRunCount(intake.daysPerWeek);
     const easyCount = Math.max(0, requestedRuns - 1);
     // Not `desiredVolumeKm - race.distanceKm`: the race is not a training session competing for
-    // the week's budget, it is the thing the week tapers into. See `RACE_WEEK_PRE_RACE_SHARE`.
-    // The ratio alone is race-distance-agnostic and race-inclusive, so for a long race (marathon,
-    // half) it sizes the pre-race days off a total that already contains a race day far larger
-    // than the 5K it was read from — race week then totals more than the peak training week it is
-    // supposed to taper from. The second bound is the runner's own recent training: the upper end
-    // of the taper research's 41-60% volume reduction (`report-source.md`), which for 5K/10K sits
-    // above the ratio and so leaves their existing behavior untouched.
-    const ratioBudgetKm = Math.round(desiredVolumeKm * RACE_WEEK_PRE_RACE_SHARE);
-    const taperBudgetKm =
-      lastLoadingWeekKm > 0
-        ? Math.min(ratioBudgetKm, Math.round(lastLoadingWeekKm * RACE_WEEK_TAPER_VOLUME_SHARE))
-        : ratioBudgetKm;
-    const easyBudgetKm = Math.max(easyCount, taperBudgetKm);
+    // the week's budget, it is the thing the week tapers into. See `RACE_WEEK_PRE_RACE_SHARE`
+    // for the ratio and `preRaceBudgetKm` for the peak-relative bound that keeps race week's
+    // total from outgrowing the block it tapers from.
+    const easyBudgetKm = preRaceBudgetKm({
+      desiredVolumeKm,
+      raceDayKm: race.distanceKm ?? 0,
+      peakTrainingWeekKm,
+      easyCount,
+    });
     const easyDistances = distributeDistance(easyBudgetKm, easyCount, maxSingleRunKm);
     const easyWorkouts = easyDistances.map((distanceKm, index) =>
       index === easyDistances.length - 1
@@ -1355,6 +1396,7 @@ export function buildTemplatePlan(params: TemplatePlanParams): Plan {
     normalizedRunCount(params.intake.daysPerWeek) === 4;
   let lastLoadingWeekKm = 0;
   let previousLongestKm = 0;
+  let peakTrainingWeekKm = 0;
   const weeks = phases.map((phase, index) => {
     const week = useGoldenFiveKShape
       ? buildCanonicalFiveKWeek({
@@ -1392,10 +1434,12 @@ export function buildTemplatePlan(params: TemplatePlanParams): Plan {
           level,
           previousLongestKm,
           lastLoadingWeekKm,
+          peakTrainingWeekKm,
           injuryReductionPct,
           redFlagReductionPct,
         });
     if (!week.isDeload) lastLoadingWeekKm = week.volumeKm;
+    peakTrainingWeekKm = Math.max(peakTrainingWeekKm, week.volumeKm);
     previousLongestKm = Math.max(
       previousLongestKm,
       week.days
