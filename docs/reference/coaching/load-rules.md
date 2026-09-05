@@ -134,13 +134,18 @@ its scaled cap on every loading and deload week.
 **The golden 12-week / 4-day / 5K plan is not exempt from these caps, it is verified against
 them.** That path is coach-authored, so nothing clamps or rewrites its numbers; instead
 `planTemplates.longRunCap.test.ts` replays the same share, spike and absolute-ceiling checks over
-its output across every level, age band and declared volume it can be reached with, plus two
-progression checks — that the long run grows over the plan, and that the biggest loading week
-reaches at least the volume the runner already runs. All of them hold, and the suite is green.
+its output across every level, age band and declared volume it can be reached with. The share,
+spike and absolute ceilings all hold, on every week of every one of those intakes, measured against
+the last un-reduced loading week rather than a collapsed week's own total.
 
-They did not, at first: three beginner intakes fell short (12 km/wk peaked at a 10 km week, 20 km/wk
-at 17 km, 30 km/wk at 27 km) with the long run frozen at its week-1 value for the whole plan. The
-cause was not coaching content but the spike ceiling's rounding — see the entry below.
+**Progression on that path is a separate, open question, and it is Ian's.** Three beginner intakes
+never raise the long run at all across twelve weeks and never reach the volume the runner declared:
+12 km/wk peaks at a 2 km long run in a 10 km week, 20 km/wk at 3 km in a 17 km week, 30 km/wk at
+5 km in a 27 km week (the 27 km/wk intermediate intake also holds a flat 8 km long run, though its
+weekly volume does reach 30 km). The engine's own generic path no longer does this — see the
+spike-ceiling entry below — but applying the same reading to the coach-authored path would move
+Ian's numbers, so it has not been done. `planTemplates.longRunCap.test.ts` pins those figures
+exactly instead, so the gap is visible and any drift in it fails a test.
 
 **Ian's ruling, 2026-09-05 (follow-up) — the spike ceiling limits the rate of growth, it never
 forbids growth.** `clampLongRun`'s spike ceiling was the raw `previousLongestKm x 1.10`, while the
@@ -150,17 +155,35 @@ forbade *all* increase instead of limiting its rate, and the long run froze at i
 the rest of the plan. That reached every beginner plan and every low-volume intermediate one, i.e.
 exactly the runners this audit was about. The ceiling is now rounded up
 (`Math.ceil(previousLongestKm x LONG_RUN_SPIKE_MULTIPLE)`); the distance rendered to the runner is
-still floored. Nothing else moves: the share, absolute and time ceilings are applied as a minimum
-alongside it, so the loosened spike ceiling can only ever permit growth one of them already allows.
+still floored. **The change is scoped to `buildGenericWeek`** (`clampLongRun`'s
+`roundSpikeCeilingUp` argument): the coach-authored golden path omits it and keeps the raw
+fractional ceiling it has always had, so every value it generates is identical to what it generated
+before this branch. Nothing else moves either: the share, absolute and time ceilings are applied as
+a minimum alongside the spike ceiling, so the loosened one can only ever permit growth one of them
+already allows.
 Explicitly declined in the same ruling: adding a minimum absolute growth step as a second,
 independent floor — that would set up a rival growth authority against the spike cap, where the real
 problem was an integer-rounding artifact.
 
-Observed effect on the golden path's beginner intakes (peak long run, peak loading week, against the
-runner's declared volume): 12 km/wk went 2 km / 10 km → 3 km / 12 km; 20 km/wk went 3 km / 17 km →
-5 km / 21 km; 30 km/wk went 5 km / 27 km → 7 km / 30 km. On the generic path, profile J (5K,
-15 km/wk, 3 days) and profile E (general fitness, 30 km/wk, 4 days) both stopped finishing on the
-same long run they started with.
+Observed effect on the generic path: profile E (general fitness, 30 km/wk, 4 days) stopped
+finishing on the same 9 km long run it started with and now closes at 11 km. The golden path is
+untouched by it, by design.
+
+**The cap bounds the week's longest run, not the session labelled `LR`.** Wiring `clampLongRun`
+into `buildGenericWeek` first shipped with the easy-day ceiling frozen at the *pre*-clamp long-run
+candidate and reduced by a kilometre. That cured an earlier volume spiral, but it left the easy days
+bounded by a long run that never shipped, so they could come out longer than the one that did — a
+3-day beginner at 15 km/wk drew a 5 km easy day against a 4 km long run, 41.7% of a 12 km week
+against a 36.7% cap. Across a 5,625-intake sweep, 1,648 plan-weeks had an easy day longer than that
+week's long run; the same sweep on the pre-branch engine had none.
+
+Every run in a generic week is now bounded by that week's actual, post-clamp long run — no
+subtracted kilometre, ties allowed. The ladder's own reachability property (`cap x runCount > 1`) is
+what lets `runCount` runs at that shared ceiling still cover the week's target, so no separate
+volume-preservation ceiling is needed and the spiral does not return. The sweep now reports zero
+such weeks. The trade is real and visible on weeks that were previously over-filled by an
+oversized easy day: they lose a few kilometres (mean 3.9 km across the 1,648 affected weeks), and on
+heavily-clamped weeks several runs legitimately read the same distance.
 
 ### Deload trigger
 

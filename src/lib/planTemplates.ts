@@ -555,23 +555,28 @@ function distributeDistance(totalKm: number, count: number, capKm: number): numb
 }
 
 /**
- * Per-easy-run ceiling on the generic path: one kilometre under the long run.
+ * Per-easy-run ceiling on the generic path: the week's own safety-clamped long run, exactly.
  *
- * Originally chosen to keep the long run the week's strictly-longest run; the captain's ruling on
- * `longrun-share-cap-floor` (2026-09-05) means that's no longer guaranteed — the safety cap can
- * now put the long run below a quality session. The ceiling stays anyway, for the reason it was
- * really added: volume preservation. The canonical 5K path keeps its own literal
- * `longDistanceKm * 0.8` and is not routed through here — that plan is coach-authored and
- * byte-pinned, so nothing here reshapes it; it is verified against the same caps instead, by
- * `planTemplates.longRunCap.test.ts`. The generic path needs the looser ceiling because it is the
- * path where the long run is clamped: 0.8 caps a week's absorbable volume at `1.8 x longRun + quality`, so once
- * `clampLongRun` shortens the long run the week can no longer reach its target at all, and the
- * shortfall is then re-read by `clampWeeklyVolume` as the next week's growth base. Letting the
- * easy days take the kilometres the long run gave up keeps the week whole and the runner's
- * declared volume intact.
+ * The share cap bounds the week's longest run as a quantity, not the session that happens to carry
+ * the `LR` label, so an easy day may not outgrow the clamped long run either. Two earlier shapes
+ * were both wrong. `longDistanceKm * 0.8` (still the canonical path's own literal) caps a week's
+ * absorbable volume at `1.8 x longRun + quality`, so once `clampLongRun` shortens the long run the
+ * week can no longer reach its target and the shortfall becomes the next week's growth base —
+ * the observed spiral. Fixing that by freezing a `longDistanceKm - 1` ceiling at the *pre*-clamp
+ * candidate cured the spiral but left the easy days bounded by a long run that no longer existed,
+ * so they could ship longer than the one that did.
+ *
+ * A ceiling equal to the final long run needs neither workaround. Ties are allowed — nothing
+ * requires an easy day to be strictly shorter — and the run-count ladder's own reachability
+ * property (`cap x runCount > 1`) is what guarantees `runCount` runs at this ceiling can still
+ * cover the week's target, so the clamp cannot chase itself downward.
+ *
+ * The canonical 5K path is not routed through here: that plan is coach-authored and byte-pinned,
+ * so nothing here reshapes it; it is verified against the same caps instead, by
+ * `planTemplates.longRunCap.test.ts`.
  */
 function easyRunCapKm(longDistanceKm: number): number {
-  return Math.max(1, longDistanceKm - 1);
+  return Math.max(1, longDistanceKm);
 }
 
 function normalizedRunCount(daysPerWeek: number): number {
@@ -1056,20 +1061,16 @@ function buildGenericWeek(args: {
   // "skip the clamp" guard.
   const shareCap = longRunShareCap(level, requestedRuns);
   let longDistanceKm = Math.min(maxSingleRunKm, longRunFromCurve, longRunVolumeBudget);
-  // Fixed at the pre-clamp candidate, not recomputed each iteration off the shrinking
-  // `longDistanceKm`: otherwise a low-volume/low-day week where the safety cap needs several
-  // iterations to bind (e.g. a 4-day beginner week) ratchets down twice over — the long run
-  // shrinks for safety, then the easy days' own ceiling shrinks with it, so the week can no
-  // longer absorb the volume the long run gave up, `clampWeeklyVolume` reads the shortfall as the
-  // next week's growth base, and the plan spirals (a 20 km/wk beginner 10K plan was observed
-  // collapsing to two consecutive 6 km weeks). The ceiling only needs to be *a* reasonable bound,
-  // not one that tracks the final long run — see `easyRunCapKm`'s own comment.
-  const easyCeilingKm = easyRunCapKm(longDistanceKm);
+  // Tracks `longDistanceKm` on purpose: the easy ceiling *is* the long run, so the week the loop
+  // measures is the week it will render. That is only safe because the ceiling no longer subtracts
+  // a kilometre — `runCount` runs at the ceiling always clear the target, per the ladder's
+  // reachability property — see `easyRunCapKm`'s own comment for the two earlier shapes and why
+  // each failed.
   for (let i = 0; i < 100; i += 1) {
     const easyTotalKm = distributeDistance(
       desiredVolumeKm - longDistanceKm - qualityKm,
       easyCount,
-      easyCeilingKm,
+      easyRunCapKm(longDistanceKm),
     ).reduce((sum, distanceKm) => sum + distanceKm, 0);
     const assembledVolumeKm = longDistanceKm + qualityKm + easyTotalKm;
     const { km } = clampLongRun({
@@ -1081,6 +1082,7 @@ function buildGenericWeek(args: {
       isDeload,
       lastLoadingWeekKm,
       shareCapOverride: shareCap,
+      roundSpikeCeilingUp: true,
     });
     // Floored so a fractional ceiling never leaks into the rendered plan, and floored no lower
     // than 1 km — a real session, matching every other minimum in this file (`distributeDistance`,
@@ -1095,7 +1097,7 @@ function buildGenericWeek(args: {
   const easyDistances = distributeDistance(
     desiredVolumeKm - longDistanceKm - qualityKm,
     easyCount,
-    easyCeilingKm,
+    easyRunCapKm(longDistanceKm),
   );
   const easyWorkouts = easyDistances.map((distanceKm) =>
     easyRun({

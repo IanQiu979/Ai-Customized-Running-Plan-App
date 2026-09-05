@@ -141,6 +141,7 @@ describe('generic path — every long-run ceiling is enforced (audit §1.2)', ()
             isDeload: week.isDeload,
             lastLoadingWeekKm,
             shareCapOverride: shareCap,
+            roundSpikeCeilingUp: true,
           });
           expect(Math.floor(km)).toBeGreaterThanOrEqual(longRun.distanceKm ?? 0);
           previousLongestKm = Math.max(previousLongestKm, longRun.distanceKm ?? 0);
@@ -299,12 +300,15 @@ describe('generic path — the long run must still be able to grow', () => {
   // rather than limiting its rate: the long run froze at its week-1 value for the rest of the plan
   // while weekly volume kept climbing. The ceiling is rounded up now; the rendered distance is
   // still floored, and every other ceiling (share, absolute, time) binds exactly as before.
-  function longRunSeries(profile: Profile): { weekNumber: number; volumeKm: number; longRunKm: number }[] {
+  function longRunSeries(
+    profile: Profile,
+  ): { weekNumber: number; volumeKm: number; longRunKm: number; isDeload: boolean }[] {
     return buildFor(profile)
       .weeks.map((week) => ({
         weekNumber: week.weekNumber,
         volumeKm: week.volumeKm,
         longRunKm: findLongRun(week)?.distanceKm ?? 0,
+        isDeload: week.isDeload,
       }))
       .filter((point) => point.longRunKm > 0);
   }
@@ -315,36 +319,117 @@ describe('generic path — the long run must still be able to grow', () => {
     expect(rises.length).toBeGreaterThan(0);
   });
 
-  it('finishes profile J (5K, 15 km/wk, 3 days) on a longer long run than it started with', () => {
-    // Frozen before the fix: 3 km in week 1 and 3 km in the last training week, six weeks apart.
+  it('pins profile F to the trajectory the share cap actually allows it', () => {
+    // F does not end higher than it started, and that is correct rather than frozen: a beginner
+    // running 20 km across 4 days is share-capped at 0.275, so its long run tracks the week's
+    // volume curve (19, 21, 15, 9d, 17, 19, 21) and cannot exceed ~5 km anywhere in the plan.
+    // Pinned so a change that breaks this correct behaviour still fails something.
+    const series = longRunSeries(PROFILES.find((p) => p.name.startsWith('F'))!);
+    expect(series.map((point) => point.longRunKm)).toEqual([5, 5, 4, 4, 4, 5, 5]);
+  });
+
+  it('pins profile J to the trajectory the share cap actually allows it', () => {
+    // Same shape as F: a 3-day beginner at 15 km/wk sits on the 0.3667 cap at a flat 11 km week,
+    // so a flat 4 km long run is the cap holding it, not the spike ceiling freezing it.
     const series = longRunSeries(PROFILES.find((p) => p.name.startsWith('J'))!);
-    expect(series[series.length - 1].longRunKm).toBeGreaterThan(series[0].longRunKm);
+    expect(series.map((point) => point.longRunKm)).toEqual([4, 4, 4, 4, 4]);
+    const cap = longRunShareCap('beginner', 3);
+    for (const point of series.filter((p) => !p.isDeload)) {
+      expect(point.longRunKm).toBe(Math.floor(cap * point.volumeKm));
+    }
   });
 
   it('finishes profile E (general fitness, 30 km/wk, 4 days) on a longer long run than it started with', () => {
+    // The regression witness for the whole-kilometre spike ceiling: with the raw fractional
+    // ceiling E closes on the same 9 km long run it opened with, twelve weeks later.
     const series = longRunSeries(PROFILES.find((p) => p.name.startsWith('E'))!);
     expect(series[series.length - 1].longRunKm).toBeGreaterThan(series[0].longRunKm);
   });
 
+  /**
+   * Window of three weeks, i.e. two consecutive volume rises. A four-week window (three rises) was
+   * vacuous for four of the ten profiles — deloads and the post-deload dip break every window —
+   * so it could not have failed on them however frozen the long run got. `RISING_WINDOW_PROFILES`
+   * is asserted below rather than assumed, so this can never quietly go vacuous again; A and J are
+   * genuinely outside it (their volume never rises twice running) and are covered instead by the
+   * cap-bound trajectory pins above.
+   */
+  const RISING_WINDOW_PROFILES = ['B', 'C', 'E', 'F', 'G', 'H', 'I', 'K'];
+
+  function risingWindows(series: ReturnType<typeof longRunSeries>) {
+    const windows: (typeof series)[] = [];
+    for (let i = 0; i + 2 < series.length; i += 1) {
+      const window = series.slice(i, i + 3);
+      if (window.every((point, index) => index === 0 || point.volumeKm > window[index - 1].volumeKm)) {
+        windows.push(window);
+      }
+    }
+    return windows;
+  }
+
+  it('keeps the anti-freeze check non-vacuous on exactly the profiles it claims to cover', () => {
+    const covered = PROFILES.filter((profile) => risingWindows(longRunSeries(profile)).length > 0).map(
+      (profile) => profile.name[0],
+    );
+    expect(covered).toEqual(RISING_WINDOW_PROFILES);
+  });
+
   it.each(PROFILES.map((profile) => [profile.name, profile] as const))(
-    'never holds %s long run flat across three consecutive weeks of rising volume',
+    'never holds %s long run flat across two consecutive weeks of rising volume',
     (_name, profile) => {
       const series = longRunSeries(profile);
       const stalls: string[] = [];
-      for (let i = 0; i + 3 < series.length; i += 1) {
-        const window = series.slice(i, i + 4);
-        const volumeRises = window.every((point, index) => index === 0 || point.volumeKm > window[index - 1].volumeKm);
-        const longRunFlat = window.every((point) => point.longRunKm === window[0].longRunKm);
-        if (volumeRises && longRunFlat) {
+      for (const window of risingWindows(series)) {
+        if (window.every((point) => point.longRunKm === window[0].longRunKm)) {
           stalls.push(
-            `weeks ${window[0].weekNumber}-${window[3].weekNumber}: long run stuck at ${window[0].longRunKm} km ` +
-              `while volume rose ${window.map((point) => point.volumeKm).join(' -> ')} km`,
+            `weeks ${window[0].weekNumber}-${window[window.length - 1].weekNumber}: long run stuck at ` +
+              `${window[0].longRunKm} km while volume rose ${window.map((point) => point.volumeKm).join(' -> ')} km`,
           );
         }
       }
       expect(stalls).toEqual([]);
     },
   );
+});
+
+describe('generic path — no run outgrows the week\'s safety-clamped long run', () => {
+  // The share cap bounds the week's longest *run*, not the session carrying the `LR` label. An
+  // earlier revision froze the easy-run ceiling at the pre-clamp long-run candidate and reused it
+  // for the final distribution, so the easy days stayed bounded by a long run that never shipped:
+  // a 3-day beginner at 15 km/wk drew `ER 5 | TR 3 | LR 4` — a 5 km easy day at 41.7% of a 12 km
+  // week, over its 36.7% cap, and the week's longest run by a kilometre.
+  it.each(PROFILES.map((profile) => [profile.name, profile] as const))(
+    'keeps every easy run of %s at or under that week\'s long run',
+    (_name, profile) => {
+      const plan = buildFor(profile);
+      const breaches: string[] = [];
+      for (const week of plan.weeks) {
+        const longRun = findLongRun(week);
+        if (!longRun) continue;
+        for (const day of week.days.filter(isWorkout)) {
+          if (day === longRun || !(day.label ?? '').startsWith('ER')) continue;
+          if ((day.distanceKm ?? 0) > (longRun.distanceKm ?? 0)) {
+            breaches.push(
+              `week ${week.weekNumber}: ${day.label} ${day.distanceKm} km against a ${longRun.distanceKm} km long run`,
+            );
+          }
+        }
+      }
+      expect(breaches).toEqual([]);
+    },
+  );
+
+  it('holds the 3-day beginner week the ceiling was frozen on inside its cap', () => {
+    const profileJ = PROFILES.find((p) => p.name.startsWith('J'))!;
+    const plan = buildFor(profileJ);
+    const cap = longRunShareCap('beginner', 3);
+    for (const week of plan.weeks) {
+      const runs = week.days.filter(isWorkout).filter((day) => (day.label ?? '').startsWith('ER'));
+      for (const run of runs) {
+        expect((run.distanceKm ?? 0) / week.volumeKm).toBeLessThanOrEqual(cap + 1e-9);
+      }
+    }
+  });
 });
 
 describe('generic path — race week is a taper, not budget math around the race (audit §1.4)', () => {

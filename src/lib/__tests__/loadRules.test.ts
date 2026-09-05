@@ -241,6 +241,17 @@ describe('long run', () => {
   });
 
   describe('the spike ceiling limits the rate of growth, it never forbids growth outright', () => {
+    it('keeps the raw fractional ceiling by default, so the coach-authored path is untouched', () => {
+      const { km, limitedBy } = clampLongRun({
+        proposedKm: 6,
+        weeklyKm: 100,
+        level: 'intermediate',
+        previousLongestKm: 5,
+      });
+      expect(km).toBeCloseTo(5.5);
+      expect(limitedBy).toBe('spike');
+    });
+
     // The rule is "no more than 10% over the plan's previous longest". Below 10 km a *fractional*
     // ceiling made that rule forbid every increase instead of limiting it: the engine renders whole
     // kilometres, so a previous longest of 5 km gave a 5.5 km ceiling, floored back to 5 km, and
@@ -252,6 +263,7 @@ describe('long run', () => {
         weeklyKm: 100,
         level: 'intermediate',
         previousLongestKm: 5,
+        roundSpikeCeilingUp: true,
       });
       expect(km).toBe(6);
       expect(limitedBy).toBe('none');
@@ -263,6 +275,7 @@ describe('long run', () => {
         weeklyKm: 100,
         level: 'intermediate',
         previousLongestKm: 5,
+        roundSpikeCeilingUp: true,
       });
       expect(km).toBe(6);
       expect(limitedBy).toBe('spike');
@@ -275,6 +288,7 @@ describe('long run', () => {
         weeklyKm: 20,
         level: 'beginner',
         previousLongestKm: 5,
+        roundSpikeCeilingUp: true,
       });
       expect(km).toBe(5);
       expect(limitedBy).toBe('weekly-share');
@@ -286,6 +300,7 @@ describe('long run', () => {
         weeklyKm: 200,
         level: 'beginner',
         previousLongestKm: 14,
+        roundSpikeCeilingUp: true,
       });
       expect(km).toBe(MAX_SINGLE_RUN_KM.beginner);
       expect(limitedBy).toBe('absolute');
@@ -330,6 +345,7 @@ describe('long run', () => {
       proposedKm: 20,
       weeklyKm: 80, // share cap 25.6 km (0.32), so the spike cap must bind first
       previousLongestKm: 12,
+      roundSpikeCeilingUp: true,
     });
     // 12 x 1.10 = 13.2 km; the engine renders whole kilometres, so the ceiling is the next one up.
     expect(km).toBe(14);
@@ -459,6 +475,7 @@ describe('long run — deload weekly-share ceiling measured against the last loa
       previousLongestKm: 6, // spike cap: ceil(6 * 1.10) = 7, tighter than the proposed 8
       isDeload: true,
       lastLoadingWeekKm: 38,
+      roundSpikeCeilingUp: true,
     });
     expect(km).toBe(7);
     expect(limitedBy).toBe('spike');

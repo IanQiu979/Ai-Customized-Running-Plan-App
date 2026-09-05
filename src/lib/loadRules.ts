@@ -340,6 +340,17 @@ export interface LongRunClamp {
  * Trust boundary: `lastLoadingWeekKm` must be derived by the caller from the plan's own
  * preceding weeks (deterministic engine state) — never taken from model output.
  */
+/**
+ * The 10% rule limits the *rate* of increase. The engine renders whole kilometres, so a raw
+ * fractional ceiling below 10 km rounds straight back to the previous longest and forbids all
+ * growth instead of limiting it — a 5 km long run gets a 5.5 km ceiling that floors to 5 km again.
+ * `roundUp` is how a caller opts into the whole-kilometre reading of the same rule.
+ */
+export function spikeCeilingKm(previousLongestKm: number, roundUp: boolean): number {
+  const raw = previousLongestKm * LONG_RUN_SPIKE_MULTIPLE;
+  return roundUp ? Math.ceil(raw) : raw;
+}
+
 export function clampLongRun(args: {
   proposedKm: number;
   weeklyKm: number;
@@ -354,6 +365,12 @@ export function clampLongRun(args: {
    * this function's own tests) omits it and gets the flat, byte-pinned table.
    */
   shareCapOverride?: number;
+  /**
+   * Rounds the spike ceiling up to a whole kilometre. `buildGenericWeek` passes `true`; the
+   * coach-authored golden-fixture path omits it and keeps the raw fractional ceiling it has always
+   * used, so none of its numbers move.
+   */
+  roundSpikeCeilingUp?: boolean;
 }): LongRunClamp {
   const {
     proposedKm,
@@ -364,6 +381,7 @@ export function clampLongRun(args: {
     isDeload,
     lastLoadingWeekKm,
     shareCapOverride,
+    roundSpikeCeilingUp,
   } = args;
 
   const shareDenominatorKm =
@@ -380,7 +398,7 @@ export function clampLongRun(args: {
     [shareDenominatorKm * shareCap, 'weekly-share'],
     [MAX_SINGLE_RUN_KM[level], 'absolute'],
     ...(previousLongestKm > 0
-      ? ([[Math.ceil(previousLongestKm * LONG_RUN_SPIKE_MULTIPLE), 'spike']] as const)
+      ? ([[spikeCeilingKm(previousLongestKm, roundSpikeCeilingUp === true), 'spike']] as const)
       : []),
     ...(easyPaceSecPerKm && easyPaceSecPerKm > 0
       ? ([[(LONG_RUN_MAX_MINUTES * 60) / easyPaceSecPerKm, 'time']] as const)

@@ -17,7 +17,7 @@ was written before the review rounds below and was not true while they were in f
 review rounds added assertions that failed (the golden path's beginner progression checks) until
 the spike-ceiling fix landed. As of that fix: `tsc --noEmit` clean, ESLint clean on every touched
 file, and the whole plan-engine suite — `src/lib/__tests__`, which is where all of this change
-lives — green at 26 suites / 578 tests. The repository-wide `npm test` and the `workers/` gate are
+lives — green at 26 suites / 585 tests. The repository-wide `npm test` and the `workers/` gate are
 run by the pipeline's own test step, not restated here.
 
 - **§1.2 — `buildGenericWeek` never called `clampLongRun()`.** Every 10K, half, marathon and
@@ -70,10 +70,27 @@ run by the pipeline's own test step, not restated here.
 - **Review follow-up: the golden 5K path is verified against the caps, not silently exempt.**
   `planTemplates.longRunCap.test.ts` gains a sweep of that coach-authored path across every level,
   age band and declared volume it is reachable with. Nothing clamps or rewrites its numbers — the
-  share, spike and absolute ceilings are simply asserted over its output, alongside two progression
-  checks (the long run grows over the plan; the peak loading week reaches the volume the runner
-  already runs). Three beginner intakes failed the progression checks when the sweep was first
-  added; the cause was the spike-ceiling rounding bug in the next bullet, and all of them pass now.
+  share, spike and absolute ceilings are simply asserted over its output, and all three hold. The
+  share denominator no longer lets a collapsed week launder itself: a deload's long run is measured
+  against the larger of that week's own volume and the last loading week, rather than falling back
+  to the collapsed total whenever `isValidDeload` happened to be false.
+  **Still open, and Ian's to rule on:** that path never grows the long run for three beginner
+  intakes, whose biggest week also stays under the volume the runner declared (12 km/wk → 2 km long
+  run in a 10 km week; 20 km/wk → 3 km / 17 km; 30 km/wk → 5 km / 27 km). Those figures are pinned
+  by test so the gap is visible and any drift fails, rather than silently fixed by reshaping a plan
+  that is the captain's own coaching.
+- **Review follow-up: the cap bounds the week's longest run, not the session labelled `LR`.**
+  Wiring the clamp in first shipped with the easy-day ceiling frozen at the *pre*-clamp long-run
+  candidate and reduced by a kilometre. That cured the volume spiral but left the easy days bounded
+  by a long run that never shipped, so they could come out longer than the one that did — a 3-day
+  beginner at 15 km/wk drew `ER 5 | TR 3 | LR 4`, a 5 km easy day at 41.7% of a 12 km week against
+  a 36.7% cap. A 5,625-intake sweep found 1,648 such plan-weeks on the branch and none on the
+  pre-branch engine. Every run in a generic week is now bounded by that week's actual post-clamp
+  long run — no subtracted kilometre, ties allowed — and the sweep now reports zero. The ladder's
+  reachability property (`cap × runCount > 1`) is what keeps the week fillable at that shared
+  ceiling, so the spiral does not return. Weeks previously over-filled by an oversized easy day do
+  lose volume (mean 3.9 km over the 1,648 affected weeks), and on heavily-clamped weeks several
+  runs now legitimately read the same distance.
 - **Review follow-up: the spike ceiling was forbidding growth instead of limiting its rate.**
   `clampLongRun`'s spike ceiling was the raw `previousLongestKm × 1.10` while the engine renders
   whole kilometres, so below 10 km the floored ceiling equalled the previous longest (5 km → a
@@ -81,12 +98,14 @@ run by the pipeline's own test step, not restated here.
   reaching every beginner plan and every low-volume intermediate one. Now
   `Math.ceil(previousLongestKm × LONG_RUN_SPIKE_MULTIPLE)`; the rendered distance is still floored,
   and the share, absolute and time ceilings still apply as a minimum alongside it, so nothing can
-  grow past a ceiling that another rule already imposes. Golden-path beginners, peak long run /
-  peak loading week vs declared volume: 12 km/wk 2/10 → 3/12, 20 km/wk 3/17 → 5/21, 30 km/wk
-  5/27 → 7/30. Covered by unit tests on `clampLongRun` (including two that pin the share and
-  absolute ceilings still binding over the loosened spike ceiling) and by plan-level tests on
-  profiles J and E, which used to finish on the same long run they started with. See
-  `docs/reference/coaching/load-rules.md`.
+  grow past a ceiling that another rule already imposes. **Scoped to the generic path** via
+  `clampLongRun`'s `roundSpikeCeilingUp` argument — the coach-authored golden path omits it and
+  keeps its original raw ceiling, verified value-for-value identical to `adc3aa0` across 480
+  intakes (5 experience levels × 6 ages × 16 declared volumes): every distance, zone, RPE,
+  structure, duration, phase, deload flag and weekly volume matches. Covered by unit tests on
+  `clampLongRun` (including two that pin the share and absolute ceilings still binding over the
+  loosened spike ceiling) and by a plan-level test on profile E, which used to finish on the same
+  9 km long run it started with. See `docs/reference/coaching/load-rules.md`.
 - New regression suite: `src/lib/__tests__/planTemplates.genericLongRun.test.ts` (64 tests) —
   every audit runner profile, replayed through `clampLongRun` and checked against the scaled share
   cap, the spike cap, the absolute cap, and the race-week reconstruction, plus two tests pinned to
