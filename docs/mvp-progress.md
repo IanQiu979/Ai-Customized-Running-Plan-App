@@ -529,8 +529,11 @@ from 82. Issue #22 remains open.)
       the non-obvious fixes (removed `regenerateDeclarations`, `absoluteFillObject` →
       `absoluteFill`, React Compiler-readiness lint false positives, `@better-auth/expo`'s web
       storage stub, the `typescript` pin defended via `expo.install.exclude`): `docs/change_log.md`,
-      2026-09-05. **Not proven by this work:** no Reanimated-driven animation (the onboarding pulse
-      trace included) has been visually checked since the version jump — see "Known debt" below.
+      2026-09-05. **Verified beyond the suite:** launched in real Expo Go 57.0.9 (self-reporting
+      SDK 57.0.0) on an iOS Simulator — reaches the signed-out landing screen with the pulse-trace
+      hero rendering correctly, zero Metro errors. **Still not exercised:** the sign-in submission
+      tap-through (no touch automation installed, and no `wrangler dev` running) — see "Known debt"
+      below.
 - [x] **Cloudflare account resources created.** `wrangler login`, `wrangler d1 create`,
       `wrangler deploy`, and the `BETTER_AUTH_SECRET` / Google OAuth `wrangler secret put`s have all
       run; `ANTHROPIC_API_KEY` has not. "Blocked / awaiting a decision" below is the row-by-row
@@ -1166,14 +1169,34 @@ intact underneath.
 
 ### Standing
 
-- 🟡 **No Reanimated-driven animation has been visually verified since the SDK 54 → 57
-  upgrade (2026-09-05).** That upgrade carried `react-native-reanimated`/`react-native-worklets`
-  across three SDK majors (4.1→4.5 / 0.5→0.10). `expo-doctor`, typecheck, lint, and all 545 Jest
-  tests are clean, but this repo's own testing notes already record that Reanimated animations
-  don't advance under Jest, so a clean suite proves nothing about whether the onboarding pulse
-  trace (`PulseTraceHero.tsx`) or any other Reanimated-driven motion still looks right. Nobody has
-  launched the app in Expo Go or a simulator since the upgrade landed — say so plainly rather than
-  assume it's fine. Full account: `docs/change_log.md`, 2026-09-05.
+- 🟡 **The client's and the Worker's `better-auth` versions must match, and only the lockfile
+  holds them together (2026-09-05).** They are two separate npm projects sharing one wire format
+  (cookie envelope, `/sign-in/social` state, session payload), both declaring `^1.6.25`. During the
+  SDK 54 → 57 upgrade the app's lockfile regen floated to 1.7.2 while `workers/` stayed at 1.6.25 —
+  a skew nothing in that run exercised, since no real sign-in was performed. Resolved by pinning
+  the app's lockfile back to 1.6.25. Residual risk: the caret ranges are unchanged, so any future
+  lockfile regen on either side can re-open the gap silently, and no test asserts the two agree.
+  Moving the server forward is a separate change with its own review chain, and should be paired
+  with an end-to-end sign-in check.
+- 🟡 **The SDK 54 → 57 upgrade launches and renders in real Expo Go 57; the sign-in
+  tap-through is the part still unproven (2026-09-05).** That upgrade carried
+  `react-native-reanimated`/`react-native-worklets` across three SDK majors (4.1→4.5 / 0.5→0.10).
+  `expo-doctor`, typecheck, lint, and all 545 Jest tests are clean, but this repo's own testing
+  notes already record that Reanimated animations don't advance under Jest, so the suite proves
+  nothing about motion. That gap was closed by hand: Expo Go **57.0.9** was installed fresh on an
+  iOS Simulator (via Expo's versions API plus the matching GitHub release asset) and Metro run
+  against the upgrade worktree. Screenshot-confirmed — Expo Go self-reports "SDK version: 57.0.0",
+  the app reaches the genuine signed-out landing screen ("Your training plan, built around you."),
+  and the pulse-trace hero (`PulseTraceHero.tsx`) renders correctly, across multiple bundle/reload
+  cycles with zero errors in the Metro log. A true cold start first required
+  `xcrun simctl keychain reset` — a real signed-in session from unrelated prior testing was still
+  in the simulator's Keychain, and `expo-secure-store` is Keychain-backed, so it survives an app
+  uninstall/reinstall. **What remains unverified is narrower than "nobody has launched it", and
+  should not be overstated in either direction: the sign-in submission tap-through was never
+  performed.** Neither blocker is about the SDK — no touch-input automation (`idb` or equivalent)
+  is installed here to tap through the native Expo Go dev-menu overlay sitting over the CTA, and
+  `wrangler dev` wasn't running, so a real sign-in would have failed on network grounds regardless.
+  Full account: `docs/change_log.md`, 2026-09-05.
 - 🟡 **`EXPO_PUBLIC_API_BASE_URL` has drifted to a dead loopback address twice on record** (2026-08-07,
   and again by 2026-09-03) despite the earlier fix, because that fix corrected a developer's
   local, gitignored `.env` but not the committed `.env.example` template fresh `.env`s are copied
