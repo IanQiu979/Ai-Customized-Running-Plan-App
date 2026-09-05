@@ -16,6 +16,7 @@
  */
 
 import { buildTemplatePlan } from '../planTemplates';
+import { longRunShareCap, maxSingleRunKm } from '../loadRules';
 import type { Day, IntakeResponses, RaceDistance, Workout } from '../planTypes';
 
 function isWorkout(day: Day): day is Workout {
@@ -216,5 +217,66 @@ describe('readiness path (first-timer vs prepared) — driven by demonstrated ca
     expect(counts.build).toBe(6);
     expect(counts.peak).toBe(6);
     expect(counts.taper).toBeUndefined();
+  });
+});
+
+describe('marathon long-run ceilings are distance-aware and PROVISIONALLY non-binding for intermediate/advanced (Firstmate engineering ruling, 2026-09-06, [key=marathon-longrun-share-cap])', () => {
+  function marathonPeak(daysPerWeek: number) {
+    const intake: IntakeResponses = {
+      goal: 'Marathon',
+      age: 35,
+      experience: 'experienced',
+      daysPerWeek,
+      weeklyKm: 50,
+      recentPerformance: { distance: 'half', timeSec: 6600 },
+      injuries: ['none'],
+    };
+    const plan = buildTemplatePlan({
+      intake: { ...intake, raceDistance: 'marathon' },
+      goalType: 'race',
+      durationWeeks: 16,
+      raceDistance: 'marathon',
+      raceDate: '2026-12-25',
+      tierAtGeneration: 'pro',
+      density: 'paid',
+    });
+    return Math.max(
+      ...plan.weeks.map(
+        (week) =>
+          week.days.filter(isWorkout).find((day) => day.isLongRun === true)?.distanceKm ?? 0,
+      ),
+    );
+  }
+
+  it('longRunShareCap and maxSingleRunKm both return Infinity for marathon/intermediate — the loosened, captain-pending mechanism', () => {
+    expect(longRunShareCap('intermediate', 4, 'marathon')).toBe(Infinity);
+    expect(longRunShareCap('advanced', 4, 'marathon')).toBe(Infinity);
+    expect(maxSingleRunKm('intermediate', 'marathon')).toBe(Infinity);
+    expect(maxSingleRunKm('advanced', 'marathon')).toBe(Infinity);
+  });
+
+  it('leaves every other distance untouched by the marathon override', () => {
+    expect(longRunShareCap('intermediate', 4, '5k')).toBeLessThan(1);
+    expect(longRunShareCap('intermediate', 4, '10k')).toBeLessThan(1);
+    expect(longRunShareCap('intermediate', 4, 'half')).toBeLessThan(1);
+    expect(longRunShareCap('intermediate', 4, undefined)).toBeLessThan(1);
+    expect(maxSingleRunKm('intermediate', '5k')).toBe(25);
+    expect(maxSingleRunKm('intermediate', '10k')).toBe(25);
+    expect(maxSingleRunKm('intermediate', 'half')).toBe(25);
+  });
+
+  it("keeps beginner's marathon ceiling at its existing conservative 14 km — a deliberate first-timer safety floor, not touched by this ruling", () => {
+    expect(maxSingleRunKm('beginner', 'marathon')).toBe(14);
+  });
+
+  it('produces the same marathon peak long run regardless of days/week, since neither day-count-sensitive cap still binds — the survey behind the ruling', () => {
+    // Before this ruling, this exact 50 km/week, 16-week, intermediate scenario surveyed at
+    // 25/19/16/8 km for 3/4/5/6 days/week (`docs/change_log.md`'s 2026-09-06 (later) entry) —
+    // the run-count-scaled share cap dominated, and the most common marathon frequency (5-6
+    // days) was worst-affected. Now the curve, spike guard, and time cap (none of which vary by
+    // day count) govern instead, so every day count converges on the same peak.
+    const peaks = [3, 4, 5, 6].map(marathonPeak);
+    expect(new Set(peaks).size).toBe(1);
+    expect(peaks[0]).toBeGreaterThan(25); // clears even the best pre-ruling day count (3 days)
   });
 });

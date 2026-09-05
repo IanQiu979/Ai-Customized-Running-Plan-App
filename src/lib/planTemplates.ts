@@ -17,6 +17,7 @@ import {
   isUnder18,
   longRunShareCap,
   MAX_SINGLE_RUN_KM,
+  maxSingleRunKm as distanceAwareMaxSingleRunKm,
   redFlagVolumeReductionPct,
   rpeForZone,
   toExperienceLevel,
@@ -129,13 +130,13 @@ const FIVE_K_LONG_RUNS = [10, 11, 12, 8, 13, 14, 15, 10, 14, 15, 12] as const;
  * (`plan-blueprint-examples.md` § 9) and worked Examples B/C/D put at roughly 33% (10K), 40%
  * (half), and over 50% (marathon), climbing well past the 5K fixture's own ~31%. That share is
  * intentionally above what `loadRules.ts`'s level-based `LONG_RUN_SHARE_CAP`/`MAX_SINGLE_RUN_KM`
- * ultimately allow for a sub-advanced runner — those ceilings are level-based, not
- * distance-based, and this file does not loosen them (CLAUDE.md: "do not undo the caps"). The
- * curve sets an honest, distance-appropriate *target*; `clampLongRun` still has the final word,
- * exactly as it already does for the 5K curve. Where that ceiling still leaves a marathon long run
- * short of the research's own numbers for a sub-advanced runner, that is a distance-vs-level
- * safety-cap gap, not something to silently paper over here — see the `needs-decision` note this
- * task's status line raises about it.
+ * were originally calibrated for — those ceilings were level-based only, not distance-based, and
+ * this file does not loosen them itself (CLAUDE.md: "do not undo the caps"). The curve sets an
+ * honest, distance-appropriate *target*; `clampLongRun` still has the final word, exactly as it
+ * already does for the 5K curve. The distance-vs-level ceiling gap this surfaced (a marathon long
+ * run capped below even the pre-fix stretched-5K-curve output at common run counts) is fixed at
+ * the `loadRules.ts` layer, not here — see `longRunShareCap`'s and `maxSingleRunKm`'s own comments
+ * for the distance-aware mechanism and its still-open, captain-pending calibration.
  *
  * Every week-type/position (ENTRY, LOAD-1/2/3, HOLD, RECOVERY, TAPER, RACE-WEEK) below follows
  * `plan-blueprint-examples.md` §§ 5, 11–14's already-resolved architecture (canonical durations
@@ -1065,6 +1066,12 @@ function buildGenericWeek(args: {
     injuryReductionPct,
     redFlagReductionPct,
   } = args;
+  // Distance-aware, not the flat `maxSingleRunKm` param: `Infinity` (non-binding) for a marathon
+  // intermediate/advanced runner, captain-pending — see `loadRules.ts`'s `maxSingleRunKm` for the
+  // full ruling. Used below for the long-run ceiling specifically; the race-week branch's
+  // per-easy-run cap a few lines down intentionally keeps the flat param — taper-week easy runs
+  // are never marathon-length, so distance-awareness there would be a no-op change.
+  const singleRunCeilingKm = distanceAwareMaxSingleRunKm(level, raceDistance);
   const isRaceWeek = isRacePlan && raceDistance !== undefined && weekNumber === durationWeeks;
   // A no-race plan must never end on a deload (captain ruling, 2026-08-15, as a McMillan-certified
   // coach): its last week is the last week the runner sees, and finishing on a recovery week leaves
@@ -1182,7 +1189,7 @@ function buildGenericWeek(args: {
       intake.weeklyKm,
       weekNumber - 1,
       durationWeeks,
-      maxSingleRunKm,
+      singleRunCeilingKm,
       isRacePlan,
       raceDistance,
     ),
@@ -1219,8 +1226,8 @@ function buildGenericWeek(args: {
   // satisfiable at every `normalizedRunCount` output (3–7) by construction, so — unlike the
   // flat-cap revision this replaces — the loop never chases an unreachable target and needs no
   // "skip the clamp" guard.
-  const shareCap = longRunShareCap(level, requestedRuns);
-  let longDistanceKm = Math.min(maxSingleRunKm, longRunFromCurve, longRunVolumeBudget);
+  const shareCap = longRunShareCap(level, requestedRuns, raceDistance);
+  let longDistanceKm = Math.min(singleRunCeilingKm, longRunFromCurve, longRunVolumeBudget);
   // Fixed at the pre-clamp candidate, not recomputed each iteration off the shrinking
   // `longDistanceKm`: otherwise a low-volume/low-day week where the safety cap needs several
   // iterations to bind (e.g. a 4-day beginner week) ratchets down twice over — the long run
@@ -1246,6 +1253,7 @@ function buildGenericWeek(args: {
       isDeload,
       lastLoadingWeekKm,
       shareCapOverride: shareCap,
+      maxSingleRunKmOverride: singleRunCeilingKm,
     });
     // Floored so a fractional ceiling never leaks into the rendered plan, and floored no lower
     // than 1 km — a real session, matching every other minimum in this file (`distributeDistance`,

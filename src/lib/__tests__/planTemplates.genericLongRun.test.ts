@@ -28,6 +28,17 @@
  * (`longRunShareCap`) instead of staying flat. Every assertion below checks against that scaled
  * cap, not the flat `LONG_RUN_SHARE_CAP` table (which remains correct only for the byte-pinned
  * golden 4-day 5K fixture — see `longRunShareCap`'s own comment in `loadRules.ts`).
+ *
+ * The distance-specific curve fix (`v22-distance-specific-plans`, 2026-09-06) surfaced a third
+ * problem: this same share cap, plus the flat `MAX_SINGLE_RUN_KM` absolute ceiling, were
+ * calibrated without marathon-length long runs in mind and became the dominant, wrongly-tight
+ * ceiling for marathon at common training frequencies. Firstmate engineering ruling (same date,
+ * `[key=marathon-longrun-share-cap]`): both ceilings are PROVISIONALLY non-binding
+ * (`Infinity`) for a marathon intermediate/advanced runner, captain-pending — see
+ * `loadRules.ts`'s `MARATHON_LONG_RUN_SHARE_CAP` and `maxSingleRunKm` for the full ruling. The
+ * marathon profiles below (B, G, I, K) therefore assert the *other* two ceilings the research
+ * does supply — `LONG_RUN_MAX_MINUTES` (time) and `LONG_RUN_SPIKE_MULTIPLE` (spike) — actually
+ * govern instead, not that the marathon long run stays small.
  */
 
 import { buildTemplatePlan } from '../planTemplates';
@@ -36,7 +47,7 @@ import {
   clampLongRun,
   longRunShareCap,
   LONG_RUN_SPIKE_MULTIPLE,
-  MAX_SINGLE_RUN_KM,
+  maxSingleRunKm,
   toExperienceLevel,
 } from '../loadRules';
 import type {
@@ -125,7 +136,7 @@ describe('generic path — every long-run ceiling is enforced (audit §1.2)', ()
     (_name, profile) => {
       const plan = buildFor(profile);
       const level = toExperienceLevel(profile.experience);
-      const shareCap = longRunShareCap(level, runCountFor(profile.daysPerWeek));
+      const shareCap = longRunShareCap(level, runCountFor(profile.daysPerWeek), profile.raceDistance);
       let previousLongestKm = 0;
       let lastLoadingWeekKm = 0;
 
@@ -140,6 +151,7 @@ describe('generic path — every long-run ceiling is enforced (audit §1.2)', ()
             isDeload: week.isDeload,
             lastLoadingWeekKm,
             shareCapOverride: shareCap,
+            maxSingleRunKmOverride: maxSingleRunKm(level, profile.raceDistance),
           });
           expect(Math.floor(km)).toBeGreaterThanOrEqual(longRun.distanceKm ?? 0);
           previousLongestKm = Math.max(previousLongestKm, longRun.distanceKm ?? 0);
@@ -150,10 +162,14 @@ describe('generic path — every long-run ceiling is enforced (audit §1.2)', ()
   );
 
   it.each(PROFILES.map((profile) => [profile.name, profile] as const))(
-    'holds %s inside the weekly-share cap on every loading week',
+    'holds %s inside the weekly-share cap on every loading week (marathon\'s cap is PROVISIONALLY non-binding, captain-pending — see `loadRules.ts`\'s `MARATHON_LONG_RUN_SHARE_CAP`)',
     (_name, profile) => {
       const plan = buildFor(profile);
-      const cap = longRunShareCap(toExperienceLevel(profile.experience), runCountFor(profile.daysPerWeek));
+      const cap = longRunShareCap(
+        toExperienceLevel(profile.experience),
+        runCountFor(profile.daysPerWeek),
+        profile.raceDistance,
+      );
       for (const week of plan.weeks) {
         const longRun = findLongRun(week);
         if (!longRun || week.isDeload) continue;
@@ -180,10 +196,10 @@ describe('generic path — every long-run ceiling is enforced (audit §1.2)', ()
   );
 
   it.each(PROFILES.map((profile) => [profile.name, profile] as const))(
-    'keeps every long run of %s under the level absolute single-run ceiling',
+    'keeps every long run of %s under the level absolute single-run ceiling (distance-aware: non-binding for a marathon intermediate/advanced runner, captain-pending)',
     (_name, profile) => {
       const plan = buildFor(profile);
-      const ceiling = MAX_SINGLE_RUN_KM[toExperienceLevel(profile.experience)];
+      const ceiling = maxSingleRunKm(toExperienceLevel(profile.experience), profile.raceDistance);
       for (const week of plan.weeks) {
         const longRun = findLongRun(week);
         if (!longRun) continue;
@@ -195,7 +211,11 @@ describe('generic path — every long-run ceiling is enforced (audit §1.2)', ()
   it('pins the two exact breaches the audit reported for profile C (half, 80 km/wk)', () => {
     const profileC = PROFILES.find((p) => p.name.startsWith('C'))!;
     const plan = buildFor(profileC);
-    const cap = longRunShareCap(toExperienceLevel(profileC.experience), runCountFor(profileC.daysPerWeek));
+    const cap = longRunShareCap(
+      toExperienceLevel(profileC.experience),
+      runCountFor(profileC.daysPerWeek),
+      profileC.raceDistance,
+    );
     // Audit: "week 7: LR 34 km in a 64 km week = 53% (advanced cap 35%)". 35% was always the wrong
     // reference for a 6-run week (see `longRunShareCap`) — the real cap here is ~23.3%.
     const week7 = plan.weeks[6];

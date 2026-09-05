@@ -121,6 +121,54 @@ week 9 was 32/41 = 78%, now 16/69 km = 23.2% against 23.3%. Every profile in the
 (`planTemplates.genericLongRun.test.ts`) — not just these four — now holds inside its scaled cap on
 every loading and deload week.
 
+**Firstmate engineering ruling, 2026-09-06 (`v22-distance-specific-plans`,
+`[key=marathon-longrun-share-cap]`) — PROVISIONAL, captain-pending: marathon's share cap and the
+absolute single-run cap below are both non-binding for intermediate/advanced.** The
+distance-specific curve fix (same date) surfaced that the ladder above — and `MAX_SINGLE_RUN_KM`'s
+flat 25/35 km ceiling below — were calibrated without marathon-length long runs in mind and became
+the dominant, wrongly-tight ceiling at common marathon training frequencies: a 50 km/week,
+16-week, intermediate marathon runner's peak long run surveyed at 25 km (3 days/week), 19 km
+(4 days), 16 km (5 days), 8 km (6 days) — the most common marathon frequency (5–6 days/week)
+capped *below* the pre-distance-fix stretched-5K-curve output.
+
+Two options were rejected outright: raising the general intermediate/advanced ceilings (would let
+a 5K runner take a marathon-sized long run — the correct value genuinely differs by goal distance,
+that is the whole point of a per-distance ceiling), and accepting the status quo (a 6-day/week
+marathon runner capped at 8 km is not a marathon plan). The actual number both ceilings should
+hold for marathon is Ian's to set — `report-source.md` line 66: "Maximum long-run share of weekly
+volume: no universal research-backed percentage exists"; line 102: remaining coaching-policy gaps
+"need Ian's judgment or licensed course material." Neither Firstmate nor this task invents it.
+
+So the mechanism was built without inventing the number: `longRunShareCap()` and
+`maxSingleRunKm()` (`src/lib/loadRules.ts`) both take an optional `raceDistance`, and for
+`raceDistance === 'marathon'` both return `Infinity` (non-binding) for `intermediate`/`advanced` —
+`MARATHON_LONG_RUN_SHARE_CAP`, a single named constant, is the one-line change once Ian sets a
+real number. `beginner` keeps its existing 14 km ceiling for marathon deliberately — a first-time
+marathoner's conservative completion track, not a value this ruling touches. Until Ian rules,
+marathon's long run is governed by the two ceilings his own research DOES supply: the absolute
+duration cap (`LONG_RUN_MAX_MINUTES`, 180 minutes — unchanged; McMillan sometimes permits up to
+4 hours for marathoners, `report-source.md` line 67, but that is a separate, explicit,
+also-captain-pending ruling, not made here) and the recent-longest-run spike guard
+(`LONG_RUN_SPIKE_MULTIPLE`, 1.10× — the one ceiling here with actual cohort evidence: Frandsen et
+al. 2025, 5,205 runners, higher overuse-injury rates when a single session exceeded the runner's
+30-day longest by more than 10%).
+
+**Survey, same intake as above, under the new mechanism** (50 km/week, 16 weeks, intermediate,
+recent half-marathon performance) — peak long run is now identical across every day count, since
+neither cap that used to vary by run count is binding any more; the curve, spike guard, and time
+cap (all day-count-independent) govern instead:
+
+| Days/week | Peak long run, before this ruling | Peak long run, after |
+|---|---:|---:|
+| 3 | 25 km | 28 km |
+| 4 | 19 km | 28 km |
+| 5 | 16 km | 28 km |
+| 6 | 8 km | 28 km |
+
+28 km is where this profile's easy pace hits the 180-minute time cap — not a hand-picked number,
+the mechanism converging on the one real ceiling left in place. Full week-by-week sequence and the
+underlying survey: `docs/change_log.md`'s 2026-09-06 (later) entry.
+
 ### Deload trigger
 
 *(load_rules.md § Rule 1 › Deload Trigger)*

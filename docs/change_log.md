@@ -5,6 +5,53 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-09-06 (later) — marathon long-run ceilings made distance-aware, PROVISIONAL/captain-pending
+
+Firstmate engineering ruling on the `needs-decision` this task escalated below
+(`[key=marathon-longrun-share-cap]`). Splits into an engineering call (made now) and a coaching
+number (deliberately not invented — held for Ian). `npm run typecheck && npm run lint && npm test`
+(37 suites, 617 tests) and `npm --prefix workers run typecheck && npm --prefix workers test` (7
+suites, 141 tests) both clean.
+
+- **Rejected outright:** raising the general intermediate/advanced long-run ceilings (would let a
+  5K runner take a marathon-sized long run — the correct value genuinely differs by goal distance)
+  and accepting the status quo (a 6-day/week marathon runner capped at an 8 km long run is not a
+  marathon plan, and 5-6 days is the most common marathon frequency).
+- **Built:** `longRunShareCap()` and the new `maxSingleRunKm()` (`src/lib/loadRules.ts`) both take
+  an optional `raceDistance`. For `marathon`, both return `Infinity` (non-binding) for
+  `intermediate`/`advanced` — `MARATHON_LONG_RUN_SHARE_CAP` is the single named constant to change
+  once Ian sets a real number; nothing else needs touching. `beginner` keeps its existing 14 km
+  marathon ceiling on purpose (a first-time marathoner's conservative completion track, not a
+  value this ruling touches). `clampLongRun()` gained a `maxSingleRunKmOverride` parameter
+  mirroring the existing `shareCapOverride`, so the override plumbing is symmetric for both
+  ceilings.
+- **Not invented:** the actual marathon share-cap/absolute-cap numbers. `report-source.md` line
+  66: "Maximum long-run share of weekly volume: no universal research-backed percentage exists";
+  line 102: remaining coaching-policy gaps "need Ian's judgment or licensed course material." Until
+  he rules, marathon's long run is governed by the two ceilings his own research DOES supply:
+  `LONG_RUN_MAX_MINUTES` (180 min, unchanged — McMillan sometimes permits up to 4 hours for
+  marathoners, also captain-pending and NOT changed here) and `LONG_RUN_SPIKE_MULTIPLE` (1.10×,
+  the one ceiling with actual cohort evidence — Frandsen et al. 2025, 5,205 runners).
+- **Survey, 50 km/week, 16-week, intermediate marathon runner, recent half-marathon performance**
+  (same intake as the `needs-decision` survey): peak long run is now identical regardless of day
+  count, since neither cap that used to vary by run count still binds — the curve, spike guard, and
+  time cap (all day-count-independent) govern instead.
+
+  | Days/week | Peak long run, before this ruling | Peak long run, after |
+  |---|---:|---:|
+  | 3 | 25 km | 28 km |
+  | 4 | 19 km | 28 km |
+  | 5 | 16 km | 28 km |
+  | 6 | 8 km | 28 km |
+
+  28 km is where this profile's easy pace hits the 180-minute time cap — the mechanism converging
+  on the one real ceiling left in place, not a hand-picked number.
+- Updated `planTemplates.genericLongRun.test.ts`'s marathon-profile assertions (B, G, I, K) to the
+  distance-aware ceilings — those profiles now legitimately exceed the old flat numbers, which is
+  the fix working, not a regression.
+- Full ruling text and reasoning: `docs/reference/coaching/load-rules.md`'s 2026-09-06 (later)
+  entry, right after the run-count-scaled share cap ruling it extends.
+
 ## 2026-09-06 — distance-specific plans, deload ruling reversed to 15-25%
 
 Closes the core-purpose audit's headline finding: every distance except the byte-pinned golden
