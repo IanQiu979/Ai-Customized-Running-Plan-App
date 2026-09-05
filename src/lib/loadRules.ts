@@ -145,6 +145,10 @@ const LONG_RUN_SHARE_MARGIN: Record<ExperienceLevel, number> = {
  * ceiling here with actual cohort evidence behind it — Frandsen et al. 2025, 5,205 runners, higher
  * overuse-injury rates when a single session exceeded the runner's 30-day longest by >10%).
  *
+ * `beginner` is deliberately excluded from this bypass, exactly as `maxSingleRunKm` below already
+ * excludes it: a first-time marathoner keeps the conservative run-count-scaled level ceiling as an
+ * untouched safety floor. The bypass applies to `intermediate`/`advanced` only.
+ *
  * Change this one constant when Ian gives a real number — every call site already reads through
  * `longRunShareCap`.
  */
@@ -155,7 +159,7 @@ export function longRunShareCap(
   runCount: number,
   raceDistance?: RaceDistance,
 ): number {
-  if (raceDistance === 'marathon') return MARATHON_LONG_RUN_SHARE_CAP;
+  if (raceDistance === 'marathon' && level !== 'beginner') return MARATHON_LONG_RUN_SHARE_CAP;
   return LONG_RUN_SHARE_MARGIN[level] / Math.max(1, runCount);
 }
 
@@ -389,7 +393,7 @@ export interface LongRunClamp {
  * measures the wrong thing — so it's measured against the right thing (the last loading week's
  * volume), not against nothing. The denominator is `lastLoadingWeekKm` only if all three hold:
  * `isDeload === true`, `lastLoadingWeekKm > 0`, and `isValidDeload(lastLoadingWeekKm, weeklyKm)`
- * (a week that claims to be a deload but isn't 35-45% down off the last loading week is not
+ * (a week that claims to be a deload but isn't 15-25% down off the last loading week is not
  * one). Otherwise the denominator is the ordinary `weeklyKm` — the conservative fallback, so an
  * unsubstantiated `isDeload: true` claim gains the caller nothing. `limitedBy` still reports
  * `'weekly-share'` in both cases; there is no separate ceiling name for the deload case.

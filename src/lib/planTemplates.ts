@@ -147,11 +147,11 @@ const FIVE_K_LONG_RUNS = [10, 11, 12, 8, 13, 14, 15, 10, 14, 15, 12] as const;
  * the volume/long-run shape is taken from it; workout selection still comes from this file's
  * existing phase-based tempo/interval logic, unchanged.
  */
-const TEN_K_WEEKLY_LOAD = [30, 33, 36, 27, 37, 40, 43, 32, 42, 45, 47, 35, 36, 26] as const;
+const TEN_K_WEEKLY_LOAD = [30, 32, 34, 36, 38, 40, 42, 43, 44, 45, 46, 47, 36, 26] as const;
 /** No entry for week 14 (race week has no scheduled long run) — same convention as `FIVE_K_LONG_RUNS`. */
 const TEN_K_LONG_RUNS = [9, 10, 11, 8, 12, 13, 14, 10, 14, 16, 17, 12, 11] as const;
 
-const HALF_WEEKLY_LOAD = [30, 33, 36, 27, 37, 40, 43, 32, 42, 45, 47, 35, 48, 49, 37, 27] as const;
+const HALF_WEEKLY_LOAD = [30, 32, 34, 36, 38, 40, 41, 43, 44, 45, 46, 47, 48, 49, 37, 27] as const;
 const HALF_LONG_RUNS = [10, 11, 12, 9, 13, 14, 15, 11, 16, 17, 18, 14, 19, 20, 15] as const;
 
 /**
@@ -167,7 +167,7 @@ const HALF_LONG_RUNS = [10, 11, 12, 9, 13, 14, 15, 11, 16, 17, 18, 14, 19, 20, 1
  * not by the unit tests alone; see `docs/change_log.md`.)
  */
 const MARATHON_WEEKLY_LOAD = [
-  29, 32, 35, 24, 36, 39, 42, 28, 41, 44, 46, 31, 45, 48, 50, 34, 49, 51, 52, 40, 53, 40, 32, 24,
+  29, 30, 32, 33, 34, 36, 37, 38, 40, 41, 42, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 40, 32, 24,
 ] as const;
 const MARATHON_LONG_RUNS = [
   10, 11, 12, 9, 13, 14, 15, 11, 16, 17, 18, 14, 19, 20, 21, 16, 22, 23, 24, 22, 25, 18, 14,
@@ -378,6 +378,14 @@ const RACE_WEEK_PRE_RACE_SHARE =
   (FIVE_K_WEEKLY_LOAD[FIVE_K_WEEKLY_LOAD.length - 1] -
     (RACE_DISTANCE_KM['5k'] + RACE_DAY_PADDING_KM)) /
   FIVE_K_WEEKLY_LOAD[FIVE_K_WEEKLY_LOAD.length - 1];
+
+/**
+ * Upper end of the taper volume reduction the research supplies (Wang et al. meta-analysis, cited
+ * in `report-source.md`: reduce volume roughly 41-60% while maintaining intensity). Used only as a
+ * second, runner-relative bound on race week's pre-race running, so a long race's race week can
+ * never total more than the block it is tapering from.
+ */
+const RACE_WEEK_TAPER_VOLUME_SHARE = 0.6;
 
 function raceDayWorkout(distance: RaceDistance): Workout {
   const raceKm = RACE_DISTANCE_KM[distance];
@@ -1071,7 +1079,11 @@ function buildGenericWeek(args: {
   // full ruling. Used below for the long-run ceiling specifically; the race-week branch's
   // per-easy-run cap a few lines down intentionally keeps the flat param — taper-week easy runs
   // are never marathon-length, so distance-awareness there would be a no-op change.
-  const singleRunCeilingKm = distanceAwareMaxSingleRunKm(level, raceDistance);
+  // Scoped to `isRacePlan`, matching `deriveReadinessPath`: a duration/no-race block that merely
+  // names marathon as an aspirational distance is not a marathon race build, so it keeps the
+  // ordinary level-based ceilings.
+  const ceilingDistance = isRacePlan ? raceDistance : undefined;
+  const singleRunCeilingKm = distanceAwareMaxSingleRunKm(level, ceilingDistance);
   const isRaceWeek = isRacePlan && raceDistance !== undefined && weekNumber === durationWeeks;
   // A no-race plan must never end on a deload (captain ruling, 2026-08-15, as a McMillan-certified
   // coach): its last week is the last week the runner sees, and finishing on a recovery week leaves
@@ -1118,7 +1130,18 @@ function buildGenericWeek(args: {
     const easyCount = Math.max(0, requestedRuns - 1);
     // Not `desiredVolumeKm - race.distanceKm`: the race is not a training session competing for
     // the week's budget, it is the thing the week tapers into. See `RACE_WEEK_PRE_RACE_SHARE`.
-    const easyBudgetKm = Math.max(easyCount, Math.round(desiredVolumeKm * RACE_WEEK_PRE_RACE_SHARE));
+    // The ratio alone is race-distance-agnostic and race-inclusive, so for a long race (marathon,
+    // half) it sizes the pre-race days off a total that already contains a race day far larger
+    // than the 5K it was read from — race week then totals more than the peak training week it is
+    // supposed to taper from. The second bound is the runner's own recent training: the upper end
+    // of the taper research's 41-60% volume reduction (`report-source.md`), which for 5K/10K sits
+    // above the ratio and so leaves their existing behavior untouched.
+    const ratioBudgetKm = Math.round(desiredVolumeKm * RACE_WEEK_PRE_RACE_SHARE);
+    const taperBudgetKm =
+      lastLoadingWeekKm > 0
+        ? Math.min(ratioBudgetKm, Math.round(lastLoadingWeekKm * RACE_WEEK_TAPER_VOLUME_SHARE))
+        : ratioBudgetKm;
+    const easyBudgetKm = Math.max(easyCount, taperBudgetKm);
     const easyDistances = distributeDistance(easyBudgetKm, easyCount, maxSingleRunKm);
     const easyWorkouts = easyDistances.map((distanceKm, index) =>
       index === easyDistances.length - 1
@@ -1226,7 +1249,7 @@ function buildGenericWeek(args: {
   // satisfiable at every `normalizedRunCount` output (3–7) by construction, so — unlike the
   // flat-cap revision this replaces — the loop never chases an unreachable target and needs no
   // "skip the clamp" guard.
-  const shareCap = longRunShareCap(level, requestedRuns, raceDistance);
+  const shareCap = longRunShareCap(level, requestedRuns, ceilingDistance);
   let longDistanceKm = Math.min(singleRunCeilingKm, longRunFromCurve, longRunVolumeBudget);
   // Fixed at the pre-clamp candidate, not recomputed each iteration off the shrinking
   // `longDistanceKm`: otherwise a low-volume/low-day week where the safety cap needs several
@@ -1265,10 +1288,16 @@ function buildGenericWeek(args: {
     longDistanceKm = flooredKm;
   }
   const long = longRun(longDistanceKm, easyPace, density, intake.age);
+  // The loop's own ceiling is deliberately frozen at the pre-clamp candidate (see above) so the
+  // week can still absorb its volume, but the runs actually rendered must never exceed the long
+  // run the clamp settled on — otherwise the kilometres the time cap and spike guard took off the
+  // long run reappear as a longer, uncapped "easy" run. Bounding by the final long run itself
+  // rather than by `easyRunCapKm` of it keeps that volume-preservation intact.
+  const finalEasyCeilingKm = Math.min(easyCeilingKm, longDistanceKm);
   const easyDistances = distributeDistance(
     desiredVolumeKm - longDistanceKm - qualityKm,
     easyCount,
-    easyCeilingKm,
+    finalEasyCeilingKm,
   );
   const easyWorkouts = easyDistances.map((distanceKm) =>
     easyRun({

@@ -280,3 +280,85 @@ describe('marathon long-run ceilings are distance-aware and PROVISIONALLY non-bi
     expect(peaks[0]).toBeGreaterThan(25); // clears even the best pre-ruling day count (3 days)
   });
 });
+
+/**
+ * Review-round regressions on the distance-specific work above. Each case below was observed in
+ * generated plan output before its fix; none of them is caught by replaying the long run back
+ * through `clampLongRun`, because every one of them lives outside the run the clamp inspects.
+ */
+describe('distance-aware ceilings and the curves that feed them', () => {
+  function marathonPlan(overrides: Partial<IntakeResponses>, durationWeeks: number) {
+    return buildTemplatePlan({
+      intake: { ...RUNNER, ...overrides, raceDistance: 'marathon' },
+      goalType: 'race',
+      durationWeeks,
+      raceDistance: 'marathon',
+      raceDate: '2026-12-25',
+      tierAtGeneration: 'pro',
+      density: 'paid',
+    });
+  }
+
+  it("keeps beginner's marathon weekly-share cap on the run-count-scaled ladder, matching maxSingleRunKm's own beginner gate", () => {
+    // The absolute ceiling above already excludes `beginner` from the marathon override; the
+    // share ceiling must too, or a first-time marathoner loses the only volume-relative ceiling
+    // they have.
+    expect(longRunShareCap('beginner', 3, 'marathon')).toBeCloseTo(
+      longRunShareCap('beginner', 3, undefined),
+    );
+    expect(longRunShareCap('beginner', 6, 'marathon')).toBeCloseTo(
+      longRunShareCap('beginner', 6, undefined),
+    );
+    expect(longRunShareCap('beginner', 3, 'marathon')).toBeLessThan(1);
+  });
+
+  it('never emits an easy run longer than the week it belongs to actually schedules as its long run', () => {
+    // The safety ceilings (time cap, spike guard) bite only on the long run; the kilometres they
+    // take off it used to be handed to the easy days under a ceiling derived from the *unclamped*
+    // candidate, so a 3-day marathon week shipped a 31 km "easy run" beside a 28 km long run.
+    for (const daysPerWeek of [3, 4, 5, 6]) {
+      const plan = marathonPlan({ daysPerWeek }, 16);
+      for (const week of plan.weeks) {
+        const runs = week.days.filter(isWorkout);
+        const long = runs.find((run) => run.isLongRun === true);
+        if (!long) continue;
+        for (const run of runs) {
+          if (run === long) continue;
+          expect(run.distanceKm ?? 0).toBeLessThanOrEqual(long.distanceKm ?? 0);
+        }
+      }
+    }
+  });
+
+  it('does not let a canonical curve dip land on a week the engine has not flagged as a deload', () => {
+    // `deloadEveryWeeks` returns 3 for an advanced runner, so any recovery dip the curve itself
+    // encoded on a fixed 4-week cadence used to land mid-block: an unflagged low week that then
+    // became the growth base for everything after it.
+    const plan = marathonPlan({ daysPerWeek: 5, weeklyKm: 60, experience: 'competitive' }, 24);
+    const loading = plan.weeks.filter(
+      (week) => !week.isDeload && week.weekNumber < plan.weeks.length - 2,
+    );
+    for (let i = 1; i < loading.length; i += 1) {
+      expect(loading[i].volumeKm).toBeGreaterThanOrEqual(loading[i - 1].volumeKm);
+    }
+  });
+
+  it('keeps a duration (no-race) block on the ordinary level ceilings even when the runner named marathon as their distance', () => {
+    // The loosened marathon ceilings are a race-block ruling. A general-fitness block that merely
+    // carries the distance tag has no race to build toward, so it stays on `MAX_SINGLE_RUN_KM`.
+    const plan = buildTemplatePlan({
+      intake: { ...RUNNER, daysPerWeek: 6, weeklyKm: 90, raceDistance: 'marathon' },
+      goalType: 'duration',
+      durationWeeks: 16,
+      tierAtGeneration: 'pro',
+      density: 'paid',
+    });
+    const longest = Math.max(
+      ...plan.weeks.map(
+        (week) =>
+          week.days.filter(isWorkout).find((day) => day.isLongRun === true)?.distanceKm ?? 0,
+      ),
+    );
+    expect(longest).toBeLessThanOrEqual(maxSingleRunKm('intermediate'));
+  });
+});

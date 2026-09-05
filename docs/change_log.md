@@ -5,6 +5,50 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-09-06 (latest) — review-round corrections to the distance-specific plan work
+
+Five defects found reviewing the two entries below, each confirmed against generated plan output
+before fixing. Regression coverage for all of them lives in
+`planTemplates.distanceSpecific.test.ts`'s "distance-aware ceilings and the curves that feed them"
+suite; every test in it fails against the pre-fix code.
+
+- **`longRunShareCap()` bypassed the weekly-share ceiling for BEGINNER marathon runners too.** It
+  short-circuited on `raceDistance === 'marathon'` before consulting `level`, so a first-time
+  marathoner lost their only volume-relative ceiling — contradicting both the ruling below and
+  `load-rules.md`, which scope the bypass to `intermediate`/`advanced`. Now gated on
+  `level !== 'beginner'`, matching `maxSingleRunKm()`'s existing gate.
+- **An easy run could end up longer than the week's own long run.** The per-easy-run ceiling is
+  deliberately frozen at the pre-clamp long-run candidate (it keeps a low-volume week able to
+  absorb its volume), but `clampLongRun`'s time cap and spike guard bite only on the long run — so
+  the kilometres they removed were handed back to the easy days under the stale, larger ceiling. A
+  3-day/50 km-week/16-week marathon plan shipped a 31 km "easy run" beside a 28 km long run. The
+  convergence loop is unchanged; only the final distribution is now additionally bounded by the
+  long run the clamp settled on.
+- **Race week's pre-race budget is now also bounded by the runner's own last loading week** —
+  `min(desiredVolumeKm × RACE_WEEK_PRE_RACE_SHARE, lastLoadingWeekKm × 0.6)`. That share is read
+  off the 5K fixture's race-inclusive total, so for a long race it sized the pre-race days against
+  a week that already contained a much larger race day. 0.6 is the upper end of the taper research
+  already cited in `report-source.md` (reduce volume ~41–60% while maintaining intensity), not a
+  new number. 5K and 10K race weeks are unaffected — the ratio is already the smaller of the two
+  there.
+- **The three new weekly-load curves no longer encode their own recovery dips.**
+  `TEN_K_WEEKLY_LOAD`, `HALF_WEEKLY_LOAD` and `MARATHON_WEEKLY_LOAD` had dips on a fixed 4-week
+  cadence, while `buildGenericWeek` derives deload weeks independently from `deloadEveryWeeks` (3
+  weeks for advanced and for 50+). Where the two disagreed the curve's dip landed on an unflagged
+  week, became `lastLoadingWeekKm`, and throttled every week after it — a 24-week/60 km/5-day
+  advanced marathon plan peaked ~10 km/week below an otherwise identical intermediate one. The
+  arrays are now smooth ramps with the same canonical durations, baselines, peaks and taper tails;
+  recovery is owned solely by `deloadEveryWeeks`/`deloadVolume`. The four LONG_RUN curves keep
+  their dips (there is no separate deload formula for the long run) and the byte-pinned
+  `FIVE_K_WEEKLY_LOAD` is untouched.
+- **The loosened marathon ceilings are now scoped to race plans.** They were computed from
+  `raceDistance` alone, so a duration/no-race block that merely named marathon as an aspirational
+  distance also got them; now gated on `isRacePlan`, matching how `deriveReadinessPath` already
+  scopes itself.
+- Doc corrections: `clampLongRun`'s header and `load-rules.md`'s deload-validity predicate both
+  still quoted the superseded 35–45% band (now 15–25%), and `load-rules.md` now states that
+  beginner is excluded from both marathon bypasses, not just the absolute one.
+
 ## 2026-09-06 (later) — marathon long-run ceilings made distance-aware, PROVISIONAL/captain-pending
 
 Firstmate engineering ruling on the `needs-decision` this task escalated below

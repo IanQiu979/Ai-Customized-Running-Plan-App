@@ -48,7 +48,7 @@ nothing. A deload long run remains bound by every other ceiling exactly as befor
 long-run spike cap above, the absolute single-run cap (Rule 4), and the Daniels 3-hour long-run
 time cap above.
 
-**A week that claims to be a deload but is not actually 35–45% down off the last loading week is
+**A week that claims to be a deload but is not actually 15–25% down off the last loading week is
 not treated as one — it is capped as an ordinary loading week**, against its own volume. This
 makes an unsubstantiated deload claim worthless as a way to loosen the cap.
 
@@ -143,8 +143,9 @@ So the mechanism was built without inventing the number: `longRunShareCap()` and
 `maxSingleRunKm()` (`src/lib/loadRules.ts`) both take an optional `raceDistance`, and for
 `raceDistance === 'marathon'` both return `Infinity` (non-binding) for `intermediate`/`advanced` —
 `MARATHON_LONG_RUN_SHARE_CAP`, a single named constant, is the one-line change once Ian sets a
-real number. `beginner` keeps its existing 14 km ceiling for marathon deliberately — a first-time
-marathoner's conservative completion track, not a value this ruling touches. Until Ian rules,
+real number. `beginner` is excluded from *both* bypasses deliberately — the existing 14 km
+absolute ceiling and the run-count-scaled weekly-share ladder alike — a first-time marathoner's
+conservative completion track, not a value this ruling touches. Until Ian rules,
 marathon's long run is governed by the two ceilings his own research DOES supply: the absolute
 duration cap (`LONG_RUN_MAX_MINUTES`, 180 minutes — unchanged; McMillan sometimes permits up to
 4 hours for marathoners, `report-source.md` line 67, but that is a separate, explicit,
