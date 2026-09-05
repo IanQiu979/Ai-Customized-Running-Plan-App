@@ -1121,6 +1121,19 @@ guidelines scout (`/Users/Guestyyyyyyyy/firstmate/data/v22-apple-kids-guidelines
 | `fifty-plus-golden-deload-weeks` | **Weeks 4, 8, and 12** are deload weeks for 50+ runners on the golden 12-week 5K path — not the generic every-3-weeks modulo (which would land on 3/6/9). This is a golden-path-only override; the generic path's every-3-weeks-for-50+ cadence is unchanged. Week 12 (the race week) is flagged `isDeload: true` in addition to its existing race-day structure. Implementation: `buildCanonicalFiveKWeek()` in `planTemplates.ts`. |
 | `age-floor` (App Store declared minimum age) | **13**, unified with the backend intake validator. The two were briefly treated as separate (the backend floor had been raised to 13 in an earlier, unrelated commit — `8acc27c` — while a prior ruling had separately declined touching it), but the captain resolved that tension mid-task: both the backend validator (`workers/src/routes.ts:210`, already `age < 13`) and the App Store Connect age-rating questionnaire answer are 13. There is no in-repo App Store Connect config to edit — `eas init` has never been run (`docs/apple-dev-blocked.md`) — so the declared floor is recorded here as the value to use once submission is set up; the questionnaire itself remains a captain's-account action at submission time. |
 
+## Decided (2026-09-05) — long-run cap and race-week fixes, `v22-core-purpose-audit-r1` §1.2/§1.4
+
+Closes the two core-purpose-audit findings that were pure rule-enforcement bugs, not coaching
+content (`/Users/Guestyyyyyyyy/firstmate/data/v22-core-purpose-audit-r1/report.md`). The audit's
+other findings (§1.1, §1.3, §1.5–§1.9 — per-distance training content, deload session shape) are
+**not** touched by this work; they stay open, captain-content-blocked.
+
+| Item | Decision |
+|---|---|
+| §1.2 — `clampLongRun()` unenforced on `buildGenericWeek` | **Fixed**: every 10K/half/marathon/general-fitness long run is now clamped the same way the golden 5K path's is. Regression: `planTemplates.genericLongRun.test.ts`. |
+| Long-run share cap, low run counts (issue `longrun-share-cap-floor`) | **The cap always wins, and it now scales by weekly run count** (`loadRules.ts`'s `longRunShareCap`), not a flat per-level number. A flat cap is arithmetically impossible below a run-count-dependent threshold (an n-run week's largest entry is never under `1/n`) — exactly why the audit's beginner and 3-day profiles breached on every loading week. The three flat numbers in the table above (25%/32%/35%) remain the reference value at the golden fixture's 4-run week and the byte-pinned canonical 5K path's own cap, unscaled on purpose; every other path scales from there. Consequence: the long run is no longer guaranteed to be "the week's longest run" — `notation.md`'s LR row and `planTemplates.ts`'s `LONG_DESCRIPTION` no longer claim it. Full ruling and the before/after numbers: `docs/reference/coaching/load-rules.md`'s 2026-09-05 entry. |
+| §1.4 — race week assembled from the race-day budget | **Fixed**: pre-race days are now sized off a share of the taper-curve target (`RACE_WEEK_PRE_RACE_SHARE`, read from the golden 5K fixture's own race week), not `desiredVolumeKm − raceDistance`, which drove every pre-race day to `distributeDistance`'s 1 km floor once the race itself was long enough to exhaust the budget (a marathon race week of three 1 km runs plus a 47 km "race day"). Regression: `planTemplates.genericLongRun.test.ts`'s §1.4 suite. Verified live for a 50 km/wk marathon and an 80 km/wk half. |
+
 ---
 
 ## Latest — 2026-08-09 comprehensive audit and captain test mode

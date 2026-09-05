@@ -18,13 +18,23 @@
  * The long-run suite here mirrors `planTemplates.longRunCap.test.ts`'s oracle technique — replay
  * every generated long run back through `clampLongRun` and demand it comes out unchanged — but
  * aims it at the generic path across the audit's own runner profiles.
+ *
+ * Closing §1.2 surfaced a second problem, resolved by the captain's ruling on
+ * `longrun-share-cap-floor` (2026-09-05, see `docs/reference/coaching/load-rules.md`): a flat
+ * per-level share cap is arithmetically impossible at low run counts (an n-run week's largest
+ * entry is never below `1/n`), and an earlier revision floored the long run at that week's
+ * hardest quality session instead of enforcing the cap, so the cap silently lost to the floor
+ * whenever they conflicted. The ruling: the cap always wins, and it scales by run count
+ * (`longRunShareCap`) instead of staying flat. Every assertion below checks against that scaled
+ * cap, not the flat `LONG_RUN_SHARE_CAP` table (which remains correct only for the byte-pinned
+ * golden 4-day 5K fixture — see `longRunShareCap`'s own comment in `loadRules.ts`).
  */
 
 import { buildTemplatePlan } from '../planTemplates';
 import type { TemplatePlanParams } from '../planTemplates';
 import {
   clampLongRun,
-  LONG_RUN_SHARE_CAP,
+  longRunShareCap,
   LONG_RUN_SPIKE_MULTIPLE,
   MAX_SINGLE_RUN_KM,
   toExperienceLevel,
@@ -50,6 +60,11 @@ function findLongRun(week: Week): Workout | undefined {
 
 function findRaceDay(week: Week): Workout | undefined {
   return week.days.filter(isWorkout).find((day) => day.label === 'Race Day');
+}
+
+/** Mirrors `planTemplates.ts`'s private `normalizedRunCount` — not exported, so re-derived here. */
+function runCountFor(daysPerWeek: number): number {
+  return Math.max(3, Math.min(7, Math.round(daysPerWeek)));
 }
 
 interface Profile {
@@ -110,6 +125,7 @@ describe('generic path — every long-run ceiling is enforced (audit §1.2)', ()
     (_name, profile) => {
       const plan = buildFor(profile);
       const level = toExperienceLevel(profile.experience);
+      const shareCap = longRunShareCap(level, runCountFor(profile.daysPerWeek));
       let previousLongestKm = 0;
       let lastLoadingWeekKm = 0;
 
@@ -123,6 +139,7 @@ describe('generic path — every long-run ceiling is enforced (audit §1.2)', ()
             previousLongestKm,
             isDeload: week.isDeload,
             lastLoadingWeekKm,
+            shareCapOverride: shareCap,
           });
           expect(Math.floor(km)).toBeGreaterThanOrEqual(longRun.distanceKm ?? 0);
           previousLongestKm = Math.max(previousLongestKm, longRun.distanceKm ?? 0);
@@ -136,7 +153,7 @@ describe('generic path — every long-run ceiling is enforced (audit §1.2)', ()
     'holds %s inside the weekly-share cap on every loading week',
     (_name, profile) => {
       const plan = buildFor(profile);
-      const cap = LONG_RUN_SHARE_CAP[toExperienceLevel(profile.experience)];
+      const cap = longRunShareCap(toExperienceLevel(profile.experience), runCountFor(profile.daysPerWeek));
       for (const week of plan.weeks) {
         const longRun = findLongRun(week);
         if (!longRun || week.isDeload) continue;
@@ -176,11 +193,14 @@ describe('generic path — every long-run ceiling is enforced (audit §1.2)', ()
   );
 
   it('pins the two exact breaches the audit reported for profile C (half, 80 km/wk)', () => {
-    const plan = buildFor(PROFILES.find((p) => p.name.startsWith('C'))!);
-    // Audit: "week 7: LR 34 km in a 64 km week = 53% (advanced cap 35%)".
+    const profileC = PROFILES.find((p) => p.name.startsWith('C'))!;
+    const plan = buildFor(profileC);
+    const cap = longRunShareCap(toExperienceLevel(profileC.experience), runCountFor(profileC.daysPerWeek));
+    // Audit: "week 7: LR 34 km in a 64 km week = 53% (advanced cap 35%)". 35% was always the wrong
+    // reference for a 6-run week (see `longRunShareCap`) — the real cap here is ~23.3%.
     const week7 = plan.weeks[6];
     const week7Long = findLongRun(week7)?.distanceKm ?? 0;
-    expect(week7Long / week7.volumeKm).toBeLessThanOrEqual(LONG_RUN_SHARE_CAP.advanced + 1e-9);
+    expect(week7Long / week7.volumeKm).toBeLessThanOrEqual(cap + 1e-9);
     // Audit: "week 4 → 5: long run 18 km → 30 km, a +67% spike (cap +10%)". The audit stated the
     // jump week-on-week; the implemented rule is measured differently — `clampLongRun`'s spike
     // ceiling is 1.10 × `previousLongestKm`, the plan's running maximum so far, so week 5's
@@ -191,6 +211,43 @@ describe('generic path — every long-run ceiling is enforced (audit §1.2)', ()
       .reduce((max, week) => Math.max(max, findLongRun(week)?.distanceKm ?? 0), 0);
     const week5Long = findLongRun(plan.weeks[4])?.distanceKm ?? 0;
     expect(week5Long).toBeLessThanOrEqual(previousLongestKm * LONG_RUN_SPIKE_MULTIPLE + 1e-9);
+  });
+
+  describe('captain\'s ruling on longrun-share-cap-floor (2026-09-05) — the cap wins, and it scales by run count', () => {
+    it('pins profile A (3-day beginner) inside its scaled cap on every loading and deload week — unreachable under the flat 25% cap', () => {
+      // Before this ruling: every loading week sat at share 0.3333 (2 km long run of a 6 km
+      // week) against a flat 25% cap that no 3-run week can ever satisfy (3 positive numbers
+      // summing to a whole can't all be under a third). `longRunShareCap('beginner', 3)` = 1.1/3
+      // ≈ 36.7%, which 0.3333 already sits inside — proving the ladder, not the flat cap, governs.
+      const profileA = PROFILES.find((p) => p.name.startsWith('A'))!;
+      const plan = buildFor(profileA);
+      const cap = longRunShareCap('beginner', 3);
+      expect(cap).toBeGreaterThan(1 / 3);
+      // R1c: a deload's long run is measured against the last *loading* week, not its own
+      // (deliberately reduced) volume — matching `clampLongRun`'s own `isDeload` handling.
+      let lastLoadingWeekKm = 0;
+      for (const week of plan.weeks) {
+        const longRun = findLongRun(week);
+        if (longRun) {
+          const denomKm = week.isDeload && lastLoadingWeekKm > 0 ? lastLoadingWeekKm : week.volumeKm;
+          expect((longRun.distanceKm ?? 0) / denomKm).toBeLessThanOrEqual(cap + 1e-9);
+        }
+        if (!week.isDeload) lastLoadingWeekKm = week.volumeKm;
+      }
+    });
+
+    it('pins profile E (4-day intermediate) inside the unchanged 32% cap even where a big tempo session used to force the floor over it', () => {
+      // Before this ruling: week 2's floor (tempo session 9 km + 1) pushed the long run to 10 km
+      // in a 30 km week — 33.3%, over the (already-reachable-at-n=4) 32% cap — because the floor
+      // was overriding the cap whenever they conflicted. The cap now wins unconditionally.
+      const profileE = PROFILES.find((p) => p.name.startsWith('E'))!;
+      const plan = buildFor(profileE);
+      const cap = longRunShareCap('intermediate', 4);
+      expect(cap).toBeCloseTo(0.32, 5);
+      const week2 = plan.weeks[1];
+      const week2Long = findLongRun(week2)?.distanceKm ?? 0;
+      expect(week2Long / week2.volumeKm).toBeLessThanOrEqual(cap + 1e-9);
+    });
   });
 });
 

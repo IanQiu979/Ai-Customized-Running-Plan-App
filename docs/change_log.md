@@ -5,6 +5,57 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-09-05 (later) — long-run cap and race-week fixes, core-purpose audit §1.2/§1.4
+
+Closes the audit's two pure rule-enforcement findings
+(`/Users/Guestyyyyyyyy/firstmate/data/v22-core-purpose-audit-r1/report.md`). Its other findings —
+per-distance training content, deload session shape (§1.1, §1.3, §1.5–§1.9) — are unrelated and
+untouched; they stay open, captain-content-blocked. `npm run typecheck && npm run lint && npm test`
+(36 suites, 610 tests) and `npm --prefix workers run typecheck && npm --prefix workers test` (7
+suites, 141 tests) both clean.
+
+- **§1.2 — `buildGenericWeek` never called `clampLongRun()`.** Every 10K, half, marathon and
+  general-fitness plan (everything off the golden 12-week/4-day 5K path) computed its long run
+  from the curve and volume budget with none of the documented share/spike/absolute/time caps
+  enforced — the audit reproduced a 34 km long run in a 64 km week (53% against a 35% cap) and
+  deload-week breaches up to 86%. Now routed through the same clamp loop
+  `buildCanonicalFiveKWeek` has used since 2026-08-03, with two new guards so the loop can't
+  spiral a low-volume plan toward zero: `longRunStartFloor` picks a sane starting candidate, and
+  `easyRunCapKm`'s ceiling is now fixed once per week (at the pre-clamp candidate) rather than
+  recomputed each loop iteration off the shrinking long run — otherwise a 4-day beginner week's
+  easy-run capacity shrank in lockstep with the safety-clamped long run, and the resulting
+  under-target volume became the next week's growth-clamp baseline (observed: a 20 km/wk beginner
+  10K plan collapsing to consecutive 6 km weeks).
+- **Long-run share cap now scales with weekly run count — captain's ruling on issue
+  `longrun-share-cap-floor`.** Fixing the wiring bug surfaced a deeper one: a flat per-level cap
+  is arithmetically impossible below a run-count-dependent threshold (an n-run week's largest
+  entry is never under `1/n` — 33% at 3 runs/week, already over every level's flat cap), which is
+  why the audit's beginner and 3-day profiles breached the cap on *every* loading week regardless
+  of the wiring fix. Ian's ruling: the cap always wins, even where that puts the long run below a
+  quality session that week, and it must scale by run count rather than stay flat — "a 3-day week
+  legitimately carries a larger share than a 6-day week; that is normal training, not a breach."
+  New: `loadRules.ts`'s `longRunShareCap(level, runCount)`. The flat `LONG_RUN_SHARE_CAP` table is
+  untouched and still governs the byte-pinned golden 5K fixture. Consequence, also per the ruling:
+  the long run is no longer guaranteed to be "the week's longest run" — `notation.ts`'s LR entry
+  and `planTemplates.ts`'s `LONG_DESCRIPTION` no longer claim it (docs mirrored in
+  `docs/reference/coaching/notation.md`). Full ruling, formula, and before/after numbers for the
+  audit's own cited breaches: `docs/reference/coaching/load-rules.md`'s 2026-09-05 entry.
+- **§1.4 — race week was assembled from the race-day budget.** `raceDayWorkout`'s distance (race +
+  5 km warm-up/cool-down — 47 km for a marathon) was charged against the race week's own volume
+  budget; once the race alone exhausted it, every day before the race fell to
+  `distributeDistance`'s 1 km floor (a marathon race week of three 1 km runs plus the 47 km "race
+  day"). Pre-race days are now sized from `RACE_WEEK_PRE_RACE_SHARE`, a share of the taper-curve
+  target read straight off the approved 12-week 5K fixture's own race week (18 of its 28 km is
+  pre-race running) — no new coaching content, the race day sits on top instead of competing with
+  it for budget. The golden 5K path is untouched (still the literal subtraction, byte-identical at
+  its own baseline where the bug never bit). Verified live for a 50 km/wk, 16-week marathon and an
+  80 km/wk, 12-week half: both now show real taper distances before the race, not filler.
+- New regression suite: `src/lib/__tests__/planTemplates.genericLongRun.test.ts` (64 tests) —
+  every audit runner profile, replayed through `clampLongRun` and checked against the scaled share
+  cap, the spike cap, the absolute cap, and the race-week reconstruction, plus two tests pinned to
+  the captain's ruling that fail without it (a 3-day beginner week, and a 4-day week where a large
+  tempo session used to force the floor over the cap).
+
 ## 2026-09-05 — Expo SDK 54 → 57 upgrade
 
 Client-only, one major version at a time (54→55→56→57) per this repo's upgrade etiquette

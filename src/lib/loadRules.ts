@@ -67,6 +67,47 @@ export const LONG_RUN_SHARE_CAP: Record<ExperienceLevel, number> = {
   advanced: 0.35,
 };
 
+/**
+ * `LONG_RUN_SHARE_CAP` scaled by weekly run count, for every plan except the byte-pinned golden
+ * 12-week/4-day 5K fixture (`buildCanonicalFiveKWeek` keeps using the flat table above, unscaled,
+ * on purpose — see its own comment).
+ *
+ * Captain's ruling on core-purpose-audit finding §1.2 / issue `longrun-share-cap-floor`,
+ * 2026-09-05: a flat per-level cap is arithmetically impossible at low run counts — an n-run week
+ * is n positive numbers summing to a whole, so its largest entry is never below `1/n` (33% at
+ * n=3), which is already over every level's flat cap. That is the audit's actual root cause, not a
+ * wiring bug: "the allowed long-run share rises as run count falls... a 3-day week legitimately
+ * carries a larger share than a 6-day week; that is normal training, not a breach." The cap must
+ * scale with `n`, explicitly, so a reader can see what's allowed at each run count and why — not
+ * sit as a magic number on one branch of the code.
+ *
+ * The ladder: `cap(level, n) = LONG_RUN_SHARE_MARGIN[level] / n`. The margin is `cap × n` held
+ * constant across `n` — the same reachability quantity `buildGenericWeek` already checked as a
+ * boolean (`cap * runCount > 1`) before this ruling, now promoted to the actual tuning knob. A
+ * margin of exactly 1 is the boundary case (the long run merely ties the other runs, no room to
+ * legitimately be the biggest); every value here is set strictly above it, so the cap is
+ * satisfiable at every run count `normalizedRunCount` produces (3–7) by construction, not just in
+ * the limit.
+ *
+ * Intermediate and advanced keep their existing flat cap as the anchor at the reference 4-run
+ * week (`0.32 × 4 = 1.28`, `0.35 × 4 = 1.40`) — both already had real headroom there, so nothing
+ * about their 4-run behavior changes. Beginner's flat cap sat exactly on the boundary
+ * (`0.25 × 4 = 1.00`) — no run count ever had headroom under it, which is why every beginner
+ * profile in the audit's regression suite breached regardless of day count. Its margin is nudged
+ * to the smallest round value that gives every run count real headroom (1.1), while staying below
+ * intermediate's at every `n` so Ian's issue #34 level ordering (beginner < intermediate <
+ * advanced) still holds throughout the ladder, not just at one run count.
+ */
+const LONG_RUN_SHARE_MARGIN: Record<ExperienceLevel, number> = {
+  beginner: 1.1,
+  intermediate: LONG_RUN_SHARE_CAP.intermediate * 4,
+  advanced: LONG_RUN_SHARE_CAP.advanced * 4,
+};
+
+export function longRunShareCap(level: ExperienceLevel, runCount: number): number {
+  return LONG_RUN_SHARE_MARGIN[level] / Math.max(1, runCount);
+}
+
 // ---------------------------------------------------------------------------
 // Zones
 // ---------------------------------------------------------------------------
@@ -293,6 +334,12 @@ export function clampLongRun(args: {
   easyPaceSecPerKm?: number;
   isDeload?: boolean;
   lastLoadingWeekKm?: number;
+  /**
+   * Overrides `LONG_RUN_SHARE_CAP[level]` for the weekly-share ceiling. `buildGenericWeek` passes
+   * `longRunShareCap(level, requestedRuns)` here; every other caller (the golden-fixture path,
+   * this function's own tests) omits it and gets the flat, byte-pinned table.
+   */
+  shareCapOverride?: number;
 }): LongRunClamp {
   const {
     proposedKm,
@@ -302,6 +349,7 @@ export function clampLongRun(args: {
     easyPaceSecPerKm,
     isDeload,
     lastLoadingWeekKm,
+    shareCapOverride,
   } = args;
 
   const shareDenominatorKm =
@@ -312,8 +360,10 @@ export function clampLongRun(args: {
       ? lastLoadingWeekKm
       : weeklyKm;
 
+  const shareCap = shareCapOverride ?? LONG_RUN_SHARE_CAP[level];
+
   const ceilings: readonly (readonly [number, LongRunLimit])[] = [
-    [shareDenominatorKm * LONG_RUN_SHARE_CAP[level], 'weekly-share'],
+    [shareDenominatorKm * shareCap, 'weekly-share'],
     [MAX_SINGLE_RUN_KM[level], 'absolute'],
     ...(previousLongestKm > 0
       ? ([[previousLongestKm * LONG_RUN_SPIKE_MULTIPLE, 'spike']] as const)

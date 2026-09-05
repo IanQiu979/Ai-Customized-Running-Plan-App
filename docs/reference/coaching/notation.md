@@ -33,7 +33,7 @@ glossary screen, which is why the table below leads with the full name).
 | TR | Tempo Run | A sustained comfortably-hard effort at or just below lactate threshold. |
 | INT | Intervals | Repeated hard efforts (VO2 max work) with jog recovery between reps. |
 | RP | Race-Pace Reps | Repeats run at goal race pace, with generous recovery — race-specificity, not VO2 max stress. |
-| LR | Long Run | The week's longest run, at easy pace throughout (or a light finish-build). |
+| LR | Long Run | Your endurance-building run for the week, at easy pace throughout (or a light finish-build). |
 | SR | Shakeout Run | A very short, very easy jog in race week to keep the legs loose. |
 | **Strides** | *(never abbreviated)* | Short, controlled accelerations to near-top speed with full recovery — neuromuscular sharpening, not a workout in itself. |
 
@@ -42,6 +42,12 @@ same "abbreviate the run type, spell out Strides" rule.
 
 **`Race Day` stays unabbreviated.** It is the event itself, not a run type — abbreviating it would
 imply it's just another training session, which it isn't.
+
+**LR's description edited, 2026-09-05 (captain's ruling on `longrun-share-cap-floor`, core-purpose
+audit §1.2).** It read "the week's longest run" until the long-run safety cap was fixed to always
+win over that claim — the cap can now put LR below a quality session in the same week. This is the
+one word of the row that isn't final per the 2026-07-12 sign-off above: it described a code
+invariant, and the invariant changed. See [`load-rules.md`](load-rules.md).
 
 ## Structure-string grammar
 

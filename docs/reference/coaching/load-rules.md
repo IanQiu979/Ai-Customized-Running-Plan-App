@@ -83,6 +83,44 @@ correct reference point for anything measured across a deload boundary. Issue #2
 a different function (the weekly-volume increase cap, not the long-run share cap) and remains
 open; it is not resolved by this ruling.
 
+**Ian's ruling, 2026-09-05 (core-purpose audit §1.2, issue `longrun-share-cap-floor`) — the cap
+scales with run count on every path except the golden fixture.** The audit found the table above
+enforced only inside `buildCanonicalFiveKWeek`; `buildGenericWeek` — every 10K, half, marathon and
+general-fitness plan — never called `clampLongRun()` at all, so long runs at 53–86% of weekly
+volume shipped unclamped. Fixing that call surfaced a second, deeper problem: the flat table above
+is arithmetically impossible at low run counts. An `n`-run week is `n` positive numbers summing to
+a whole, so its largest entry is never below `1/n` — 33% at 3 runs/week, already over every level's
+flat cap. Every beginner and 3-day profile in the audit's own regression suite breached the cap on
+every single loading week as a direct result, independent of the wiring bug.
+
+Ian's ruling: **the cap wins, unconditionally** — the long run is capped even if that puts it below
+a quality session that week (an earlier, incomplete fix instead floored the long run at that
+session's length, which is why the cap stayed unreachable for exactly the plans the audit flagged).
+Losing "long run = week's longest run" as an absolute is the accepted cost; `notation.md`'s LR row
+and `planTemplates.ts`'s `LONG_DESCRIPTION` are both edited to stop claiming it. **And the table
+above is a special case of a run-count-scaled ladder, not the whole rule**: "a 3-day week
+legitimately carries a larger share than a 6-day week; that is normal training, not a breach." The
+table's three numbers remain the cap at the reference 4-run week (unchanged, still what
+`buildCanonicalFiveKWeek` uses); `src/lib/loadRules.ts`'s `longRunShareCap(level, runCount)` scales
+them by run count for every other path — see that function's own comment for the exact formula
+and the reasoning behind beginner's single small adjustment (its flat cap sat exactly on the
+reachability boundary at every run count, not just at 3).
+
+Explicitly declined in the same ruling: shrinking that week's quality session to keep the long run
+on top instead. That changes the training stimulus the captain designed, which was not this
+decision's call to make.
+
+**Before / after, the audit's own cited breaches** (the audit measured a deload's long run against
+that week's own, deliberately-reduced volume; the figures below use R1c's actual measurement — the
+last *loading* week — which is what `clampLongRun()` enforces): profile B (marathon, 50 km/wk,
+intermediate, 5 runs/week) week 8 deload was reported at 20/25 km = 80% of its own volume, now
+10/41 km = 24.4% of the last loading week against a 25.6% cap; profile K (marathon, 60 km/wk, same
+level/frequency) week 8 was 24/30 = 80%, now 12/50 km = 24.0% against 25.6%; profile C (half,
+80 km/wk, advanced, 6 runs/week) week 6 was 30/35 = 86%, now 13/58 km = 22.4% against a 23.3% cap;
+week 9 was 32/41 = 78%, now 16/69 km = 23.2% against 23.3%. Every profile in the regression suite
+(`planTemplates.genericLongRun.test.ts`) — not just these four — now holds inside its scaled cap on
+every loading and deload week.
+
 ### Deload trigger
 
 *(load_rules.md § Rule 1 › Deload Trigger)*
