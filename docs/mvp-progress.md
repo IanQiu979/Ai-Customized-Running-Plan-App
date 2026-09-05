@@ -1171,11 +1171,15 @@ intact underneath.
 
 - 🟡 **The client's and the Worker's `better-auth` versions must match, and only the lockfile
   holds them together (2026-09-05).** They are two separate npm projects sharing one wire format
-  (cookie envelope, `/sign-in/social` state, session payload), both declaring `^1.6.25`. During the
+  (cookie envelope, `/sign-in/social` state, session payload). During the
   SDK 54 → 57 upgrade the app's lockfile regen floated to 1.7.2 while `workers/` stayed at 1.6.25 —
   a skew nothing in that run exercised, since no real sign-in was performed. Resolved by pinning
-  the app's lockfile back to 1.6.25. Residual risk: the caret ranges are unchanged, so any future
-  lockfile regen on either side can re-open the gap silently, and no test asserts the two agree.
+  the app to exact `1.6.25` on both packages (no caret — the caret is what let it drift, and a
+  from-scratch install re-floats to 1.7.2 with it in place) plus
+  `"overrides": {"@better-auth/core": "1.6.25"}`, which is needed because `@better-auth/expo`
+  declares core as a peer at `^1.6.25` and npm otherwise hoists the newest match. Residual risk:
+  `workers/` still declares its own `^1.6.25`, so the server side can still float independently,
+  and no test asserts the two agree.
   Moving the server forward is a separate change with its own review chain, and should be paired
   with an end-to-end sign-in check.
 - 🟡 **The SDK 54 → 57 upgrade launches and renders in real Expo Go 57; the sign-in

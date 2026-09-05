@@ -21,7 +21,9 @@ step.
   longer work out of the box alongside expo-router" — Expo's SDK 56 changelog).
   `npx expo-codemod sdk-56-expo-router-react-navigation-replace .` rewrote the two call sites
   (`src/app/_layout.tsx`'s `ThemeProvider`, `src/constants/navigation-theme.ts`'s
-  `DarkTheme`/`DefaultTheme`/`Theme`) to import from `expo-router/react-navigation` instead —
+  `DarkTheme`/`DefaultTheme`/`Theme`) to import from `expo-router/react-navigation` instead;
+  those imports were then moved to the `expo-router` package root, which re-exports the identical
+  bindings and is the path SDK 57 documents (the subpath marks all three deprecated) —
   verified as an identical re-export of expo-router's own fork. This also retires the
   V2.2-specific landmine that `@react-navigation/native` was never a declared dependency here, only
   resolved transitively through expo-router under SDK 54/55; nothing in `src/` imports
@@ -53,9 +55,14 @@ step.
   `workers/` (out of scope, untouched) stays on 1.6.25 — a client/server skew across the whole auth
   wire format (cookie envelope, `/sign-in/social` state, session payload), and 1.7.2's `getCookie()`
   change is in exactly that area. Nothing in this upgrade exercised a real sign-in, so the skew was
-  never tested. The lockfile now resolves both packages back to 1.6.25; the `^1.6.25` ranges in
-  `package.json` are unchanged, and `workers/` was not touched. Bumping the server is a separate
-  change with its own review chain. `src/lib/apiClient.ts`'s web storage stub keeps all four
+  never tested. Both are now pinned **exactly** — `"better-auth": "1.6.25"`,
+  `"@better-auth/expo": "1.6.25"`, no caret. The caret is what let it drift, and a from-scratch
+  `npm install` re-floats to 1.7.2 with it in place, so dropping it is the fix rather than a style
+  choice. One more pin is needed on top: `@better-auth/expo` declares `@better-auth/core` as a
+  **peer** at `^1.6.25`, so npm satisfies it with the newest match (1.7.2) and hoists that, while
+  `better-auth`'s exact `1.6.25` core dependency nests underneath — a split that survives any clean
+  reinstall. `"overrides": {"@better-auth/core": "1.6.25"}` collapses it to one hoisted copy.
+  `workers/` was not touched; bumping the server is a separate change with its own review chain. `src/lib/apiClient.ts`'s web storage stub keeps all four
   methods — the async pair is unused under 1.6.25 but is what 1.7.2 needs on web, so it stays
   correct whichever side of the range wins next; the reasoning is written down there.
 

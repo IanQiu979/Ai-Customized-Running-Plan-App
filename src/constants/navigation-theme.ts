@@ -24,13 +24,16 @@
  *
  * SDK 56: `expo-router` forked away from `@react-navigation/*` (most direct imports of those
  * packages stop resolving once expo-router no longer pulls them in transitively). `DarkTheme`,
- * `DefaultTheme`, and the `Theme` type are re-exported from `expo-router/react-navigation`
+ * `DefaultTheme`, and the `Theme` type are re-exported from the `expo-router` package root
  * instead — verified identical to the react-navigation originals (`expo-router`'s own
- * `build/react-navigation` module re-exports them unmodified). Applied by Expo's own codemod,
- * `npx expo-codemod sdk-56-expo-router-react-navigation-replace`.
+ * `build/react-navigation` modules, re-exported unmodified through `build/exports`). Expo's
+ * codemod (`npx expo-codemod sdk-56-expo-router-react-navigation-replace`) writes the
+ * `expo-router/react-navigation` subpath, but SDK 57 marks these three bindings deprecated there
+ * ("Import `DarkTheme` from `expo-router` instead. Will be removed in a future SDK.") — the root
+ * is the supported path.
  */
 
-import { type Theme, DarkTheme, DefaultTheme } from 'expo-router/react-navigation';
+import { type Theme, DarkTheme, DefaultTheme } from 'expo-router';
 
 import { Colors, ColorScheme } from './theme';
 
