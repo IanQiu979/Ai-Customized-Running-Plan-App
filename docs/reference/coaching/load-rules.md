@@ -154,6 +154,33 @@ also-captain-pending ruling, not made here) and the recent-longest-run spike gua
 al. 2025, 5,205 runners, higher overuse-injury rates when a single session exceeded the runner's
 30-day longest by more than 10%).
 
+**Known consequence of the non-binding ceilings — read this before setting the number.** While
+`MARATHON_LONG_RUN_SHARE_CAP` is `Infinity`, a marathon plan's deload weeks are **not bounded
+relative to their own reduced volume** the way the run-count-scaled ladder at the top of this
+section achieves for every other distance. The share ceiling is the only one of the three that
+scales with the week it sits in; with it non-binding, a recovery week is governed only by the
+1.10× spike guard, which measures against the runner's previous longest run and knows nothing
+about the current week being a deload.
+
+Reproducible case — marathon, 16 weeks, 50 km/week, 4 days/week, intermediate, no injuries (this
+branch's own flagship profile). Week 4 is a deload: `deloadVolume(47) = 38 km`. But
+`interpolateCanonical` samples `MARATHON_LONG_RUNS` at `idx × 22/14`, so week 4's curve position
+does **not** land on one of that array's own dips, and with both marathon ceilings non-binding
+only the spike guard applies: `1.10 × previousLongest(15) = 16.5 → 16 km`. The plan therefore
+ships a **16 km long run inside a 38 km "recovery" week — a 42% share, and longer than any of
+weeks 1–3 (14/15/14 km)**. With the level-based share cap still active the same week would clamp
+to `0.32 × 47 = 15 km`, against the last loading week rather than the deload's own total.
+
+**This has two separate causes, and the number you are about to set fixes only one of them.**
+(i) *Magnitude* — a real share-cap number will clamp how long that long run may be, and this
+specific 16 km figure will come down. (ii) *Structure* — the long-run curves carry recovery dips
+at fixed array positions, which do not realign with `deloadEveryWeeks`' cadence (3 weeks for
+advanced and for 50+, 4 otherwise) once `interpolateCanonical` resamples them onto a
+non-canonical duration. That misalignment is independent of the cap and **will still be there
+after the number is set**: a correctly-capped plan can still put its relatively-longest run in a
+week labelled as recovery, just at a smaller absolute distance. Setting the share cap does not
+resolve this; it resolves the magnitude half only.
+
 **Survey, same intake as above, under the new mechanism** (50 km/week, 16 weeks, intermediate,
 recent half-marathon performance) — peak long run is now identical across every day count, since
 neither cap that used to vary by run count is binding any more; the curve, spike guard, and time

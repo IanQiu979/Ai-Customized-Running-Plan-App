@@ -384,7 +384,7 @@ const RACE_DAY_PADDING_KM = 5;
  * The ratio alone is not enough for a long race, because it is read off a race-*inclusive* 5K
  * total and the race day is then stacked on top of it uncounted: a marathon's 47 km race day is
  * larger than the whole scaled race-week entry, so the assembled week outgrew the block it is
- * meant to taper from. `RACE_WEEK_HEADROOM` below is the bound that actually holds that line —
+ * meant to taper from. `preRaceBudgetKm` below is the bound that actually holds that line —
  * the pre-race training budget is additionally capped at the plan's own peak training week minus
  * race day, so pre-race running plus race day together never exceed the peak.
  */
