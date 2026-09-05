@@ -561,9 +561,10 @@ function distributeDistance(totalKm: number, count: number, capKm: number): numb
  * `longrun-share-cap-floor` (2026-09-05) means that's no longer guaranteed — the safety cap can
  * now put the long run below a quality session. The ceiling stays anyway, for the reason it was
  * really added: volume preservation. The canonical 5K path keeps its own literal
- * `longDistanceKm * 0.8` and is deliberately not routed through here — the golden 12-week fixture
- * is byte-pinned. The generic path needs the looser ceiling because it is the path where the long
- * run is clamped: 0.8 caps a week's absorbable volume at `1.8 x longRun + quality`, so once
+ * `longDistanceKm * 0.8` and is not routed through here — that plan is coach-authored and
+ * byte-pinned, so nothing here reshapes it; it is verified against the same caps instead, by
+ * `planTemplates.longRunCap.test.ts`. The generic path needs the looser ceiling because it is the
+ * path where the long run is clamped: 0.8 caps a week's absorbable volume at `1.8 x longRun + quality`, so once
  * `clampLongRun` shortens the long run the week can no longer reach its target at all, and the
  * shortfall is then re-read by `clampWeeklyVolume` as the next week's growth base. Letting the
  * easy days take the kilometres the long run gave up keeps the week whole and the runner's

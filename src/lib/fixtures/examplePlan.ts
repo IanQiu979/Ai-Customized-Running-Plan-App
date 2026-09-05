@@ -116,7 +116,7 @@ export const EXAMPLE_PLAN_ID = 'example-5k-pro';
 const REST: RestDay = { kind: 'rest' };
 
 const EASY_DESCRIPTION = 'Easy, conversational pace.';
-const LONG_DESCRIPTION = "Easy, conversational pace — the week's longest run.";
+const LONG_DESCRIPTION = 'Easy, conversational pace — your endurance-building run for the week.';
 const TEMPO_DESCRIPTION = 'Comfortably hard, sustained effort — at or just below threshold.';
 const INTERVAL_DESCRIPTION = 'Hard, controlled effort with full recovery between reps.';
 // Updated for ruling 3: these reps anchor to goal pace, not "current" pace — see file header.

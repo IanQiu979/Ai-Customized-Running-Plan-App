@@ -50,11 +50,31 @@ suites, 141 tests) both clean.
   it for budget. The golden 5K path is untouched (still the literal subtraction, byte-identical at
   its own baseline where the bug never bit). Verified live for a 50 km/wk, 16-week marathon and an
   80 km/wk, 12-week half: both now show real taper distances before the race, not filler.
+- **Review follow-up (same day): the ladder is floored at the flat table.** The first revision of
+  `longRunShareCap` was a bare `margin / runCount`, which raised the cap at low run counts as the
+  ruling required but also *lowered* it at high run counts — advanced 35% → 23.3% at six runs a
+  week and 20.0% at seven, halving the long runs on the marathon and half plans the flat table was
+  signed off for (an 80 km/wk half runner peaked at a 16 km long run). Nobody ruled on that.
+  `longRunShareCap` is now `max(flat cap, margin / runCount)`: 4–7-run weeks are byte-identical to
+  the flat table again, and only the 3-run weeks that motivated the ruling move. The half runner
+  above now peaks at 27 km, the 50 km/wk marathon at 18 km.
+- **Review follow-up: `src/lib/fixtures/examplePlan.ts` no longer claims "the week's longest
+  run" either.** The permanent example plan every signed-in user can open still carried the retired
+  wording next to the glossary entry that had already dropped it. Same copy as the engine now.
+- **Review follow-up: the golden 5K path is verified against the caps, not silently exempt.**
+  `planTemplates.longRunCap.test.ts` gains a sweep of that coach-authored path across every level,
+  age band and declared volume it is reachable with. Nothing clamps or rewrites its numbers — the
+  share, spike and absolute ceilings are simply asserted over its output, and all three hold. A
+  fourth assertion (a 12-week plan's peak loading week should reach the volume the runner already
+  runs) **fails for beginner intakes** — a 20 km/wk beginner's plan peaks at 17 km, a 30 km/wk one
+  at 27 km. Left failing on purpose, per the captain's instruction, so it surfaces as an explicit
+  coaching question rather than a declared gap. See `docs/reference/coaching/load-rules.md`.
 - New regression suite: `src/lib/__tests__/planTemplates.genericLongRun.test.ts` (64 tests) —
   every audit runner profile, replayed through `clampLongRun` and checked against the scaled share
   cap, the spike cap, the absolute cap, and the race-week reconstruction, plus two tests pinned to
   the captain's ruling that fail without it (a 3-day beginner week, and a 4-day week where a large
-  tempo session used to force the floor over the cap).
+  tempo session used to force the floor over the cap), plus a volume-preservation pair for
+  profile F that fails if `easyRunCapKm`'s ceiling moves back inside the clamp loop.
 
 ## 2026-09-05 — Expo SDK 54 → 57 upgrade
 

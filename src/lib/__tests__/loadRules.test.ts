@@ -12,6 +12,7 @@ import {
   isUnder18,
   isValidDeload,
   LONG_RUN_SHARE_CAP,
+  longRunShareCap,
   redFlagVolumeReductionPct,
   RED_FLAG_VOLUME_REDUCTION_PCT,
   rpeForZone,
@@ -180,6 +181,62 @@ describe('long run', () => {
 
   it('pins the cap ladder exactly (guards against a silent ladder mutation slipping past every other assertion)', () => {
     expect(LONG_RUN_SHARE_CAP).toEqual({ beginner: 0.25, intermediate: 0.32, advanced: 0.35 });
+  });
+
+  describe('the run-count ladder only ever loosens the flat cap', () => {
+    const LEVELS = ['beginner', 'intermediate', 'advanced'] as const;
+
+    // The flat table is the floor, not the reference point the ladder rotates around. A bare
+    // `margin / n` also *tightened* the cap at high run counts (advanced 35% -> 23.3% at six runs
+    // a week, 20.0% at seven), halving the long runs on the marathon and half plans the flat cap
+    // was signed off for. Nobody asked for that; it is not what the ladder ruling authorised.
+    it.each([5, 6, 7])('leaves a %i-run week on exactly the flat per-level cap', (runCount) => {
+      for (const level of LEVELS) {
+        expect(longRunShareCap(level, runCount)).toBeCloseTo(LONG_RUN_SHARE_CAP[level], 10);
+      }
+    });
+
+    it('never returns less than the flat cap at any run count the engine can produce', () => {
+      for (const level of LEVELS) {
+        for (let runCount = 1; runCount <= 7; runCount += 1) {
+          expect(longRunShareCap(level, runCount)).toBeGreaterThanOrEqual(
+            LONG_RUN_SHARE_CAP[level] - 1e-12,
+          );
+        }
+      }
+    });
+
+    it('raises the cap above 1/n at every run count the engine can produce, so it is satisfiable', () => {
+      // The reachability argument the ruling rests on: an n-run week is n positive numbers
+      // summing to a whole, so its largest entry is never below 1/n. A cap at or under 1/n is
+      // unsatisfiable by arithmetic, not by unsafe coaching.
+      for (const level of LEVELS) {
+        for (let runCount = 3; runCount <= 7; runCount += 1) {
+          expect(longRunShareCap(level, runCount)).toBeGreaterThan(1 / runCount);
+        }
+      }
+    });
+
+    it('keeps the level ordering monotonic at every run count', () => {
+      for (let runCount = 3; runCount <= 7; runCount += 1) {
+        expect(longRunShareCap('beginner', runCount)).toBeLessThan(
+          longRunShareCap('intermediate', runCount),
+        );
+        expect(longRunShareCap('intermediate', runCount)).toBeLessThan(
+          longRunShareCap('advanced', runCount),
+        );
+      }
+    });
+
+    it('loosens monotonically as run count falls', () => {
+      for (const level of LEVELS) {
+        for (let runCount = 4; runCount <= 7; runCount += 1) {
+          expect(longRunShareCap(level, runCount - 1)).toBeGreaterThanOrEqual(
+            longRunShareCap(level, runCount),
+          );
+        }
+      }
+    });
   });
 
   it('caps at the level share of weekly volume (doc example: 50 km week -> 16 km, issue #34 ruling R1a\'s 0.32 intermediate cap)', () => {

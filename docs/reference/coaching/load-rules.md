@@ -106,6 +106,15 @@ them by run count for every other path — see that function's own comment for t
 and the reasoning behind beginner's single small adjustment (its flat cap sat exactly on the
 reachability boundary at every run count, not just at 3).
 
+**The ladder only ever loosens the table; it never tightens it.** `longRunShareCap` is floored at
+the flat per-level cap, so 4-, 5-, 6- and 7-run weeks stay on exactly the numbers above and only
+3-run weeks (and beginner's 4-run week) move. That floor is deliberate and was added after a first
+revision shipped a bare `margin / n`, which *also* cut the cap at high run counts — advanced fell
+from 35% to 23.3% at six runs a week and 20.0% at seven, which halved the long runs on precisely
+the marathon and half plans the table was signed off for (an 80 km/wk half runner peaked at a 16 km
+long run). Nothing in the ruling authorised that; the ruling authorised raising the allowance for
+runners who train on fewer days.
+
 Explicitly declined in the same ruling: shrinking that week's quality session to keep the long run
 on top instead. That changes the training stimulus the captain designed, which was not this
 decision's call to make.
@@ -114,12 +123,22 @@ decision's call to make.
 that week's own, deliberately-reduced volume; the figures below use R1c's actual measurement — the
 last *loading* week — which is what `clampLongRun()` enforces): profile B (marathon, 50 km/wk,
 intermediate, 5 runs/week) week 8 deload was reported at 20/25 km = 80% of its own volume, now
-10/41 km = 24.4% of the last loading week against a 25.6% cap; profile K (marathon, 60 km/wk, same
-level/frequency) week 8 was 24/30 = 80%, now 12/50 km = 24.0% against 25.6%; profile C (half,
-80 km/wk, advanced, 6 runs/week) week 6 was 30/35 = 86%, now 13/58 km = 22.4% against a 23.3% cap;
-week 9 was 32/41 = 78%, now 16/69 km = 23.2% against 23.3%. Every profile in the regression suite
-(`planTemplates.genericLongRun.test.ts`) — not just these four — now holds inside its scaled cap on
-every loading and deload week.
+13/41 km = 31.7% of the last loading week against the unchanged 32% cap; profile K (marathon,
+60 km/wk, same level/frequency) week 8 was 24/30 = 80%, now 16/50 km = 32.0% against 32%; profile C
+(half, 80 km/wk, advanced, 6 runs/week) week 6 was 30/35 = 86%, now 20/58 km = 34.5% against the
+unchanged 35% cap; week 9 was 32/41 = 78%, now 24/69 km = 34.8% against 35%. The plans these
+produce still build: B peaks at an 18 km long run, K at 22 km, C at 27 km. Every profile in the
+regression suite (`planTemplates.genericLongRun.test.ts`) — not just these four — now holds inside
+its scaled cap on every loading and deload week.
+
+**The golden 12-week / 4-day / 5K plan is not exempt from these caps, it is verified against
+them.** That path is coach-authored, so nothing clamps or rewrites its numbers; instead
+`planTemplates.longRunCap.test.ts` replays the same share, spike and absolute-ceiling checks over
+its output across every level, age band and declared volume it can be reached with. All three hold.
+The fourth check in that block — that a 12-week plan's biggest loading week reaches at least the
+volume the runner already runs — does **not** hold for beginner intakes: a 20 km/week beginner's
+plan peaks at 17 km, a 30 km/week one at 27 km. That is an open coaching question for Ian, recorded
+here as a failing assertion rather than a silent exemption.
 
 ### Deload trigger
 

@@ -68,9 +68,12 @@ export const LONG_RUN_SHARE_CAP: Record<ExperienceLevel, number> = {
 };
 
 /**
- * `LONG_RUN_SHARE_CAP` scaled by weekly run count, for every plan except the byte-pinned golden
- * 12-week/4-day 5K fixture (`buildCanonicalFiveKWeek` keeps using the flat table above, unscaled,
- * on purpose — see its own comment).
+ * `LONG_RUN_SHARE_CAP` scaled by weekly run count, for every plan except the golden 12-week/4-day
+ * 5K plan. That plan is coach-authored — its weekly load and session tables are Ian's own coaching
+ * — so `buildCanonicalFiveKWeek` keeps using the flat table above, unscaled, and no formula here
+ * rewrites its numbers. It is not thereby unmeasured: `planTemplates.longRunCap.test.ts` replays
+ * the share, spike and absolute ceilings over that path's output across every level, age band and
+ * declared volume it can be reached with.
  *
  * Captain's ruling on core-purpose-audit finding §1.2 / issue `longrun-share-cap-floor`,
  * 2026-09-05: a flat per-level cap is arithmetically impossible at low run counts — an n-run week
@@ -81,7 +84,15 @@ export const LONG_RUN_SHARE_CAP: Record<ExperienceLevel, number> = {
  * scale with `n`, explicitly, so a reader can see what's allowed at each run count and why — not
  * sit as a magic number on one branch of the code.
  *
- * The ladder: `cap(level, n) = LONG_RUN_SHARE_MARGIN[level] / n`. The margin is `cap × n` held
+ * The ladder: `cap(level, n) = max(LONG_RUN_SHARE_CAP[level], LONG_RUN_SHARE_MARGIN[level] / n)`.
+ * The flat table is a **floor**, never a ceiling: the ruling authorised raising the allowance as
+ * run count falls, not tightening it at run counts nobody complained about. A bare `margin / n`
+ * did the latter — advanced fell from the signed-off 35% to 23.3% at six runs a week and 20.0% at
+ * seven, which would have halved the long runs on exactly the marathon and half plans the flat cap
+ * was set for. Flooring at the flat cap leaves every run count at or above the reference (4) with
+ * byte-identical behaviour and confines the change to the 3-run weeks that motivated it.
+ *
+ * The margin is `cap × n` held
  * constant across `n` — the same reachability quantity `buildGenericWeek` already checked as a
  * boolean (`cap * runCount > 1`) before this ruling, now promoted to the actual tuning knob. A
  * margin of exactly 1 is the boundary case (the long run merely ties the other runs, no room to
@@ -105,7 +116,10 @@ const LONG_RUN_SHARE_MARGIN: Record<ExperienceLevel, number> = {
 };
 
 export function longRunShareCap(level: ExperienceLevel, runCount: number): number {
-  return LONG_RUN_SHARE_MARGIN[level] / Math.max(1, runCount);
+  return Math.max(
+    LONG_RUN_SHARE_CAP[level],
+    LONG_RUN_SHARE_MARGIN[level] / Math.max(1, runCount),
+  );
 }
 
 // ---------------------------------------------------------------------------

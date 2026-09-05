@@ -34,6 +34,7 @@ import { buildTemplatePlan } from '../planTemplates';
 import type { TemplatePlanParams } from '../planTemplates';
 import {
   clampLongRun,
+  DELOAD_REDUCTION_MIN,
   longRunShareCap,
   LONG_RUN_SPIKE_MULTIPLE,
   MAX_SINGLE_RUN_KM,
@@ -248,6 +249,46 @@ describe('generic path — every long-run ceiling is enforced (audit §1.2)', ()
       const week2Long = findLongRun(week2)?.distanceKm ?? 0;
       expect(week2Long / week2.volumeKm).toBeLessThanOrEqual(cap + 1e-9);
     });
+  });
+});
+
+describe('generic path — the safety clamp must not eat the week it was applied to', () => {
+  // Regression for the easy-run ceiling being recomputed inside the clamp loop off the shrinking,
+  // safety-clamped long run instead of being fixed once from the pre-clamp candidate. When it
+  // tracked the long run, a low-volume/low-day week ratcheted down twice over — the long run
+  // shrank for safety, the easy days' ceiling shrank with it, the week fell short of its target,
+  // and `clampWeeklyVolume` then read that shortfall as the next week's growth base, so the plan
+  // spiralled. Profile F is the observed case: a 20 km/week beginner 10K plan whose loading weeks
+  // collapsed to 15, 15, 11, 6, 6, 6 km. With the ceiling fixed once per week they read
+  // 19, 21, 15, 17, 19, 21 km.
+  const profileF = PROFILES.find((p) => p.name.startsWith('F'))!;
+
+  it('keeps every loading week of profile F (10K, 20 km/wk, 4 days) near the runner\'s declared volume', () => {
+    const plan = buildFor(profileF);
+    const floorKm = profileF.weeklyKm * 0.7;
+    const loadingWeeks = plan.weeks.filter(
+      (week, index) => !week.isDeload && index !== plan.weeks.length - 1,
+    );
+    expect(loadingWeeks.length).toBeGreaterThan(0);
+    const collapsed = loadingWeeks
+      .filter((week) => week.volumeKm < floorKm)
+      .map((week) => `week ${week.weekNumber} = ${week.volumeKm} km`);
+    expect(collapsed).toEqual([]);
+  });
+
+  it('never lets profile F shrink from one loading week to the next by more than a deload would', () => {
+    // The spiral's signature was a monotonic slide, not a single short week: each shortfall became
+    // the next week's growth ceiling. A loading week may dip after a deload, but it must never
+    // fall to deload depth relative to the loading week before it.
+    const plan = buildFor(profileF);
+    let previousLoadingKm = 0;
+    for (const week of plan.weeks.slice(0, -1)) {
+      if (week.isDeload) continue;
+      if (previousLoadingKm > 0) {
+        expect(week.volumeKm).toBeGreaterThan(previousLoadingKm * (1 - DELOAD_REDUCTION_MIN));
+      }
+      previousLoadingKm = week.volumeKm;
+    }
   });
 });
 
