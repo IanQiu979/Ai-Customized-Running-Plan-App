@@ -179,6 +179,12 @@ function buildGoldenPlanFor(profile: GoldenProfile): Plan {
   return buildTemplatePlan(params);
 }
 
+function plan_longRuns(plan: Plan): number[] {
+  return plan.weeks
+    .map((week) => findLongRun(week)?.distanceKm ?? 0)
+    .filter((km) => km > 0);
+}
+
 describe('golden 5K path — the coach-authored plan is verified against the caps, not exempt from them', () => {
   const CASES = GOLDEN_PROFILES.map((profile) => [profile.name, profile] as const);
 
@@ -221,7 +227,7 @@ describe('golden 5K path — the coach-authored plan is verified against the cap
         const longRun = findLongRun(week);
         if (!longRun) continue;
         const km = longRun.distanceKm ?? 0;
-        if (previousLongestKm > 0 && km > previousLongestKm * LONG_RUN_SPIKE_MULTIPLE + 1e-9) {
+        if (previousLongestKm > 0 && km > Math.ceil(previousLongestKm * LONG_RUN_SPIKE_MULTIPLE)) {
           breaches.push(`week ${week.weekNumber}: ${km} km after a previous longest of ${previousLongestKm} km`);
         }
         previousLongestKm = Math.max(previousLongestKm, km);
@@ -240,6 +246,16 @@ describe('golden 5K path — the coach-authored plan is verified against the cap
         .filter(({ longRun }) => (longRun?.distanceKm ?? 0) > ceiling)
         .map(({ week, longRun }) => `week ${week.weekNumber}: ${longRun?.distanceKm} km > ${ceiling} km`);
       expect(breaches).toEqual([]);
+    },
+  );
+
+  it.each(CASES)(
+    'grows the long run of %s over the course of the plan',
+    (_name, profile) => {
+      // Frozen before the spike ceiling stopped being floored: a 20 km/wk beginner opened on a
+      // 3 km long run and closed on a 3 km long run twelve weeks later.
+      const longRuns = plan_longRuns(buildGoldenPlanFor(profile));
+      expect(Math.max(...longRuns)).toBeGreaterThan(longRuns[0]);
     },
   );
 

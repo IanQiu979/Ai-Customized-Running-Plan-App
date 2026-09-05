@@ -380,7 +380,7 @@ export function clampLongRun(args: {
     [shareDenominatorKm * shareCap, 'weekly-share'],
     [MAX_SINGLE_RUN_KM[level], 'absolute'],
     ...(previousLongestKm > 0
-      ? ([[previousLongestKm * LONG_RUN_SPIKE_MULTIPLE, 'spike']] as const)
+      ? ([[Math.ceil(previousLongestKm * LONG_RUN_SPIKE_MULTIPLE), 'spike']] as const)
       : []),
     ...(easyPaceSecPerKm && easyPaceSecPerKm > 0
       ? ([[(LONG_RUN_MAX_MINUTES * 60) / easyPaceSecPerKm, 'time']] as const)

@@ -134,11 +134,33 @@ its scaled cap on every loading and deload week.
 **The golden 12-week / 4-day / 5K plan is not exempt from these caps, it is verified against
 them.** That path is coach-authored, so nothing clamps or rewrites its numbers; instead
 `planTemplates.longRunCap.test.ts` replays the same share, spike and absolute-ceiling checks over
-its output across every level, age band and declared volume it can be reached with. All three hold.
-The fourth check in that block — that a 12-week plan's biggest loading week reaches at least the
-volume the runner already runs — does **not** hold for beginner intakes: a 20 km/week beginner's
-plan peaks at 17 km, a 30 km/week one at 27 km. That is an open coaching question for Ian, recorded
-here as a failing assertion rather than a silent exemption.
+its output across every level, age band and declared volume it can be reached with, plus two
+progression checks — that the long run grows over the plan, and that the biggest loading week
+reaches at least the volume the runner already runs. All of them hold, and the suite is green.
+
+They did not, at first: three beginner intakes fell short (12 km/wk peaked at a 10 km week, 20 km/wk
+at 17 km, 30 km/wk at 27 km) with the long run frozen at its week-1 value for the whole plan. The
+cause was not coaching content but the spike ceiling's rounding — see the entry below.
+
+**Ian's ruling, 2026-09-05 (follow-up) — the spike ceiling limits the rate of growth, it never
+forbids growth.** `clampLongRun`'s spike ceiling was the raw `previousLongestKm x 1.10`, while the
+engine renders whole kilometres. Below 10 km the floored ceiling therefore equalled the previous
+longest — a 5 km long run gave a 5.5 km ceiling that floored straight back to 5 km — so the rule
+forbade *all* increase instead of limiting its rate, and the long run froze at its week-1 value for
+the rest of the plan. That reached every beginner plan and every low-volume intermediate one, i.e.
+exactly the runners this audit was about. The ceiling is now rounded up
+(`Math.ceil(previousLongestKm x LONG_RUN_SPIKE_MULTIPLE)`); the distance rendered to the runner is
+still floored. Nothing else moves: the share, absolute and time ceilings are applied as a minimum
+alongside it, so the loosened spike ceiling can only ever permit growth one of them already allows.
+Explicitly declined in the same ruling: adding a minimum absolute growth step as a second,
+independent floor — that would set up a rival growth authority against the spike cap, where the real
+problem was an integer-rounding artifact.
+
+Observed effect on the golden path's beginner intakes (peak long run, peak loading week, against the
+runner's declared volume): 12 km/wk went 2 km / 10 km → 3 km / 12 km; 20 km/wk went 3 km / 17 km →
+5 km / 21 km; 30 km/wk went 5 km / 27 km → 7 km / 30 km. On the generic path, profile J (5K,
+15 km/wk, 3 days) and profile E (general fitness, 30 km/wk, 4 days) both stopped finishing on the
+same long run they started with.
 
 ### Deload trigger
 

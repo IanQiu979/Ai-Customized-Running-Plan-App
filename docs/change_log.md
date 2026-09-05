@@ -10,9 +10,15 @@ make a behavior-changing commit, add a bullet under today's date — create a ne
 Closes the audit's two pure rule-enforcement findings
 (`/Users/Guestyyyyyyyy/firstmate/data/v22-core-purpose-audit-r1/report.md`). Its other findings —
 per-distance training content, deload session shape (§1.1, §1.3, §1.5–§1.9) — are unrelated and
-untouched; they stay open, captain-content-blocked. `npm run typecheck && npm run lint && npm test`
-(36 suites, 610 tests) and `npm --prefix workers run typecheck && npm --prefix workers test` (7
-suites, 141 tests) both clean.
+untouched; they stay open, captain-content-blocked.
+
+**Verification, as measured — the "36 suites, 610 tests clean" line this entry originally carried
+was written before the review rounds below and was not true while they were in flight.** The
+review rounds added assertions that failed (the golden path's beginner progression checks) until
+the spike-ceiling fix landed. As of that fix: `tsc --noEmit` clean, ESLint clean on every touched
+file, and the whole plan-engine suite — `src/lib/__tests__`, which is where all of this change
+lives — green at 26 suites / 578 tests. The repository-wide `npm test` and the `workers/` gate are
+run by the pipeline's own test step, not restated here.
 
 - **§1.2 — `buildGenericWeek` never called `clampLongRun()`.** Every 10K, half, marathon and
   general-fitness plan (everything off the golden 12-week/4-day 5K path) computed its long run
@@ -64,11 +70,23 @@ suites, 141 tests) both clean.
 - **Review follow-up: the golden 5K path is verified against the caps, not silently exempt.**
   `planTemplates.longRunCap.test.ts` gains a sweep of that coach-authored path across every level,
   age band and declared volume it is reachable with. Nothing clamps or rewrites its numbers — the
-  share, spike and absolute ceilings are simply asserted over its output, and all three hold. A
-  fourth assertion (a 12-week plan's peak loading week should reach the volume the runner already
-  runs) **fails for beginner intakes** — a 20 km/wk beginner's plan peaks at 17 km, a 30 km/wk one
-  at 27 km. Left failing on purpose, per the captain's instruction, so it surfaces as an explicit
-  coaching question rather than a declared gap. See `docs/reference/coaching/load-rules.md`.
+  share, spike and absolute ceilings are simply asserted over its output, alongside two progression
+  checks (the long run grows over the plan; the peak loading week reaches the volume the runner
+  already runs). Three beginner intakes failed the progression checks when the sweep was first
+  added; the cause was the spike-ceiling rounding bug in the next bullet, and all of them pass now.
+- **Review follow-up: the spike ceiling was forbidding growth instead of limiting its rate.**
+  `clampLongRun`'s spike ceiling was the raw `previousLongestKm × 1.10` while the engine renders
+  whole kilometres, so below 10 km the floored ceiling equalled the previous longest (5 km → a
+  5.5 km ceiling → back to 5 km) and the long run could never move again for the rest of the plan —
+  reaching every beginner plan and every low-volume intermediate one. Now
+  `Math.ceil(previousLongestKm × LONG_RUN_SPIKE_MULTIPLE)`; the rendered distance is still floored,
+  and the share, absolute and time ceilings still apply as a minimum alongside it, so nothing can
+  grow past a ceiling that another rule already imposes. Golden-path beginners, peak long run /
+  peak loading week vs declared volume: 12 km/wk 2/10 → 3/12, 20 km/wk 3/17 → 5/21, 30 km/wk
+  5/27 → 7/30. Covered by unit tests on `clampLongRun` (including two that pin the share and
+  absolute ceilings still binding over the loosened spike ceiling) and by plan-level tests on
+  profiles J and E, which used to finish on the same long run they started with. See
+  `docs/reference/coaching/load-rules.md`.
 - New regression suite: `src/lib/__tests__/planTemplates.genericLongRun.test.ts` (64 tests) —
   every audit runner profile, replayed through `clampLongRun` and checked against the scaled share
   cap, the spike cap, the absolute cap, and the race-week reconstruction, plus two tests pinned to
