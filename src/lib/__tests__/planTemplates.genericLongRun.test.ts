@@ -24,21 +24,20 @@
  * per-level share cap is arithmetically impossible at low run counts (an n-run week's largest
  * entry is never below `1/n`), and an earlier revision floored the long run at that week's
  * hardest quality session instead of enforcing the cap, so the cap silently lost to the floor
- * whenever they conflicted. The ruling: the cap always wins, and it scales by run count
- * (`longRunShareCap`) instead of staying flat. Every assertion below checks against that scaled
- * cap, not the flat `LONG_RUN_SHARE_CAP` table (which remains correct only for the byte-pinned
- * golden 4-day 5K fixture — see `longRunShareCap`'s own comment in `loadRules.ts`).
+ * whenever they conflicted. The ruling: the cap always wins, and the ordinary level cap scales
+ * by run count (`longRunShareCap`) instead of staying flat. The assertions below call that
+ * distance-aware helper: non-marathon plans and beginner marathon plans use the scaled ladder,
+ * while intermediate/advanced marathon plans use the separate final 35% ceiling. The flat
+ * `LONG_RUN_SHARE_CAP` table remains correct only for the byte-pinned golden 4-day 5K fixture —
+ * see `longRunShareCap`'s own comment in `loadRules.ts`.
  *
  * The distance-specific curve fix (`v22-distance-specific-plans`, 2026-09-06) surfaced a third
- * problem: this same share cap, plus the flat `MAX_SINGLE_RUN_KM` absolute ceiling, were
- * calibrated without marathon-length long runs in mind and became the dominant, wrongly-tight
- * ceiling for marathon at common training frequencies. Firstmate engineering ruling (same date,
- * `[key=marathon-longrun-share-cap]`): both ceilings are PROVISIONALLY non-binding
- * (`Infinity`) for a marathon intermediate/advanced runner, captain-pending — see
- * `loadRules.ts`'s `MARATHON_LONG_RUN_SHARE_CAP` and `maxSingleRunKm` for the full ruling. The
- * marathon profiles below (B, G, I, K) therefore assert the *other* two ceilings the research
- * does supply — `LONG_RUN_MAX_MINUTES` (time) and `LONG_RUN_SPIKE_MULTIPLE` (spike) — actually
- * govern instead, not that the marathon long run stays small.
+ * problem: the run-count-scaled share cap and flat `MAX_SINGLE_RUN_KM` ceiling were calibrated
+ * without marathon-length long runs in mind. The captain's final ruling
+ * (`[key=marathon-longrun-share-cap]`) sets a distance-specific 35% weekly-share ceiling for
+ * intermediate/advanced marathoners. Their separate kilometre ceiling remains non-binding
+ * (`Infinity`), while the unchanged 180-minute time cap and `LONG_RUN_SPIKE_MULTIPLE` continue to
+ * apply. Beginner marathoners keep both their run-count-scaled share ladder and 14 km ceiling.
  */
 
 import { buildTemplatePlan } from '../planTemplates';
@@ -113,12 +112,10 @@ const PROFILES: Profile[] = [
   // regime where the budget and the day count actually conflict.
   { name: 'L — 5K, 12 km/wk, 6 days, 10 weeks', experience: 'some', age: 34, daysPerWeek: 6, weeklyKm: 12, durationWeeks: 10, raceDistance: '5k', goalType: 'race' },
   { name: 'M — 5K, 9 km/wk, 6 days, 10 weeks', experience: 'new', age: 45, daysPerWeek: 6, weeklyKm: 9, durationWeeks: 10, raceDistance: '5k', goalType: 'race' },
-  // N is the only profile for which the marathon ceilings actually bind. `longRunShareCap` and
-  // `maxSingleRunKm` are both non-binding (`Infinity`) for an intermediate/advanced marathon
-  // runner while the captain's number is pending, so the share-cap and absolute-cap assertions
-  // below are vacuous for B, G, I and K. Beginner is deliberately excluded from that bypass and
-  // keeps the 14 km ceiling and the run-count-scaled ladder — which nothing here exercised
-  // through a generated plan until now.
+  // N exercises the beginner-only marathon ceilings: the run-count-scaled share ladder and 14 km
+  // absolute ceiling. Profiles B, G, I and K exercise the captain's final 35% marathon share cap;
+  // their separate kilometre ceiling remains intentionally non-binding (`Infinity`), with the
+  // 180-minute time cap and spike guard still active.
   { name: 'N — beginner marathon, 30 km/wk, 20 weeks', experience: 'new', age: 33, daysPerWeek: 4, weeklyKm: 30, durationWeeks: 20, raceDistance: 'marathon', goalType: 'race' },
 ];
 
@@ -176,7 +173,7 @@ describe('generic path — every long-run ceiling is enforced (audit §1.2)', ()
   );
 
   it.each(PROFILES.map((profile) => [profile.name, profile] as const))(
-    'holds %s inside the weekly-share cap on every loading week (marathon\'s cap is PROVISIONALLY non-binding, captain-pending — see `loadRules.ts`\'s `MARATHON_LONG_RUN_SHARE_CAP`)',
+    "holds %s inside its weekly-share cap on every loading week, including marathon's final 35% ceiling",
     (_name, profile) => {
       const plan = buildFor(profile);
       const cap = longRunShareCap(
@@ -184,11 +181,14 @@ describe('generic path — every long-run ceiling is enforced (audit §1.2)', ()
         runCountFor(profile.daysPerWeek),
         profile.raceDistance,
       );
+      let checkedLoadingLongRuns = 0;
       for (const week of plan.weeks) {
         const longRun = findLongRun(week);
         if (!longRun || week.isDeload) continue;
+        checkedLoadingLongRuns += 1;
         expect((longRun.distanceKm ?? 0) / week.volumeKm).toBeLessThanOrEqual(cap + 1e-9);
       }
+      expect(checkedLoadingLongRuns).toBeGreaterThan(0);
     },
   );
 
@@ -210,7 +210,7 @@ describe('generic path — every long-run ceiling is enforced (audit §1.2)', ()
   );
 
   it.each(PROFILES.map((profile) => [profile.name, profile] as const))(
-    'keeps every long run of %s under the level absolute single-run ceiling (distance-aware: non-binding for a marathon intermediate/advanced runner, captain-pending)',
+    'keeps every long run of %s under its distance-aware absolute kilometre ceiling (still non-binding for marathon intermediate/advanced; the 180-minute cap remains separate)',
     (_name, profile) => {
       const plan = buildFor(profile);
       const ceiling = maxSingleRunKm(toExperienceLevel(profile.experience), profile.raceDistance);

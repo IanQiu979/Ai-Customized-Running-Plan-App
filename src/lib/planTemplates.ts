@@ -109,6 +109,12 @@ const UNDER_18_DISCLAIMER =
   'training load and has the right to pause or stop the plan at any time. This plan does not ' +
   "account for individual medical history, injuries, or a coach's in-person supervision.";
 
+/** Source §20's required disclosure for the limited-preparation fixed point created by applying
+ * the captain's 35% marathon long-run cap to a non-beginner three-day race plan. */
+const THREE_DAY_MARATHON_DISCLAIMER =
+  "With three running days, the 35% long-run cap limits this plan's long-run progression. " +
+  'Add a fourth running day for fuller marathon preparation.';
+
 /** Ian-approved 12-week 5K load shape, normalized to the 35 km worked-example baseline. Read by
  * `buildCanonicalFiveKWeek` only — that path is byte-pinned to the fixture and owns its own
  * recovery weeks (4 and 8) by reading these dips directly. */
@@ -153,7 +159,8 @@ const FIVE_K_WEEKLY_LOAD_GENERIC = [34, 35, 37, 38, 40, 41, 43, 44, 46, 48, 40, 
  * already does for the 5K curve. The distance-vs-level ceiling gap this surfaced (a marathon long
  * run capped below even the pre-fix stretched-5K-curve output at common run counts) is fixed at
  * the `loadRules.ts` layer, not here — see `longRunShareCap`'s and `maxSingleRunKm`'s own comments
- * for the distance-aware mechanism and its still-open, captain-pending calibration.
+ * for the distance-aware mechanism and the captain's resulting 35% share ruling. The separate
+ * absolute-distance calibration remains pending there.
  *
  * The week-type/position architecture below (ENTRY, LOAD-1/2/3, HOLD, TAPER, RACE-WEEK) follows
  * `plan-blueprint-examples.md` §§ 5, 11–14's already-resolved canonical durations. RECOVERY is
@@ -927,7 +934,11 @@ function placeWorkouts(
   hard.forEach((workout, index) => reserve(layout.hardSlots[index], workout));
 
   const openSlots = layout.runSlots.filter((slot) => days[slot].kind === 'rest');
-  easy.forEach((workout, index) => reserve(openSlots[index], workout));
+  // Race week can deliberately contain fewer workouts than the normalized layout after
+  // `preRaceSchedule` drops unaffordable runs. Keep the surviving pre-race block in order, but
+  // right-align it into the latest open slots so SR remains the final workout before race day.
+  const easySlots = raceDay && !padShortWeeks ? openSlots.slice(-easy.length) : openSlots;
+  easy.forEach((workout, index) => reserve(easySlots[index], workout));
   return days as unknown as Week7<Day>;
 }
 
@@ -1316,7 +1327,9 @@ function buildGenericWeek(args: {
   }
 
   const requestedRuns = normalizedRunCount(intake.daysPerWeek);
-  const retainedQuality = quality.slice(0, Math.max(1, requestedRuns - 2));
+  // Source §6: at three or four running days, keep Q1 and the long run, then spend the remaining
+  // slot(s) on easy support. Q2 enters only once the runner has at least five days available.
+  const retainedQuality = quality.slice(0, requestedRuns >= 5 ? requestedRuns - 2 : 1);
   const easyCount = Math.max(1, requestedRuns - retainedQuality.length - 1);
   const qualityKm = retainedQuality.reduce(
     (sum, workout) => sum + (workout.distanceKm ?? 0),
@@ -1355,10 +1368,11 @@ function buildGenericWeek(args: {
   // `clampWeeklyVolume`, so the two can drift apart with nothing reconciling them.
   //
   // Same convergence argument as the canonical path: the share ceiling is measured against the
-  // week's *assembled* volume (easy runs are capped per `easyRunCapKm`, so a week cannot always
-  // absorb its full budget), and shrinking the long run shrinks the assembled volume, which can
-  // reopen the share. The map is a contraction, so it converges in a handful of steps and the loop
-  // exits as soon as the clamp stops moving the value.
+  // week's *rendered* volume after the final easy-run ceiling and volume reconciliation. A
+  // provisional distribution can absorb more volume than the rendered one, so clamping against
+  // that earlier denominator can still leave the final long-run share over its ceiling. Shrinking
+  // the long run shrinks the rendered volume and can reopen the share; the integer map converges in
+  // a handful of steps and exits as soon as the clamp stops moving the rendered value.
   //
   // Captain's ruling on core-purpose-audit finding §1.2 / issue `longrun-share-cap-floor`,
   // 2026-09-05: the safety cap always wins, even where that means the long run is no longer this
@@ -1374,24 +1388,40 @@ function buildGenericWeek(args: {
   // "skip the clamp" guard.
   const shareCap = longRunShareCap(level, requestedRuns, ceilingDistance);
   let longDistanceKm = Math.min(singleRunCeilingKm, longRunFromCurve, longRunVolumeBudget);
-  // Fixed at the pre-clamp candidate, not recomputed each iteration off the shrinking
-  // `longDistanceKm`: otherwise a low-volume/low-day week where the safety cap needs several
-  // iterations to bind (e.g. a 4-day beginner week) ratchets down twice over — the long run
-  // shrinks for safety, then the easy days' own ceiling shrinks with it, so the week can no
-  // longer absorb the volume the long run gave up, `clampWeeklyVolume` reads the shortfall as the
-  // next week's growth base, and the plan spirals (a 20 km/wk beginner 10K plan was observed
-  // collapsing to two consecutive 6 km weeks). The ceiling only needs to be *a* reasonable bound,
-  // not one that tracks the final long run — see `easyRunCapKm`'s own comment.
+  // Keep the shaping ceiling fixed at the pre-clamp candidate. The rendered ceiling below also
+  // respects the settled long run, but this stable upper bound lets higher-frequency weeks absorb
+  // kilometres the long run gives up whenever their final run ceiling still permits it.
   const easyCeilingKm = easyRunCapKm(longDistanceKm);
+  let reconciledWorkouts: Workout[] = [];
   for (let i = 0; i < 100; i += 1) {
-    const easyTotalKm = distributeDistance(
+    const finalEasyCeilingKm = Math.min(easyCeilingKm, longDistanceKm);
+    const easyDistances = distributeDistance(
       desiredVolumeKm - longDistanceKm - qualityKm,
       easyCount,
-      easyCeilingKm,
-    ).reduce((sum, distanceKm) => sum + distanceKm, 0);
-    const assembledVolumeKm = longDistanceKm + qualityKm + easyTotalKm;
+      finalEasyCeilingKm,
+    );
+    const easyWorkouts = easyDistances.map((distanceKm) =>
+      easyRun({
+        distanceKm,
+        pace: easyPace,
+        density,
+        age: intake.age,
+        strides: !isDeload,
+        ...(!isDeload ? { structure: '4 × 30 s Strides' } : {}),
+      }),
+    );
+    reconciledWorkouts = reconcileVolumeToTarget(
+      [...easyWorkouts, ...retainedQuality, longRun(longDistanceKm, easyPace, density, intake.age)],
+      desiredVolumeKm,
+    );
+    const renderedLongRun = reconciledWorkouts.find((workout) => workout.isLongRun === true);
+    const renderedLongRunKm = renderedLongRun?.distanceKm ?? 0;
+    const assembledVolumeKm = reconciledWorkouts.reduce(
+      (sum, workout) => sum + (workout.distanceKm ?? 0),
+      0,
+    );
     const { km } = clampLongRun({
-      proposedKm: longDistanceKm,
+      proposedKm: renderedLongRunKm,
       weeklyKm: assembledVolumeKm,
       level,
       previousLongestKm,
@@ -1404,38 +1434,12 @@ function buildGenericWeek(args: {
     // Floored so a fractional ceiling never leaks into the rendered plan, and floored no lower
     // than 1 km — a real session, matching every other minimum in this file (`distributeDistance`,
     // `easyRunCapKm`) — never back up to `longRunStartFloor`; see the ruling above. Flooring only
-    // shrinks the value, so the loop's invariant holds and it still terminates:
-    // `flooredKm >= longDistanceKm` breaks the moment the clamp stops biting.
+    // shrinks the value, so the loop's invariant holds and it still terminates against the actual
+    // rendered long run rather than the pre-reconciliation candidate.
     const flooredKm = Math.max(1, Math.floor(km));
-    if (flooredKm >= longDistanceKm) break;
+    if (flooredKm >= renderedLongRunKm) break;
     longDistanceKm = flooredKm;
   }
-  const long = longRun(longDistanceKm, easyPace, density, intake.age);
-  // The loop's own ceiling is deliberately frozen at the pre-clamp candidate (see above) so the
-  // week can still absorb its volume, but the runs actually rendered must never exceed the long
-  // run the clamp settled on — otherwise the kilometres the time cap and spike guard took off the
-  // long run reappear as a longer, uncapped "easy" run. Bounding by the final long run itself
-  // rather than by `easyRunCapKm` of it keeps that volume-preservation intact.
-  const finalEasyCeilingKm = Math.min(easyCeilingKm, longDistanceKm);
-  const easyDistances = distributeDistance(
-    desiredVolumeKm - longDistanceKm - qualityKm,
-    easyCount,
-    finalEasyCeilingKm,
-  );
-  const easyWorkouts = easyDistances.map((distanceKm) =>
-    easyRun({
-      distanceKm,
-      pace: easyPace,
-      density,
-      age: intake.age,
-      strides: !isDeload,
-      ...(!isDeload ? { structure: '4 × 30 s Strides' } : {}),
-    }),
-  );
-  const reconciledWorkouts = reconcileVolumeToTarget(
-    [...easyWorkouts, ...retainedQuality, long],
-    desiredVolumeKm,
-  );
   const days = placeWorkouts(reconciledWorkouts, requestedRuns);
   const volumeKm = days
     .filter((day): day is Workout => day.kind === 'run')
@@ -1543,6 +1547,12 @@ export function buildTemplatePlan(params: TemplatePlanParams): Plan {
 
   const disclaimers = [
     GENERAL_DISCLAIMER,
+    ...(isRacePlan &&
+    raceDistance === 'marathon' &&
+    normalizedRunCount(params.intake.daysPerWeek) === 3 &&
+    level !== 'beginner'
+      ? [THREE_DAY_MARATHON_DISCLAIMER]
+      : []),
     ...(isUnder18(params.intake.age) ? [UNDER_18_DISCLAIMER] : []),
     ...(hasDeclaredInjury(params.intake.injuries) ? [INJURY_DISCLAIMER] : []),
     ...(hasRedFlagInjury(params.intake.injuries) ? [RED_FLAG_INJURY_DISCLAIMER] : []),

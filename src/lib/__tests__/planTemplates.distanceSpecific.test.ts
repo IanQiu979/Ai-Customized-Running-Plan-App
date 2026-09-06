@@ -70,26 +70,21 @@ describe('distance-specific plans (core-purpose audit) — no distance is a rela
   });
 
   it('a 50 km/week, 16-week marathon plan builds toward a genuinely marathon-length long run — the exact scenario the core-purpose audit reported capped at ~21 km', () => {
-    // 3 days/week: a real, common lower-frequency marathon pattern (long run + two other runs),
-    // and — documented honestly, not hidden — the day count at which
-    // `loadRules.ts`'s run-count-scaled `longRunShareCap` leaves the most headroom for this
-    // fix to show through. At higher day counts (5-6/week, also common for marathon training)
-    // that same cap becomes the dominant ceiling and this fix's improvement shrinks or reverses
-    // — a distance-vs-level safety-cap gap flagged separately (see this task's `needs-decision`
-    // status line), not something silently reconciled here.
-    const marathonRunner: IntakeResponses = { ...RUNNER, daysPerWeek: 3 };
+    // The source's prepared-intermediate four-day pattern is the first layout with enough
+    // sessions to express both the captain's final 35% share ceiling and a marathon-specific
+    // long run. The exact three-day E/Q1/LR layout is more constrained: with its fixed Q1 dose
+    // and easy <= long invariant, the settled cap yields an 11 km peak, so it is covered by the
+    // all-frequency safety survey below rather than misrepresented as this headline case.
+    const marathonRunner: IntakeResponses = { ...RUNNER, daysPerWeek: 4 };
     const longRuns = longRunsOf(marathonRunner, 'marathon', 16);
     const peak = peakOf(longRuns);
 
-    // The literal old-bug reconstruction: what this exact intake (16 weeks, 3 days/week,
-    // 50 km/week) produces when forced through the 5K curve instead of a marathon one — i.e.
-    // exactly what `buildGenericWeek` computed before this fix, for a race distance no different
-    // in the old code's eyes from a marathon. Computed by generating a 16-week/3-day "5K" plan
-    // at the same weekly km — not hand-derived — so this assertion is pinned to the actual old
-    // formula's output, not an approximation of it.
-    const oldBugPeak = peakOf(longRunsOf(marathonRunner, '5k', 16));
-    expect(oldBugPeak).toBe(19); // pinned so a curve-shape edit here is a deliberate, visible change
-    expect(peak).toBeGreaterThan(oldBugPeak);
+    // Independently reconstructed from the pre-fix 16-week stretched-5K curve and its integer
+    // safety/distribution passes: this same four-day intake peaked at 19 km. Keep that old output
+    // literal here; generating a current 5K plan as the oracle would make both sides depend on the
+    // builder under test and let a shared regression pass unnoticed.
+    const oldStretchedFiveKPeakKm = 19;
+    expect(peak).toBeGreaterThan(oldStretchedFiveKPeakKm);
     expect(peak).toBeGreaterThan(21); // the audit's own reported ceiling for this exact runner
 
     // Genuine progression, not a step straight to peak and back: the long run in the second
@@ -220,8 +215,8 @@ describe('readiness path (first-timer vs prepared) — driven by demonstrated ca
   });
 });
 
-describe('marathon long-run ceilings are distance-aware and PROVISIONALLY non-binding for intermediate/advanced (Firstmate engineering ruling, 2026-09-06, [key=marathon-longrun-share-cap])', () => {
-  function marathonPeak(daysPerWeek: number) {
+describe("marathon long-run ceilings are distance-aware and enforce the captain's 35% share ruling", () => {
+  function marathonPlan(daysPerWeek: number) {
     const intake: IntakeResponses = {
       goal: 'Marathon',
       age: 35,
@@ -231,7 +226,7 @@ describe('marathon long-run ceilings are distance-aware and PROVISIONALLY non-bi
       recentPerformance: { distance: 'half', timeSec: 6600 },
       injuries: ['none'],
     };
-    const plan = buildTemplatePlan({
+    return buildTemplatePlan({
       intake: { ...intake, raceDistance: 'marathon' },
       goalType: 'race',
       durationWeeks: 16,
@@ -240,20 +235,7 @@ describe('marathon long-run ceilings are distance-aware and PROVISIONALLY non-bi
       tierAtGeneration: 'pro',
       density: 'paid',
     });
-    return Math.max(
-      ...plan.weeks.map(
-        (week) =>
-          week.days.filter(isWorkout).find((day) => day.isLongRun === true)?.distanceKm ?? 0,
-      ),
-    );
   }
-
-  it('longRunShareCap and maxSingleRunKm both return Infinity for marathon/intermediate — the loosened, captain-pending mechanism', () => {
-    expect(longRunShareCap('intermediate', 4, 'marathon')).toBe(Infinity);
-    expect(longRunShareCap('advanced', 4, 'marathon')).toBe(Infinity);
-    expect(maxSingleRunKm('intermediate', 'marathon')).toBe(Infinity);
-    expect(maxSingleRunKm('advanced', 'marathon')).toBe(Infinity);
-  });
 
   it('leaves every other distance untouched by the marathon override', () => {
     expect(longRunShareCap('intermediate', 4, '5k')).toBeLessThan(1);
@@ -265,20 +247,100 @@ describe('marathon long-run ceilings are distance-aware and PROVISIONALLY non-bi
     expect(maxSingleRunKm('intermediate', 'half')).toBe(25);
   });
 
-  it("keeps beginner's marathon ceiling at its existing conservative 14 km — a deliberate first-timer safety floor, not touched by this ruling", () => {
+  it('keeps the separate absolute kilometre ceiling non-binding for intermediate/advanced marathoners and unchanged for beginners', () => {
+    expect(maxSingleRunKm('intermediate', 'marathon')).toBe(Infinity);
+    expect(maxSingleRunKm('advanced', 'marathon')).toBe(Infinity);
     expect(maxSingleRunKm('beginner', 'marathon')).toBe(14);
   });
 
-  it('produces the same marathon peak long run regardless of days/week, since neither day-count-sensitive cap still binds — the survey behind the ruling', () => {
-    // Before this ruling, this exact 50 km/week, 16-week, intermediate scenario surveyed at
-    // 25/19/16/8 km for 3/4/5/6 days/week (`docs/change_log.md`'s 2026-09-06 (later) entry) —
-    // the run-count-scaled share cap dominated, and the most common marathon frequency (5-6
-    // days) was worst-affected. Now the curve, spike guard, and time cap (none of which vary by
-    // day count) govern instead, so every day count converges on the same peak.
-    const peaks = [3, 4, 5, 6].map(marathonPeak);
-    expect(new Set(peaks).size).toBe(1);
-    expect(peaks[0]).toBeGreaterThan(25); // clears even the best pre-ruling day count (3 days)
+  it.each([3, 4, 5, 6])(
+    'keeps every loading-week long run at or below 35%% of generated weekly volume for the 50 km/week, 16-week intermediate marathon survey at %i days/week',
+    (daysPerWeek) => {
+      const plan = marathonPlan(daysPerWeek);
+      let checkedLoadingLongRuns = 0;
+      for (const week of plan.weeks) {
+        if (week.isDeload) continue;
+        const longRun = week.days
+          .filter(isWorkout)
+          .find((day) => day.isLongRun === true)?.distanceKm;
+        if (longRun === undefined) continue;
+        checkedLoadingLongRuns += 1;
+
+        // Literal captain-owned policy. Deliberately independent of `longRunShareCap`, so
+        // mutating the marathon override back to `Infinity` cannot make this assertion vacuous.
+        expect(longRun / week.volumeKm).toBeLessThanOrEqual(0.35);
+      }
+      expect(checkedLoadingLongRuns).toBeGreaterThan(0);
+    },
+  );
+
+  it('uses the prepared-intermediate four-day peak layout E + Q1 + E + LR, dropping Q2 before easy support', () => {
+    const peakWeek = marathonPlan(4).weeks.find(
+      (week) => week.phase === 'peak' && !week.isDeload,
+    );
+    expect(peakWeek).toBeDefined();
+
+    const layout = peakWeek!.days.map((day) => {
+      if (day.kind === 'rest') return 'rest';
+      if (day.isLongRun === true) return 'long';
+      if (day.effort === 'tempo' || day.effort === 'interval') return 'quality';
+      return 'easy';
+    });
+    expect(layout).toEqual(['easy', 'rest', 'quality', 'rest', 'easy', 'long', 'rest']);
   });
+
+  it('scopes the visible three-day limitation to normalized-three-run intermediate/advanced marathon race plans', () => {
+    const limitation =
+      "With three running days, the 35% long-run cap limits this plan's long-run progression. Add a fourth running day for fuller marathon preparation.";
+
+    // Two available days normalize to the source's three-run floor, so raw-input equality is
+    // not enough. Both intermediate and advanced race plans carry the disclosure.
+    expect(marathonPlan(2).disclaimers).toContain(limitation);
+    expect(marathonPlan(3).disclaimers).toContain(limitation);
+    const advanced = buildTemplatePlan({
+      intake: { ...RUNNER, experience: 'competitive', daysPerWeek: 3, raceDistance: 'marathon' },
+      goalType: 'race',
+      durationWeeks: 16,
+      raceDistance: 'marathon',
+      raceDate: '2026-12-25',
+      tierAtGeneration: 'pro',
+      density: 'paid',
+    });
+    expect(advanced.disclaimers).toContain(limitation);
+
+    // Four days can express the fuller layout, while beginner, non-marathon, and no-race plans
+    // belong to different source-defined tracks and must not inherit this warning by accident.
+    expect(marathonPlan(4).disclaimers).not.toContain(limitation);
+    const beginner = buildTemplatePlan({
+      intake: { ...RUNNER, experience: 'new', daysPerWeek: 3, raceDistance: 'marathon' },
+      goalType: 'race',
+      durationWeeks: 16,
+      raceDistance: 'marathon',
+      raceDate: '2026-12-25',
+      tierAtGeneration: 'pro',
+      density: 'paid',
+    });
+    expect(beginner.disclaimers).not.toContain(limitation);
+    const half = buildTemplatePlan({
+      intake: { ...RUNNER, daysPerWeek: 3, raceDistance: 'half' },
+      goalType: 'race',
+      durationWeeks: 16,
+      raceDistance: 'half',
+      raceDate: '2026-12-25',
+      tierAtGeneration: 'pro',
+      density: 'paid',
+    });
+    expect(half.disclaimers).not.toContain(limitation);
+    const noRace = buildTemplatePlan({
+      intake: { ...RUNNER, daysPerWeek: 3, raceDistance: 'marathon' },
+      goalType: 'duration',
+      durationWeeks: 16,
+      tierAtGeneration: 'pro',
+      density: 'paid',
+    });
+    expect(noRace.disclaimers).not.toContain(limitation);
+  });
+
 });
 
 /**
@@ -492,6 +554,50 @@ describe('distance-aware ceilings and the curves that feed them', () => {
     expect(preRace.map((run) => run.distanceKm)).toEqual([2]);
     expect(raceWeek.days.filter((day) => day.kind === 'rest')).toHaveLength(5);
   });
+
+  it('places surviving shakeouts in the latest available slots nearest race day for a low-volume, high-frequency runner', () => {
+    const plan = buildTemplatePlan({
+      intake: { ...RUNNER, daysPerWeek: 6, weeklyKm: 12, raceDistance: '5k' },
+      goalType: 'race',
+      durationWeeks: 10,
+      raceDistance: '5k',
+      raceDate: '2026-12-25',
+      tierAtGeneration: 'pro',
+      density: 'paid',
+    });
+    const raceWeek = plan.weeks[plan.weeks.length - 1];
+
+    // The six requested days cannot all receive a real run from this race-week budget. The two
+    // survivors belong in the two latest slots the three-run layout leaves before Sunday; Monday
+    // stays genuine rest instead of receiving the first surviving run by array order.
+    expect(
+      raceWeek.days.map((day) =>
+        day.kind === 'rest' ? 'rest' : `${day.label}:${day.distanceKm ?? 0}`,
+      ),
+    ).toEqual(['rest', 'rest', 'rest', 'ER:2', 'rest', 'SR:2', 'Race Day:10']);
+  });
+
+  it.each([2, 3])(
+    'puts the sole real shakeout on the latest pre-race slot when %i available days normalize to the three-run floor',
+    (daysPerWeek) => {
+      const plan = buildTemplatePlan({
+        intake: { ...RUNNER, daysPerWeek, weeklyKm: 5, raceDistance: '5k' },
+        goalType: 'race',
+        durationWeeks: 10,
+        raceDistance: '5k',
+        raceDate: '2026-12-25',
+        tierAtGeneration: 'pro',
+        density: 'paid',
+      });
+      const raceWeek = plan.weeks[plan.weeks.length - 1];
+
+      expect(
+        raceWeek.days.map((day) =>
+          day.kind === 'rest' ? 'rest' : `${day.label}:${day.distanceKm ?? 0}`,
+        ),
+      ).toEqual(['rest', 'rest', 'rest', 'rest', 'rest', 'SR:2', 'Race Day:10']);
+    },
+  );
 
   it('does not let a canonical curve dip land on an unflagged week of a no-race plan either', () => {
     // Same defect as the marathon case below, on the path that serves every general-fitness plan:

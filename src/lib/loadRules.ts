@@ -122,15 +122,11 @@ const LONG_RUN_SHARE_MARGIN: Record<ExperienceLevel, number> = {
 };
 
 /**
- * PROVISIONAL — marathon's long-run weekly-share ceiling, captain-pending.
+ * Marathon's long-run weekly-share ceiling for intermediate and advanced runners.
  *
- * `report-source.md` line 66: "Maximum long-run share of weekly volume: no universal
- * research-backed percentage exists." Line 102: remaining coaching-policy gaps "need Ian's
- * judgment or licensed course material, not more low-specificity sources." He has already
- * written down that this number is his to set.
- *
- * Firstmate engineering ruling, 2026-09-06 (`v22-distance-specific-plans`,
- * `[key=marathon-longrun-share-cap]`): a distance-specific curve fix surfaced that the
+ * Captain's ruling, 2026-09-06 (`v22-distance-specific-plans`,
+ * `[key=marathon-longrun-share-cap]`): cap these long runs at 35% of generated weekly volume.
+ * The distance-specific curve fix had surfaced that the
  * level-based, run-count-scaled `LONG_RUN_SHARE_MARGIN` above — calibrated without marathon-length
  * long runs in mind — becomes the dominant, wrongly-tight ceiling for marathon at common training
  * frequencies (surveyed: a 6-day/week intermediate marathon runner capped at an 8 km long run,
@@ -138,10 +134,8 @@ const LONG_RUN_SHARE_MARGIN: Record<ExperienceLevel, number> = {
  * rejected (it would let a 5K runner take a marathon-sized long run — the correct value genuinely
  * differs by goal distance) and accepting the current ceiling was rejected (5-6 days/week is the
  * most common marathon frequency, so the cap is most wrong exactly where most marathon runners
- * are). The fix is building the distance-aware plumbing without inventing the number: this
- * constant is `Infinity` — deliberately non-binding — until Ian sets it. Until then, the two
- * long-run ceilings his own research DOES supply govern marathon instead: `LONG_RUN_MAX_MINUTES`
- * (the time cap) and `LONG_RUN_SPIKE_MULTIPLE` (the recent-longest-run spike guard, the one
+ * are). The distance-aware 35% ceiling now applies alongside `LONG_RUN_MAX_MINUTES` (the unchanged
+ * three-hour time cap) and `LONG_RUN_SPIKE_MULTIPLE` (the recent-longest-run spike guard, the one
  * ceiling here with actual cohort evidence behind it — Frandsen et al. 2025, 5,205 runners, higher
  * overuse-injury rates when a single session exceeded the runner's 30-day longest by >10%).
  *
@@ -149,10 +143,8 @@ const LONG_RUN_SHARE_MARGIN: Record<ExperienceLevel, number> = {
  * excludes it: a first-time marathoner keeps the conservative run-count-scaled level ceiling as an
  * untouched safety floor. The bypass applies to `intermediate`/`advanced` only.
  *
- * Change this one constant when Ian gives a real number — every call site already reads through
- * `longRunShareCap`.
  */
-export const MARATHON_LONG_RUN_SHARE_CAP = Infinity; // PENDING CAPTAIN CALIBRATION, see comment above
+export const MARATHON_LONG_RUN_SHARE_CAP = 0.35;
 
 export function longRunShareCap(
   level: ExperienceLevel,
@@ -164,8 +156,9 @@ export function longRunShareCap(
 }
 
 /**
- * PROVISIONAL — same captain-pending reasoning as `MARATHON_LONG_RUN_SHARE_CAP` above, applied to
- * the absolute single-run ceiling. `MAX_SINGLE_RUN_KM`'s flat per-level values (14/25/35 km) were
+ * PROVISIONAL — marathon's absolute single-run ceiling remains captain-pending even though its
+ * weekly-share ceiling is now settled above. `MAX_SINGLE_RUN_KM`'s flat per-level values
+ * (14/25/35 km) were
  * never calibrated for marathon-length long runs either — `report-source.md` line 67 notes
  * McMillan sometimes permits up to 4 hours for marathoners against V2.2's current 3-hour cap
  * (`LONG_RUN_MAX_MINUTES`), also captain-pending and NOT changed here; that is a separate,
@@ -174,9 +167,9 @@ export function longRunShareCap(
  * `beginner` keeps its existing 14 km ceiling for marathon on purpose, not an oversight: it
  * reflects a first-time marathoner's conservative completion/run-walk track
  * (`plan-blueprint-examples.md` § 9's `NEW`/`SOME` marathon guidance is deliberately conservative
- * regardless of run count), a safety floor this ruling does not touch. `intermediate` and
- * `advanced` become non-binding for marathon, same as the share cap: the time cap and spike guard
- * govern until Ian sets a real marathon-specific number.
+ * regardless of run count), a safety floor this ruling does not touch. The absolute ceiling stays
+ * non-binding for `intermediate` and `advanced`; the 35% weekly-share cap, time cap, and spike
+ * guard govern until Ian sets a real marathon-specific absolute number.
  */
 export function maxSingleRunKm(level: ExperienceLevel, raceDistance?: RaceDistance): number {
   if (raceDistance === 'marathon' && level !== 'beginner') return Infinity;
