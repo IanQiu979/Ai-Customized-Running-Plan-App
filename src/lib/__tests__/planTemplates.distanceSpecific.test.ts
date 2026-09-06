@@ -419,34 +419,78 @@ describe('distance-aware ceilings and the curves that feed them', () => {
     }
   });
 
-  it("sizes race week's pre-race running from the taper, not from how many days the runner trains", () => {
-    // The pre-race budget is a share of the taper curve's own race-week target, which does not
-    // depend on day count — so two otherwise identical runners must not get more pre-race volume
-    // just for training more often. A per-day shakeout floor that outranked that share broke this:
-    // a 12 km/week runner racing a 5K got 4/6/8/10 km of pre-race running at 3/4/5/6 days a week,
-    // climbing past both the taper's prescription and their own peak week.
+  it("holds race week's pre-race running inside the peak week's room above race day, dropping days rather than shrinking them", () => {
+    // Two bounds that used to be traded off against each other, now both true at once.
     //
-    // Comparing two generated plans against each other, rather than against a bound rebuilt from
-    // the budget function's own constants, is what keeps this able to fail.
-    const trainingKmAt = (daysPerWeek: number) => {
-      const plan = buildTemplatePlan({
-        intake: { ...RUNNER, daysPerWeek, weeklyKm: 12, raceDistance: '5k' },
-        goalType: 'race',
-        durationWeeks: 10,
-        raceDistance: '5k',
-        raceDate: '2026-12-25',
-        tierAtGeneration: 'pro',
-        density: 'paid',
-      });
-      const raceWeek = plan.weeks[plan.weeks.length - 1];
-      const raceDayKm = raceWeek.days
-        .filter(isWorkout)
-        .reduce((max, run) => Math.max(max, run.distanceKm ?? 0), 0);
-      return raceWeek.volumeKm - raceDayKm;
-    };
-    const atFourDays = trainingKmAt(4);
-    expect(trainingKmAt(5)).toBe(atFourDays);
-    expect(trainingKmAt(6)).toBe(atFourDays);
+    // The budget is capped by the peak week minus race day. When that leaves too little to give
+    // every requested pre-race day a real shakeout, the days are dropped to rest — not shrunk to
+    // the sub-2 km filler that is the §1.4 bug's signature. A per-day floor that scaled with the
+    // requested day count used to override the cap instead: a 12 km/week runner training six days
+    // took 10 km of pre-race running against 6 km of room, and a 9 km/week runner took 5 against
+    // 2.
+    //
+    // The allowance uses only the plan's own peak week and race day — nothing from the budget
+    // function — plus the one documented exception: where race day alone already meets or exceeds
+    // the peak, a single 2 km shakeout is scheduled regardless, so the bound is "fits in the
+    // headroom, or is one short run where the headroom cannot fund even that".
+    for (const weeklyKm of [9, 12, 20]) {
+      for (const daysPerWeek of [3, 4, 5, 6]) {
+        const plan = buildTemplatePlan({
+          intake: { ...RUNNER, daysPerWeek, weeklyKm, raceDistance: '5k' },
+          goalType: 'race',
+          durationWeeks: 10,
+          raceDistance: '5k',
+          raceDate: '2026-12-25',
+          tierAtGeneration: 'pro',
+          density: 'paid',
+        });
+        const raceWeek = plan.weeks[plan.weeks.length - 1];
+        const raceDayKm = raceWeek.days
+          .filter(isWorkout)
+          .reduce((max, run) => Math.max(max, run.distanceKm ?? 0), 0);
+        const peakTrainingKm = Math.max(...plan.weeks.slice(0, -1).map((week) => week.volumeKm));
+        const preRace = raceWeek.days
+          .filter(isWorkout)
+          .filter((run) => (run.distanceKm ?? 0) !== raceDayKm);
+        const preRaceKm = preRace.reduce((sum, run) => sum + (run.distanceKm ?? 0), 0);
+        // Fits in the room above race day, or — where that room cannot fund even one real run —
+        // is exactly one minimum shakeout. 2 km is this suite's own definition of a real run, the
+        // same threshold `planTemplates.genericLongRun.test.ts` asserts, not a term lifted from
+        // the budget function.
+        const headroomKm = Math.max(0, peakTrainingKm - raceDayKm);
+        const allowanceKm = Math.max(headroomKm, 2);
+        const shortestPreRaceKm = Math.min(...preRace.map((run) => run.distanceKm ?? 0));
+
+        expect({ weeklyKm, daysPerWeek, preRaceKm, shortestPreRaceKm }).toEqual({
+          weeklyKm,
+          daysPerWeek,
+          preRaceKm: Math.min(preRaceKm, allowanceKm),
+          shortestPreRaceKm: Math.max(shortestPreRaceKm, 2),
+        });
+      }
+    }
+  });
+
+  it('gives a runner whose race day alone outweighs their peak week exactly one shakeout and otherwise rest', () => {
+    // The documented boundary of the rule above: no headroom exists at all, so the peak bound
+    // yields to a single 2 km shakeout rather than a race week with no running but the race.
+    // `placeWorkouts` must leave the freed slots as real rest — it pads short weeks with 1 km
+    // filler runs for every other caller, which is exactly what the day-dropping is avoiding.
+    const plan = buildTemplatePlan({
+      intake: { ...RUNNER, daysPerWeek: 6, weeklyKm: 5, raceDistance: '5k' },
+      goalType: 'race',
+      durationWeeks: 10,
+      raceDistance: '5k',
+      raceDate: '2026-12-25',
+      tierAtGeneration: 'pro',
+      density: 'paid',
+    });
+    const raceWeek = plan.weeks[plan.weeks.length - 1];
+    const runs = raceWeek.days.filter(isWorkout);
+    const preRace = runs.filter((run) => run.label !== 'Race Day');
+
+    expect(preRace.map((run) => run.distanceKm)).toEqual([2]);
+    expect(raceWeek.days.filter((day) => day.kind === 'rest')).toHaveLength(5);
   });
 
   it('does not let a canonical curve dip land on an unflagged week of a no-race plan either', () => {

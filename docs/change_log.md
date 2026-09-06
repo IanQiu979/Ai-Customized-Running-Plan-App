@@ -5,6 +5,57 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-09-07 — race week drops pre-race days instead of shrinking them to filler
+
+The previous round capped the pre-race shakeout floor at the taper ratio, which moved the defect
+rather than removing it: for a low-volume runner training often, the floor went inert and the
+budget was spread thinner than a real run per day — the exact 1 km filler signature the §1.4
+race-week fix exists to prevent. Bounding the budget harder alone was not the answer either; the
+two rules (fit inside the peak week, give every pre-race day a real run) genuinely conflict once
+race day is most of the runner's biggest week.
+
+**The pre-race budget is now bounded by the peak week's room above race day, and surplus days are
+dropped to rest.** `preRaceBudgetKm` returns `min(ratio, peak − raceDay)` with no floor; the new
+`preRaceSchedule` converts that into however many days it can fund at 2 km each, and the rest of
+the week is genuine rest. `placeWorkouts` grew a `padShortWeeks` flag because it pads any short
+week with 1 km filler runs — race week now opts out, so the dropped slots come out as rest instead
+of silently re-adding what was just removed.
+
+Concrete, 5K / 10 weeks / 6 days a week (all three are permanent regression profiles now):
+
+| runner | pre-race days, before | after | race week total | peak |
+|---|---|---|---:|---:|
+| 12 km/week | 2, 1, 1, 1, 1 km (1 rest day) | **2, 2 km (4 rest days)** | 16 → **14** | 14 |
+| 9 km/week | 1, 1, 1, 1, 1 km (1 rest day) | **2 km (5 rest days)** | 15 → **12** | 8 |
+| 5 km/week | 1, 1, 1, 1, 1 km (1 rest day) | **2 km (5 rest days)** | 15 → **12** | 7 |
+
+For a low-volume runner training 5–6 days a week before a short race, race week therefore contains
+**fewer running days than before**, with the removed slots as real rest. That is the intended
+coaching change: three token kilometres in the four days before a goal race are not a taper.
+
+**The one place the peak bound yields**, documented on `preRaceSchedule` and pinned by its own
+test: where race day alone already meets or exceeds the peak week (the 9 and 5 km/week rows above),
+a single 2 km shakeout is scheduled anyway rather than shipping a race week with no running but the
+race. The overshoot is exactly one minimum run and cannot grow with day count; above that regime
+the bound is absolute.
+
+**Profile-list audit** — the fourth coverage hole on this branch, so the matrix was audited rather
+than just patched. Added permanently to `planTemplates.genericLongRun.test.ts`'s `PROFILES`:
+
+- **L** (5K, 12 km/wk, 6 days) and **M** (5K, 9 km/wk, 6 days) — the low-volume/high-frequency
+  corner. The `>= 2 km` pre-race assertion had existed since the §1.4 fix but no profile could
+  reach the regime where the budget and the day count conflict, so it could not fail.
+- **N** (beginner marathon, 30 km/wk, 20 weeks) — the weekly-share and absolute single-run
+  assertions are vacuous for B/G/I/K, because both marathon ceilings are `Infinity` for
+  intermediate/advanced pending the captain's number. Beginner is excluded from that bypass, so N
+  is the only profile for which those two assertions test anything on a marathon plan.
+
+Remaining invariants were each checked for a profile capable of violating them: the `clampLongRun`
+replay (C, the audit's own breach), the spike guard (B/I, where it is the only live ceiling), the
+taper-down rule (A/J/L/M), the race-week-vs-peak and headroom bounds (weeklyKm 9/12/20 × 3–6 days),
+and the curve-dip monotonicity checks (5K no-race, advanced marathon). No invariant is left without
+one.
+
 ## 2026-09-06 (final) — the 5K/no-race curve loses its dips too, and the pre-race floor is bounded
 
 Two defects the previous round's own fixes left behind, plus a sweep for the error shape that

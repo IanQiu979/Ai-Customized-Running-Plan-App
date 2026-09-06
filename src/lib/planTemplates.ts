@@ -420,7 +420,9 @@ const RACE_DAY_PADDING_KM = 5;
  * larger than the whole scaled race-week entry, so the assembled week outgrew the block it is
  * meant to taper from. `preRaceBudgetKm` below is the bound that actually holds that line —
  * the pre-race training budget is additionally capped at the plan's own peak training week minus
- * race day, so pre-race running plus race day together never exceed the peak.
+ * race day. Where that leaves too little for every planned pre-race day to get a real shakeout,
+ * days are dropped to rest rather than shrunk into filler; see `preRaceSchedule`, which also
+ * documents the single exception where the peak bound yields to one 2 km shakeout.
  */
 const RACE_WEEK_PRE_RACE_SHARE =
   (FIVE_K_WEEKLY_LOAD[FIVE_K_WEEKLY_LOAD.length - 1] -
@@ -431,36 +433,60 @@ const RACE_WEEK_PRE_RACE_SHARE =
 const MIN_PRE_RACE_RUN_KM = 2;
 
 /**
- * The pre-race training budget, bounded so race week's *total* — pre-race running plus race day —
- * cannot exceed the plan's own peak training week. Race day is a fixed cost the runner cannot
- * shrink, so it is subtracted from the peak first and the tapered training component takes what
- * is left, never more than the race-inclusive ratio already prescribes.
+ * The pre-race training budget: the smaller of what the taper curve prescribes and what the
+ * plan's own peak training week leaves once race day is paid for. Race day is a fixed cost the
+ * runner cannot shrink, so it is subtracted from the peak first and the tapered training
+ * component takes what is left. Both bounds are hard — the result never exceeds either — so race
+ * week's total can only exceed the peak by race day itself, never by training the engine added.
  *
  * `peakTrainingWeekKm` is the largest week the plan has already assembled; race week is always
  * the plan's last week, so by the time this runs it is the true peak. It is 0 only for a
  * one-week plan, where there is no peak to measure against and the ratio governs alone.
  *
- * The floor is `MIN_PRE_RACE_RUN_KM` per pre-race day: where race day alone already eats the
- * peak — a 10 km/week runner's 5K, where the race is most of the week whatever the taper does —
- * the peak-relative bound alone would collapse the pre-race days to the 1 km filler the §1.4
- * race-week bug produced, so a real shakeout is preferred instead. The floor is itself capped at
- * the ratio, so it can only ever raise the budget back towards what the taper curve already
- * prescribes, never past it: the tapered component is `min(ratio, …)` under every branch, and any
- * overshoot of the peak is race day itself, never training volume the engine chose to add.
+ * There is deliberately no per-day floor raising this number. An earlier revision had one, to
+ * avoid the 1 km filler days the §1.4 race-week bug produced — but a floor that scales with the
+ * requested day count and outranks the peak bound is just the peak bound not holding.
+ * `preRaceSchedule` resolves the same problem from the other side, by dropping pre-race *days*
+ * to rest until the days that remain can each take a real shakeout.
  */
 function preRaceBudgetKm(args: {
   desiredVolumeKm: number;
   raceDayKm: number;
   peakTrainingWeekKm: number;
-  easyCount: number;
 }): number {
-  const { desiredVolumeKm, raceDayKm, peakTrainingWeekKm, easyCount } = args;
+  const { desiredVolumeKm, raceDayKm, peakTrainingWeekKm } = args;
   const ratioKm = Math.round(desiredVolumeKm * RACE_WEEK_PRE_RACE_SHARE);
   const headroomKm = peakTrainingWeekKm > 0 ? peakTrainingWeekKm - raceDayKm : ratioKm;
-  return Math.max(
-    Math.min(ratioKm, headroomKm),
-    Math.min(ratioKm, easyCount * MIN_PRE_RACE_RUN_KM),
-  );
+  return Math.max(0, Math.min(ratioKm, headroomKm));
+}
+
+/**
+ * Turns the budget into a day count and the volume those days actually share.
+ *
+ * A sub-2 km run the day before a race is noise with a distance attached, not training — it is
+ * the exact signature the §1.4 race-week bug left behind, and `planTemplates.genericLongRun.
+ * test.ts` treats it as a defect. So when the budget cannot give every requested pre-race day a
+ * real shakeout, the surplus days become genuine rest instead of filler runs: a 12 km/week runner
+ * training six days a week gets three 2 km shakeouts and three rest days before their 5K, not
+ * five runs of `[2, 1, 1, 1, 1]`.
+ *
+ * **The one place the peak bound yields.** If the budget cannot fund even a single 2 km shakeout,
+ * one is scheduled anyway. That regime is a runner whose race day alone already meets or exceeds
+ * their biggest training week — a 10 km/week beginner's first 5K, where race day plus warm-up and
+ * cool-down is 10 km — and for them the alternative is a race week containing no running but the
+ * race itself, which is not a taper, it is an omission. The overshoot is bounded at exactly one
+ * `MIN_PRE_RACE_RUN_KM` run and cannot grow with day count; every other pre-race day is still
+ * dropped to rest. Above that regime the peak bound is absolute.
+ */
+function preRaceSchedule(
+  budgetKm: number,
+  requestedEasyCount: number,
+): { dayCount: number; budgetKm: number } {
+  if (requestedEasyCount <= 0) return { dayCount: 0, budgetKm: 0 };
+  const affordableDays = Math.floor(budgetKm / MIN_PRE_RACE_RUN_KM);
+  if (affordableDays < 1) return { dayCount: 1, budgetKm: MIN_PRE_RACE_RUN_KM };
+  const dayCount = Math.min(requestedEasyCount, affordableDays);
+  return { dayCount, budgetKm };
 }
 
 function raceDayWorkout(distance: RaceDistance): Workout {
@@ -844,7 +870,17 @@ function placeWorkoutsInOrder(workouts: Workout[], daysPerWeek: number): Week7<D
   return days as unknown as Week7<Day>;
 }
 
-function placeWorkouts(workouts: Workout[], daysPerWeek: number): Week7<Day> {
+/**
+ * `padShortWeeks` covers the caller that deliberately schedules fewer runs than the runner asked
+ * for: race week drops pre-race days to rest rather than shrink them below a real shakeout, so
+ * padding the gap back out with 1 km filler would undo that day-dropping. Every other caller
+ * assembles exactly `runCount` workouts and keeps the padding as a safety net.
+ */
+function placeWorkouts(
+  workouts: Workout[],
+  daysPerWeek: number,
+  padShortWeeks = true,
+): Week7<Day> {
   const runCount = normalizedRunCount(daysPerWeek);
   const layouts: Record<number, {
     runSlots: number[];
@@ -860,7 +896,7 @@ function placeWorkouts(workouts: Workout[], daysPerWeek: number): Week7<Day> {
   };
   const layout = layouts[runCount];
   const selected = workouts.slice(0, runCount);
-  while (selected.length < runCount) {
+  while (padShortWeeks && selected.length < runCount) {
     selected.unshift({
       kind: 'run',
       effort: 'easy',
@@ -1221,20 +1257,22 @@ function buildGenericWeek(args: {
     // the week's budget, it is the thing the week tapers into. See `RACE_WEEK_PRE_RACE_SHARE`
     // for the ratio and `preRaceBudgetKm` for the peak-relative bound that keeps race week's
     // total from outgrowing the block it tapers from.
-    const easyBudgetKm = preRaceBudgetKm({
-      desiredVolumeKm,
-      raceDayKm: race.distanceKm ?? 0,
-      peakTrainingWeekKm,
+    const schedule = preRaceSchedule(
+      preRaceBudgetKm({
+        desiredVolumeKm,
+        raceDayKm: race.distanceKm ?? 0,
+        peakTrainingWeekKm,
+      }),
       easyCount,
-    });
-    const easyDistances = distributeDistance(easyBudgetKm, easyCount, maxSingleRunKm);
+    );
+    const easyDistances = distributeDistance(schedule.budgetKm, schedule.dayCount, maxSingleRunKm);
     const easyWorkouts = easyDistances.map((distanceKm, index) =>
       index === easyDistances.length - 1
         ? shakeoutRun(distanceKm, density, intake.age, '2 × 30 s Strides @ GP')
         : easyRun({ distanceKm, pace: easyPace, density, age: intake.age }),
     );
-    const reconciledEasyWorkouts = reconcileVolumeToTarget(easyWorkouts, easyBudgetKm);
-    const days = placeWorkouts([...reconciledEasyWorkouts, race], requestedRuns);
+    const reconciledEasyWorkouts = reconcileVolumeToTarget(easyWorkouts, schedule.budgetKm);
+    const days = placeWorkouts([...reconciledEasyWorkouts, race], schedule.dayCount + 1, false);
     const volumeKm = days
       .filter((day): day is Workout => day.kind === 'run')
       .reduce((sum, workout) => sum + (workout.distanceKm ?? 0), 0);

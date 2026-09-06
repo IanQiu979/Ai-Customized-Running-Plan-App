@@ -106,6 +106,20 @@ const PROFILES: Profile[] = [
   { name: 'I — marathon, 100 km/wk, 20 weeks', experience: 'competitive', age: 29, daysPerWeek: 6, weeklyKm: 100, durationWeeks: 20, raceDistance: 'marathon', goalType: 'race' },
   { name: 'J — 5K, 15 km/wk, 6 weeks', experience: 'some', age: 40, daysPerWeek: 3, weeklyKm: 15, durationWeeks: 6, raceDistance: '5k', goalType: 'race' },
   { name: 'K — marathon, 60 km/wk, 16 weeks', experience: 'experienced', age: 38, daysPerWeek: 5, weeklyKm: 60, durationWeeks: 16, raceDistance: 'marathon', goalType: 'race' },
+  // L and M are the low-volume/high-frequency corner this list had no profile for: a runner whose
+  // race day is most of their biggest week, training often enough that the pre-race budget cannot
+  // give every requested day a real shakeout. Every race-week invariant below (the >= 2 km
+  // pre-race floor especially) was previously unfalsifiable because no profile could reach the
+  // regime where the budget and the day count actually conflict.
+  { name: 'L — 5K, 12 km/wk, 6 days, 10 weeks', experience: 'some', age: 34, daysPerWeek: 6, weeklyKm: 12, durationWeeks: 10, raceDistance: '5k', goalType: 'race' },
+  { name: 'M — 5K, 9 km/wk, 6 days, 10 weeks', experience: 'new', age: 45, daysPerWeek: 6, weeklyKm: 9, durationWeeks: 10, raceDistance: '5k', goalType: 'race' },
+  // N is the only profile for which the marathon ceilings actually bind. `longRunShareCap` and
+  // `maxSingleRunKm` are both non-binding (`Infinity`) for an intermediate/advanced marathon
+  // runner while the captain's number is pending, so the share-cap and absolute-cap assertions
+  // below are vacuous for B, G, I and K. Beginner is deliberately excluded from that bypass and
+  // keeps the 14 km ceiling and the run-count-scaled ladder — which nothing here exercised
+  // through a generated plan until now.
+  { name: 'N — beginner marathon, 30 km/wk, 20 weeks', experience: 'new', age: 33, daysPerWeek: 4, weeklyKm: 30, durationWeeks: 20, raceDistance: 'marathon', goalType: 'race' },
 ];
 
 function buildFor(profile: Profile): Plan {
