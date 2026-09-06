@@ -308,6 +308,17 @@ export interface LongRunClamp {
 }
 
 /**
+ * The 10% rule limits the *rate* of increase. The engine renders whole kilometres, so a raw
+ * fractional ceiling below 10 km rounds straight back to the previous longest and forbids all
+ * growth instead of limiting it — a 5 km long run gets a 5.5 km ceiling that floors to 5 km again.
+ * `roundUp` is how a caller opts into the whole-kilometre reading of the same rule.
+ */
+export function spikeCeilingKm(previousLongestKm: number, roundUp: boolean): number {
+  const raw = previousLongestKm * LONG_RUN_SPIKE_MULTIPLE;
+  return roundUp ? Math.ceil(raw) : raw;
+}
+
+/**
  * Applies every long-run ceiling and reports which one bound.
  *
  * The spike cap is the evidence-backed one: a 2025 BJSM cohort found weekly volume
@@ -340,17 +351,6 @@ export interface LongRunClamp {
  * Trust boundary: `lastLoadingWeekKm` must be derived by the caller from the plan's own
  * preceding weeks (deterministic engine state) — never taken from model output.
  */
-/**
- * The 10% rule limits the *rate* of increase. The engine renders whole kilometres, so a raw
- * fractional ceiling below 10 km rounds straight back to the previous longest and forbids all
- * growth instead of limiting it — a 5 km long run gets a 5.5 km ceiling that floors to 5 km again.
- * `roundUp` is how a caller opts into the whole-kilometre reading of the same rule.
- */
-export function spikeCeilingKm(previousLongestKm: number, roundUp: boolean): number {
-  const raw = previousLongestKm * LONG_RUN_SPIKE_MULTIPLE;
-  return roundUp ? Math.ceil(raw) : raw;
-}
-
 export function clampLongRun(args: {
   proposedKm: number;
   weeklyKm: number;

@@ -37,10 +37,12 @@ import {
   DELOAD_REDUCTION_MIN,
   isValidDeload,
   longRunShareCap,
+  LONG_RUN_MAX_MINUTES,
   LONG_RUN_SPIKE_MULTIPLE,
   MAX_SINGLE_RUN_KM,
   toExperienceLevel,
 } from '../loadRules';
+import { deriveTrainingPaces } from '../paceDerivation';
 import type {
   Day,
   ExperienceAnswer,
@@ -153,19 +155,6 @@ describe('generic path — every long-run ceiling is enforced (audit §1.2)', ()
   );
 
   it.each(PROFILES.map((profile) => [profile.name, profile] as const))(
-    'holds %s inside the weekly-share cap on every loading week',
-    (_name, profile) => {
-      const plan = buildFor(profile);
-      const cap = longRunShareCap(toExperienceLevel(profile.experience), runCountFor(profile.daysPerWeek));
-      for (const week of plan.weeks) {
-        const longRun = findLongRun(week);
-        if (!longRun || week.isDeload) continue;
-        expect((longRun.distanceKm ?? 0) / week.volumeKm).toBeLessThanOrEqual(cap + 1e-9);
-      }
-    },
-  );
-
-  it.each(PROFILES.map((profile) => [profile.name, profile] as const))(
     'never lets %s spike its long run more than the spike multiple over its previous longest',
     (_name, profile) => {
       const plan = buildFor(profile);
@@ -195,6 +184,66 @@ describe('generic path — every long-run ceiling is enforced (audit §1.2)', ()
       }
     },
   );
+
+  it('keeps a pace-known, high-volume marathon long run within the three-hour ceiling', () => {
+    const recentPerformance = { distance: '10k', timeSec: 7200 } as const;
+    const level = toExperienceLevel('regular');
+    const easyPace = deriveTrainingPaces(recentPerformance, level).easy;
+    expect(easyPace).toBeDefined();
+    const easyPaceSecPerKm = easyPace!.highSecPerKm;
+
+    const plan = buildTemplatePlan({
+      intake: {
+        goal: 'Finish a marathon',
+        age: 35,
+        experience: 'regular',
+        daysPerWeek: 5,
+        weeklyKm: 110,
+        raceDistance: 'marathon',
+        recentPerformance,
+        injuries: ['none'],
+      },
+      goalType: 'race',
+      durationWeeks: 20,
+      raceDistance: 'marathon',
+      tierAtGeneration: 'pro',
+      density: 'paid',
+    });
+
+    let previousLongestKm = 0;
+    let lastLoadingWeekKm = 0;
+    let timeCeilingWitness: Workout | undefined;
+    for (const week of plan.weeks) {
+      const longRun = findLongRun(week);
+      if (longRun) {
+        const distanceKm = longRun.distanceKm ?? 0;
+        const { km } = clampLongRun({
+          proposedKm: distanceKm,
+          weeklyKm: week.volumeKm,
+          level,
+          previousLongestKm,
+          easyPaceSecPerKm,
+          isDeload: week.isDeload,
+          lastLoadingWeekKm,
+          shareCapOverride: longRunShareCap(level, 5),
+          roundSpikeCeilingUp: true,
+        });
+        expect(Math.floor(km)).toBeGreaterThanOrEqual(distanceKm);
+
+        const durationMinutes = (distanceKm * easyPaceSecPerKm) / 60;
+        expect(durationMinutes).toBeLessThanOrEqual(LONG_RUN_MAX_MINUTES);
+        if (
+          ((distanceKm + 1) * easyPaceSecPerKm) / 60 >
+          LONG_RUN_MAX_MINUTES
+        ) {
+          timeCeilingWitness = longRun;
+        }
+        previousLongestKm = Math.max(previousLongestKm, distanceKm);
+      }
+      if (!week.isDeload) lastLoadingWeekKm = week.volumeKm;
+    }
+    expect(timeCeilingWitness).toBeDefined();
+  });
 
   it('pins the two exact breaches the audit reported for profile C (half, 80 km/wk)', () => {
     const profileC = PROFILES.find((p) => p.name.startsWith('C'))!;
@@ -509,6 +558,111 @@ describe('generic path — volume reconciliation may not re-open the share cap',
 
 describe('generic path — race week is a taper, not budget math around the race (audit §1.4)', () => {
   const RACE_PROFILES = PROFILES.filter((profile) => profile.raceDistance !== undefined);
+  const FUNDED_RACE_PROFILES = [
+    PROFILES.find((profile) => profile.name.startsWith('B'))!,
+    PROFILES.find((profile) => profile.name.startsWith('C'))!,
+  ];
+  const UNDERFUNDED_RACE_CASES: {
+    profile: Profile;
+    expectedPreRaceRuns: number;
+    expectedPreRaceKm: number;
+  }[] = [
+    {
+      profile: {
+        name: 'half, 10 km/wk, 6 days',
+        experience: 'regular',
+        age: 35,
+        daysPerWeek: 6,
+        weeklyKm: 10,
+        durationWeeks: 12,
+        raceDistance: 'half',
+        goalType: 'race',
+      },
+      expectedPreRaceRuns: 2,
+      expectedPreRaceKm: 5,
+    },
+    {
+      profile: {
+        name: 'half, 10 km/wk, 7 days',
+        experience: 'regular',
+        age: 35,
+        daysPerWeek: 7,
+        weeklyKm: 10,
+        durationWeeks: 12,
+        raceDistance: 'half',
+        goalType: 'race',
+      },
+      expectedPreRaceRuns: 3,
+      expectedPreRaceKm: 6,
+    },
+    {
+      profile: {
+        name: 'marathon, 10 km/wk, 6 days',
+        experience: 'regular',
+        age: 35,
+        daysPerWeek: 6,
+        weeklyKm: 10,
+        durationWeeks: 16,
+        raceDistance: 'marathon',
+        goalType: 'race',
+      },
+      expectedPreRaceRuns: 2,
+      expectedPreRaceKm: 5,
+    },
+    {
+      profile: {
+        name: 'marathon, 10 km/wk, 7 days',
+        experience: 'regular',
+        age: 35,
+        daysPerWeek: 7,
+        weeklyKm: 10,
+        durationWeeks: 16,
+        raceDistance: 'marathon',
+        goalType: 'race',
+      },
+      expectedPreRaceRuns: 3,
+      expectedPreRaceKm: 6,
+    },
+  ];
+
+  it.each(
+    UNDERFUNDED_RACE_CASES.map(
+      ({ profile, expectedPreRaceRuns, expectedPreRaceKm }) =>
+        [profile.name, profile, expectedPreRaceRuns, expectedPreRaceKm] as const,
+    ),
+  )(
+    'rests omitted pre-race slots instead of padding %s with 1 km filler runs',
+    (_name, profile, expectedPreRaceRuns, expectedPreRaceKm) => {
+      const raceWeek = buildFor(profile).weeks.at(-1)!;
+      expect(raceWeek.days[6]).toMatchObject({ kind: 'run', label: 'Race Day' });
+
+      const preRaceRuns = raceWeek.days.slice(0, 6).filter(isWorkout);
+      expect(preRaceRuns).toHaveLength(expectedPreRaceRuns);
+      expect(
+        preRaceRuns.reduce((sum, run) => sum + (run.distanceKm ?? 0), 0),
+      ).toBe(expectedPreRaceKm);
+      expect(raceWeek.days.filter(isWorkout)).toHaveLength(expectedPreRaceRuns + 1);
+      const fillerRuns = preRaceRuns
+        .filter((run) => (run.distanceKm ?? 0) < 2)
+        .map((run) => ({ label: run.label, distanceKm: run.distanceKm }));
+      expect(fillerRuns).toEqual([]);
+      expect(preRaceRuns.length).toBeLessThan(runCountFor(profile.daysPerWeek) - 1);
+      expect(preRaceRuns.at(-1)?.label).toBe('SR');
+
+      const baselineRestDays = 7 - runCountFor(profile.daysPerWeek);
+      expect(raceWeek.days.filter((day) => day.kind === 'rest').length).toBeGreaterThan(
+        baselineRestDays,
+      );
+    },
+  );
+
+  it.each(FUNDED_RACE_PROFILES.map((profile) => [profile.name, profile] as const))(
+    'keeps all requested race-week runs for funded profile %s',
+    (_name, profile) => {
+      const raceWeek = buildFor(profile).weeks.at(-1)!;
+      expect(raceWeek.days.filter(isWorkout)).toHaveLength(runCountFor(profile.daysPerWeek));
+    },
+  );
 
   it.each(RACE_PROFILES.map((profile) => [profile.name, profile] as const))(
     'gives %s pre-race days that are real runs, never the 1 km distributeDistance floor',

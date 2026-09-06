@@ -18,7 +18,6 @@ import {
   isValidDeload,
   LONG_RUN_SHARE_CAP,
   LONG_RUN_SPIKE_MULTIPLE,
-  longRunShareCap,
   MAX_SINGLE_RUN_KM,
   toExperienceLevel,
 } from '../loadRules';
@@ -194,7 +193,7 @@ describe('golden 5K path — the coach-authored plan is verified against the cap
       const plan = buildGoldenPlanFor(profile);
       // R1c: a deload's long run is measured against the last *loading* week, not its own
       // deliberately-reduced volume.
-      const cap = longRunShareCap(toExperienceLevel(profile.experience), 4);
+      const cap = LONG_RUN_SHARE_CAP[toExperienceLevel(profile.experience)];
       let lastLoadingWeekKm = 0;
       const breaches: string[] = [];
       for (const week of plan.weeks) {
@@ -235,7 +234,7 @@ describe('golden 5K path — the coach-authored plan is verified against the cap
         const longRun = findLongRun(week);
         if (!longRun) continue;
         const km = longRun.distanceKm ?? 0;
-        if (previousLongestKm > 0 && km > Math.ceil(previousLongestKm * LONG_RUN_SPIKE_MULTIPLE)) {
+        if (previousLongestKm > 0 && km > previousLongestKm * LONG_RUN_SPIKE_MULTIPLE) {
           breaches.push(`week ${week.weekNumber}: ${km} km after a previous longest of ${previousLongestKm} km`);
         }
         previousLongestKm = Math.max(previousLongestKm, km);

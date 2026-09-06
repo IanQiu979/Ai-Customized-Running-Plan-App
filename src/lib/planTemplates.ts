@@ -512,8 +512,8 @@ function scaleQualityDistanceKm(nominalKm: number, volumeKm: number): number {
 /**
  * Per-workout structural floors (a quality session's own minimum, the long run's own candidate,
  * `distributeDistance`'s 1 km/session floor) can each be individually reasonable yet still stack
- * past `targetKm`. This is the last-mile guarantee that the assembled, user-visible total never
- * exceeds the clamped target.
+ * past `targetKm`. This is the last-mile attempt to bring the assembled, user-visible total back
+ * to the clamped target without deleting a scheduled session.
  *
  * It must not re-open the share cap the clamp loop just closed, which a proportional rescale did:
  * flooring each workout independently overshot downward, so the week's total fell further than the
@@ -521,8 +521,11 @@ function scaleQualityDistanceKm(nominalKm: number, volumeKm: number): number {
  * 20 km/wk week rendered a 6 km long run in a 17 km week — 35.3% against a 35.0% cap). So it
  * removes whole kilometres one at a time, largest first, from everything that is not the long run,
  * and only starts on the long run once every other session is down to its 1 km floor. Removing
- * exactly the overshoot lands the week on `targetKm` rather than under it, which is what keeps the
- * ratio the loop measured intact.
+ * whole-kilometre overshoot normally lands the week on `targetKm` rather than under it, which is
+ * what keeps the ratio the loop measured intact. If `targetKm` is smaller than the number of
+ * scheduled sessions, the 1 km/session floor makes some overshoot unavoidable; the function
+ * leaves those sessions at their existing floor. This preserves the established tiny-deload
+ * behavior instead of silently dropping runs.
  */
 function reconcileVolumeToTarget(workouts: Workout[], targetKm: number): Workout[] {
   const distances = workouts.map((workout) => workout.distanceKm ?? 0);
@@ -631,7 +634,11 @@ function placeWorkoutsInOrder(workouts: Workout[], daysPerWeek: number): Week7<D
   return days as unknown as Week7<Day>;
 }
 
-function placeWorkouts(workouts: Workout[], daysPerWeek: number): Week7<Day> {
+function placeWorkouts(
+  workouts: Workout[],
+  daysPerWeek: number,
+  options: { padMissing?: boolean } = {},
+): Week7<Day> {
   const runCount = normalizedRunCount(daysPerWeek);
   const layouts: Record<number, {
     runSlots: number[];
@@ -647,14 +654,16 @@ function placeWorkouts(workouts: Workout[], daysPerWeek: number): Week7<Day> {
   };
   const layout = layouts[runCount];
   const selected = workouts.slice(0, runCount);
-  while (selected.length < runCount) {
-    selected.unshift({
-      kind: 'run',
-      effort: 'easy',
-      label: 'ER',
-      distanceKm: 1,
-      effortDescription: EASY_DESCRIPTION,
-    });
+  if (options.padMissing !== false) {
+    while (selected.length < runCount) {
+      selected.unshift({
+        kind: 'run',
+        effort: 'easy',
+        label: 'ER',
+        distanceKm: 1,
+        effortDescription: EASY_DESCRIPTION,
+      });
+    }
   }
 
   const days: Day[] = Array.from({ length: 7 }, () => REST);
@@ -989,14 +998,20 @@ function buildGenericWeek(args: {
     // Not `desiredVolumeKm - race.distanceKm`: the race is not a training session competing for
     // the week's budget, it is the thing the week tapers into. See `RACE_WEEK_PRE_RACE_SHARE`.
     const easyBudgetKm = Math.max(easyCount, Math.round(desiredVolumeKm * RACE_WEEK_PRE_RACE_SHARE));
-    const easyDistances = distributeDistance(easyBudgetKm, easyCount, maxSingleRunKm);
+    const scheduledEasyCount = Math.max(
+      1,
+      Math.min(easyCount, Math.floor(easyBudgetKm / 2)),
+    );
+    const easyDistances = distributeDistance(easyBudgetKm, scheduledEasyCount, maxSingleRunKm);
     const easyWorkouts = easyDistances.map((distanceKm, index) =>
       index === easyDistances.length - 1
         ? shakeoutRun(distanceKm, density, intake.age, '2 × 30 s Strides @ GP')
         : easyRun({ distanceKm, pace: easyPace, density, age: intake.age }),
     );
     const reconciledEasyWorkouts = reconcileVolumeToTarget(easyWorkouts, easyBudgetKm);
-    const days = placeWorkouts([...reconciledEasyWorkouts, race], requestedRuns);
+    const days = placeWorkouts([...reconciledEasyWorkouts, race], requestedRuns, {
+      padMissing: false,
+    });
     const volumeKm = days
       .filter((day): day is Workout => day.kind === 'run')
       .reduce((sum, workout) => sum + (workout.distanceKm ?? 0), 0);

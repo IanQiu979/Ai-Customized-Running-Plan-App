@@ -131,11 +131,14 @@ produce still build: B peaks at a 19 km long run, K at 22 km, C at 27 km. Every 
 regression suite (`planTemplates.genericLongRun.test.ts`) — not just these four — now holds inside
 its scaled cap on every loading and deload week.
 
-**The golden 12-week / 4-day / 5K plan is not exempt from these caps, it is verified against
-them.** That path is coach-authored, so nothing clamps or rewrites its numbers; instead
-`planTemplates.longRunCap.test.ts` replays the same share, spike and absolute-ceiling checks over
-its output across every level, age band and declared volume it can be reached with. The share,
-spike and absolute ceilings all hold, on every week of every one of those intakes, measured with
+**The golden 12-week / 4-day / 5K plan is not exempt from these caps: it calls the same clamp and
+is verified against them.** Both plan-building paths call `clampLongRun()`. The generic path passes
+its run-count-scaled share cap and asks for a rounded-up whole-kilometre spike ceiling; the golden
+path deliberately omits both overrides, retaining the flat share table and raw fractional spike
+ceiling. Its coach-authored values already fit, so the clamp returns them unchanged.
+`planTemplates.longRunCap.test.ts` also replays the share, spike and absolute-ceiling checks over
+the golden output across every level, age band and declared volume it can be reached with. The
+ceilings all hold, on every week of every one of those intakes, measured with
 `clampLongRun`'s own denominator — the last loading week when the week is a genuine deload against
 it (`isValidDeload`), otherwise the week's own volume.
 
@@ -155,8 +158,16 @@ it against the race week's budget never bites. That reasoning was wrong away fro
 10 km`, the audit's own §1.4 signature. Race-week budget arithmetic is not coaching content, so the
 golden path now uses the same share. At the 35 km fixture the two agree exactly (28 − 10 = 18 =
 28 × 18/28), so that plan is unchanged; across 480 golden intakes the eleven training weeks are
-value-for-value identical to the pre-branch engine, and the 90 intakes that used to render a 1 km
-filler race week now render none.
+numerically and structurally identical to `adc3aa0`. Their `effortDescription` intentionally
+differs because the LR definition no longer promises that session is the week's longest run. The
+90 intakes that used to render a 1 km filler race week now render none.
+
+On the generic path, a low-volume/high-frequency race week may not have enough pre-race budget to
+fund every requested run slot without recreating the 1 km filler. The existing non-filler threshold
+is 2 km, so the engine reduces the number of scheduled pre-race runs to what the budget can fund
+and leaves the remaining slots as rest. It does not compress the layout: Race Day stays on Day 7,
+and SR is the final run before it. Normally funded audit profiles B/C and the golden fixture keep
+their existing numeric schedule; only the already-noted golden LR `effortDescription` differs.
 
 **Progression on that path is a separate, open question, and it is Ian's.** Three beginner intakes
 never raise the long run at all across twelve weeks and never reach the volume the runner declared:
@@ -178,9 +189,10 @@ exactly the runners this audit was about. The ceiling is now rounded up
 still floored. **The change is scoped to `buildGenericWeek`** (`clampLongRun`'s
 `roundSpikeCeilingUp` argument): the coach-authored golden path omits it and keeps the raw
 fractional ceiling it has always had, so every value it generates is identical to what it generated
-before this branch. Nothing else moves either: the share, absolute and time ceilings are applied as
-a minimum alongside the spike ceiling, so the loosened one can only ever permit growth one of them
-already allows.
+before this branch apart from the intentionally revised LR `effortDescription`; its numeric and
+structural fields remain identical. Nothing else moves either: the share, absolute and time
+ceilings are applied as a minimum alongside the spike ceiling, so the loosened one can only ever
+permit growth one of them already allows.
 Explicitly declined in the same ruling: adding a minimum absolute growth step as a second,
 independent floor — that would set up a rival growth authority against the spike cap, where the real
 problem was an integer-rounding artifact.
@@ -198,12 +210,14 @@ week 5 settled a 7 km long run against an assembled 20 km, then rendered `ER 1 |
 INT 5 | LR 6` — a 6 km long run in a 17 km week, 35.3% against a 35.0% cap. Two changes close it:
 the loop now measures against `min(assembled, target)`, and `reconcileVolumeToTarget` removes the
 overshoot a whole kilometre at a time from the largest non-long-run session — only touching the
-long run once every other session is at its 1 km floor — so the week lands exactly on the target
-instead of undershooting it. That week now reads `ER 1 | TR 5 | ER 1 | INT 6 | LR 6`, 19 km,
-31.6%. Across the same 5,625-intake sweep, share-cap breaches go from 47,183 on the pre-branch
-engine to 0.
+long run once every other session is at its 1 km floor. Ordinarily this lands on the target instead
+of undershooting it. If the target is smaller than the number of scheduled sessions, the
+1 km/session floor makes some overshoot unavoidable; preserving those sessions is the established
+tiny-deload behavior and is not changed here. The example week now reads
+`ER 1 | TR 5 | ER 1 | INT 6 | LR 6`, 19 km, 31.6%. Across the same 5,625-intake sweep, share-cap
+breaches go from 47,183 on the pre-branch engine to 0.
 
-**The cap bounds the week's longest run, not the session labelled `LR`.** Wiring `clampLongRun`
+**Easy runs are bounded by the final clamped LR, not a pre-clamp candidate.** Wiring `clampLongRun`
 into `buildGenericWeek` first shipped with the easy-day ceiling frozen at the *pre*-clamp long-run
 candidate and reduced by a kilometre. That cured an earlier volume spiral, but it left the easy days
 bounded by a long run that never shipped, so they could come out longer than the one that did — a
@@ -211,13 +225,19 @@ bounded by a long run that never shipped, so they could come out longer than the
 against a 36.7% cap. Across a 5,625-intake sweep, 1,648 plan-weeks had an easy day longer than that
 week's long run; the same sweep on the pre-branch engine had none.
 
-Every run in a generic week is now bounded by that week's actual, post-clamp long run — no
-subtracted kilometre, ties allowed. The ladder's own reachability property (`cap x runCount > 1`) is
-what lets `runCount` runs at that shared ceiling still cover the week's target, so no separate
-volume-preservation ceiling is needed and the spiral does not return. The sweep now reports zero
-such weeks. The trade is real and visible on weeks that were previously over-filled by an
+Every easy run in a generic week is now bounded by that week's actual, post-clamp long run — no
+subtracted kilometre, ties allowed. Quality/tempo sessions are deliberately not bounded by LR and
+may be longer; shrinking them was explicitly declined because it would change the authored
+training stimulus. The ladder's own reachability property (`cap x runCount > 1`) is what lets the
+easy-run allocation cover the week's target where the other structural floors allow it, so no
+separate pre-clamp ceiling is needed and the spiral does not return. The sweep now reports zero
+easy-run breaches. The trade is real and visible on weeks that were previously over-filled by an
 oversized easy day: they lose a few kilometres (mean 3.9 km across the 1,648 affected weeks), and on
 heavily-clamped weeks several runs legitimately read the same distance.
+
+The plan-level regression suite now also generates a pace-known, high-volume marathon and proves
+its rendered long run stays within the three-hour ceiling. This complements the direct
+`clampLongRun()` unit tests with coverage of the real generic plan path.
 
 ### Deload trigger
 
