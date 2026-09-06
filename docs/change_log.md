@@ -5,6 +5,147 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-09-06 — long-run cap and race-week fixes, core-purpose audit §1.2/§1.4
+
+Closes the audit's two pure rule-enforcement findings
+(`/Users/Guestyyyyyyyy/firstmate/data/v22-core-purpose-audit-r1/report.md`). Its other findings —
+per-distance training content, deload session shape (§1.1, §1.3, §1.5–§1.9) — are unrelated and
+untouched; they stay open, captain-content-blocked.
+
+**Verification, as measured — the "36 suites, 610 tests clean" line this entry originally carried
+was written before the review rounds below and was not true while they were in flight.** The final
+focused pass is green at 3 suites / 177 tests, including generated marathon and half-marathon
+plans, underfunded 6/7-day race weeks, and a pace-known marathon that exercises the
+three-hour ceiling. ESLint is clean on the two changed source files and `git diff --check` passes;
+the repository-wide gate belongs to the delivery pipeline.
+
+- **§1.2 — `buildGenericWeek` never called `clampLongRun()`.** Every 10K, half, marathon and
+  general-fitness plan (everything off the golden 12-week/4-day 5K path) computed its long run
+  from the curve and volume budget with none of the documented share/spike/absolute/time caps
+  enforced — the audit reproduced a 34 km long run in a 64 km week (53% against a 35% cap) and
+  deload-week breaches up to 86%. Both paths now call `clampLongRun()`: the generic path supplies
+  its run-count-scaled share cap and whole-kilometre rounded-up spike ceiling, while the
+  coach-authored golden path deliberately keeps the flat share table and raw fractional spike
+  ceiling. On the generic path, `longRunStartFloor` is only the pre-clamp starting candidate and
+  `easyRunCapKm` follows the final clamped long run, so an easy run cannot outgrow the LR that
+  actually ships. Quality sessions are not bounded by LR; Ian explicitly accepted that a safety
+  cap can put LR below a tempo/interval session rather than silently changing its stimulus.
+- **Long-run share cap now scales with weekly run count — captain's ruling on issue
+  `longrun-share-cap-floor`.** Fixing the wiring bug surfaced a deeper one: a flat per-level cap
+  is arithmetically impossible below a run-count-dependent threshold (an n-run week's largest
+  entry is never under `1/n` — 33% at 3 runs/week, already over every level's flat cap), which is
+  why the audit's beginner and 3-day profiles breached the cap on *every* loading week regardless
+  of the wiring fix. Ian's ruling: the cap always wins, even where that puts the long run below a
+  quality session that week, and it must scale by run count rather than stay flat — "a 3-day week
+  legitimately carries a larger share than a 6-day week; that is normal training, not a breach."
+  New: `loadRules.ts`'s `longRunShareCap(level, runCount)`. The flat `LONG_RUN_SHARE_CAP` table is
+  untouched and still governs the byte-pinned golden 5K fixture. Consequence, also per the ruling:
+  the long run is no longer guaranteed to be "the week's longest run" — `notation.ts`'s LR entry
+  and `planTemplates.ts`'s `LONG_DESCRIPTION` no longer claim it (docs mirrored in
+  `docs/reference/coaching/notation.md`). Full ruling, formula, and before/after numbers for the
+  audit's own cited breaches: `docs/reference/coaching/load-rules.md`'s 2026-09-05 entry.
+- **§1.4 — race week was assembled from the race-day budget.** `raceDayWorkout`'s distance (race +
+  5 km warm-up/cool-down — 47 km for a marathon) was charged against the race week's own volume
+  budget; once the race alone exhausted it, every day before the race fell to
+  `distributeDistance`'s 1 km floor (a marathon race week of three 1 km runs plus the 47 km "race
+  day"). Pre-race days are now sized from `RACE_WEEK_PRE_RACE_SHARE`, a share of the taper-curve
+  target read straight off the approved 12-week 5K fixture's own race week (18 of its 28 km is
+  pre-race running) — no new coaching content, the race day sits on top instead of competing with
+  it for budget. **Both paths use it.** The golden 5K path was first left on the literal
+  subtraction, on the reasoning that a 5K race day is too small for the bug to bite there — which
+  was false away from the fixture's own 35 km baseline (a 12 km/wk beginner's golden race week
+  rendered `1 km | 1 km | 1 km | Race Day 10 km`). At 35 km the share and the subtraction agree
+  exactly, so the pinned fixture is unchanged; across 480 golden intakes the eleven training weeks
+  are numerically and structurally identical to `adc3aa0`; `effortDescription` intentionally
+  differs because LR copy no longer promises it is the week's longest run. The 90 golden intakes
+  that rendered a 1 km filler race week now render none. On the generic path, a race-week budget
+  too small to fund every requested pre-race slot at the existing 2 km non-filler threshold now
+  schedules fewer pre-race runs and leaves the unused slots as rest. It keeps the original layout:
+  Race Day is Day 7 and SR is the final run before it. Normally funded audit profiles B/C and the
+  golden fixture retain their existing run counts and numeric distances.
+- **Review follow-up (same day): the ladder is floored at the flat table.** The first revision of
+  `longRunShareCap` was a bare `margin / runCount`, which raised the cap at low run counts as the
+  ruling required but also *lowered* it at high run counts — advanced 35% → 23.3% at six runs a
+  week and 20.0% at seven, halving the long runs on the marathon and half plans the flat table was
+  signed off for (an 80 km/wk half runner peaked at a 16 km long run). Nobody ruled on that.
+  `longRunShareCap` is now `max(flat cap, margin / runCount)`: 4–7-run weeks are byte-identical to
+  the flat table again, and only the 3-run weeks that motivated the ruling move. The half runner
+  above now peaks at 27 km, the 50 km/wk marathon at 18 km.
+- **Review follow-up: `src/lib/fixtures/examplePlan.ts` no longer claims "the week's longest
+  run" either.** The permanent example plan every signed-in user can open still carried the retired
+  wording next to the glossary entry that had already dropped it. Same copy as the engine now.
+- **Review follow-up: the golden 5K path calls the clamp and is verified against the caps, not
+  silently exempt.**
+  `planTemplates.longRunCap.test.ts` gains a sweep of that coach-authored path across every level,
+  age band and declared volume it is reachable with. It calls `clampLongRun()` with the flat share
+  table and raw spike ceiling; its authored numbers already fit, so the clamp returns them
+  unchanged. The share, spike and absolute ceilings are also asserted over its output. The
+  share is measured with `clampLongRun`'s own denominator — the last loading week when the week is a
+  genuine deload against it (`isValidDeload`), otherwise the week's own volume. An earlier revision
+  of this entry claimed that denominator had been *tightened* to `max(own, last loading)`; that
+  claim is withdrawn as false. Taking the larger of the two can only shrink the measured share, so
+  it was strictly weaker, and it has been reverted. **No ratio-based share check can catch a week
+  where the long run and the week's total collapse together** — the golden 12 km/wk beginner's
+  week-4 "deload" is a 4 km total of four 1 km runs, and 1/4 = 25.0% sits exactly on the beginner
+  cap whichever denominator is used. That needs an assertion about absolute degeneracy, which this
+  suite does not have.
+  **Still open, and Ian's to rule on:** that path never grows the long run for three beginner
+  intakes, whose biggest week also stays under the volume the runner declared (12 km/wk → 2 km long
+  run in a 10 km week; 20 km/wk → 3 km / 17 km; 30 km/wk → 5 km / 27 km). Those figures are pinned
+  by test so the gap is visible and any drift fails, rather than silently fixed by reshaping a plan
+  that is the captain's own coaching.
+- **Review follow-up: the clamp is closed against the volume the week actually renders.** The
+  convergence loop measured the long run's share against the *assembled* sum of its sessions, which
+  `distributeDistance`'s 1 km-per-session floor can push above the week's target;
+  `reconcileVolumeToTarget` then trimmed the week back to the target and the rendered share climbed
+  back over the ceiling the loop had just satisfied. A 5-day advanced 20 km/wk runner's week 5
+  settled a 7 km long run against an assembled 20 km and rendered `ER 1 | TR 4 | ER 1 | INT 5 |
+  LR 6` — 6 km of a 17 km week, 35.3% against a 35.0% cap. The loop now measures against
+  `min(assembled, target)`, and `reconcileVolumeToTarget` removes the overshoot one whole kilometre
+  at a time from the largest non-long-run session, only reaching the long run once everything else
+  is at its 1 km floor — so an ordinarily funded week lands on target rather than undershooting it.
+  When the target is smaller than the number of scheduled sessions, the 1 km/session floor makes
+  some overshoot unavoidable; the established tiny-deload behavior is intentionally unchanged.
+  That week now reads `ER 1 | TR 5 | ER 1 | INT 6 | LR 6`, 19 km, 31.6%. Share-cap breaches
+  across the 5,625-intake sweep: 47,183 on `adc3aa0` → 0.
+- **Review follow-up: easy runs follow the final clamped LR, not a pre-clamp candidate.**
+  Wiring the clamp in first shipped with the easy-day ceiling frozen at the *pre*-clamp long-run
+  candidate and reduced by a kilometre. That cured the volume spiral but left the easy days bounded
+  by a long run that never shipped, so they could come out longer than the one that did — a 3-day
+  beginner at 15 km/wk drew `ER 5 | TR 3 | LR 4`, a 5 km easy day at 41.7% of a 12 km week against
+  a 36.7% cap. A 5,625-intake sweep found 1,648 such plan-weeks on the branch and none on the
+  pre-branch engine. Every easy run in a generic week is now bounded by that week's actual
+  post-clamp long run — no subtracted kilometre, ties allowed — and the sweep now reports zero.
+  Quality/tempo sessions are deliberately outside that ceiling and may be longer than LR. The
+  ladder's reachability property (`cap × runCount > 1`) is what keeps the week fillable at that
+  shared ceiling, so the spiral does not return. Weeks previously over-filled by an oversized easy
+  day do lose volume (mean 3.9 km over the 1,648 affected weeks), and on heavily-clamped weeks
+  several runs now legitimately read the same distance.
+- **Review follow-up: the spike ceiling was forbidding growth instead of limiting its rate.**
+  `clampLongRun`'s spike ceiling was the raw `previousLongestKm × 1.10` while the engine renders
+  whole kilometres, so below 10 km the floored ceiling equalled the previous longest (5 km → a
+  5.5 km ceiling → back to 5 km) and the long run could never move again for the rest of the plan —
+  reaching every beginner plan and every low-volume intermediate one. Now
+  `Math.ceil(previousLongestKm × LONG_RUN_SPIKE_MULTIPLE)`; the rendered distance is still floored,
+  and the share, absolute and time ceilings still apply as a minimum alongside it, so nothing can
+  grow past a ceiling that another rule already imposes. **Scoped to the generic path** via
+  `clampLongRun`'s `roundSpikeCeilingUp` argument — the coach-authored golden path omits it and
+  keeps its original raw ceiling, verified numerically and structurally identical to `adc3aa0`
+  across 480 intakes (5 experience levels × 6 ages × 16 declared volumes): every distance, zone,
+  RPE, structure, duration, phase, deload flag and weekly volume matches; `effortDescription`
+  intentionally differs because the LR definition changed. Covered by unit tests on
+  `clampLongRun` (including two that pin the share and absolute ceilings still binding over the
+  loosened spike ceiling) and by a plan-level test on profile E, which used to finish on the same
+  9 km long run it started with. See `docs/reference/coaching/load-rules.md`.
+- Expanded regression suite: `src/lib/__tests__/planTemplates.genericLongRun.test.ts` —
+  every audit runner profile, replayed through `clampLongRun` and checked against the scaled share
+  cap, the spike cap, the absolute cap, and the race-week reconstruction, plus two tests pinned to
+  the captain's ruling that fail without it (a 3-day beginner week, and a 4-day week where a large
+  tempo session used to force the floor over the cap), plus a volume-preservation pair for
+  profile F that fails if easy runs stop tracking the final clamped LR. It also generates a
+  pace-known, high-volume marathon and proves the rendered long run stays within the three-hour
+  ceiling, rather than testing that limit only at the arithmetic-helper level.
+
 ## 2026-09-05 — Expo SDK 54 → 57 upgrade
 
 Client-only, one major version at a time (54→55→56→57) per this repo's upgrade etiquette

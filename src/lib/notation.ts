@@ -51,7 +51,11 @@ export const RUN_TYPE_ABBREVIATIONS: Record<string, GlossaryEntry> = {
   },
   LR: {
     fullName: 'Long Run',
-    description: "The week's longest run, at easy pace throughout (or a light finish-build).",
+    // Not "the week's longest run": the long-run safety cap can put this session below a quality
+    // session in the same week (captain's ruling on `longrun-share-cap-floor`, 2026-09-05). Keep
+    // this in sync with `planTemplates.ts`'s `LONG_DESCRIPTION`.
+    description:
+      'Your endurance-building run for the week, at easy pace throughout (or a light finish-build).',
   },
   SR: {
     fullName: 'Shakeout Run',

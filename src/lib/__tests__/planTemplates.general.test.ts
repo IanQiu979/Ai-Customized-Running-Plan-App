@@ -20,11 +20,17 @@ function isWorkout(day: Day): day is Workout {
 
 /**
  * A race week's own distance is fixed by the event and cannot be clamped down like an ordinary
- * training week — a marathon race day is 42.195 km regardless of the runner's taper volume. That
- * week complies with the growth cap either the ordinary way (its actual, user-visible volume is
- * within the 15% cap off the last loading week) or because it sits exactly at the mathematically
- * mandatory minimum forced by the fixed race distance plus one required run per remaining day
- * (i.e. there is no discretionary padding beyond what the race itself forces).
+ * training week — a marathon race day is 42.195 km regardless of the runner's taper volume, so
+ * race week's *total* legitimately exceeds the growth cap. What must still comply is the training
+ * the runner does around it: the growth cap governs the week's **pre-race** volume, the race day
+ * itself being the one exempt line item.
+ *
+ * This assertion used to accept race week whenever its total sat at "the fixed race distance plus
+ * one required run per remaining day" — which passed precisely because the generic path was
+ * assembling race week backwards, charging race day against the week's volume budget until the
+ * surrounding days collapsed to `distributeDistance`'s 1 km floor. That escape hatch encoded the
+ * bug it was meant to police, so it is gone: pre-race volume is a real taper now and is held to
+ * the ordinary cap, which is a strictly stronger check than the floor it replaces.
  */
 function assertWeekGrowthCapCompliance(
   week: ReturnType<typeof buildTemplatePlan>['weeks'][number],
@@ -40,9 +46,9 @@ function assertWeekGrowthCapCompliance(
       `week ${week.weekNumber} grew ${(growth * 100).toFixed(1)}% off ${lastLoadingWeekKm} km, exceeding the reject threshold`,
     );
   }
-  const otherRuns = week.days.filter(isWorkout).filter((day) => day !== raceDay).length;
-  const mandatoryFloorKm = (raceDay.distanceKm ?? 0) + otherRuns;
-  expect(week.volumeKm).toBeLessThanOrEqual(mandatoryFloorKm + 1e-9);
+  const preRaceKm = week.volumeKm - (raceDay.distanceKm ?? 0);
+  const preRaceGrowth = (preRaceKm - lastLoadingWeekKm) / lastLoadingWeekKm;
+  expect(preRaceGrowth).toBeLessThanOrEqual(WEEKLY_INCREASE_REJECT_ABOVE + 1e-9);
 }
 
 function build(args: {

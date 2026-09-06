@@ -13,8 +13,22 @@
 
 import { buildTemplatePlan } from '../planTemplates';
 import type { TemplatePlanParams } from '../planTemplates';
-import { clampLongRun, LONG_RUN_SHARE_CAP, toExperienceLevel } from '../loadRules';
-import type { Day, IntakeResponses, Plan, Week, Workout } from '../planTypes';
+import {
+  clampLongRun,
+  isValidDeload,
+  LONG_RUN_SHARE_CAP,
+  LONG_RUN_SPIKE_MULTIPLE,
+  MAX_SINGLE_RUN_KM,
+  toExperienceLevel,
+} from '../loadRules';
+import type {
+  Day,
+  ExperienceAnswer,
+  IntakeResponses,
+  Plan,
+  Week,
+  Workout,
+} from '../planTypes';
 
 function isWorkout(day: Day): day is Workout {
   return day.kind === 'run';
@@ -109,5 +123,219 @@ describe('golden 5K path — long-run weekly-share cap holds at any baseline (sc
       }
       if (!week.isDeload) lastLoadingWeekKm = week.volumeKm;
     }
+  });
+});
+
+/**
+ * The golden 12-week / 4-day / 5K plan is the one genuinely coach-authored plan in the product —
+ * its weekly load, tempo and interval tables are Ian's own coaching, not generated output. It is
+ * therefore deliberately NOT routed through the run-count-scaled cap or the per-week fixed easy
+ * ceiling the generic path uses; nothing here clamps or rewrites those numbers.
+ *
+ * What it is no longer is *unmeasured*. The sweep above only ever exercised `experienced`
+ * (→ intermediate). This block replays the same four checks the generic suite applies
+ * (`planTemplates.genericLongRun.test.ts`) across every level, age band and volume the path can
+ * be reached with, so the coach-authored plan is verified against the safety rules rather than
+ * silently exempt from them. A breach here is a coaching question for Ian, not a licence to clamp.
+ */
+interface GoldenProfile {
+  name: string;
+  experience: ExperienceAnswer;
+  age: number;
+  weeklyKm: number;
+}
+
+const GOLDEN_PROFILES: GoldenProfile[] = [
+  { name: 'beginner — brand new, 12 km/wk, 30 y/o', experience: 'new', age: 30, weeklyKm: 12 },
+  { name: 'beginner — brand new, 20 km/wk, 16 y/o (youth, RPE not HR)', experience: 'new', age: 16, weeklyKm: 20 },
+  { name: 'beginner — some experience, 30 km/wk, 55 y/o (3-week deload cadence)', experience: 'some', age: 55, weeklyKm: 30 },
+  { name: 'intermediate — regular, 35 km/wk, 30 y/o', experience: 'regular', age: 30, weeklyKm: 35 },
+  { name: 'intermediate — experienced, 27 km/wk, 16 y/o', experience: 'experienced', age: 16, weeklyKm: 27 },
+  { name: 'intermediate — experienced, 45 km/wk, 55 y/o', experience: 'experienced', age: 55, weeklyKm: 45 },
+  { name: 'advanced — competitive, 60 km/wk, 30 y/o', experience: 'competitive', age: 30, weeklyKm: 60 },
+  { name: 'advanced — competitive, 80 km/wk, 55 y/o', experience: 'competitive', age: 55, weeklyKm: 80 },
+];
+
+function buildGoldenPlanFor(profile: GoldenProfile): Plan {
+  const intake: IntakeResponses = {
+    goal: 'Run a fast 5K',
+    age: profile.age,
+    experience: profile.experience,
+    daysPerWeek: 4,
+    weeklyKm: profile.weeklyKm,
+    raceDistance: '5k',
+    recentPerformance: { distance: '5k', timeSec: 1516 },
+    injuries: ['none'],
+  };
+  const params: TemplatePlanParams = {
+    intake,
+    goalType: 'race',
+    durationWeeks: 12,
+    raceDistance: '5k',
+    tierAtGeneration: 'pro',
+    density: 'paid',
+  };
+  return buildTemplatePlan(params);
+}
+
+function plan_longRuns(plan: Plan): number[] {
+  return plan.weeks
+    .map((week) => findLongRun(week)?.distanceKm ?? 0)
+    .filter((km) => km > 0);
+}
+
+describe('golden 5K path — the coach-authored plan is verified against the caps, not exempt from them', () => {
+  const CASES = GOLDEN_PROFILES.map((profile) => [profile.name, profile] as const);
+
+  it.each(CASES)(
+    'holds %s inside the weekly-share cap on every week',
+    (_name, profile) => {
+      const plan = buildGoldenPlanFor(profile);
+      // R1c: a deload's long run is measured against the last *loading* week, not its own
+      // deliberately-reduced volume.
+      const cap = LONG_RUN_SHARE_CAP[toExperienceLevel(profile.experience)];
+      let lastLoadingWeekKm = 0;
+      const breaches: string[] = [];
+      for (const week of plan.weeks) {
+        const longRun = findLongRun(week);
+        if (longRun) {
+          // Exactly `clampLongRun`'s own denominator: the last loading week only when this week
+          // is a genuine deload against it, otherwise the week's own volume.
+          //
+          // Known limit of any ratio-based check, stated so nobody reads a green run as more than
+          // it is: it cannot catch a week where the long run and the week's total collapse
+          // together. A golden 12 km/wk beginner's week-4 "deload" is a 4 km total made of four
+          // 1 km runs; 1/4 = 25.0% sits exactly on the beginner cap and passes, and no choice of
+          // denominator changes that — the share is fine, the absolute numbers are not. Measuring
+          // against the last loading week instead (max(own, lastLoading)) does not fix it either;
+          // it only lowers the ratio further. Absolute degeneracy needs its own assertion, which
+          // this suite does not yet have.
+          const useLastLoading =
+            week.isDeload && lastLoadingWeekKm > 0 && isValidDeload(lastLoadingWeekKm, week.volumeKm);
+          const denomKm = useLastLoading ? lastLoadingWeekKm : week.volumeKm;
+          const share = (longRun.distanceKm ?? 0) / denomKm;
+          if (share > cap + 1e-9) {
+            breaches.push(`week ${week.weekNumber}: ${longRun.distanceKm} km of ${denomKm} km = ${(share * 100).toFixed(1)}%`);
+          }
+        }
+        if (!week.isDeload) lastLoadingWeekKm = week.volumeKm;
+      }
+      expect(breaches).toEqual([]);
+    },
+  );
+
+  it.each(CASES)(
+    'never lets %s spike its long run past the spike multiple over its previous longest',
+    (_name, profile) => {
+      const plan = buildGoldenPlanFor(profile);
+      let previousLongestKm = 0;
+      const breaches: string[] = [];
+      for (const week of plan.weeks) {
+        const longRun = findLongRun(week);
+        if (!longRun) continue;
+        const km = longRun.distanceKm ?? 0;
+        if (previousLongestKm > 0 && km > previousLongestKm * LONG_RUN_SPIKE_MULTIPLE) {
+          breaches.push(`week ${week.weekNumber}: ${km} km after a previous longest of ${previousLongestKm} km`);
+        }
+        previousLongestKm = Math.max(previousLongestKm, km);
+      }
+      expect(breaches).toEqual([]);
+    },
+  );
+
+  it.each(CASES)(
+    'keeps every long run of %s under the level absolute single-run ceiling',
+    (_name, profile) => {
+      const plan = buildGoldenPlanFor(profile);
+      const ceiling = MAX_SINGLE_RUN_KM[toExperienceLevel(profile.experience)];
+      const breaches = plan.weeks
+        .map((week) => ({ week, longRun: findLongRun(week) }))
+        .filter(({ longRun }) => (longRun?.distanceKm ?? 0) > ceiling)
+        .map(({ week, longRun }) => `week ${week.weekNumber}: ${longRun?.distanceKm} km > ${ceiling} km`);
+      expect(breaches).toEqual([]);
+    },
+  );
+
+  /**
+   * Progression, as opposed to safety, is where this path stops being clean — and it is not this
+   * branch's to fix. The generic path's spike ceiling is read in whole kilometres so a sub-10 km
+   * long run can still grow; the coach-authored path deliberately keeps the raw fractional
+   * ceiling it has always had, which below 10 km rounds back to the previous longest and holds
+   * the long run still. Fixing that here would reshape Ian's own plan, so the numbers are pinned
+   * instead: they are green today, and any drift — improvement or regression — fails.
+   */
+  const PROGRESSION: Record<string, { peakLongRunKm: number; firstLongRunKm: number; peakLoadingWeekKm: number }> = {
+    'beginner — brand new, 12 km/wk, 30 y/o': { peakLongRunKm: 2, firstLongRunKm: 2, peakLoadingWeekKm: 10 },
+    'beginner — brand new, 20 km/wk, 16 y/o (youth, RPE not HR)': { peakLongRunKm: 3, firstLongRunKm: 3, peakLoadingWeekKm: 17 },
+    'beginner — some experience, 30 km/wk, 55 y/o (3-week deload cadence)': { peakLongRunKm: 5, firstLongRunKm: 5, peakLoadingWeekKm: 27 },
+    'intermediate — regular, 35 km/wk, 30 y/o': { peakLongRunKm: 15, firstLongRunKm: 10, peakLoadingWeekKm: 48 },
+    'intermediate — experienced, 27 km/wk, 16 y/o': { peakLongRunKm: 8, firstLongRunKm: 8, peakLoadingWeekKm: 30 },
+    'intermediate — experienced, 45 km/wk, 55 y/o': { peakLongRunKm: 17, firstLongRunKm: 13, peakLoadingWeekKm: 54 },
+    'advanced — competitive, 60 km/wk, 30 y/o': { peakLongRunKm: 24, firstLongRunKm: 17, peakLoadingWeekKm: 72 },
+    'advanced — competitive, 80 km/wk, 55 y/o': { peakLongRunKm: 34, firstLongRunKm: 23, peakLoadingWeekKm: 98 },
+  };
+
+  it.each(CASES)('pins the progression the coach-authored plan actually delivers for %s', (name, profile) => {
+    const plan = buildGoldenPlanFor(profile);
+    const longRuns = plan_longRuns(plan);
+    const loadingWeeks = plan.weeks.slice(0, -1).filter((week) => !week.isDeload);
+    expect({
+      peakLongRunKm: Math.max(...longRuns),
+      firstLongRunKm: longRuns[0],
+      peakLoadingWeekKm: Math.max(...loadingWeeks.map((week) => week.volumeKm)),
+    }).toEqual(PROGRESSION[name]);
+  });
+
+  it.each(CASES)('builds %s a race week from the taper, not from the race-day budget', (_name, profile) => {
+    // Audit §1.4's signature on the coach-authored path: charging the 10 km race-day line item
+    // against a 13 km race-week budget left three days on `distributeDistance`'s 1 km floor.
+    // 90 of the 480 golden intakes rendered that; none do now.
+    const raceWeek = buildGoldenPlanFor(profile).weeks[11];
+    const preRace = raceWeek.days.filter(isWorkout).filter((day) => day.label !== 'Race Day');
+    expect(preRace.length).toBeGreaterThan(0);
+    expect(preRace.every((day) => (day.distanceKm ?? 0) <= 1)).toBe(false);
+  });
+
+  it('leaves the byte-pinned 35 km fixture race week exactly where it was', () => {
+    // The share and the old subtraction agree exactly at this baseline (28 - 10 = 18 = 28 x 18/28),
+    // which is what makes the fix safe to apply to the coach-authored path at all.
+    const plan = buildGoldenPlanAt(35);
+    const raceWeek = plan.weeks[11];
+    expect(raceWeek.volumeKm).toBe(28);
+    expect(raceWeek.days.filter(isWorkout).map((day) => day.distanceKm)).toEqual([6, 6, 6, 10]);
+  });
+
+  it('names the intakes where that progression is a coaching question, not a passing grade', () => {
+    // Open, and deliberately not fixed here: three beginner intakes never grow the long run at
+    // all, and their biggest week never reaches the volume the runner said they already run.
+    // Ian's call — the plan those numbers come from is his, not the engine's. Derived from the
+    // generated plans, not from `PROGRESSION`, so this fails when the engine changes rather than
+    // only when someone edits the table next to it.
+    const measured = CASES.map(([name, profile]) => {
+      const plan = buildGoldenPlanFor(profile);
+      const longRuns = plan_longRuns(plan);
+      const loadingWeeks = plan.weeks.slice(0, -1).filter((week) => !week.isDeload);
+      return {
+        name,
+        declaredKm: profile.weeklyKm,
+        stalled: Math.max(...longRuns) === longRuns[0],
+        peakLoadingWeekKm: Math.max(...loadingWeeks.map((week) => week.volumeKm)),
+      };
+    });
+    const stalled = measured.filter((row) => row.stalled).map((row) => row.name);
+    const shortOfDeclared = measured
+      .filter((row) => row.peakLoadingWeekKm < row.declaredKm)
+      .map((row) => row.name);
+    expect(stalled).toEqual([
+      'beginner — brand new, 12 km/wk, 30 y/o',
+      'beginner — brand new, 20 km/wk, 16 y/o (youth, RPE not HR)',
+      'beginner — some experience, 30 km/wk, 55 y/o (3-week deload cadence)',
+      'intermediate — experienced, 27 km/wk, 16 y/o',
+    ]);
+    expect(shortOfDeclared).toEqual([
+      'beginner — brand new, 12 km/wk, 30 y/o',
+      'beginner — brand new, 20 km/wk, 16 y/o (youth, RPE not HR)',
+      'beginner — some experience, 30 km/wk, 55 y/o (3-week deload cadence)',
+    ]);
   });
 });

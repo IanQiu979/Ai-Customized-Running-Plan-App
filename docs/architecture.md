@@ -508,6 +508,23 @@ Claude's output for Pro and Elite. See
 [`docs/reference/plan-generation.md`](reference/plan-generation.md) for why: selling the top tier
 as the one with the guardrail removed would be backwards.
 
+Inside the deterministic template engine, both plan-building paths call `clampLongRun()`, but they
+preserve their intended arithmetic. The generic path supplies `longRunShareCap(level, runCount)`
+and rounds the 1.10× spike ceiling up to a renderable whole kilometre; the coach-authored golden
+5K path uses the flat per-level share table and raw fractional spike ceiling. Generic easy runs are
+capped at the final clamped LR distance. Quality/tempo sessions are not: the safety cap may put LR
+below one of them rather than rewriting the authored stimulus. `reconcileVolumeToTarget()` trims
+whole kilometres without dropping scheduled training runs; an extremely small target can therefore
+remain above target when every session has reached its 1 km floor.
+
+Race-day distance is not charged against the pre-race taper budget. Both paths derive that budget
+from `RACE_WEEK_PRE_RACE_SHARE`; on a generic low-volume/high-frequency plan, the engine schedules
+only as many pre-race runs as the budget can fund at the existing 2 km non-filler threshold and
+leaves the other slots as rest. The original layout still governs placement, so Race Day remains
+Day 7 and SR is the final pre-race run. Normally funded audit profiles and the golden fixture keep
+their existing numeric schedule; the golden LR `effortDescription` intentionally carries the
+revised definition that no longer promises it is the week's longest run.
+
 ### Quota periods
 
 Computed **arithmetically at read time** from the purchase-day anchor (e.g. May 26 → June 26,

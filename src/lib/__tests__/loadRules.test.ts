@@ -12,6 +12,8 @@ import {
   isUnder18,
   isValidDeload,
   LONG_RUN_SHARE_CAP,
+  longRunShareCap,
+  MAX_SINGLE_RUN_KM,
   redFlagVolumeReductionPct,
   RED_FLAG_VOLUME_REDUCTION_PCT,
   rpeForZone,
@@ -182,6 +184,129 @@ describe('long run', () => {
     expect(LONG_RUN_SHARE_CAP).toEqual({ beginner: 0.25, intermediate: 0.32, advanced: 0.35 });
   });
 
+  describe('the run-count ladder only ever loosens the flat cap', () => {
+    const LEVELS = ['beginner', 'intermediate', 'advanced'] as const;
+
+    // The flat table is the floor, not the reference point the ladder rotates around. A bare
+    // `margin / n` also *tightened* the cap at high run counts (advanced 35% -> 23.3% at six runs
+    // a week, 20.0% at seven), halving the long runs on the marathon and half plans the flat cap
+    // was signed off for. Nobody asked for that; it is not what the ladder ruling authorised.
+    it.each([5, 6, 7])('leaves a %i-run week on exactly the flat per-level cap', (runCount) => {
+      for (const level of LEVELS) {
+        expect(longRunShareCap(level, runCount)).toBeCloseTo(LONG_RUN_SHARE_CAP[level], 10);
+      }
+    });
+
+    it('never returns less than the flat cap at any run count the engine can produce', () => {
+      for (const level of LEVELS) {
+        for (let runCount = 1; runCount <= 7; runCount += 1) {
+          expect(longRunShareCap(level, runCount)).toBeGreaterThanOrEqual(
+            LONG_RUN_SHARE_CAP[level] - 1e-12,
+          );
+        }
+      }
+    });
+
+    it('raises the cap above 1/n at every run count the engine can produce, so it is satisfiable', () => {
+      // The reachability argument the ruling rests on: an n-run week is n positive numbers
+      // summing to a whole, so its largest entry is never below 1/n. A cap at or under 1/n is
+      // unsatisfiable by arithmetic, not by unsafe coaching.
+      for (const level of LEVELS) {
+        for (let runCount = 3; runCount <= 7; runCount += 1) {
+          expect(longRunShareCap(level, runCount)).toBeGreaterThan(1 / runCount);
+        }
+      }
+    });
+
+    it('keeps the level ordering monotonic at every run count', () => {
+      for (let runCount = 3; runCount <= 7; runCount += 1) {
+        expect(longRunShareCap('beginner', runCount)).toBeLessThan(
+          longRunShareCap('intermediate', runCount),
+        );
+        expect(longRunShareCap('intermediate', runCount)).toBeLessThan(
+          longRunShareCap('advanced', runCount),
+        );
+      }
+    });
+
+    it('loosens monotonically as run count falls', () => {
+      for (const level of LEVELS) {
+        for (let runCount = 4; runCount <= 7; runCount += 1) {
+          expect(longRunShareCap(level, runCount - 1)).toBeGreaterThanOrEqual(
+            longRunShareCap(level, runCount),
+          );
+        }
+      }
+    });
+  });
+
+  describe('the spike ceiling limits the rate of growth, it never forbids growth outright', () => {
+    it('keeps the raw fractional ceiling by default, so the coach-authored path is untouched', () => {
+      const { km, limitedBy } = clampLongRun({
+        proposedKm: 6,
+        weeklyKm: 100,
+        level: 'intermediate',
+        previousLongestKm: 5,
+      });
+      expect(km).toBeCloseTo(5.5);
+      expect(limitedBy).toBe('spike');
+    });
+
+    // The rule is "no more than 10% over the plan's previous longest". Below 10 km a *fractional*
+    // ceiling made that rule forbid every increase instead of limiting it: the engine renders whole
+    // kilometres, so a previous longest of 5 km gave a 5.5 km ceiling, floored back to 5 km, and
+    // the long run could never move again for the rest of the plan. The rendered distance is still
+    // floored; the growth the ceiling *permits* is rounded up.
+    it('lets a 5 km previous longest reach 6 km when nothing else binds', () => {
+      const { km, limitedBy } = clampLongRun({
+        proposedKm: 6,
+        weeklyKm: 100,
+        level: 'intermediate',
+        previousLongestKm: 5,
+        roundSpikeCeilingUp: true,
+      });
+      expect(km).toBe(6);
+      expect(limitedBy).toBe('none');
+    });
+
+    it('still refuses a second kilometre of growth in the same step', () => {
+      const { km, limitedBy } = clampLongRun({
+        proposedKm: 7,
+        weeklyKm: 100,
+        level: 'intermediate',
+        previousLongestKm: 5,
+        roundSpikeCeilingUp: true,
+      });
+      expect(km).toBe(6);
+      expect(limitedBy).toBe('spike');
+    });
+
+    it('leaves the share cap binding — the loosened spike ceiling never overrides it', () => {
+      // 0.25 x 20 = 5 km, tighter than the 6 km the spike ceiling now permits.
+      const { km, limitedBy } = clampLongRun({
+        proposedKm: 6,
+        weeklyKm: 20,
+        level: 'beginner',
+        previousLongestKm: 5,
+        roundSpikeCeilingUp: true,
+      });
+      expect(km).toBe(5);
+      expect(limitedBy).toBe('weekly-share');
+    });
+
+    it('leaves the absolute single-run ceiling binding too', () => {
+      const { km, limitedBy } = clampLongRun({
+        proposedKm: 20,
+        weeklyKm: 200,
+        level: 'beginner',
+        previousLongestKm: 14,
+        roundSpikeCeilingUp: true,
+      });
+      expect(km).toBe(MAX_SINGLE_RUN_KM.beginner);
+      expect(limitedBy).toBe('absolute');
+    });
+  });
+
   it('caps at the level share of weekly volume (doc example: 50 km week -> 16 km, issue #34 ruling R1a\'s 0.32 intermediate cap)', () => {
     const { km, limitedBy } = clampLongRun({
       ...intermediate,
@@ -214,14 +339,16 @@ describe('long run', () => {
     expect(limitedBy).toBe('weekly-share');
   });
 
-  it('caps a single-run spike at 110% of the plan its own previous longest', () => {
+  it('caps a single-run spike at 110% of the plan its own previous longest, rounded up to a whole kilometre', () => {
     const { km, limitedBy } = clampLongRun({
       level: 'intermediate',
-      proposedKm: 14,
-      weeklyKm: 60, // share cap 19.2 km (0.32), so the spike cap must bind first
+      proposedKm: 20,
+      weeklyKm: 80, // share cap 25.6 km (0.32), so the spike cap must bind first
       previousLongestKm: 12,
+      roundSpikeCeilingUp: true,
     });
-    expect(km).toBeCloseTo(13.2);
+    // 12 x 1.10 = 13.2 km; the engine renders whole kilometres, so the ceiling is the next one up.
+    expect(km).toBe(14);
     expect(limitedBy).toBe('spike');
   });
 
@@ -345,11 +472,12 @@ describe('long run — deload weekly-share ceiling measured against the last loa
       level: 'intermediate',
       proposedKm: 8,
       weeklyKm: 23,
-      previousLongestKm: 6, // spike cap: 6 * 1.10 = 6.6, tighter than the proposed 8
+      previousLongestKm: 6, // spike cap: ceil(6 * 1.10) = 7, tighter than the proposed 8
       isDeload: true,
       lastLoadingWeekKm: 38,
+      roundSpikeCeilingUp: true,
     });
-    expect(km).toBeCloseTo(6.6);
+    expect(km).toBe(7);
     expect(limitedBy).toBe('spike');
   });
 
