@@ -470,8 +470,13 @@ generation still falls back to the same template every tier gets, honestly marke
    training rather than desired goal time, phases, deload cadence, weekly volumes under
    `loadRules.ts` caps, and workout primitives from `workout-library.md`. Intermediate/advanced
    marathon race plans cap long runs at 35% of the generated loading-week denominator; their
-   separate absolute kilometre ceiling remains non-binding pending calibration, while the
-   180-minute duration cap remains active. **All three tiers build on this same coach-authored
+   separate absolute kilometre ceiling (≤25 / ≤35 km) is lifted only for a `prepared` runner whose
+   easy pace makes the 180-minute duration cap enforceable — a runner with no recent time, any
+   advanced runner (no derived easy pace) or a first-timer keeps it, since nothing else could
+   bound them in kilometres. The number for the lifted case is still pending calibration. Race
+   plans carry `Plan.readinessPath`; a first-timer plan discloses why it took that path and, on a
+   runway under the research's first-timer minimum, that it is a completion plan rather than full
+   preparation. **All three tiers build on this same coach-authored
    skeleton — it is never removed.** What scales across tiers is how much of the runner the plan
    reasons about and how much it explains, never how much of the coach's judgment is taken away.
 6. **Free tier stops here.** Template + effort descriptions only. No AI call, ever.

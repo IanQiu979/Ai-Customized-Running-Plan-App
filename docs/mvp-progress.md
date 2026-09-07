@@ -50,10 +50,17 @@
   2026-09-06, 10K/half/marathon each have their own weekly-volume and long-run curves instead of a
   scaled 5K curve — see "Decided (2026-09-06)" below. Marathon's long-run ceiling is now
   distance-aware too: intermediate/advanced race plans use the captain's final 35% share cap,
-  while their separate absolute kilometre ceiling remains non-binding and captain-pending; the
-  unchanged 180-minute duration cap remains active. A 50 km/week, 16-week intermediate plan now
+  and — since 2026-09-07 — their separate absolute kilometre ceiling is lifted **only** for a
+  `prepared` runner whose easy pace makes the 180-minute time cap enforceable; a runner with no
+  recent time, any advanced runner (no derived easy pace), and any first-timer keep the level's own
+  ≤25 / ≤35 km cap, so an advanced marathoner is always bounded at 35 km (a 110 km/week advanced
+  marathoner with no recent time rendered 38 km before the fix). The number itself is still
+  captain-pending. Race plans also carry `Plan.readinessPath`, and a first-timer plan says which
+  capacity check sent it there and, on a runway under the research's first-timer minimum, that it
+  is a completion plan rather than full preparation. A 50 km/week, 16-week intermediate plan now
   peaks at 11/24/24/24 km for 3/4/5/6 days, with the constrained three-day shape disclosed and a
-  fourth running day recommended — see "Decided (2026-09-06, later)" and "Blocked".
+  fourth running day recommended — see "Decided (2026-09-07)", "Decided (2026-09-06, later)",
+  "Blocked" and "Known debt".
   The Pro/Elite personalization prompt is built, bound, and tested
   (2026-08-10) but has **never made a live model call**: `ANTHROPIC_API_KEY` is unset everywhere,
   so paid-tier requests still serve the honest, quota-exempt template fallback. That key is the
@@ -111,11 +118,11 @@
   `[vars]` of `workers/wrangler.toml` (the committed `[env.production.vars]` value is `"false"`),
   so the captain's test pass runs with every account Elite and the quota gate bypassed. Set the
   top-level value to `"false"` before real users arrive. Recorded in "Latest — 2026-08-09".
-- **Test counts:** 511 root tests across 32 suites on `fm/v22-redesign-theme-onboarding`, verified
-  by running `npm test` there on 2026-09-04; `main`'s figure is the 469 across 29 suites recorded
-  in the 2026-09-01 and 2026-09-03 entries below. 139 `workers/` tests across 7 files
-  (`npm --prefix workers test`, verified 2026-08-17 and untouched since — no `workers/` change has
-  landed). Typecheck clean on both sides and root lint clean (`workers/` has no lint script — its
+- **Test counts:** 778 root tests across 38 suites on `fm/v22-distance-specific-plans`, verified
+  by running `npm test` there on 2026-09-07 (after the rebase onto #88); 511 across 32 suites on
+  `fm/v22-redesign-theme-onboarding` (2026-09-04); `main`'s figure is the 469 across 29 suites
+  recorded in the 2026-09-01 and 2026-09-03 entries below. 141 `workers/` tests across 7 files
+  (`npm --prefix workers test`, verified 2026-09-07). Typecheck clean on both sides and root lint clean (`workers/` has no lint script — its
   gate is typecheck + test). The dated entries below record each point in time's counts — this line
   is the current one.
 - **Verified by hand on an iOS 26.5 simulator**, scoped to the 2026-08-15 check: Home in both the
@@ -1005,7 +1012,7 @@ to "Decided" below.
 | **Decided 2026-08-07: deploy the Worker.** How a phone reaches the backend — LAN against `wrangler dev` was the alternative and was declined; on-device testing waits on `wrangler deploy` (the row above) rather than a same-Wi-Fi workaround | all on-device testing; caused the 2026-08-07 `Network request failed` report | **Ian — ruled.** A loopback base URL is unreachable from a phone by construction, tunnel or not (see `.env.example`); once deployed, `EXPO_PUBLIC_API_BASE_URL` becomes the Worker's `https://` URL. The app now reports the unreachable case clearly instead of crashing, but cannot fix it |
 | `wrangler deploy --env production` for the 2026-08-10 (later) `INVALID_ORIGIN`/`INVALID_CALLBACK_URL` fix | email sign-up and Google sign-in against the deployed Worker | **Ian.** The fix (`workers/src/auth.ts`, `workers/wrangler.toml`) is merged and tested but not live until redeployed — see the "Last updated" entry above |
 | Google OAuth consent screen publishing status (Testing vs. production) — does it block real users, not just listed test accounts | Google sign-in for anyone other than a listed test user | **Ian**, in Google Cloud Console → OAuth consent screen. Not checkable or changeable by an agent |
-| Marathon's separate absolute single-run calibration for intermediate/advanced remains open (`maxSingleRunKm()` returns `Infinity` for a marathon race plan); the weekly-share number is settled at 35% and is not part of this blocker | the final marathon-specific absolute kilometre ceiling, and whether the unchanged 180-minute duration cap should remain the ultimate duration bound | **Ian.** `report-source.md` says the exact absolute policy is coaching judgment and notes McMillan sometimes permits up to four hours; this work settles the share at 35%, leaving only the absolute calibration and any future time-cap change open. The current 180-minute cap and 10% spike guard remain active. Separately, the fixed-position long-run-curve dips still do not realign with `deloadEveryWeeks` when resampled onto noncanonical durations; 35% controls magnitude but does not solve that structure. Valid deloads use the last loading week's denominator, so their displayed own-week ratio is not required to be ≤35%. |
+| Marathon's separate absolute single-run calibration for intermediate/advanced remains open. Since 2026-09-07 `maxSingleRunKm()` returns `Infinity` only for a `prepared` marathoner whose easy pace makes the 180-minute cap enforceable; everyone else (no recent time, advanced, first-timer) keeps the flat ≤25 / ≤35 km table, so the open question is now what number should replace the table for the prepared, pace-known case. The weekly-share number is settled at 35% and is not part of this blocker | the final marathon-specific absolute kilometre ceiling, and whether the unchanged 180-minute duration cap should remain the ultimate duration bound | **Ian.** `report-source.md` says the exact absolute policy is coaching judgment and notes McMillan sometimes permits up to four hours; this work settles the share at 35%, leaving only the absolute calibration and any future time-cap change open. The current 180-minute cap and 10% spike guard remain active. Separately, the fixed-position long-run-curve dips still do not realign with `deloadEveryWeeks` when resampled onto noncanonical durations; 35% controls magnitude but does not solve that structure. Valid deloads use the last loading week's denominator, so their displayed own-week ratio is not required to be ≤35%. |
 
 None of the above blocks local work: everything in `workers/` runs offline against `wrangler dev`'s
 Miniflare emulation with no account. The list is the exact Cloudflare counterpart of what the audit
@@ -1143,7 +1150,7 @@ detail: `docs/change_log.md`'s 2026-09-06 entry.
 | No marathon/half/10K training content — every distance stretched the 5K curve | **Fixed.** New per-distance weekly-load/long-run curves (`TEN_K_*`, `HALF_*`, `MARATHON_*` in `planTemplates.ts`), shaped from the research's already-resolved architecture (canonical durations, recovery-week positions). Their raw targets climb from ~31% (5K) to ~50%+ (marathon) before safety clamps; generated intermediate/advanced marathon long runs are capped at 35%. Regression: `planTemplates.distanceSpecific.test.ts`. |
 | Plan selection ignoring readiness (first-timer vs. prepared runner entering a race block) | **Fixed.** New `deriveReadinessPath()`, driven only by `weeklyKm`/`recentPerformance` — never `goalTimeSec` — shifts phase weighting toward more aerobic foundation for a runner who hasn't demonstrated a race block's prerequisites. Applies only to actual race entries, not no-race/duration plans. |
 | Down-week reduction: McMillan's public 15–25% vs. V2.2's imported-examples 35–45% (flagged by `report-source.md`, escalated per this task's brief) | **Ian ruled, 2026-09-06, before being asked: use the published 15–25% figure, superseding the 35–45% ruling.** Recovery weeks are shallower across every generated plan now. See `docs/reference/coaching/load-rules.md` § Deload trigger for the full history and the confirmed interaction with the 2026-09-05 long-run-cap work (below) — the golden fixture's own weeks 4/8 long runs tightened from 8/10 km to 7/9 km as a direct, documented consequence, not a silent side effect. |
-| Long-run ceilings (`loadRules.ts`'s `longRunShareCap`/`MAX_SINGLE_RUN_KM`) were level-based, not distance-based | **Fixed for weekly share; absolute calibration remains open.** Intermediate/advanced marathon race plans now use `MARATHON_LONG_RUN_SHARE_CAP = 0.35`; their separate absolute kilometre ceiling remains non-binding, while the 180-minute time cap and 10% spike guard remain active. Final 50 km/week, 16-week intermediate peaks at 3/4/5/6 days are 11/24/24/24 km. |
+| Long-run ceilings (`loadRules.ts`'s `longRunShareCap`/`MAX_SINGLE_RUN_KM`) were level-based, not distance-based | **Fixed for weekly share; absolute calibration remains open.** Intermediate/advanced marathon race plans now use `MARATHON_LONG_RUN_SHARE_CAP = 0.35`; their separate absolute kilometre ceiling remains non-binding, while the 180-minute time cap and 10% spike guard remain active. Final 50 km/week, 16-week intermediate peaks at 3/4/5/6 days are 11/24/24/24 km. *Narrowed 2026-09-07: the ceiling is non-binding only for a prepared, pace-known runner — see "Decided (2026-09-07)".* |
 
 ## Decided (2026-09-06, later) — marathon long-run share made distance-aware; 35% final
 
@@ -1155,11 +1162,27 @@ The distance-aware plumbing was built on 2026-09-06; Ian then settled the share 
 |---|---|
 | Raise the general intermediate/advanced long-run ceilings | **Rejected.** Would let a 5K runner take a marathon-sized long run — the correct value genuinely differs by goal distance. |
 | Accept the current level-based ceiling as marathon's real limit | **Rejected.** 5-6 days/week is the most common marathon frequency, and that is exactly where the current ceiling is most wrong (8 km peak long run surveyed). |
-| Add a distance-aware dimension to the ceilings | **Built.** `longRunShareCap()`/`maxSingleRunKm()` (`loadRules.ts`) both take `raceDistance`. Intermediate/advanced marathon race plans use a fixed 35% share cap; their absolute kilometre ceiling remains `Infinity`. `beginner` keeps its existing 14 km absolute ceiling and run-count-scaled share ladder — a deliberate, untouched safety floor for a first-timer's completion track. |
+| Add a distance-aware dimension to the ceilings | **Built.** `longRunShareCap()`/`maxSingleRunKm()` (`loadRules.ts`) both take `raceDistance`. Intermediate/advanced marathon race plans use a fixed 35% share cap; their absolute kilometre ceiling was `Infinity` unconditionally at this ruling (*narrowed 2026-09-07 to the prepared, pace-known case — see "Decided (2026-09-07)"*). `beginner` keeps its existing 14 km absolute ceiling and run-count-scaled share ladder — a deliberate, untouched safety floor for a first-timer's completion track. |
 | Marathon weekly-share number | **Settled at 35%.** It is measured against the rendered loading week, or against the last loading week for a valid deload. The 50 km/week, 16-week intermediate survey peaks at 11/24/24/24 km for 3/4/5/6 days. The four-day plan is the headline genuine progression at 24 km, versus the old stretched-5K 19 km and audit observation of roughly 21 km. |
 | Three-day marathon fixed point | **Disclosed, not hidden.** The sourced E + Q1 + LR layout and fixed Q1 dose leave an 11 km peak under 35%; generated plans state the limitation and recommend a fourth running day. At 3–4 days Q1 is retained and Q2 is dropped before easy support; 5+ days may retain Q2. |
-| Separate absolute kilometre calibration | **Still held for Ian.** `maxSingleRunKm()` remains non-binding for intermediate/advanced marathon race plans. The existing 180-minute duration cap and 10% spike guard remain active; neither is weakened by the 35% ruling. |
+| Separate absolute kilometre calibration | **Still held for Ian.** At this ruling `maxSingleRunKm()` was non-binding for every intermediate/advanced marathon race plan; *since 2026-09-07 it is non-binding only for a prepared runner with a pace* (see "Decided (2026-09-07)"). The existing 180-minute duration cap and 10% spike guard remain active; neither is weakened by the 35% ruling. |
 | Noncanonical deload alignment | **Still unresolved.** Fixed long-run-curve dips do not realign to `deloadEveryWeeks` when resampled. The 35% cap limits magnitude, not that structural mismatch; valid deloads use the last loading week's denominator, so their displayed own-week ratio can exceed 35% without a breach. |
+
+## Decided (2026-09-07) — the no-recent-time marathoner is bounded; readiness surfaced
+
+The branch's ship gate, named by the captain: an advanced marathoner with no recent race time must
+receive a bounded long run with the 35% cap actually binding. Commit `bd2b0b6` on
+`fm/v22-distance-specific-plans`, rebased onto #88. Full account: `docs/change_log.md`'s
+2026-09-07 (later) entry; enforcement detail in `docs/reference/coaching/load-rules.md` § "Long-run
+cap, by level".
+
+| Item | Decision |
+|---|---|
+| Marathon absolute-ceiling bypass applied to runners it could not protect | **Fixed.** The bypass was justified by "the 180-minute time cap and spike guard govern instead", which is false for a runner with no pace (no recent time; or advanced, for whom no easy pace is derived). `maxSingleRunKm(level, raceDistance, { readiness, easyPaceSecPerKm })` now returns `Infinity` only for a `prepared` runner whose easy pace makes the time cap computable; everyone else keeps `MAX_SINGLE_RUN_KM` (≤14 / ≤25 / ≤35 km, the blueprint's § 4 limits). A 110 km/week advanced marathoner with no recent time renders 35 km, not 38 km. An advanced marathoner's absolute ceiling is therefore always 35 km; the intermediate bypass can only matter through the time cap (35% of the 70 km intermediate weekly ceiling is under 25 km). |
+| The 35% share cap | **Unchanged**, and proven to bind on the gate profile (`planTemplates.noRecentTime.test.ts`): advanced, marathon, 60 km/week, 5 days, 16 weeks — every long run ≤35% of its share denominator, loading weeks on `floor(0.35 × volume)`, peak 31 km in a 91 km week; with the share cap mocked away the same plan breaches 35%. |
+| Separate absolute kilometre calibration | **Still held for Ian** — narrowed, not settled. What remains open is the number for the prepared, pace-known case; see "Blocked". |
+| Readiness path visible to the runner | **Built.** `Plan.readinessPath` on race plans; a first-timer plan carries a disclosure naming the capacity check that sent it there (volume below `READINESS_WEEKLY_KM_THRESHOLD`, or no 10K-or-longer result for marathon) and, on a runway under `FIRST_TIMER_MIN_WEEKS` (12/12/16/16), a limited-preparation disclosure per the research's § 8 rules 3–4. Prepared runners get neither. Not coaching content: the numbers are the engine's own thresholds and the intake. |
+| Three-day intermediate/advanced marathon plateau | **Known, unchanged** — disclosed by `THREE_DAY_MARATHON_DISCLAIMER`; see "Known debt". |
 
 ## Decided (2026-09-06) — long-run cap and race-week fixes, `v22-core-purpose-audit-r1` §1.2/§1.4
 
@@ -1222,6 +1245,13 @@ intact underneath.
 
 ### Standing
 
+- 🟡 **Three-day intermediate/advanced marathon plans plateau (confirmed 2026-09-07, unchanged by
+  the rebase onto #88).** A 50 km/week, 16-week, 3-day intermediate marathon renders 32 km every
+  loading week (26 km on deloads) and an 11 km long run in every week of the plan: the sourced
+  E + Q1 + LR layout and fixed Q1 dose leave the 35% share cap nothing to grow into. The plan
+  discloses it (`THREE_DAY_MARATHON_DISCLAIMER`, captain-ruled 2026-09-06) and recommends a fourth
+  running day; it is not hidden, but it is not a progression either. Any fix is coaching content
+  (a different three-day layout or Q1 dose), so it waits on Ian.
 - 🟡 **The client's and the Worker's `better-auth` versions must match, and only the lockfile
   holds them together (2026-09-05).** They are two separate npm projects sharing one wire format
   (cookie envelope, `/sign-in/social` state, session payload). During the

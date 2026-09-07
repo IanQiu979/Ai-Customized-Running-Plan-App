@@ -262,12 +262,22 @@ identified the share percentage as coaching policy rather than settled science; 
 `longRunShareCap()` and `maxSingleRunKm()` (`src/lib/loadRules.ts`) both take `raceDistance`, but
 their marathon outcomes are now deliberately different. For intermediate/advanced race plans,
 `MARATHON_LONG_RUN_SHARE_CAP` is **0.35 and binding**. The separate absolute kilometre ceiling is
-still `Infinity` (non-binding) pending Ian's calibration. `beginner` is excluded from both
-marathon overrides: it keeps the existing 14 km absolute ceiling and run-count-scaled share
-ladder, preserving the first-timer completion track. The unchanged 180-minute duration cap and
-1.10× recent-longest-run spike guard remain active for every marathon plan alongside the share
-cap. McMillan's occasional four-hour marathon allowance remains a separate captain-owned question;
-this ruling does not change V2.2's three-hour limit.
+lifted (`Infinity`) **only** for a `prepared` runner whose easy pace makes the 180-minute duration
+cap enforceable — `maxSingleRunKm(level, raceDistance, { readiness, easyPaceSecPerKm })`, since
+2026-09-07. The bypass was justified by "the time cap and spike guard govern instead", and that is
+only true when a pace exists to measure the time cap with: a runner who gave no recent time has
+none, and an advanced runner never has a derived easy pace (easy is by feel), so both keep the
+flat ≤25 / ≤35 km table (`plan-blueprint-examples.md` § 4's REG/EXP and COMP limits), as does a
+first-timer, who has by definition not demonstrated the long-run base a marathon block assumes.
+Before that narrowing a 110 km/week advanced marathoner with no recent time rendered a 38 km long
+run; the ceiling now holds it at 35 km. An advanced marathoner's absolute ceiling is therefore
+always 35 km, and the intermediate bypass can only matter through the time cap (35% of the 70 km
+intermediate weekly ceiling is under 25 km). The number for the lifted case is still pending Ian's
+calibration. `beginner` is excluded from both marathon overrides: it keeps the existing 14 km
+absolute ceiling and run-count-scaled share ladder, preserving the first-timer completion track.
+The unchanged 180-minute duration cap and 1.10× recent-longest-run spike guard remain active for
+every marathon plan alongside the share cap. McMillan's occasional four-hour marathon allowance
+remains a separate captain-owned question; this ruling does not change V2.2's three-hour limit.
 
 **Generated survey, 50 km/week, 16 weeks, intermediate, recent half-marathon performance:**
 

@@ -5,6 +5,81 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-09-07 (later) — the no-recent-time marathoner is bounded; the readiness path is surfaced
+
+Branch `fm/v22-distance-specific-plans`, commit `bd2b0b6`, on top of the squashed `6a9f4a7` (the
+entry below). `npm run typecheck && npm run lint && npm test` (38 suites, 778 tests) and
+`npm --prefix workers run typecheck && npm --prefix workers test` (7 files, 141 tests) both clean.
+
+**The marathon absolute-ceiling bypass now requires the evidence it was justified on.**
+`maxSingleRunKm()` returned `Infinity` for every intermediate/advanced marathon race plan on the
+premise that "the 180-minute time cap and spike guard govern instead". That premise is false for a
+runner who gave no recent race time — they have no pace, so the time cap cannot be measured — and
+for every advanced runner, since `deriveTrainingPaces` derives no easy pace for them (easy is by
+feel). Concretely, a 110 km/week advanced marathoner with no recent time rendered a **38 km** long
+run, above the blueprint's own `COMP` ≤35 km (`plan-blueprint-examples.md` § 4 "Experience-specific
+operating limits": NEW/SOME ≤14, REG/EXP ≤25, COMP ≤35 km).
+
+- **`maxSingleRunKm(level, raceDistance, context?)`** takes `{ readiness, easyPaceSecPerKm }` and
+  returns `Infinity` **only** for a `prepared` runner whose easy pace makes the time cap
+  computable. Every other marathoner — no recent time, advanced, first-timer, or a caller passing
+  no context — keeps the flat `MAX_SINGLE_RUN_KM` table. Two consequences worth knowing: an
+  advanced marathoner's absolute ceiling is therefore always 35 km (exactly § 4's `COMP` limit),
+  and `MAX_WEEKLY_KM.intermediate` is 70 km, so 35% of it is under 25 km at every volume — the
+  intermediate bypass can only ever matter through the time cap. The captain's 35% share cap
+  (`MARATHON_LONG_RUN_SHARE_CAP`) is unchanged and remains the binding ceiling for the ship-gate
+  profile. **Where the two entries below say the absolute ceiling "remains non-binding
+  (`Infinity`)" for intermediate/advanced marathon race plans, they describe the code before this
+  commit.** The separate marathon absolute calibration itself is still captain-pending — this
+  commit narrows when the bypass applies; it does not settle the number.
+- **Readiness carried through.** `ReadinessPath` lives in `src/lib/planTypes.ts` (re-exported from
+  `planTemplates.ts`); `deriveReadinessPath`, `READINESS_WEEKLY_KM_THRESHOLD` (5K 15 / 10K 25 /
+  half 35 / marathon 45 km/week) and the new `FIRST_TIMER_MIN_WEEKS` (5K 12 / 10K 12 / half 16 /
+  marathon 16 — the low end of the research's first-timer duration ranges) are exported.
+  `Plan.readinessPath?: ReadinessPath` is set on race plans only. Readiness feeds the long-run
+  absolute ceiling above and two new disclaimers on first-timer race plans. Neither is coaching
+  content — the numbers are the engine's own thresholds and the runner's intake:
+  - a first-timer disclosure naming which capacity check sent them there, in their own numbers:
+    "This plan takes the first-timer path — a longer aerobic foundation before race-specific work,
+    with long runs held to your level's ceiling — because no recent result at 10K or longer shows
+    the long-run base a marathon block assumes." The volume variant reads "…because your current
+    30 km/week is below the 45 km/week a prepared Marathon block assumes".
+  - when the runway is shorter than `FIRST_TIMER_MIN_WEEKS`, a limited-preparation disclosure per
+    § 8 "Shorter race date" rules 3–4: "With 12 weeks to race day, under the 16 weeks a first-timer
+    Marathon build normally needs, this is a safe completion plan rather than full preparation. It
+    keeps the taper and race week and does not try to compress fitness into the time available."
+
+  Prepared runners get neither line.
+- **The ship gate, proven** — new suite `src/lib/__tests__/planTemplates.noRecentTime.test.ts`.
+  Profile: advanced (`competitive`), marathon, 60 km/week, 5 days, 16 weeks, no recent performance.
+  Every long run is ≤35% of its share denominator; loading weeks sit on `floor(0.35 × volume)`;
+  the peak loading week renders a 31 km long run in a 91 km week (cap 31.85 km, 34.1%); with
+  `longRunShareCap` mocked to `Infinity` the same plan breaches 35%, which proves the cap is what
+  binds, not the curve. At 110 km/week, 6 days the long run is 35 km (38 km before the fix). Also
+  pinned: no numeric pace on any workout without a recent time, even with a goal time declared;
+  `hrZone` still present on paid; the `maxSingleRunKm` contract table.
+- **Rebase.** The branch was rebased onto `origin/main` after PR #88 (`9fb3b33`) landed. #88 is a
+  reviewed evolution of this branch's first two commits, so those were dropped and the later work
+  squashed into `6a9f4a7`. Merge resolutions kept main's landed shapes (ladder floored at the flat
+  cap, whole-kilometre spike ceiling, largest-first `reconcileVolumeToTarget`, easy-run ceiling
+  tracking the clamped long run, `placeWorkouts`' `{ padMissing }` option) and the branch's
+  additions (35% marathon share cap, `maxSingleRunKmOverride`, `preRaceSchedule`/`preRaceBudgetKm`
+  peak-bounded race week with the single-shakeout exception, in-loop rendered-week share
+  measurement). The orphaned JSDoc on `clampLongRun`'s args in `loadRules.ts` — the compile break
+  the earlier rebase left — is fixed. Test expectations re-pinned as a consequence, each verified
+  against a printed plan: profile F (10K, 20 km/wk, 4 days) long runs are now [4, 5, 5, 5, 6, 7, 7]
+  on the 10K curve; profiles L and N join the rising-window set, and the anti-freeze stall check
+  now distinguishes a cap-bound flat long run (`floor(cap × volume)`) from a freeze; the reconcile
+  profile's week 5 is 25 km with an 8 km long run (no longer a curve dip); the four underfunded
+  10 km/week half/marathon 6–7-day race weeks get one 2 km shakeout (race day alone exceeds their
+  peak week); the 12 km/week, 6-day 5K race week is `ER:3, SR:2` (peak 15 km − 10 km race day =
+  5 km budget).
+- **Known, unchanged.** The three-day intermediate/advanced marathon plateau survives the merge: a
+  50 km/week, 16-week, 3-day intermediate marathon renders 32 km every loading week (26 km on
+  deloads) and an 11 km long run throughout. It is disclosed by `THREE_DAY_MARATHON_DISCLAIMER`
+  per the earlier ruling and is not changed here; now recorded under "Known debt" in
+  `docs/mvp-progress.md`.
+
 ## 2026-09-07 — marathon share cap finalized; race-week placement corrected
 
 The previous round capped the pre-race shakeout floor at the taper ratio, which moved the defect
@@ -17,7 +92,7 @@ race day is most of the runner's biggest week.
 **The pre-race budget is now bounded by the peak week's room above race day, and surplus days are
 dropped to rest.** `preRaceBudgetKm` returns `min(ratio, peak − raceDay)` with no floor; the new
 `preRaceSchedule` converts that into however many days it can fund at 2 km each, and the rest of
-the week is genuine rest. `placeWorkouts` grew a `padShortWeeks` flag because it pads any short
+the week is genuine rest. `placeWorkouts` grew a `padMissing: false` option because it pads any short
 week with 1 km filler runs — race week now opts out, so the dropped slots come out as rest instead
 of silently re-adding what was just removed. Surviving pre-race workouts are right-aligned into
 the latest available slots, preserving their order so SR remains the final workout before race
