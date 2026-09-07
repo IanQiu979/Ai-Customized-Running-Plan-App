@@ -599,6 +599,10 @@ function generalPhaseWeights(raceDistance: RaceDistance | undefined): number[] {
   return racePhaseWeights(raceDistance).slice(0, 3);
 }
 
+/** Re-export so callers can reach the type from the engine; it lives in `planTypes.ts` so
+ * `loadRules.ts` stays pure. */
+export type { ReadinessPath } from './planTypes';
+
 /**
  * The research's two race-entry paths (`report-source.md`'s Executive Answer): a first-timer
  * needs more aerobic foundation before race-specific work, a prepared runner can spend more of
@@ -608,8 +612,6 @@ function generalPhaseWeights(raceDistance: RaceDistance | undefined): number[] {
  * own reasonable read of "extend the foundation" (the research gives no exact figure), not a
  * sourced coaching number.
  */
-export type { ReadinessPath } from './planTypes';
-
 function readinessAdjustedWeights(weights: number[], readiness: ReadinessPath): number[] {
   if (readiness === 'prepared') return weights;
   const [base, build, peak, taper] = weights;

@@ -488,9 +488,13 @@ export function clampLongRun(args: {
   roundSpikeCeilingUp?: boolean;
   /**
    * Overrides `MAX_SINGLE_RUN_KM[level]` for the absolute single-run ceiling. `buildGenericWeek`
-   * passes `maxSingleRunKm(level, raceDistance)` here, which is `Infinity` (non-binding) for a
-   * marathon intermediate/advanced runner — see that function's own comment. Every other caller
-   * omits it and gets the flat table.
+   * passes `maxSingleRunKm(level, raceDistance, context)` here, always supplying the
+   * `SingleRunCeilingContext`. That is `Infinity` (non-binding) only for a marathon
+   * intermediate/advanced runner whose readiness is `prepared` AND whose easy pace makes the
+   * 180-minute time cap computable; every other runner — including any runner with no recent
+   * time, and every `advanced` runner, who never gets an easy pace — keeps the flat level table.
+   * See `maxSingleRunKm`'s own comment. Every other caller omits this override and gets the flat
+   * table.
    */
   maxSingleRunKmOverride?: number;
 }): LongRunClamp {

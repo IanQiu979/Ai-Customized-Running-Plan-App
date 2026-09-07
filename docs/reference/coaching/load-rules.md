@@ -239,7 +239,7 @@ The plan-level regression suite now also generates a pace-known, high-volume mar
 its rendered long run stays within the three-hour ceiling. This complements the direct
 `clampLongRun()` unit tests with coverage of the real generic plan path.
 
-**Ian's ruling, 2026-09-07 (`v22-distance-specific-plans`,
+**Ian's ruling, 2026-09-06 (`v22-distance-specific-plans`,
 `[key=marathon-longrun-share-cap]`) — an intermediate or advanced marathon long run is capped at
 35% of the generated loading-week denominator.** On an ordinary loading week that denominator is
 the rendered week volume. On a valid 15–25% deload it remains the last loading week's volume under
