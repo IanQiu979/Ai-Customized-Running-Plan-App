@@ -39,6 +39,7 @@ import {
   type Phase,
   type Plan,
   type RaceDistance,
+  type ReadinessPath,
   type RestDay,
   type Tier,
   type Week,
@@ -114,6 +115,49 @@ const UNDER_18_DISCLAIMER =
 const THREE_DAY_MARATHON_DISCLAIMER =
   "With three running days, the 35% long-run cap limits this plan's long-run progression. " +
   'Add a fourth running day for fuller marathon preparation.';
+
+/**
+ * Why a race plan took the first-timer path, in the runner's own numbers. The research's
+ * selection model (`plan-blueprint-examples.md`) picks the path from demonstrated capacity —
+ * current weekly volume and, for marathon, evidence of the long-run base — and its § 20 order
+ * ends with "disclaimers and limited-preparation disclosure … never silently relabel a reduced
+ * plan as full preparation". The path changes the plan (more aerobic foundation before
+ * race-specific work, and the level's own long-run ceiling kept in force), so the runner is told
+ * which of the two capacity checks sent them there. Nothing here is coaching content: the numbers
+ * are the engine's own thresholds and the intake the runner typed.
+ */
+function firstTimerDisclosure(intake: IntakeResponses, raceDistance: RaceDistance): string {
+  const label = distanceLabel(raceDistance);
+  const reasons: string[] = [];
+  const threshold = READINESS_WEEKLY_KM_THRESHOLD[raceDistance];
+  if (intake.weeklyKm < threshold) {
+    reasons.push(
+      `your current ${intake.weeklyKm} km/week is below the ${threshold} km/week a prepared ` +
+        `${label} block assumes`,
+    );
+  }
+  if (raceDistance === 'marathon' && !hasMarathonLongRunEvidence(intake.recentPerformance)) {
+    reasons.push(
+      'no recent result at 10K or longer shows the long-run base a marathon block assumes',
+    );
+  }
+  return (
+    'This plan takes the first-timer path — a longer aerobic foundation before race-specific ' +
+    `work, with long runs held to your level's ceiling — because ${reasons.join(', and ')}.`
+  );
+}
+
+/** § 8 "Shorter race date", rules 3–4, for a first-timer whose runway is under the research's
+ * minimum for the distance. Full preparation is not claimed and fitness is not compressed. */
+function limitedPreparationDisclosure(durationWeeks: number, raceDistance: RaceDistance): string {
+  const label = distanceLabel(raceDistance);
+  const minimum = FIRST_TIMER_MIN_WEEKS[raceDistance];
+  return (
+    `With ${durationWeeks} weeks to race day, under the ${minimum} weeks a first-timer ${label} ` +
+    'build normally needs, this is a safe completion plan rather than full preparation. It keeps ' +
+    'the taper and race week and does not try to compress fitness into the time available.'
+  );
+}
 
 /** Ian-approved 12-week 5K load shape, normalized to the 35 km worked-example baseline. Read by
  * `buildCanonicalFiveKWeek` only — that path is byte-pinned to the fixture and owns its own
@@ -564,7 +608,7 @@ function generalPhaseWeights(raceDistance: RaceDistance | undefined): number[] {
  * own reasonable read of "extend the foundation" (the research gives no exact figure), not a
  * sourced coaching number.
  */
-export type ReadinessPath = 'first-timer' | 'prepared';
+export type { ReadinessPath } from './planTypes';
 
 function readinessAdjustedWeights(weights: number[], readiness: ReadinessPath): number[] {
   if (readiness === 'prepared') return weights;
@@ -586,11 +630,26 @@ function readinessAdjustedWeights(weights: number[], readiness: ReadinessPath): 
  * own reasonable read of Examples A–D's illustrative intake ranges, not a sourced coaching
  * number — the research gives ranges, not cutoffs.
  */
-const READINESS_WEEKLY_KM_THRESHOLD: Record<RaceDistance, number> = {
+export const READINESS_WEEKLY_KM_THRESHOLD: Record<RaceDistance, number> = {
   '5k': 15,
   '10k': 25,
   half: 35,
   marathon: 45,
+};
+
+/**
+ * The lower end of the research's first-timer duration ranges (`plan-blueprint-examples.md`
+ * § "Research duration ranges behind the examples": 12–16 weeks for 5K/10K, 16–20 for half and
+ * marathon). A first-timer whose runway is shorter than this cannot be given full preparation, and
+ * § 8's "Shorter race date" rules say what the plan must do instead: keep the taper and race week,
+ * retain preparation rather than compress fitness, and say so — "the plan becomes a safe
+ * completion/tune-up plan rather than pretending full preparation is possible."
+ */
+export const FIRST_TIMER_MIN_WEEKS: Record<RaceDistance, number> = {
+  '5k': 12,
+  '10k': 12,
+  half: 16,
+  marathon: 16,
 };
 
 function hasMarathonLongRunEvidence(recentPerformance: Performance | undefined): boolean {
@@ -602,7 +661,7 @@ function hasMarathonLongRunEvidence(recentPerformance: Performance | undefined):
   );
 }
 
-function deriveReadinessPath(intake: IntakeResponses, raceDistance: RaceDistance): ReadinessPath {
+export function deriveReadinessPath(intake: IntakeResponses, raceDistance: RaceDistance): ReadinessPath {
   if (intake.weeklyKm < READINESS_WEEKLY_KM_THRESHOLD[raceDistance]) return 'first-timer';
   if (raceDistance === 'marathon' && !hasMarathonLongRunEvidence(intake.recentPerformance)) {
     return 'first-timer';
@@ -1206,6 +1265,8 @@ function buildGenericWeek(args: {
   /** True only for a race goal type that also has a distance to aim at. Gates race week, the
    * race-pace taper session, and everything else that presumes a start line exists. */
   isRacePlan: boolean;
+  /** `deriveReadinessPath`'s verdict; `'prepared'` for a no-race block, where it is unused. */
+  readiness: ReadinessPath;
   intake: IntakeResponses;
   density: TemplateDensity;
   easyPace?: Pace;
@@ -1227,6 +1288,7 @@ function buildGenericWeek(args: {
     phase,
     raceDistance,
     isRacePlan,
+    readiness,
     intake,
     density,
     easyPace,
@@ -1242,16 +1304,22 @@ function buildGenericWeek(args: {
     injuryReductionPct,
     redFlagReductionPct,
   } = args;
-  // Distance-aware, not the flat `maxSingleRunKm` param: `Infinity` (non-binding) for a marathon
-  // intermediate/advanced runner, captain-pending — see `loadRules.ts`'s `maxSingleRunKm` for the
-  // full ruling. Used below for the long-run ceiling specifically; the race-week branch's
-  // per-easy-run cap a few lines down intentionally keeps the flat param — taper-week easy runs
-  // are never marathon-length, so distance-awareness there would be a no-op change.
-  // Scoped to `isRacePlan`, matching `deriveReadinessPath`: a duration/no-race block that merely
-  // names marathon as an aspirational distance is not a marathon race build, so it keeps the
-  // ordinary level-based ceilings.
+  // Distance-aware, not the flat `maxSingleRunKm` param: `Infinity` (non-binding) for a
+  // *prepared* marathon intermediate/advanced runner *with a pace* — the two conditions under
+  // which the 180-minute time cap and spike guard can genuinely take the absolute ceiling's place,
+  // captain-pending beyond that — see `loadRules.ts`'s `maxSingleRunKm`. A runner with no recent
+  // time has no pace, so for them the level's own kilometre cap stays in force: it is, with the
+  // 35% share cap, what bounds their long run. Used below for the long-run ceiling specifically;
+  // the race-week branch's per-easy-run cap a few lines down intentionally keeps the flat param —
+  // taper-week easy runs are never marathon-length, so distance-awareness there would be a no-op
+  // change. Scoped to `isRacePlan`, matching `deriveReadinessPath`: a duration/no-race block that
+  // merely names marathon as an aspirational distance is not a marathon race build, so it keeps
+  // the ordinary level-based ceilings.
   const ceilingDistance = isRacePlan ? raceDistance : undefined;
-  const singleRunCeilingKm = distanceAwareMaxSingleRunKm(level, ceilingDistance);
+  const singleRunCeilingKm = distanceAwareMaxSingleRunKm(level, ceilingDistance, {
+    readiness,
+    easyPaceSecPerKm: easyPace?.highSecPerKm,
+  });
   const isRaceWeek = isRacePlan && raceDistance !== undefined && weekNumber === durationWeeks;
   // A no-race plan must never end on a deload (captain ruling, 2026-08-15, as a McMillan-certified
   // coach): its last week is the last week the runner sees, and finishing on a recovery week leaves
@@ -1544,6 +1612,7 @@ export function buildTemplatePlan(params: TemplatePlanParams): Plan {
           phase,
           raceDistance,
           isRacePlan,
+          readiness,
           intake: params.intake,
           density: params.density,
           easyPace: trainingPaces.easy,
@@ -1588,6 +1657,14 @@ export function buildTemplatePlan(params: TemplatePlanParams): Plan {
     level !== 'beginner'
       ? [THREE_DAY_MARATHON_DISCLAIMER]
       : []),
+    ...(isRacePlan && raceDistance && readiness === 'first-timer'
+      ? [
+          firstTimerDisclosure(params.intake, raceDistance),
+          ...(durationWeeks < FIRST_TIMER_MIN_WEEKS[raceDistance]
+            ? [limitedPreparationDisclosure(durationWeeks, raceDistance)]
+            : []),
+        ]
+      : []),
     ...(isUnder18(params.intake.age) ? [UNDER_18_DISCLAIMER] : []),
     ...(hasDeclaredInjury(params.intake.injuries) ? [INJURY_DISCLAIMER] : []),
     ...(hasRedFlagInjury(params.intake.injuries) ? [RED_FLAG_INJURY_DISCLAIMER] : []),
@@ -1610,5 +1687,6 @@ export function buildTemplatePlan(params: TemplatePlanParams): Plan {
     extras: [],
     disclaimers,
     ...(goalRealism ? { goalRealism } : {}),
+    ...(isRacePlan && raceDistance ? { readinessPath: readiness } : {}),
   };
 }

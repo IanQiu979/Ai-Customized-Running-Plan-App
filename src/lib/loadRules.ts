@@ -17,6 +17,7 @@ import type {
   HrZone,
   InjuryFlag,
   RaceDistance,
+  ReadinessPath,
   RpeValue,
 } from './planTypes';
 
@@ -180,12 +181,58 @@ export function longRunShareCap(
  * `beginner` keeps its existing 14 km ceiling for marathon on purpose, not an oversight: it
  * reflects a first-time marathoner's conservative completion/run-walk track
  * (`plan-blueprint-examples.md` § 9's `NEW`/`SOME` marathon guidance is deliberately conservative
- * regardless of run count), a safety floor this ruling does not touch. The absolute ceiling stays
- * non-binding for `intermediate` and `advanced`; the 35% weekly-share cap, time cap, and spike
- * guard govern until Ian sets a real marathon-specific absolute number.
+ * regardless of run count), a safety floor this ruling does not touch. The absolute ceiling is
+ * non-binding for `intermediate` and `advanced` only under the conditions `SingleRunCeilingContext`
+ * spells out below; there the 35% weekly-share cap, time cap, and spike guard govern until Ian
+ * sets a real marathon-specific absolute number.
  */
-export function maxSingleRunKm(level: ExperienceLevel, raceDistance?: RaceDistance): number {
-  if (raceDistance === 'marathon' && level !== 'beginner') return Infinity;
+export interface SingleRunCeilingContext {
+  /** `deriveReadinessPath`'s verdict for this race plan. */
+  readiness: ReadinessPath;
+  /**
+   * The easy pace the 180-minute time cap would be measured with — `undefined` when the runner gave
+   * no recent time (or is advanced, whose easy running is by feel), in which case the time cap is
+   * unenforceable.
+   */
+  easyPaceSecPerKm?: number;
+}
+
+/**
+ * The bypass above is only legitimate where the ceilings it defers to can actually take its
+ * place. The 180-minute time cap needs a pace; the spike guard needs a demonstrated long run.
+ * A runner who gave no recent time has neither — the research's own answer for that runner
+ * (`plan-blueprint-examples.md` § 3 "Effort hierarchy when no recent performance exists") is a
+ * time-and-effort prescription bounded by the level's kilometre limits, which § 4's operating
+ * limits state outright: `REG`/`EXP` ≤25 km, `COMP` ≤35 km. And a first-timer (§ "The proposed
+ * selection model") has by definition not demonstrated the long-run base a marathon block assumes,
+ * so the level cap is the honest ceiling for them too. So `Infinity` is returned only for a
+ * `prepared` runner whose pace makes the time cap computable; every other marathoner keeps the
+ * flat table, the same table every non-marathon plan already uses. With no `context` at all the
+ * cap likewise stays in force — the loose case must be opted into with evidence, never assumed.
+ *
+ * Two facts worth knowing before "fixing" this: `deriveTrainingPaces` never derives an easy pace
+ * for `advanced` (their easy running is by feel), so an advanced marathoner's absolute ceiling is
+ * always 35 km, exactly § 4's `COMP` limit; and `MAX_WEEKLY_KM.intermediate` (70 km) keeps a 35%
+ * share under 25 km at every volume, so the intermediate bypass can only ever matter through the
+ * time cap. The captain's separate marathon calibration of these absolute numbers is still open.
+ */
+export function maxSingleRunKm(
+  level: ExperienceLevel,
+  raceDistance?: RaceDistance,
+  context?: SingleRunCeilingContext,
+): number {
+  const timeCapEnforceable =
+    context !== undefined &&
+    context.easyPaceSecPerKm !== undefined &&
+    context.easyPaceSecPerKm > 0;
+  if (
+    raceDistance === 'marathon' &&
+    level !== 'beginner' &&
+    context?.readiness === 'prepared' &&
+    timeCapEnforceable
+  ) {
+    return Infinity;
+  }
   return MAX_SINGLE_RUN_KM[level];
 }
 

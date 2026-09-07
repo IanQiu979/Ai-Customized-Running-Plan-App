@@ -35,12 +35,14 @@
  * problem: the run-count-scaled share cap and flat `MAX_SINGLE_RUN_KM` ceiling were calibrated
  * without marathon-length long runs in mind. The captain's final ruling
  * (`[key=marathon-longrun-share-cap]`) sets a distance-specific 35% weekly-share ceiling for
- * intermediate/advanced marathoners. Their separate kilometre ceiling remains non-binding
- * (`Infinity`), while the unchanged 180-minute time cap and `LONG_RUN_SPIKE_MULTIPLE` continue to
- * apply. Beginner marathoners keep both their run-count-scaled share ladder and 14 km ceiling.
+ * intermediate/advanced marathoners. Their separate kilometre ceiling is lifted (`Infinity`) only
+ * for a prepared runner whose pace makes the 180-minute time cap enforceable — a runner with no
+ * recent time keeps the level's own cap, since nothing else could bound them in kilometres
+ * (`planTemplates.noRecentTime.test.ts`) — while `LONG_RUN_SPIKE_MULTIPLE` continues to apply
+ * throughout. Beginner marathoners keep both their run-count-scaled share ladder and 14 km ceiling.
  */
 
-import { buildTemplatePlan } from '../planTemplates';
+import { buildTemplatePlan, deriveReadinessPath } from '../planTemplates';
 import type { TemplatePlanParams } from '../planTemplates';
 import {
   clampLongRun,
@@ -118,8 +120,9 @@ const PROFILES: Profile[] = [
   { name: 'M — 5K, 9 km/wk, 6 days, 10 weeks', experience: 'new', age: 45, daysPerWeek: 6, weeklyKm: 9, durationWeeks: 10, raceDistance: '5k', goalType: 'race' },
   // N exercises the beginner-only marathon ceilings: the run-count-scaled share ladder and 14 km
   // absolute ceiling. Profiles B, G, I and K exercise the captain's final 35% marathon share cap;
-  // their separate kilometre ceiling remains intentionally non-binding (`Infinity`), with the
-  // 180-minute time cap and spike guard still active.
+  // B and K (prepared, with a pace) have their kilometre ceiling lifted in favour of the
+  // 180-minute time cap, while G (first-timer by volume) and I (advanced, so no easy pace) keep
+  // the level cap — the spike guard is active for all four.
   { name: 'N — beginner marathon, 30 km/wk, 20 weeks', experience: 'new', age: 33, daysPerWeek: 4, weeklyKm: 30, durationWeeks: 20, raceDistance: 'marathon', goalType: 'race' },
 ];
 
@@ -145,6 +148,23 @@ function buildFor(profile: Profile): Plan {
   return buildTemplatePlan(params);
 }
 
+/**
+ * The same evidence `buildGenericWeek` hands `maxSingleRunKm`: the readiness verdict and whether
+ * a pace exists to enforce the time cap. `buildFor` always supplies a 10K result, so readiness is
+ * the volume test alone, and advanced runners never get an easy pace (`deriveTrainingPaces`).
+ */
+function ceilingContextFor(profile: Profile) {
+  const level = toExperienceLevel(profile.experience);
+  const readiness = profile.raceDistance
+    ? deriveReadinessPath(
+        { goal: profile.name, age: profile.age, experience: profile.experience, daysPerWeek: profile.daysPerWeek, weeklyKm: profile.weeklyKm, raceDistance: profile.raceDistance, recentPerformance: { distance: '10k', timeSec: 2700 }, injuries: profile.injuries ?? ['none'] },
+        profile.raceDistance,
+      )
+    : 'prepared';
+  const easyPaceSecPerKm = deriveTrainingPaces({ distance: '10k', timeSec: 2700 }, level).easy?.highSecPerKm;
+  return { readiness, easyPaceSecPerKm } as const;
+}
+
 describe('generic path — every long-run ceiling is enforced (audit §1.2)', () => {
   it.each(PROFILES.map((profile) => [profile.name, profile] as const))(
     'replays every long run of %s through clampLongRun and gets it back unchanged',
@@ -167,7 +187,7 @@ describe('generic path — every long-run ceiling is enforced (audit §1.2)', ()
             lastLoadingWeekKm,
             shareCapOverride: shareCap,
             roundSpikeCeilingUp: true,
-            maxSingleRunKmOverride: maxSingleRunKm(level, profile.raceDistance),
+            maxSingleRunKmOverride: maxSingleRunKm(level, profile.raceDistance, ceilingContextFor(profile)),
           });
           expect(Math.floor(km)).toBeGreaterThanOrEqual(longRun.distanceKm ?? 0);
           previousLongestKm = Math.max(previousLongestKm, longRun.distanceKm ?? 0);
@@ -216,10 +236,14 @@ describe('generic path — every long-run ceiling is enforced (audit §1.2)', ()
   );
 
   it.each(PROFILES.map((profile) => [profile.name, profile] as const))(
-    'keeps every long run of %s under its distance-aware absolute kilometre ceiling (still non-binding for marathon intermediate/advanced; the 180-minute cap remains separate)',
+    'keeps every long run of %s under its distance-aware absolute kilometre ceiling (lifted only for a prepared marathoner with a pace; the 180-minute cap remains separate)',
     (_name, profile) => {
       const plan = buildFor(profile);
-      const ceiling = maxSingleRunKm(toExperienceLevel(profile.experience), profile.raceDistance);
+      const ceiling = maxSingleRunKm(
+        toExperienceLevel(profile.experience),
+        profile.raceDistance,
+        ceilingContextFor(profile),
+      );
       for (const week of plan.weeks) {
         const longRun = findLongRun(week);
         if (!longRun) continue;

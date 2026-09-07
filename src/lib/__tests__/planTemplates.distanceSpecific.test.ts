@@ -247,10 +247,18 @@ describe("marathon long-run ceilings are distance-aware and enforce the captain'
     expect(maxSingleRunKm('intermediate', 'half')).toBe(25);
   });
 
-  it('keeps the separate absolute kilometre ceiling non-binding for intermediate/advanced marathoners and unchanged for beginners', () => {
-    expect(maxSingleRunKm('intermediate', 'marathon')).toBe(Infinity);
-    expect(maxSingleRunKm('advanced', 'marathon')).toBe(Infinity);
-    expect(maxSingleRunKm('beginner', 'marathon')).toBe(14);
+  it('lifts the absolute kilometre ceiling only for a prepared intermediate/advanced marathoner whose pace makes the time cap enforceable', () => {
+    // The bypass defers to the 180-minute time cap and the spike guard. Neither can stand in for
+    // the level cap without a pace and a demonstrated base, so the loose case is opted into with
+    // both; everything else keeps the blueprint's own ≤25 / ≤35 km. Beginners never bypass.
+    const prepared = { readiness: 'prepared', easyPaceSecPerKm: 360 } as const;
+    expect(maxSingleRunKm('intermediate', 'marathon', prepared)).toBe(Infinity);
+    expect(maxSingleRunKm('advanced', 'marathon', prepared)).toBe(Infinity);
+    expect(maxSingleRunKm('beginner', 'marathon', prepared)).toBe(14);
+    expect(maxSingleRunKm('intermediate', 'marathon')).toBe(25);
+    expect(maxSingleRunKm('advanced', 'marathon')).toBe(35);
+    expect(maxSingleRunKm('advanced', 'marathon', { readiness: 'first-timer', easyPaceSecPerKm: 300 })).toBe(35);
+    expect(maxSingleRunKm('advanced', 'marathon', { readiness: 'prepared' })).toBe(35);
   });
 
   it.each([3, 4, 5, 6])(
