@@ -1443,7 +1443,11 @@ function buildGenericWeek(args: {
   // Starting guess only — a floor here just picks a sane pre-clamp candidate (the long run
   // should, all else equal, exceed the hardest quality session). The safety loop below may still
   // shrink the result under this per the captain's ruling on `longrun-share-cap-floor`; see there.
-  const longRunStartFloor = retainedQuality.reduce(
+  // Deriving this from `retainedQuality` rather than the full `quality` array is the correct
+  // reading — a session that is not scheduled should not floor the long run — but it is
+  // deliberately deferred to issue #99, because lowering the floor unmasks a separate pre-existing
+  // 3-day progression undershoot in which a peak week can render below its own base weeks.
+  const longRunStartFloor = quality.reduce(
     (max, workout) => Math.max(max, (workout.distanceKm ?? 0) + 1),
     1,
   );

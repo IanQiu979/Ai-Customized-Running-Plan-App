@@ -79,6 +79,18 @@ operating limits": NEW/SOME ≤14, REG/EXP ≤25, COMP ≤35 km).
   deloads) and an 11 km long run throughout. It is disclosed by `THREE_DAY_MARATHON_DISCLAIMER`
   per the earlier ruling and is not changed here; now recorded under "Known debt" in
   `docs/mvp-progress.md`.
+- **Found in review, deliberately deferred (2026-09-08): `longRunStartFloor` derives from the full
+  `quality` array, not from `retainedQuality`.** At three and four running days Q2 is dropped
+  (`retainedQuality = quality.slice(0, 1)`), so a peak week floors its long-run candidate on an
+  interval session it does not schedule. Deriving the floor from `retainedQuality` is the correct
+  reading, and it was tried here and reverted: a 22,000-plan before/after sweep showed **518 plans
+  move, no long run ever moves up, the largest long-run drop is 3 km, 3-day weekly volume falls by
+  up to 6 km, and a peak week can render below its own base weeks.** That undershoot is a separate,
+  pre-existing 3-day progression defect the lower floor merely unmasks (the single easy run is
+  itself capped at the long run), so it is filed for the captain as **GitHub issue #99** and this
+  PR ships no plan-shape change. For the record, the profile raised in review — advanced / 5K /
+  4 days / 35 km per week / 10 weeks — **does not move**: its peak long run is 15 km in a 47 km
+  week both before and after, because the curve target dominated the floor in both derivations.
 
 ## 2026-09-07 — marathon share cap finalized; race-week placement corrected
 

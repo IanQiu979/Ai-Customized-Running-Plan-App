@@ -1195,7 +1195,7 @@ other findings (§1.1, §1.3, §1.5–§1.9 — per-distance training content, d
 |---|---|
 | §1.2 — `clampLongRun()` unenforced on `buildGenericWeek` | **Fixed**: both generic and golden paths call `clampLongRun()`. Generic plans use the run-count-scaled share cap and rounded-up whole-kilometre spike ceiling; the coach-authored golden path retains the flat share table and raw spike ceiling. Generic easy runs track the final clamped LR, while quality/tempo sessions remain outside that easy-run ceiling and may be longer. The generated-plan regression suite also exercises the three-hour cap with a pace-known marathon. |
 | Long-run share cap, low run counts (issue `longrun-share-cap-floor`) | **The cap always wins, and it now scales by weekly run count** (`loadRules.ts`'s `longRunShareCap`), not a flat per-level number. A flat cap is arithmetically impossible below a run-count-dependent threshold (an n-run week's largest entry is never under `1/n`) — exactly why the audit's beginner and 3-day profiles breached on every loading week. The three flat numbers in the table above (25%/32%/35%) remain the reference value at the golden fixture's 4-run week and the byte-pinned canonical 5K path's own cap, unscaled on purpose; every other path scales from there. Consequence: the long run is no longer guaranteed to be "the week's longest run" — `notation.md`'s LR row and `planTemplates.ts`'s `LONG_DESCRIPTION` no longer claim it. Full ruling and the before/after numbers: `docs/reference/coaching/load-rules.md`'s 2026-09-05 entry. |
-| §1.4 — race week assembled from the race-day budget | **Fixed, including the low-volume follow-up**: pre-race days are sized off a share of the taper-curve target, bounded by the peak week's room above race day. If that budget cannot fund every requested day at 2 km, surplus workouts become rest rather than 1 km filler. Survivors are right-aligned into the latest pre-race slots so SR stays nearest race day; the 12 km/week, 6-day 5K case produces two 2 km workouts (ER Thursday, SR Saturday), not three. Regression: `planTemplates.genericLongRun.test.ts` and `planTemplates.distanceSpecific.test.ts`. |
+| §1.4 — race week assembled from the race-day budget | **Fixed, including the low-volume follow-up**: pre-race days are sized off a share of the taper-curve target, bounded by the peak week's room above race day. If that budget cannot fund every requested day at 2 km, surplus workouts become rest rather than 1 km filler. Survivors are right-aligned into the latest pre-race slots so SR stays nearest race day; the 12 km/week, 6-day 5K case produces a 3 km and a 2 km run plus four rest days, on a 5 km budget (15 km peak week − 10 km race day), not five filler runs. Regression: `planTemplates.genericLongRun.test.ts` and `planTemplates.distanceSpecific.test.ts`. |
 
 ---
 
@@ -1252,6 +1252,17 @@ intact underneath.
   discloses it (`THREE_DAY_MARATHON_DISCLAIMER`, captain-ruled 2026-09-06) and recommends a fourth
   running day; it is not hidden, but it is not a progression either. Any fix is coaching content
   (a different three-day layout or Q1 dose), so it waits on Ian.
+- 🟡 **Three-day plans: the peak phase can render below the base phase — GitHub issue #99
+  (filed 2026-09-08).** `buildGenericWeek`'s `longRunStartFloor` derives from the full `quality`
+  array rather than `retainedQuality`, so at three and four running days the long-run candidate is
+  floored on a Q2 interval session the week does not schedule. Correcting the derivation was tried
+  and reverted on this branch: a 22,000-plan sweep showed 518 plans move, no long run ever moves
+  up, the largest long-run drop is 3 km, and 3-day weekly volume falls by up to 6 km — enough for a
+  peak week to render below its own base weeks (regular / 5K / 3 days / 20 km per week / 24 weeks:
+  weeks 17–19 go from 9/9/9 km long runs in 23/24/24 km weeks to 6/7/8 km in 17/18/20 km weeks).
+  The wrong floor is masking a genuine 3-day progression undershoot — the single easy run is itself
+  capped at the long run — so both must be fixed together, which is coaching-visible and waits on
+  Ian.
 - 🟡 **The client's and the Worker's `better-auth` versions must match, and only the lockfile
   holds them together (2026-09-05).** They are two separate npm projects sharing one wire format
   (cookie envelope, `/sign-in/social` state, session payload). During the
