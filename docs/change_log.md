@@ -353,15 +353,18 @@ onto, and builds on top of, the 2026-09-05 (later) long-run-cap/race-week fixes 
   than have it resolved silently, Ian chose the published figure — recovery weeks are shallower
   across every generated plan now, not just marathon ones. Full history:
   `docs/reference/coaching/load-rules.md` § Deload trigger.
-  - **Confirmed interaction with the 2026-09-05 long-run-cap work, surfaced per the captain's
-    explicit instruction rather than quietly reconciled:** the byte-pinned golden 12-week/4-day 5K
-    fixture's own weeks 4/8 dips (~39.5%/~37.5%, from `example-plan-5k-pro.md`) no longer count as
-    "a genuine deload" under the tighter band, which flips `clampLongRun`'s weekly-share
+  - **Confirmed interaction with the 2026-09-05 long-run-cap work, and a deliberate exception
+    rather than an open divergence (Ian's ruling, 2026-09-08,
+    `[key=golden-deloads-outside-new-band]`):** the byte-pinned golden 12-week/4-day 5K fixture's
+    own weeks 4/8 dips (~39.5%/~37.5%, from `example-plan-5k-pro.md`) fall outside the tighter
+    band, so they no longer count as "a genuine deload", which flips `clampLongRun`'s weekly-share
     denominator from the prior loading week to the deload week's own (smaller) volume for those
-    two weeks — tightening their long runs from 8/10 km to 7/9 km. Both the generated golden
-    fixture's tests and the hand-built `src/lib/fixtures/examplePlan.ts` screen fixture were
-    updated to the new, correctly-computed numbers; neither curve's own authored weekly-volume
-    values changed.
+    two weeks — tightening their long runs from 8/10 km to 7/9 km. Asked whether to reshape those
+    dips into the band, Ian ruled they stay exactly as authored: the 15-25% band is authoritative
+    for every generic-path deload, and the golden plan's weeks 4 and 8 are the one ruled exception
+    to it. Both the generated golden fixture's tests and the hand-built
+    `src/lib/fixtures/examplePlan.ts` screen fixture were updated to the new, correctly-computed
+    numbers; neither curve's own authored weekly-volume values changed.
 
 ## 2026-09-06 — long-run cap and race-week fixes, core-purpose audit §1.2/§1.4
 

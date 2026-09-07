@@ -360,25 +360,30 @@ The engine enforces a band with both a floor and a ceiling, not a "no minimum" a
 `isValidDeload()` in `src/lib/loadRules.ts` accepts a reduction in `[0.15, 0.25]` and rejects
 anything shallower or deeper. Generation uses the 20% midpoint.
 
-**Known interaction with the long-run cap work (flagged per the captain's instruction, not quietly
-reconciled):** `clampLongRun()`'s weekly-share ceiling measures a deload week's long run against the
-*last loading week's* volume, but only when `isValidDeload(lastLoadingWeekKm, weeklyKm)` agrees the
-week is a genuine deload under the currently-configured band (R1c, 2026-07-12, issue #34). The
-byte-pinned golden 12-week/4-day 5K fixture (`example-plan-5k-pro.md`, `FIVE_K_WEEKLY_LOAD` /
-`FIVE_K_LONG_RUNS` in `src/lib/planTemplates.ts`) has its own literal, separately-approved dip at
-weeks 4 and 8 — roughly **37–40%** off the prior loading week. That figure was authored years before
-this ruling and was never itself a `deloadVolume()` output, so tightening the band to 15–25% does
-not change the fixture's literal weekly-volume numbers, but it **does** flip `isValidDeload()` to
-`false` for those two weeks (37–40% no longer qualifies as "a genuine deload" under the new
-narrower band), which flips `clampLongRun()`'s denominator from the prior loading week back to the
-deload week's own (smaller) volume — tightening the share ceiling and shrinking the golden fixture's
-weeks 4/8 long runs by one kilometre each (8→7, 10→9). This is two coaching rules disagreeing, not a
-bug: the golden fixture's own dip depth was never brought into line with this ruling (that would be
-a separate, explicit edit to `example-plan-5k-pro.md`'s content, which nothing here authorizes), so
-it now reads as "not a real deload" by the newly-tightened definition purely because it dips deeper
-than the new 25% ceiling allows. The golden fixture's test expectations were updated to the new,
-correctly-computed numbers rather than left pinned to pre-ruling output; the fixture's own
-`FIVE_K_WEEKLY_LOAD`/`FIVE_K_LONG_RUNS` values were left untouched.
+**Deliberate, captain-ruled exception — the golden path keeps its coach-authored dips (Ian's
+ruling, 2026-09-08, `[key=golden-deloads-outside-new-band]`):** `clampLongRun()`'s weekly-share
+ceiling measures a deload week's long run against the *last loading week's* volume, but only when
+`isValidDeload(lastLoadingWeekKm, weeklyKm)` agrees the week is a genuine deload under the
+currently-configured band (R1c, 2026-07-12, issue #34). The byte-pinned golden 12-week/4-day 5K
+fixture (`example-plan-5k-pro.md`, `FIVE_K_WEEKLY_LOAD` / `FIVE_K_LONG_RUNS` in
+`src/lib/planTemplates.ts`) has its own literal, separately-approved dip at weeks 4 and 8 — roughly
+**37–40%** off the prior loading week. That figure was authored years before this ruling and was
+never itself a `deloadVolume()` output. Ian was asked directly whether to reshape those dips into
+the 15–25% band and ruled that they stay exactly as written: the golden plan is coach-authored
+content, and its recovery weeks are approved on their own terms. So the two depths coexist on
+purpose — **the 15–25% band is authoritative for every generic-path deload, and the golden
+12-week/4-day 5K plan's weeks 4 and 8 are the one ruled exception to it.** Nothing here is pending
+a later fix.
+
+The mechanical consequence is settled and intended: tightening the band to 15–25% does not change
+the fixture's literal weekly-volume numbers, but it **does** make `isValidDeload()` return `false`
+for those two weeks (37–40% falls outside the band), which flips `clampLongRun()`'s denominator
+from the prior loading week back to the deload week's own (smaller) volume — tightening the share
+ceiling and shrinking the golden fixture's weeks 4/8 long runs by one kilometre each (8→7, 10→9).
+That is the safety cap doing its job against a deeper-than-band week, which is the conservative
+direction. The golden fixture's test expectations were updated to the new, correctly-computed
+numbers rather than left pinned to pre-ruling output; the fixture's own
+`FIVE_K_WEEKLY_LOAD`/`FIVE_K_LONG_RUNS` values were left untouched, per this ruling.
 
 **Still an error, not an alternative:** the 5K example plan's Week 4 is labelled a deload while its
 volume *rises* (~17–19 km → ~18–19 km). See `plan-structure.md`.

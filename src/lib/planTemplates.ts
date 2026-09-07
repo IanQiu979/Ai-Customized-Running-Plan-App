@@ -518,8 +518,9 @@ function preRaceBudgetKm(args: {
  * the exact signature the §1.4 race-week bug left behind, and `planTemplates.genericLongRun.
  * test.ts` treats it as a defect. So when the budget cannot give every requested pre-race day a
  * real shakeout, the surplus days become genuine rest instead of filler runs: a 12 km/week runner
- * training six days a week gets three 2 km shakeouts and three rest days before their 5K, not
- * five runs of `[2, 1, 1, 1, 1]`.
+ * training six days a week has a 5 km pre-race budget (their 15 km peak training week minus a
+ * 10 km race day), which affords `floor(5 / 2) = 2` days, so they get runs of 3 km and 2 km and
+ * four rest days before their 5K, not five runs of `[2, 1, 1, 1, 1]`.
  *
  * **The one place the peak bound yields.** If the budget cannot fund even a single 2 km shakeout,
  * one is scheduled anyway. That regime is a runner whose race day alone already meets or exceeds
@@ -1442,7 +1443,7 @@ function buildGenericWeek(args: {
   // Starting guess only — a floor here just picks a sane pre-clamp candidate (the long run
   // should, all else equal, exceed the hardest quality session). The safety loop below may still
   // shrink the result under this per the captain's ruling on `longrun-share-cap-floor`; see there.
-  const longRunStartFloor = quality.reduce(
+  const longRunStartFloor = retainedQuality.reduce(
     (max, workout) => Math.max(max, (workout.distanceKm ?? 0) + 1),
     1,
   );
