@@ -162,18 +162,20 @@ describe('weekly volume', () => {
 });
 
 describe('deload weeks', () => {
-  it('reduces by the midpoint of the 35-45% band', () => {
-    expect(deloadVolume(50)).toBeCloseTo(30); // 40% off
+  // Band is 15-25%, midpoint 20% — Ian's ruling, 2026-09-06, superseded the 35-45%/40% figure
+  // these tests pinned before (`docs/reference/coaching/load-rules.md` § Deload trigger).
+  it('reduces by the midpoint of the 15-25% band', () => {
+    expect(deloadVolume(50)).toBeCloseTo(40); // 20% off
   });
 
   it('accepts a reduction anywhere inside the band', () => {
-    expect(isValidDeload(50, 32.5)).toBe(true); // 35%
-    expect(isValidDeload(50, 27.5)).toBe(true); // 45%
+    expect(isValidDeload(50, 42.5)).toBe(true); // 15%
+    expect(isValidDeload(50, 37.5)).toBe(true); // 25%
   });
 
   it('rejects a deload that is too shallow or too deep', () => {
-    expect(isValidDeload(50, 35)).toBe(false); // 30% — the old, superseded band
-    expect(isValidDeload(50, 25)).toBe(false); // 50%
+    expect(isValidDeload(50, 45)).toBe(false); // 10%
+    expect(isValidDeload(50, 35)).toBe(false); // 30% — the pre-2026-09-06 band's own midpoint
   });
 });
 
@@ -437,16 +439,16 @@ describe('long run — deload weekly-share ceiling measured against the last loa
     expect(limitedBy).toBe('weekly-share');
   });
 
-  it("measures the ceiling against lastLoadingWeekKm for a genuine deload — the golden week-4 " +
-    'shape: 23 km deload week, 38 km last loading week, a 39.5% reduction inside the 35-45% ' +
-    "band, so the 8 km long run (21.1% of 38) sits well under the 32% cap (12.16 km)", () => {
+  it("measures the ceiling against lastLoadingWeekKm for a genuine deload — 32 km deload week, " +
+    '40 km last loading week, a 20% reduction inside the 15-25% band, so the 8 km long run (25% ' +
+    'of 32) sits well under the 32% cap (12.8 km)', () => {
     const { km, limitedBy } = clampLongRun({
       level: 'intermediate',
       proposedKm: 8,
-      weeklyKm: 23,
+      weeklyKm: 32,
       previousLongestKm: 0,
       isDeload: true,
-      lastLoadingWeekKm: 38,
+      lastLoadingWeekKm: 40,
     });
     expect(km).toBe(8);
     expect(limitedBy).toBe('none');
@@ -457,12 +459,12 @@ describe('long run — deload weekly-share ceiling measured against the last loa
     const { km, limitedBy } = clampLongRun({
       level: 'intermediate',
       proposedKm: 13,
-      weeklyKm: 23,
+      weeklyKm: 32,
       previousLongestKm: 0,
       isDeload: true,
-      lastLoadingWeekKm: 38, // valid deload; share cap = 0.32 * 38 = 12.16, tighter than 13
+      lastLoadingWeekKm: 40, // valid deload (20%); share cap = 0.32 * 40 = 12.8, tighter than 13
     });
-    expect(km).toBeCloseTo(12.16);
+    expect(km).toBeCloseTo(12.8);
     expect(limitedBy).toBe('weekly-share');
   });
 
@@ -485,10 +487,10 @@ describe('long run — deload weekly-share ceiling measured against the last loa
     const { km, limitedBy } = clampLongRun({
       level: 'beginner',
       proposedKm: 20,
-      weeklyKm: 36,
+      weeklyKm: 48,
       previousLongestKm: 0,
       isDeload: true,
-      lastLoadingWeekKm: 60, // valid deload: (60-36)/60 = 40%; share cap = 0.25 * 60 = 15,
+      lastLoadingWeekKm: 60, // valid deload: (60-48)/60 = 20%; share cap = 0.25 * 60 = 15,
       // looser than the beginner absolute cap (14), so absolute binds instead
     });
     expect(km).toBe(14); // beginner absolute cap
@@ -499,10 +501,11 @@ describe('long run — deload weekly-share ceiling measured against the last loa
     const { km, limitedBy } = clampLongRun({
       level: 'advanced',
       proposedKm: 30,
-      weeklyKm: 50,
+      weeklyKm: 65,
       previousLongestKm: 0,
       isDeload: true,
-      lastLoadingWeekKm: 90, // valid deload: (90-50)/90 = 44.4%; share cap = 0.35 * 90 = 31.5
+      lastLoadingWeekKm: 81.25, // valid deload: (81.25-65)/81.25 = 20%; share cap = 0.35 * 81.25
+      // = 28.4375, looser than the 27 km time cap, so time binds instead
       easyPaceSecPerKm: 400, // 3 h at 6:40/km = 27 km
     });
     expect(km).toBeCloseTo(27);

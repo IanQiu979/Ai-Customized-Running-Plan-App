@@ -136,11 +136,11 @@ src/
     postSignupRedirect.ts    # one-shot module-level flag so a fresh signup lands on Intake — see
                               #  "Sign-up → Intake redirect" below
     planTypes.ts              # canonical — shared Plan/Week/Workout/Tier vocabulary
-    loadRules.ts               # canonical — deterministic safety arithmetic, 31 unit tests
+    loadRules.ts               # canonical — deterministic safety arithmetic
     notation.ts                 # canonical — run-type/structure-string notation, the code
                                  #             counterpart of `notation.md`, 13 unit tests
     paceDerivation.ts        # pure Riegel/training-pace/goal-realism arithmetic
-    planTemplates.ts         # pure deterministic template + fallback plan engine
+    planTemplates.ts         # pure deterministic, distance-specific template + fallback engine
     tierLimits.ts                # canonical — the ONE copy of Free/Pro/Elite limits + the
                                   #             fallback-exemption cap. Imported by the app AND
                                   #             by `workers/`. 8 unit tests
@@ -367,7 +367,7 @@ src/lib/
                              #                `describeError()`, re-exported from `apiClient.ts`
   planTypes.ts             # exists today — shared Plan/Week/Workout/Tier types, one source of
                             #                truth for the app and the Worker
-  loadRules.ts              # exists today — deterministic safety arithmetic, 31 unit tests
+  loadRules.ts              # exists today — deterministic safety arithmetic
   notation.ts                # exists today — run-type/structure-string notation, the code
                               #                counterpart of `notation.md`, 13 unit tests
   tierLimits.ts               # exists today — the one copy of the tier limits, app + Worker
@@ -378,7 +378,13 @@ src/lib/
                             #          any legal week count (per the plan-shape rules in
                             #          `planning/02-product-requirements.md`), any days/week, any
                             #          starting weekly volume (km); exactly reproduces the golden
-                            #          5K case. Free's 12-week/5K limit is a UI/quota gate applied
+                            #          5K case, while 10K/half/marathon use their own volume and
+                            #          long-run curves. Race plans select first-timer vs prepared
+                            #          phase weighting from demonstrated weekly volume/recent
+                            #          performance, never desired goal time. At 3–4 running days
+                            #          the generic layout keeps Q1 and drops Q2 before easy
+                            #          support; Q2 may remain at 5+ days. Free's 12-week/5K limit
+                            #          is a UI/quota gate applied
                             #          on top of this engine, not a limit of the engine itself — a
                             #          Pro/Elite fallback still needs, say, a 26-week marathon
                             #          template. Since 2026-08-15 a plan with no race is a first
@@ -386,7 +392,7 @@ src/lib/
                             #          taper phase, the loading block of the curve only, and a final
                             #          week forced to be a loading week so it never ends on a deload
                             #          (captain's coaching ruling — the cadence yields for that week
-                            #          alone). Race plans, golden fixture included, are unchanged.
+                            #          alone). The byte-pinned golden fixture remains its own path.
   paceDerivation.ts        # exists — Riegel cross-distance equivalency, source-relative training
                             #          bands, and the ruled goal-realism/race-pace cap (decision
                             #          13, 2026-07-10)
@@ -460,10 +466,14 @@ generation still falls back to the same template every tier gets, honestly marke
    ruling, 2026-08-03; see `docs/reference/coaching/plan-structure.md`), not a separate
    return-to-running protocol — never a rejection, and does not consume quota.
 5. **Build the template skeleton** — parametric, from `planTemplates.ts` and the coaching docs:
-   phases, deload cadence, weekly volumes under `loadRules.ts` caps, workout primitives from
-   `workout-library.md`. **All three tiers build on this same coach-authored skeleton — it is
-   never removed.** What scales across tiers is how much of the runner the plan reasons about and
-   how much it explains, never how much of the coach's judgment is taken away.
+   distance-specific weekly-volume/long-run curves, readiness selected from demonstrated recent
+   training rather than desired goal time, phases, deload cadence, weekly volumes under
+   `loadRules.ts` caps, and workout primitives from `workout-library.md`. Intermediate/advanced
+   marathon race plans cap long runs at 35% of the generated loading-week denominator; their
+   separate absolute kilometre ceiling remains non-binding pending calibration, while the
+   180-minute duration cap remains active. **All three tiers build on this same coach-authored
+   skeleton — it is never removed.** What scales across tiers is how much of the runner the plan
+   reasons about and how much it explains, never how much of the coach's judgment is taken away.
 6. **Free tier stops here.** Template + effort descriptions only. No AI call, ever.
 7. **Pro/Elite — one Claude call** (`claude-sonnet-5`). **Shipped 2026-08-10, narrower than
    originally sketched here.** Pace, HR zone/RPE, and every distance are already final by this
@@ -485,7 +495,7 @@ generation still falls back to the same template every tier gets, honestly marke
    handful of AI-personalized representative weeks), in case a future revision of step 7 goes back
    to emitting structure. The shipped step 7 above never produces partial-plan structure that would
    need expanding — every week already exists, from the skeleton — so this step is a no-op today.
-9. **Clamp** — `loadRules.ts` re-checks every week (weekly increase cap, deload band 35–45%,
+9. **Clamp** — `loadRules.ts` re-checks every week (weekly increase cap, deload band 15–25%,
    long-run share/spike/time caps) identically across all three tiers. A model cannot emit an
    unsafe week because this code rejects the number before the user sees it.
 10. **Validate structurally, loosely** — shape only. Fail → retry once. Fail again → fall back to

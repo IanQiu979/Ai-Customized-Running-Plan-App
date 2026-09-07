@@ -24,10 +24,20 @@
  * per-level share cap is arithmetically impossible at low run counts (an n-run week's largest
  * entry is never below `1/n`), and an earlier revision floored the long run at that week's
  * hardest quality session instead of enforcing the cap, so the cap silently lost to the floor
- * whenever they conflicted. The ruling: the cap always wins, and it scales by run count
- * (`longRunShareCap`) instead of staying flat. Every assertion below checks against that scaled
- * cap, not the flat `LONG_RUN_SHARE_CAP` table (which remains correct only for the byte-pinned
- * golden 4-day 5K fixture — see `longRunShareCap`'s own comment in `loadRules.ts`).
+ * whenever they conflicted. The ruling: the cap always wins, and the ordinary level cap scales
+ * by run count (`longRunShareCap`) instead of staying flat. The assertions below call that
+ * distance-aware helper: non-marathon plans and beginner marathon plans use the scaled ladder,
+ * while intermediate/advanced marathon plans use the separate final 35% ceiling. The flat
+ * `LONG_RUN_SHARE_CAP` table remains correct only for the byte-pinned golden 4-day 5K fixture —
+ * see `longRunShareCap`'s own comment in `loadRules.ts`.
+ *
+ * The distance-specific curve fix (`v22-distance-specific-plans`, 2026-09-06) surfaced a third
+ * problem: the run-count-scaled share cap and flat `MAX_SINGLE_RUN_KM` ceiling were calibrated
+ * without marathon-length long runs in mind. The captain's final ruling
+ * (`[key=marathon-longrun-share-cap]`) sets a distance-specific 35% weekly-share ceiling for
+ * intermediate/advanced marathoners. Their separate kilometre ceiling remains non-binding
+ * (`Infinity`), while the unchanged 180-minute time cap and `LONG_RUN_SPIKE_MULTIPLE` continue to
+ * apply. Beginner marathoners keep both their run-count-scaled share ladder and 14 km ceiling.
  */
 
 import { buildTemplatePlan } from '../planTemplates';
@@ -39,7 +49,7 @@ import {
   longRunShareCap,
   LONG_RUN_MAX_MINUTES,
   LONG_RUN_SPIKE_MULTIPLE,
-  MAX_SINGLE_RUN_KM,
+  maxSingleRunKm,
   toExperienceLevel,
 } from '../loadRules';
 import { deriveTrainingPaces } from '../paceDerivation';
@@ -99,6 +109,18 @@ const PROFILES: Profile[] = [
   { name: 'I — marathon, 100 km/wk, 20 weeks', experience: 'competitive', age: 29, daysPerWeek: 6, weeklyKm: 100, durationWeeks: 20, raceDistance: 'marathon', goalType: 'race' },
   { name: 'J — 5K, 15 km/wk, 6 weeks', experience: 'some', age: 40, daysPerWeek: 3, weeklyKm: 15, durationWeeks: 6, raceDistance: '5k', goalType: 'race' },
   { name: 'K — marathon, 60 km/wk, 16 weeks', experience: 'experienced', age: 38, daysPerWeek: 5, weeklyKm: 60, durationWeeks: 16, raceDistance: 'marathon', goalType: 'race' },
+  // L and M are the low-volume/high-frequency corner this list had no profile for: a runner whose
+  // race day is most of their biggest week, training often enough that the pre-race budget cannot
+  // give every requested day a real shakeout. Every race-week invariant below (the >= 2 km
+  // pre-race floor especially) was previously unfalsifiable because no profile could reach the
+  // regime where the budget and the day count actually conflict.
+  { name: 'L — 5K, 12 km/wk, 6 days, 10 weeks', experience: 'some', age: 34, daysPerWeek: 6, weeklyKm: 12, durationWeeks: 10, raceDistance: '5k', goalType: 'race' },
+  { name: 'M — 5K, 9 km/wk, 6 days, 10 weeks', experience: 'new', age: 45, daysPerWeek: 6, weeklyKm: 9, durationWeeks: 10, raceDistance: '5k', goalType: 'race' },
+  // N exercises the beginner-only marathon ceilings: the run-count-scaled share ladder and 14 km
+  // absolute ceiling. Profiles B, G, I and K exercise the captain's final 35% marathon share cap;
+  // their separate kilometre ceiling remains intentionally non-binding (`Infinity`), with the
+  // 180-minute time cap and spike guard still active.
+  { name: 'N — beginner marathon, 30 km/wk, 20 weeks', experience: 'new', age: 33, daysPerWeek: 4, weeklyKm: 30, durationWeeks: 20, raceDistance: 'marathon', goalType: 'race' },
 ];
 
 function buildFor(profile: Profile): Plan {
@@ -129,7 +151,7 @@ describe('generic path — every long-run ceiling is enforced (audit §1.2)', ()
     (_name, profile) => {
       const plan = buildFor(profile);
       const level = toExperienceLevel(profile.experience);
-      const shareCap = longRunShareCap(level, runCountFor(profile.daysPerWeek));
+      const shareCap = longRunShareCap(level, runCountFor(profile.daysPerWeek), profile.raceDistance);
       let previousLongestKm = 0;
       let lastLoadingWeekKm = 0;
 
@@ -145,12 +167,33 @@ describe('generic path — every long-run ceiling is enforced (audit §1.2)', ()
             lastLoadingWeekKm,
             shareCapOverride: shareCap,
             roundSpikeCeilingUp: true,
+            maxSingleRunKmOverride: maxSingleRunKm(level, profile.raceDistance),
           });
           expect(Math.floor(km)).toBeGreaterThanOrEqual(longRun.distanceKm ?? 0);
           previousLongestKm = Math.max(previousLongestKm, longRun.distanceKm ?? 0);
         }
         if (!week.isDeload) lastLoadingWeekKm = week.volumeKm;
       }
+    },
+  );
+
+  it.each(PROFILES.map((profile) => [profile.name, profile] as const))(
+    "holds %s inside its weekly-share cap on every loading week, including marathon's final 35% ceiling",
+    (_name, profile) => {
+      const plan = buildFor(profile);
+      const cap = longRunShareCap(
+        toExperienceLevel(profile.experience),
+        runCountFor(profile.daysPerWeek),
+        profile.raceDistance,
+      );
+      let checkedLoadingLongRuns = 0;
+      for (const week of plan.weeks) {
+        const longRun = findLongRun(week);
+        if (!longRun || week.isDeload) continue;
+        checkedLoadingLongRuns += 1;
+        expect((longRun.distanceKm ?? 0) / week.volumeKm).toBeLessThanOrEqual(cap + 1e-9);
+      }
+      expect(checkedLoadingLongRuns).toBeGreaterThan(0);
     },
   );
 
@@ -173,10 +216,10 @@ describe('generic path — every long-run ceiling is enforced (audit §1.2)', ()
   );
 
   it.each(PROFILES.map((profile) => [profile.name, profile] as const))(
-    'keeps every long run of %s under the level absolute single-run ceiling',
+    'keeps every long run of %s under its distance-aware absolute kilometre ceiling (still non-binding for marathon intermediate/advanced; the 180-minute cap remains separate)',
     (_name, profile) => {
       const plan = buildFor(profile);
-      const ceiling = MAX_SINGLE_RUN_KM[toExperienceLevel(profile.experience)];
+      const ceiling = maxSingleRunKm(toExperienceLevel(profile.experience), profile.raceDistance);
       for (const week of plan.weeks) {
         const longRun = findLongRun(week);
         if (!longRun) continue;
@@ -248,9 +291,14 @@ describe('generic path — every long-run ceiling is enforced (audit §1.2)', ()
   it('pins the two exact breaches the audit reported for profile C (half, 80 km/wk)', () => {
     const profileC = PROFILES.find((p) => p.name.startsWith('C'))!;
     const plan = buildFor(profileC);
-    const cap = longRunShareCap(toExperienceLevel(profileC.experience), runCountFor(profileC.daysPerWeek));
+    const cap = longRunShareCap(
+      toExperienceLevel(profileC.experience),
+      runCountFor(profileC.daysPerWeek),
+      profileC.raceDistance,
+    );
     // Audit: "week 7: LR 34 km in a 64 km week = 53% (advanced cap 35%)". The ladder is floored at
-    // the flat table, so a 6-run advanced week is still governed by exactly that 35%.
+    // the flat table (and marathon's own cap is 35% too), so a 6-run advanced week is still
+    // governed by exactly that 35%.
     const week7 = plan.weeks[6];
     const week7Long = findLongRun(week7)?.distanceKm ?? 0;
     expect(week7Long / week7.volumeKm).toBeLessThanOrEqual(cap + 1e-9);
@@ -370,12 +418,17 @@ describe('generic path — the long run must still be able to grow', () => {
   });
 
   it('pins profile F to the trajectory the share cap actually allows it', () => {
-    // F does not end higher than it started, and that is correct rather than frozen: a beginner
-    // running 20 km across 4 days is share-capped at 0.275, so its long run tracks the week's
-    // volume curve (19, 21, 15, 9d, 17, 19, 21) and cannot exceed ~5 km anywhere in the plan.
-    // Pinned so a change that breaks this correct behaviour still fails something.
+    // A beginner running 20 km across 4 days is share-capped at 0.275, so F's long run tracks the
+    // 10K curve's own volume (17, 19, 21, 17d, 23, 26, 26) and never exceeds floor(0.275 × week).
+    // On the stretched-5K curve this plan used to read, F peaked at 5 km and ended where it began;
+    // the 10K curve climbs through the block, so the long run climbs with it. Pinned so a change
+    // that breaks this correct behaviour still fails something.
     const series = longRunSeries(PROFILES.find((p) => p.name.startsWith('F'))!);
-    expect(series.map((point) => point.longRunKm)).toEqual([5, 5, 4, 4, 4, 5, 5]);
+    expect(series.map((point) => point.longRunKm)).toEqual([4, 5, 5, 5, 6, 7, 7]);
+    const cap = longRunShareCap('beginner', 4, '10k');
+    for (const point of series.filter((p) => !p.isDeload)) {
+      expect(point.longRunKm).toBeLessThanOrEqual(Math.floor(cap * point.volumeKm));
+    }
   });
 
   it('pins profile J to the trajectory the share cap actually allows it', () => {
@@ -402,9 +455,11 @@ describe('generic path — the long run must still be able to grow', () => {
    * so it could not have failed on them however frozen the long run got. `RISING_WINDOW_PROFILES`
    * is asserted below rather than assumed, so this can never quietly go vacuous again; A and J are
    * genuinely outside it (their volume never rises twice running) and are covered instead by the
-   * cap-bound trajectory pins above.
+   * cap-bound trajectory pins above. L and N (added with the distance-specific curves) both rise
+   * twice running and so are inside it; L's long run is cap-bound across its rising window, which
+   * the stall check below distinguishes from a freeze.
    */
-  const RISING_WINDOW_PROFILES = ['B', 'C', 'E', 'F', 'G', 'H', 'I', 'K'];
+  const RISING_WINDOW_PROFILES = ['B', 'C', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'N'];
 
   function risingWindows(series: ReturnType<typeof longRunSeries>) {
     const windows: (typeof series)[] = [];
@@ -428,9 +483,21 @@ describe('generic path — the long run must still be able to grow', () => {
     'never holds %s long run flat across two consecutive weeks of rising volume',
     (_name, profile) => {
       const series = longRunSeries(profile);
+      const cap = longRunShareCap(
+        toExperienceLevel(profile.experience),
+        runCountFor(profile.daysPerWeek),
+        profile.raceDistance,
+      );
       const stalls: string[] = [];
       for (const window of risingWindows(series)) {
-        if (window.every((point) => point.longRunKm === window[0].longRunKm)) {
+        // A flat long run is a freeze only if the share cap would have let it grow. When every
+        // point already sits on floor(cap × volume) — L's 3 km at 14 and 15 km, both under a 25%
+        // beginner cap — the cap is holding it, exactly as J's pin above documents, not the spike
+        // ceiling freezing it.
+        const capBound = window.every(
+          (point) => point.longRunKm >= Math.floor(cap * point.volumeKm),
+        );
+        if (!capBound && window.every((point) => point.longRunKm === window[0].longRunKm)) {
           stalls.push(
             `weeks ${window[0].weekNumber}-${window[window.length - 1].weekNumber}: long run stuck at ` +
               `${window[0].longRunKm} km while volume rose ${window.map((point) => point.volumeKm).join(' -> ')} km`,
@@ -526,17 +593,22 @@ describe('generic path — volume reconciliation may not re-open the share cap',
 
   it('lands that week exactly on its target rather than undershooting it', () => {
     // The trim removes only the overshoot, so the week keeps the volume the growth clamp allowed
-    // it — 19 km, not the 17 km an independent per-workout floor produced.
+    // it rather than the smaller total an independent per-workout floor produced (19 km, not
+    // 17 km, when week 5 was a curve dip; 25 km now that the generic no-race curve has no dips).
     const plan = buildFor(RECONCILE_PROFILE);
-    expect(plan.weeks[4].volumeKm).toBe(19);
-    expect(findLongRun(plan.weeks[4])?.distanceKm).toBe(6);
+    expect(plan.weeks[4].volumeKm).toBe(25);
+    expect(findLongRun(plan.weeks[4])?.distanceKm).toBe(8);
   });
 
   it.each(PROFILES.map((profile) => [profile.name, profile] as const))(
     'holds %s inside the share cap using clampLongRun\'s own deload denominator',
     (_name, profile) => {
       const plan = buildFor(profile);
-      const cap = longRunShareCap(toExperienceLevel(profile.experience), runCountFor(profile.daysPerWeek));
+      const cap = longRunShareCap(
+        toExperienceLevel(profile.experience),
+        runCountFor(profile.daysPerWeek),
+        profile.raceDistance,
+      );
       const breaches: string[] = [];
       let lastLoadingWeekKm = 0;
       for (const week of plan.weeks) {
@@ -562,6 +634,10 @@ describe('generic path — race week is a taper, not budget math around the race
     PROFILES.find((profile) => profile.name.startsWith('B'))!,
     PROFILES.find((profile) => profile.name.startsWith('C'))!,
   ];
+  // Each of these runners' race day alone meets or exceeds their peak training week (a 10 km/wk
+  // runner peaks around 15 km; a half is 26 km and a marathon 47 km on race day), so the
+  // peak-relative pre-race bound leaves no room at all and `preRaceSchedule`'s single documented
+  // exception applies: one 2 km shakeout, every other pre-race slot rest.
   const UNDERFUNDED_RACE_CASES: {
     profile: Profile;
     expectedPreRaceRuns: number;
@@ -578,8 +654,8 @@ describe('generic path — race week is a taper, not budget math around the race
         raceDistance: 'half',
         goalType: 'race',
       },
-      expectedPreRaceRuns: 2,
-      expectedPreRaceKm: 5,
+      expectedPreRaceRuns: 1,
+      expectedPreRaceKm: 2,
     },
     {
       profile: {
@@ -592,8 +668,8 @@ describe('generic path — race week is a taper, not budget math around the race
         raceDistance: 'half',
         goalType: 'race',
       },
-      expectedPreRaceRuns: 3,
-      expectedPreRaceKm: 6,
+      expectedPreRaceRuns: 1,
+      expectedPreRaceKm: 2,
     },
     {
       profile: {
@@ -606,8 +682,8 @@ describe('generic path — race week is a taper, not budget math around the race
         raceDistance: 'marathon',
         goalType: 'race',
       },
-      expectedPreRaceRuns: 2,
-      expectedPreRaceKm: 5,
+      expectedPreRaceRuns: 1,
+      expectedPreRaceKm: 2,
     },
     {
       profile: {
@@ -620,8 +696,8 @@ describe('generic path — race week is a taper, not budget math around the race
         raceDistance: 'marathon',
         goalType: 'race',
       },
-      expectedPreRaceRuns: 3,
-      expectedPreRaceKm: 6,
+      expectedPreRaceRuns: 1,
+      expectedPreRaceKm: 2,
     },
   ];
 

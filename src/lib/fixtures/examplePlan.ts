@@ -32,12 +32,20 @@
  *      against — but week 11's race-pace-rep session, now sitting in the race-specific phase,
  *      converges to goal pace directly: 240 s/km (4:00/km). See the source doc's "Session
  *      sizing" section and Open item 3 for the full reasoning.
- *   2. MOOT. The 2026-07-10 file trimmed the week 4 and week 8 deload long runs to 7 km and
- *      9 km (from the source doc's 8 km and 10 km) to land inside the 35–45% deload band. The
- *      rebuilt doc's own volume table already lands cleanly there without any adjustment: week 4
- *      (23 km total, 8 km long run) is 39.5% off week 3 (38 km, the last loading week); week 8
- *      (30 km total, 10 km long run) is 37.5% off week 7 (48 km). This file now uses the doc's
- *      own figures unaltered.
+ *   2. RE-APPLIED 2026-09-06, no longer moot. The 2026-07-10 file trimmed the week 4 and week 8
+ *      deload long runs to 7 km and 9 km (from the source doc's 8 km and 10 km) to land inside
+ *      the then-current 35–45% deload band; the 2026-07-11 rebuild found the doc's own untrimmed
+ *      figures already fit that band (week 4: 23 km total, 8 km long run, 39.5% off week 3's
+ *      38 km; week 8: 30 km total, 10 km long run, 37.5% off week 7's 48 km) and reverted to
+ *      them. Ian's 2026-09-06 ruling (`docs/reference/coaching/load-rules.md` § Deload trigger)
+ *      superseded that 35–45% band with McMillan's public 15–25% figure, and 39.5%/37.5% no
+ *      longer fit it — `isValidDeload()` now says neither week 4 nor week 8 is "a genuine
+ *      deload", which flips `clampLongRun`'s weekly-share ceiling from measuring against the
+ *      prior loading week (38/48 km) to measuring against the deload week's own smaller volume
+ *      (23/30 km), tightening the cap below the doc's 8/10 km. This file is back to trimming
+ *      the two long runs to 7 km and 9 km — same numbers as the 2026-07-10 file, same
+ *      mechanism, different rule change forcing it. See the two weeks' own `why` text below for
+ *      the exact arithmetic.
  *
  * Labels follow `docs/reference/coaching/notation.md` (`src/lib/notation.ts` is its code
  * counterpart): `ER`, `ER + Strides`, `TR`, `INT`, `RP`, `LR`, `SR`, and unabbreviated
@@ -311,12 +319,18 @@ export const examplePlan: Plan = {
       'base',
       true,
       23,
-      [easyRun(6), REST, easyRun(5), REST, easyRun(4), longRun(8), REST],
+      [easyRun(6), REST, easyRun(5), REST, easyRun(5), longRun(7), REST],
       "First deload. No quality work at all — a deload that keeps the hard session isn't a " +
         'deload. Volume drops 39.5% off week 3, the last loading week. Deliberately ' +
         'strides-free, unlike the loading weeks either side — the library permits strides ' +
         'during a deload for "speedster" types, but this revision keeps deload weeks pure as ' +
-        'the simpler default.',
+        'the simpler default. Long run trimmed from the doc\'s 8 km to 7 km (2026-09-06, see ' +
+        'the file header) — a 39.5% volume drop no longer counts as "a genuine deload" once ' +
+        'the deload band tightened to 15–25%, so the safety layer\'s weekly-share ceiling now ' +
+        'measures against this week\'s own 23 km rather than week 3\'s 38 km, tightening from ' +
+        '12.16 km to 7.36 km. The freed kilometre moved to the third easy run (5, not 4), ' +
+        "matching exactly what `buildTemplatePlan`'s own generic engine now produces for this " +
+        'shape — not a hand guess.',
     ),
     week(
       5,
@@ -378,9 +392,15 @@ export const examplePlan: Plan = {
       'build',
       true,
       30,
-      [easyRun(8), REST, easyRun(7), REST, easyRun(5), longRun(10), REST],
+      [easyRun(7), REST, easyRun(7), REST, easyRun(7), longRun(9), REST],
       'Second deload, same rule as week 4: no quality work at all. Volume drops 37.5% off ' +
-        'week 7 — the last loading week. Strides-free, like week 4.',
+        'week 7 — the last loading week. Strides-free, like week 4. Long run trimmed from the ' +
+        "doc's 10 km to 9 km (2026-09-06, see the file header), the same interaction as week " +
+        '4: 37.5% no longer reads as a genuine deload once the band tightened, so the ceiling ' +
+        'measures against this week\'s own 30 km (share cap 9.6 km) instead of week 7\'s 48 km ' +
+        "(15.36 km). The freed two kilometres spread across all three easy runs (8/7/5 → " +
+        "7/7/7), matching exactly what `buildTemplatePlan`'s own generic engine now produces " +
+        'for this shape.',
     ),
     week(
       9,
