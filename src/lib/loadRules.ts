@@ -11,7 +11,15 @@
  * Pure module — imported by the app and by the Deno edge functions. No runtime deps.
  */
 
-import type { ExperienceAnswer, ExperienceLevel, HrZone, InjuryFlag, RpeValue } from './planTypes';
+import type {
+  ExperienceAnswer,
+  ExperienceLevel,
+  HrZone,
+  InjuryFlag,
+  RaceDistance,
+  ReadinessPath,
+  RpeValue,
+} from './planTypes';
 
 // ---------------------------------------------------------------------------
 // Rule 1 — weekly volume
@@ -23,9 +31,19 @@ export const WEEKLY_INCREASE_REJECT_ABOVE = 0.15;
 /** What a rejected week is recalculated at. */
 export const WEEKLY_INCREASE_RECALC_AT = 0.10;
 
-/** Deload reduction band. Ian's decision, superseding the source's 20–30% table. */
-export const DELOAD_REDUCTION_MIN = 0.35;
-export const DELOAD_REDUCTION_MAX = 0.45;
+/**
+ * Deload reduction band. **15–25%, targeting 20% — Ian's ruling, 2026-09-06, superseding the
+ * 35–45% figure that stood here from 2026-07-10.** The V2.2 distance-specific-plans research
+ * (`report-source.md`) surfaced that McMillan's own public marathon guide recommends a down week
+ * every third or fourth week at roughly 15–25% lower load, conflicting with the 35–45% figure
+ * this project had been using (itself from Ian's imported worked examples, not from that public
+ * guide). Asked to choose rather than have the conflict resolved silently, Ian chose the
+ * published McMillan figure over his own earlier ruling — a deliberate reversal, not drift. Full
+ * history and the resulting interaction with the long-run-cap deload-validity check:
+ * `docs/reference/coaching/load-rules.md` § Deload trigger.
+ */
+export const DELOAD_REDUCTION_MIN = 0.15;
+export const DELOAD_REDUCTION_MAX = 0.25;
 
 /** No long run may exceed this multiple of the plan's own previous longest. */
 export const LONG_RUN_SPIKE_MULTIPLE = 1.10;
@@ -115,11 +133,107 @@ const LONG_RUN_SHARE_MARGIN: Record<ExperienceLevel, number> = {
   advanced: LONG_RUN_SHARE_CAP.advanced * 4,
 };
 
-export function longRunShareCap(level: ExperienceLevel, runCount: number): number {
+/**
+ * Marathon's long-run weekly-share ceiling for intermediate and advanced runners.
+ *
+ * Captain's ruling, 2026-09-06 (`v22-distance-specific-plans`,
+ * `[key=marathon-longrun-share-cap]`): cap these long runs at 35% of generated weekly volume.
+ * The distance-specific curve fix had surfaced that the
+ * level-based, run-count-scaled `LONG_RUN_SHARE_MARGIN` above — calibrated without marathon-length
+ * long runs in mind — becomes the dominant, wrongly-tight ceiling for marathon at common training
+ * frequencies (surveyed: a 6-day/week intermediate marathon runner capped at an 8 km long run,
+ * *below* the pre-distance-fix stretched-5K-curve output). Raising the general level margins was
+ * rejected (it would let a 5K runner take a marathon-sized long run — the correct value genuinely
+ * differs by goal distance) and accepting the current ceiling was rejected (5-6 days/week is the
+ * most common marathon frequency, so the cap is most wrong exactly where most marathon runners
+ * are). The distance-aware 35% ceiling now applies alongside `LONG_RUN_MAX_MINUTES` (the unchanged
+ * three-hour time cap) and `LONG_RUN_SPIKE_MULTIPLE` (the recent-longest-run spike guard, the one
+ * ceiling here with actual cohort evidence behind it — Frandsen et al. 2025, 5,205 runners, higher
+ * overuse-injury rates when a single session exceeded the runner's 30-day longest by >10%).
+ *
+ * `beginner` is deliberately excluded from this bypass, exactly as `maxSingleRunKm` below already
+ * excludes it: a first-time marathoner keeps the conservative run-count-scaled level ceiling as an
+ * untouched safety floor. The bypass applies to `intermediate`/`advanced` only.
+ */
+export const MARATHON_LONG_RUN_SHARE_CAP = 0.35;
+
+export function longRunShareCap(
+  level: ExperienceLevel,
+  runCount: number,
+  raceDistance?: RaceDistance,
+): number {
+  if (raceDistance === 'marathon' && level !== 'beginner') return MARATHON_LONG_RUN_SHARE_CAP;
   return Math.max(
     LONG_RUN_SHARE_CAP[level],
     LONG_RUN_SHARE_MARGIN[level] / Math.max(1, runCount),
   );
+}
+
+/**
+ * PROVISIONAL — marathon's absolute single-run ceiling remains captain-pending even though its
+ * weekly-share ceiling is now settled above. `MAX_SINGLE_RUN_KM`'s flat per-level values
+ * (14/25/35 km) were
+ * never calibrated for marathon-length long runs either — `report-source.md` line 67 notes
+ * McMillan sometimes permits up to 4 hours for marathoners against V2.2's current 3-hour cap
+ * (`LONG_RUN_MAX_MINUTES`), also captain-pending and NOT changed here; that is a separate,
+ * explicit ruling this task does not make.
+ *
+ * `beginner` keeps its existing 14 km ceiling for marathon on purpose, not an oversight: it
+ * reflects a first-time marathoner's conservative completion/run-walk track
+ * (`plan-blueprint-examples.md` § 9's `NEW`/`SOME` marathon guidance is deliberately conservative
+ * regardless of run count), a safety floor this ruling does not touch. The absolute ceiling is
+ * non-binding for `intermediate` and `advanced` only under the conditions `SingleRunCeilingContext`
+ * spells out below; there the 35% weekly-share cap, time cap, and spike guard govern until Ian
+ * sets a real marathon-specific absolute number.
+ */
+export interface SingleRunCeilingContext {
+  /** `deriveReadinessPath`'s verdict for this race plan. */
+  readiness: ReadinessPath;
+  /**
+   * The easy pace the 180-minute time cap would be measured with — `undefined` when the runner gave
+   * no recent time (or is advanced, whose easy running is by feel), in which case the time cap is
+   * unenforceable.
+   */
+  easyPaceSecPerKm?: number;
+}
+
+/**
+ * The bypass above is only legitimate where the ceilings it defers to can actually take its
+ * place. The 180-minute time cap needs a pace; the spike guard needs a demonstrated long run.
+ * A runner who gave no recent time has neither — the research's own answer for that runner
+ * (`plan-blueprint-examples.md` § 3 "Effort hierarchy when no recent performance exists") is a
+ * time-and-effort prescription bounded by the level's kilometre limits, which § 4's operating
+ * limits state outright: `REG`/`EXP` ≤25 km, `COMP` ≤35 km. And a first-timer (§ "The proposed
+ * selection model") has by definition not demonstrated the long-run base a marathon block assumes,
+ * so the level cap is the honest ceiling for them too. So `Infinity` is returned only for a
+ * `prepared` runner whose pace makes the time cap computable; every other marathoner keeps the
+ * flat table, the same table every non-marathon plan already uses. With no `context` at all the
+ * cap likewise stays in force — the loose case must be opted into with evidence, never assumed.
+ *
+ * Two facts worth knowing before "fixing" this: `deriveTrainingPaces` never derives an easy pace
+ * for `advanced` (their easy running is by feel), so an advanced marathoner's absolute ceiling is
+ * always 35 km, exactly § 4's `COMP` limit; and `MAX_WEEKLY_KM.intermediate` (70 km) keeps a 35%
+ * share under 25 km at every volume, so the intermediate bypass can only ever matter through the
+ * time cap. The captain's separate marathon calibration of these absolute numbers is still open.
+ */
+export function maxSingleRunKm(
+  level: ExperienceLevel,
+  raceDistance?: RaceDistance,
+  context?: SingleRunCeilingContext,
+): number {
+  const timeCapEnforceable =
+    context !== undefined &&
+    context.easyPaceSecPerKm !== undefined &&
+    context.easyPaceSecPerKm > 0;
+  if (
+    raceDistance === 'marathon' &&
+    level !== 'beginner' &&
+    context?.readiness === 'prepared' &&
+    timeCapEnforceable
+  ) {
+    return Infinity;
+  }
+  return MAX_SINGLE_RUN_KM[level];
 }
 
 // ---------------------------------------------------------------------------
@@ -343,7 +457,7 @@ export function spikeCeilingKm(previousLongestKm: number, roundUp: boolean): num
  * measures the wrong thing — so it's measured against the right thing (the last loading week's
  * volume), not against nothing. The denominator is `lastLoadingWeekKm` only if all three hold:
  * `isDeload === true`, `lastLoadingWeekKm > 0`, and `isValidDeload(lastLoadingWeekKm, weeklyKm)`
- * (a week that claims to be a deload but isn't 35-45% down off the last loading week is not
+ * (a week that claims to be a deload but isn't 15-25% down off the last loading week is not
  * one). Otherwise the denominator is the ordinary `weeklyKm` — the conservative fallback, so an
  * unsubstantiated `isDeload: true` claim gains the caller nothing. `limitedBy` still reports
  * `'weekly-share'` in both cases; there is no separate ceiling name for the deload case.
@@ -361,8 +475,9 @@ export function clampLongRun(args: {
   lastLoadingWeekKm?: number;
   /**
    * Overrides `LONG_RUN_SHARE_CAP[level]` for the weekly-share ceiling. `buildGenericWeek` passes
-   * `longRunShareCap(level, requestedRuns)` here; every other caller (the golden-fixture path,
-   * this function's own tests) omits it and gets the flat, byte-pinned table.
+   * `longRunShareCap(level, requestedRuns, raceDistance)` here; every other caller (the
+   * golden-fixture path, this function's own tests) omits it and gets the flat, byte-pinned
+   * table.
    */
   shareCapOverride?: number;
   /**
@@ -371,6 +486,17 @@ export function clampLongRun(args: {
    * used, so none of its numbers move.
    */
   roundSpikeCeilingUp?: boolean;
+  /**
+   * Overrides `MAX_SINGLE_RUN_KM[level]` for the absolute single-run ceiling. `buildGenericWeek`
+   * passes `maxSingleRunKm(level, raceDistance, context)` here, always supplying the
+   * `SingleRunCeilingContext`. That is `Infinity` (non-binding) only for a marathon
+   * intermediate/advanced runner whose readiness is `prepared` AND whose easy pace makes the
+   * 180-minute time cap computable; every other runner — including any runner with no recent
+   * time, and every `advanced` runner, who never gets an easy pace — keeps the flat level table.
+   * See `maxSingleRunKm`'s own comment. Every other caller omits this override and gets the flat
+   * table.
+   */
+  maxSingleRunKmOverride?: number;
 }): LongRunClamp {
   const {
     proposedKm,
@@ -382,6 +508,7 @@ export function clampLongRun(args: {
     lastLoadingWeekKm,
     shareCapOverride,
     roundSpikeCeilingUp,
+    maxSingleRunKmOverride,
   } = args;
 
   const shareDenominatorKm =
@@ -396,7 +523,7 @@ export function clampLongRun(args: {
 
   const ceilings: readonly (readonly [number, LongRunLimit])[] = [
     [shareDenominatorKm * shareCap, 'weekly-share'],
-    [MAX_SINGLE_RUN_KM[level], 'absolute'],
+    [maxSingleRunKmOverride ?? MAX_SINGLE_RUN_KM[level], 'absolute'],
     ...(previousLongestKm > 0
       ? ([[spikeCeilingKm(previousLongestKm, roundSpikeCeilingUp === true), 'spike']] as const)
       : []),

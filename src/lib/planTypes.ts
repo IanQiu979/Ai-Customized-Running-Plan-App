@@ -67,6 +67,15 @@ export type RpeValue = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
 
 export type Phase = 'base' | 'build' | 'peak' | 'taper';
 
+/**
+ * The research's two race-entry paths (`planning/research/plan-blueprint-examples.md` § "The
+ * proposed selection model"): a first-timer whose base is not yet established, or a prepared runner
+ * entering a race-specific block. Derived from demonstrated capacity only — never a goal time — by
+ * `planTemplates.ts`'s `deriveReadinessPath`; read by `loadRules.ts`'s marathon single-run
+ * ceiling. Lives here so both stay pure and neither imports the other.
+ */
+export type ReadinessPath = 'first-timer' | 'prepared';
+
 export type ExperienceLevel = 'beginner' | 'intermediate' | 'advanced';
 
 /** Intake's five answers collapse to the three levels the load rules are written against. */
@@ -239,6 +248,12 @@ export interface Plan {
   disclaimers: string[];
   /** Present only when a goal time and a recent performance both exist. */
   goalRealism?: GoalRealismAssessment;
+  /**
+   * Which race-entry path the engine chose, for race plans only (a no-race block makes no such
+   * decision). The plan's own disclaimers explain a `first-timer` choice to the runner; this field
+   * lets a client or a later reader see it without parsing prose.
+   */
+  readinessPath?: ReadinessPath;
 }
 
 // ---------------------------------------------------------------------------

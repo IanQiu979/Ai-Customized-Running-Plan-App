@@ -83,10 +83,11 @@ hard way. Phase 0 fixes the paper so the build never has to guess which doc wins
 
 These were resolved by evidence during the audit. They are not open questions.
 
-1. **Deload band is 35–45%** (Ian's 2026-07-10 ruling in `load-rules.md` Rule 1; implemented in
-   `loadRules.ts`). Delete `docs/mvp-progress.md`'s stale 🟠 risk claiming 20–30% is
-   authoritative and "the port enforces 20–30%" — both halves are false. Never "fix" the band
-   backwards.
+1. **Deload band** — *superseded: Ian reversed this on 2026-09-06 to McMillan's published
+   **15–25%**. `load-rules.md` § "Deload trigger" is the owner; take the band from there, never
+   from this line.* As written on 2026-07-10 this ruling read: the band is 35–45% (`load-rules.md`
+   Rule 1; implemented in `loadRules.ts`); delete `docs/mvp-progress.md`'s stale 🟠 risk claiming
+   20–30% is authoritative and "the port enforces 20–30%" — both halves are false.
 2. **Intake is 10 fields** (8 always asked; goal-time + race-date appear only with a race —
    recent-time is always asked, optional to answer), per the change_log supersession. Fix the stale "Intake is 8 fields" line in `CLAUDE.md`/`AGENTS.md`
    §Coaching domain, and the "eight fields" mentions in `docs/reference/coaching/00-README.md`
@@ -244,7 +245,8 @@ are proven and get ported, not reinvented.
 8. **Deterministic expander** — typed code materializes every calendar week from the
    representative weeks: scales distances along the phase's load curve, progresses the long run,
    applies per-week corrections. (V1's expander is the reference.)
-9. **Clamp** — `loadRules.ts` re-checks every week: weekly increase cap, deload band 35–45%,
+9. **Clamp** — `loadRules.ts` re-checks every week: weekly increase cap, the deload band of
+   `load-rules.md` § "Deload trigger",
    long-run share/spike/time caps. Clamping a number is arithmetic, not the over-tight content
    validation that hurt V1. The model cannot emit an unsafe week because this code rejects it.
 10. **Validate structurally, loosely** — shape only: weeks exist, days are 1–7, types right.
@@ -288,8 +290,8 @@ The demoable core: a real template plan rendered on a real screen, zero network.
      see `docs/change_log.md`'s "theme rewrite" entry.**
 2. `implementer` executes the planTemplates plan (with `scope-guard` wrapping the handoff);
    `test-writer` in parallel: golden tests per distance × duration × days/week × experience;
-   property test — every generated week passes every `loadRules.ts` clamp; deload weeks reduce
-   35–45%; no numeric pace without a recent time.
+   property test — every generated week passes every `loadRules.ts` clamp; deload weeks reduce by
+   the band in `load-rules.md` § "Deload trigger"; no numeric pace without a recent time.
 3. `frontend-builder`: plan view (`plan/[id]` reading a local fixture for now) — nameplate,
    week ribbon rows (colour + monotonic height, rest gaps, unbroken baseline), expanded
    workout rows with readout brackets only on measured numerals. Skip the wave until Phase 6

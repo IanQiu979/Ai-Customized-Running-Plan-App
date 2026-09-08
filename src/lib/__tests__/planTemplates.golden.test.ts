@@ -184,10 +184,25 @@ describe('buildTemplatePlan — 5K golden fixture', () => {
     expect(plan.weeklyLoad).toEqual(plan.weeks.map((w) => w.volumeKm));
   });
 
-  it('reproduces the fixture long-run schedule for weeks 1-11, with weeks 4/8 at the rebuilt doc\'s own 8/10 km (the 2026-07-10 Addendum A4\'s 7/9 km is moot — see header)', () => {
+  it('reproduces the fixture long-run schedule for weeks 1-11, with weeks 4/8 tightened to 7/9 km by the 2026-09-06 deload ruling (were 8/10 km)', () => {
     // docs/reference/coaching/example-plan-5k-pro.md § "Volume plan" table, Long run column,
     // weeks 1-11: 10, 11, 12, 8, 13, 14, 15, 10, 14, 15, 12.
-    const expected = [10, 11, 12, 8, 13, 14, 15, 10, 14, 15, 12];
+    //
+    // Weeks 4 and 8 changed (8→7, 10→9) when Ian's 2026-09-06 ruling tightened the deload band
+    // from 35–45% to 15–25% (`docs/reference/coaching/load-rules.md` § Deload trigger). The
+    // fixture's own dips (week3→4: 38→23 km, ~39.5%; week7→8: 48→30 km, ~37.5%,
+    // `FIVE_K_WEEKLY_LOAD`) were real deloads under the old band but are no longer "genuine"
+    // under the new, narrower one — `isValidDeload(38, 23)` and `isValidDeload(48, 30)` now both
+    // return `false`. `clampLongRun`'s weekly-share ceiling only measures a deload long run
+    // against the *prior loading week* when `isValidDeload` agrees it really is one (R1c,
+    // 2026-07-12, issue #34); once that flips `false` here, the ceiling is measured against each
+    // deload week's own (smaller) volume instead — week 4: 38×0.32=12.16 km (8 km long run
+    // comfortably inside it) tightens to 23×0.32=7.36 km, floored to 7; week 8: 48×0.32=15.36 km
+    // tightens to 30×0.32=9.6 km, floored to 9. This is the exact interaction the 2026-09-06
+    // ruling asked to have surfaced rather than silently reconciled — see the load-rules.md
+    // section above for the full account. Verified against the real generated plan output, not
+    // derived by hand.
+    const expected = [10, 11, 12, 7, 13, 14, 15, 9, 14, 15, 12];
     plan.weeks.slice(0, 11).forEach((w, i) => {
       const longRun = findLongRun(w);
       expect(longRun?.distanceKm).toBe(expected[i]);

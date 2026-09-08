@@ -226,6 +226,21 @@ Built-ins also available: `Explore`, `Plan`, `general-purpose`. Plugin agents ar
   and only when `isRacePlan` is false), and `raceDistance` is validated **whenever it is present on
   any goal type**, not only on `goalType: 'race'` — see `validateRequest` in
   `workers/src/lib/generate-plan-flow.ts`, since the client sends it with `duration` too.
+- **The marathon absolute long-run ceiling yields only to a ceiling that can replace it.**
+  `loadRules.ts`'s `maxSingleRunKm` lifts the level's km cap (≤25 / ≤35 km) for a marathon race
+  plan only when the runner is `prepared` AND has an easy pace, because the 180-minute time cap it
+  defers to needs a pace to exist. A runner with no recent time has no pace (and `advanced` never
+  gets an easy pace), so for them the km cap plus the captain's 35% share cap are the whole bound —
+  `planTemplates.noRecentTime.test.ts` is the ship-gate proof, including a mocked-away cap showing
+  the assertion can fail. Do not pass `Infinity` in from a new caller without that context, and do
+  not calibrate the marathon absolute number: it is still the captain's open ruling.
+- **Readiness is derived from capacity, never ambition, and it reaches the plan.**
+  `deriveReadinessPath` reads `weeklyKm` and (marathon) a ≥10K recent result — never
+  `goalTimeSec` — and its verdict shapes phase weights, gates the ceiling above, sets
+  `Plan.readinessPath`, and adds the first-timer / limited-preparation disclaimers whose numbers
+  are the engine's own thresholds (`READINESS_WEEKLY_KM_THRESHOLD`, `FIRST_TIMER_MIN_WEEKS`).
+  The coaching source for both is `planning/research/plan-blueprint-examples.md` (§ "The proposed
+  selection model", § 4, § 8, § 9); it may be untracked in a worktree pending the captain's commit.
 - **A race date that has already passed is refused, never generated against.** It would otherwise
   reach `weeksUntilRace`'s `Math.max(1, …)` floor and charge a quota slot for a one-week plan. Both
   screens refuse and both say why; the decision and both messages are pure and testable in

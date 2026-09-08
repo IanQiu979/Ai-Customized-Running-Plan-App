@@ -48,7 +48,7 @@ nothing. A deload long run remains bound by every other ceiling exactly as befor
 long-run spike cap above, the absolute single-run cap (Rule 4), and the Daniels 3-hour long-run
 time cap above.
 
-**A week that claims to be a deload but is not actually 35–45% down off the last loading week is
+**A week that claims to be a deload but is not actually 15–25% down off the last loading week is
 not treated as one — it is capped as an ordinary loading week**, against its own volume. This
 makes an unsubstantiated deload claim worthless as a way to loosen the cap.
 
@@ -239,6 +239,71 @@ The plan-level regression suite now also generates a pace-known, high-volume mar
 its rendered long run stays within the three-hour ceiling. This complements the direct
 `clampLongRun()` unit tests with coverage of the real generic plan path.
 
+**Ian's ruling, 2026-09-06 (`v22-distance-specific-plans`,
+`[key=marathon-longrun-share-cap]`) — an intermediate or advanced marathon long run is capped at
+35% of the generated loading-week denominator.** On an ordinary loading week that denominator is
+the rendered week volume. On a valid 15–25% deload it remains the last loading week's volume under
+R1c above, not the deload's own reduced total. Therefore a displayed deload-week ratio can exceed
+35% without breaching the rule; the enforced comparison uses the last loading week.
+
+The distance-specific curve fix surfaced that the run-count-scaled ladder above — and
+`MAX_SINGLE_RUN_KM`'s flat 25/35 km ceiling below — were calibrated without marathon-length long
+runs in mind and became wrongly tight at common marathon training frequencies. Before the
+distance-specific override, the 50 km/week, 16-week intermediate survey peaked at 25/19/16/8 km
+for 3/4/5/6 running days. A temporary `Infinity` engineering stage produced 28 km at every
+frequency while the decision was open; that was plumbing validation, never the final policy.
+
+Two options were rejected outright: raising the general intermediate/advanced ceilings (which
+would let a 5K runner take a marathon-sized share) and accepting the old ladder as marathon's real
+limit (which was most restrictive at the common 5–6-day frequencies). The research correctly
+identified the share percentage as coaching policy rather than settled science; Ian supplied the
+35% policy instead of the implementation inventing it.
+
+`longRunShareCap()` and `maxSingleRunKm()` (`src/lib/loadRules.ts`) both take `raceDistance`, but
+their marathon outcomes are now deliberately different. For intermediate/advanced race plans,
+`MARATHON_LONG_RUN_SHARE_CAP` is **0.35 and binding**. The separate absolute kilometre ceiling is
+lifted (`Infinity`) **only** for a `prepared` runner whose easy pace makes the 180-minute duration
+cap enforceable — `maxSingleRunKm(level, raceDistance, { readiness, easyPaceSecPerKm })`, since
+2026-09-07. The bypass was justified by "the time cap and spike guard govern instead", and that is
+only true when a pace exists to measure the time cap with: a runner who gave no recent time has
+none, and an advanced runner never has a derived easy pace (easy is by feel), so both keep the
+flat ≤25 / ≤35 km table (`plan-blueprint-examples.md` § 4's REG/EXP and COMP limits), as does a
+first-timer, who has by definition not demonstrated the long-run base a marathon block assumes.
+Before that narrowing a 110 km/week advanced marathoner with no recent time rendered a 38 km long
+run; the ceiling now holds it at 35 km. An advanced marathoner's absolute ceiling is therefore
+always 35 km, and the intermediate bypass can only matter through the time cap (35% of the 70 km
+intermediate weekly ceiling is under 25 km). The number for the lifted case is still pending Ian's
+calibration. `beginner` is excluded from both marathon overrides: it keeps the existing 14 km
+absolute ceiling and run-count-scaled share ladder, preserving the first-timer completion track.
+The unchanged 180-minute duration cap and 1.10× recent-longest-run spike guard remain active for
+every marathon plan alongside the share cap. McMillan's occasional four-hour marathon allowance
+remains a separate captain-owned question; this ruling does not change V2.2's three-hour limit.
+
+**Generated survey, 50 km/week, 16 weeks, intermediate, recent half-marathon performance:**
+
+| Days/week | Old level/run-count cap | Temporary `Infinity` stage | Final 35% share cap |
+|---|---:|---:|---:|
+| 3 | 25 km | 28 km | **11 km** |
+| 4 | 19 km | 28 km | **24 km** |
+| 5 | 16 km | 28 km | **24 km** |
+| 6 | 8 km | 28 km | **24 km** |
+
+Four days is the headline case: **24 km**, versus 19 km under the old stretched-5K behavior (and
+the core-purpose audit's approximately 21 km observation). At three days, the sourced E + Q1 + LR
+layout and fixed Q1 dose leave no additional easy-support slot; enforcing 35% against the rendered
+week reaches an 11 km fixed point. The plan exposes that limitation in its disclaimers and
+recommends a fourth running day rather than pretending this is full marathon preparation. The
+source-corrected adaptation keeps Q1 and drops Q2 before easy support at both three and four days;
+Q2 may be retained only at five or more running days.
+
+**Structural caveat not solved by the 35% ruling.** The long-run curves still carry recovery dips
+at fixed array positions. Those positions do not realign with `deloadEveryWeeks` (three weeks for
+advanced and for 50+, four otherwise) when `interpolateCanonical` resamples a curve onto a
+noncanonical duration. The cap fixes the magnitude of an overlarge long run, but a relatively
+long run can still land in a week labelled as recovery. Valid deloads use the last loading week's
+denominator under R1c, so this structural issue must not be audited by requiring every displayed
+deload-week ratio to be at or below 35%.
+
 ### Deload trigger
 
 *(load_rules.md § Rule 1 › Deload Trigger)*
@@ -268,22 +333,57 @@ land on 3, 6, 9 and drop off the plan by week 9). This aligns with the natural v
 week — as a deload for 50+ runners specifically, on top of its existing taper/race structure. The
 generic (non-golden) path is unaffected and still uses the every-3-weeks modulo above.
 
-**Reduction: 35–45% of volume** during a deload week — authoritative (Ian's decision, 2026-07-10,
-**superseding an earlier 20–30% call the same day**).
+**Reduction: 15–25% of volume** during a deload week — authoritative (**Ian's ruling, 2026-09-06,
+superseding the 35–45% figure below**).
 
-Why the change. The source disagrees with itself three ways: the Deload Trigger table says 20–30%;
-the separate "Exception — Recovery Weeks" clause (`load_rules.md § Rule 1`) says volume "can
-decrease by any amount… even 50% reduction is fine"; and `workout_library.md`'s own three worked
-deload examples reduce by ~40% (beginner), ~45% (intermediate), and ~35–40% (advanced). Ian ruled
-that the worked examples reflect what he actually does. 35–45% sits inside the Exception clause and
-matches all three examples, so it reconciles the source rather than contradicting it.
+**What changed and why.** The number in this section was **35–45%, targeting 40%**, from 2026-07-10
+until 2026-09-06. The V2.2 distance-specific-plans research (`report-source.md`) surfaced that
+McMillan's own public marathon guide recommends a down week every third or fourth week at roughly
+**15–25%** lower load — directly conflicting with the imported-examples figure below. Ian was asked
+to pick rather than have the conflict resolved silently, and on 2026-09-06 he chose the published
+McMillan figure over his own earlier ruling: **use 15–25%, targeting 20%,** everywhere in the
+engine. This is a deliberate reversal, not drift — a future reader should not assume the 2026-07-10
+reasoning below still holds; it is kept for history, not as the current rule.
+
+Why the *old* number had been chosen (2026-07-10, superseding an earlier 20–30% call the same day):
+the source disagreed with itself three ways — the Deload Trigger table said 20–30%; the separate
+"Exception — Recovery Weeks" clause (`load_rules.md § Rule 1`) said volume "can decrease by any
+amount… even 50% reduction is fine"; and `workout_library.md`'s own three worked deload examples
+reduced by ~40% (beginner), ~45% (intermediate), and ~35–40% (advanced). Ian ruled at the time that
+the worked examples reflected what he actually did. 35–45% sat inside the Exception clause and
+matched all three examples, so it reconciled the source rather than contradicting it.
 
 The fact-check found no direct RCT evidence for *any* specific deload magnitude — it is coaching
-convention either way, which is why the coach's own practice is the tiebreak.
+convention either way, which is why the coach's own choice is the tiebreak, then and now.
 
 The engine enforces a band with both a floor and a ceiling, not a "no minimum" allowance:
-`isValidDeload()` in `src/lib/loadRules.ts` accepts a reduction in `[0.35, 0.45]` and rejects
-anything shallower or deeper. Generation uses the 40% midpoint.
+`isValidDeload()` in `src/lib/loadRules.ts` accepts a reduction in `[0.15, 0.25]` and rejects
+anything shallower or deeper. Generation uses the 20% midpoint.
+
+**Deliberate, captain-ruled exception — the golden path keeps its coach-authored dips (Ian's
+ruling, 2026-09-08, `[key=golden-deloads-outside-new-band]`):** `clampLongRun()`'s weekly-share
+ceiling measures a deload week's long run against the *last loading week's* volume, but only when
+`isValidDeload(lastLoadingWeekKm, weeklyKm)` agrees the week is a genuine deload under the
+currently-configured band (R1c, 2026-07-12, issue #34). The byte-pinned golden 12-week/4-day 5K
+fixture (`example-plan-5k-pro.md`, `FIVE_K_WEEKLY_LOAD` / `FIVE_K_LONG_RUNS` in
+`src/lib/planTemplates.ts`) has its own literal, separately-approved dip at weeks 4 and 8 — roughly
+**37–40%** off the prior loading week. That figure was authored years before this ruling and was
+never itself a `deloadVolume()` output. Ian was asked directly whether to reshape those dips into
+the 15–25% band and ruled that they stay exactly as written: the golden plan is coach-authored
+content, and its recovery weeks are approved on their own terms. So the two depths coexist on
+purpose — **the 15–25% band is authoritative for every generic-path deload, and the golden
+12-week/4-day 5K plan's weeks 4 and 8 are the one ruled exception to it.** Nothing here is pending
+a later fix.
+
+The mechanical consequence is settled and intended: tightening the band to 15–25% does not change
+the fixture's literal weekly-volume numbers, but it **does** make `isValidDeload()` return `false`
+for those two weeks (37–40% falls outside the band), which flips `clampLongRun()`'s denominator
+from the prior loading week back to the deload week's own (smaller) volume — tightening the share
+ceiling and shrinking the golden fixture's weeks 4/8 long runs by one kilometre each (8→7, 10→9).
+That is the safety cap doing its job against a deeper-than-band week, which is the conservative
+direction. The golden fixture's test expectations were updated to the new, correctly-computed
+numbers rather than left pinned to pre-ruling output; the fixture's own
+`FIVE_K_WEEKLY_LOAD`/`FIVE_K_LONG_RUNS` values were left untouched, per this ruling.
 
 **Still an error, not an alternative:** the 5K example plan's Week 4 is labelled a deload while its
 volume *rises* (~17–19 km → ~18–19 km). See `plan-structure.md`.
