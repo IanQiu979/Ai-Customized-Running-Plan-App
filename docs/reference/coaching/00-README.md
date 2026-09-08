@@ -109,10 +109,11 @@ how the ported rules get used. Applied without second-guessing:
    error is worse in youth specifically, and the definitive youth-running consensus prescribes no
    HR-zone training regardless of formula — captain-approved policy suppresses `hrZone` entirely
    below 18 and substitutes RPE. See `training-zones.md`.
-4. **Deload weeks reduce volume 35–45%** (2026-07-10, superseding an earlier 20–30% call the same
-   day). Ian's own three worked examples in `workout_library.md` all land in this band, and his
-   "Exception — Recovery Weeks" clause already permits it. See `plan-structure.md`. The 5K plan's
-   Week 4, whose volume *rises* while labelled a deload, remains an error either way.
+4. **Deload weeks reduce volume 15–25%** (Ian's ruling, 2026-09-06, adopting McMillan's published
+   figure and superseding his own 35–45% ruling of 2026-07-10, which had itself superseded a
+   20–30% call the same day). `load-rules.md` § "Deload trigger" owns the current band and the full
+   history; `plan-structure.md` keeps the superseded 2026-07-10 reasoning. The 5K plan's Week 4,
+   whose volume *rises* while labelled a deload, remains an error under every one of these bands.
 5. **The 10–15% weekly cap stays, plus a new long-run spike cap.** See corrections (a) and (b).
 6. **Injuries intake field shape (decision gate #10, 2026-07-10).** Closed-set `InjuryFlag` flags
    plus an optional free-text `injury_notes` field. The flags, and only the flags, drive

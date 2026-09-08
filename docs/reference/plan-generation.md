@@ -131,7 +131,7 @@ is unit-tested with no network and no Anthropic spend:
 8. **Deterministic expander** — typed code materializes every calendar week from the
    representative weeks, scaling distances along the phase's load curve (Echo V1's expander is
    the reference).
-9. **Clamp** — `loadRules.ts` re-checks every week (weekly increase cap, deload band 35–45%,
+9. **Clamp** — `loadRules.ts` re-checks every week (weekly increase cap, deload band 15–25%,
    long-run share/spike/time caps), identically across all three tiers.
 10. **Validate structurally, loosely; retry once; fall back.** See "Validation" below. A second
     failure falls back to the pure template plan, `is_fallback: true`, rendered at **Free

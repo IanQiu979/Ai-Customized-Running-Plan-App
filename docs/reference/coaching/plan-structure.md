@@ -44,13 +44,16 @@ above as the general shape — build aerobic base → introduce structure/thresh
 specificity → taper — scaled proportionally to the plan's total length, rather than a fixed
 4-phase contract. That's how the source itself handles different race distances and durations.
 
-## Deload cadence and the 35–45% rule
+## Deload cadence and the reduction band
 
-**Ian's decision (authoritative, 2026-07-10 — superseding an earlier 20–30% call the same day):**
-deload weeks reduce volume **35–45%**. See `load-rules.md` Rule 1 for the deload-frequency table by
-level, and for why this reconciles rather than contradicts the source.
+**Ian's decision (authoritative, 2026-09-06): deload weeks reduce volume 15–25%**, superseding the
+35–45% figure he ruled on 2026-07-10. `load-rules.md` § "Deload trigger" is the owner of this rule
+— it carries the current band, the deload-frequency table by level, the reasoning for the reversal,
+and the one ruled exception (the golden 5K plan's own weeks 4 and 8). Do not restate the number
+anywhere else.
 
-The source disagrees with itself three ways, and the worked examples won:
+The rest of this section is the **superseded** 2026-07-10 basis, kept as history. The source
+disagreed with itself three ways, and the worked examples won:
 
 | Level (source example) | Normal volume | Deload volume | Reduction |
 |---|---|---|---|
@@ -62,12 +65,14 @@ The source disagrees with itself three ways, and the worked examples won:
 
 All three of Ian's own worked examples sit in the 35–45% band, not the 20–30% one his Deload Trigger
 table states. His separate "Exception — Recovery Weeks" clause already permits "any amount… even 50%
-reduction," so 35–45% is consistent with the source's own allowance. The fact-check found **no direct
+reduction," so 35–45% was consistent with the source's own allowance. The fact-check found **no direct
 RCT evidence for any specific deload magnitude** — it is coaching convention either way, which is why
-the coach's own practice is the tiebreak.
+the coach's own practice was the tiebreak then, and his choice of McMillan's published figure is the
+tiebreak now.
 
-The engine computes deload volume at the 40% midpoint and clamps model output to `[0.35, 0.45]`
-(`isValidDeload()` in `src/lib/loadRules.ts`).
+What the engine actually enforces follows the current band, not the table above:
+`deloadVolume()`/`isValidDeload()` in `src/lib/loadRules.ts` — see `load-rules.md`
+§ "Deload trigger".
 
 **The source's Week 4 example remains an error, not an alternative.** In the 5K plan it is labelled a
 deload ("Day 6: … This is deload week, keep it easy" — `ECHO_Training_Plans_McMillan.md § Example 1,
