@@ -611,7 +611,7 @@ export type { ReadinessPath } from './planTypes';
  * explicitly "prepared intermediate" runner — so `prepared` leaves it untouched, and only
  * `first-timer` reallocates weight from `peak` into `base`. The 0.4 shift factor is this file's
  * own reasonable read of "extend the foundation" (the research gives no exact figure), not a
- * sourced coaching number.
+ * sourced coaching number. Filed for the captain's ruling as GitHub issue #100.
  */
 function readinessAdjustedWeights(weights: number[], readiness: ReadinessPath): number[] {
   if (readiness === 'prepared') return weights;
@@ -785,7 +785,27 @@ function taperAwareCurve(values: readonly number[], includeTaper: boolean): read
   if (taperEntries === undefined) {
     throw new Error('taperAwareCurve: no taper length registered for this canonical curve.');
   }
-  return values.slice(0, values.length - taperEntries);
+  return endOnPeak(values.slice(0, values.length - taperEntries));
+}
+
+/**
+ * Dropping the taper is not enough on its own: a curve may still end on one of its own recovery
+ * dips, and a no-race plan that finishes on a dip winds down for a start line that does not exist
+ * — the same defect `taperAwareCurve` exists to prevent, one week earlier, and the same captain's
+ * ruling (2026-08-15) that a no-race plan never ends on a deload. The weekly-load curves were
+ * de-dipped by hand for it; `TEN_K_LONG_RUNS` was the one curve left whose 4-week dip cadence
+ * lands on its last pre-taper entry, where the other three distances all place their peak.
+ *
+ * No number is invented here either: trailing entries below the block's own peak are dropped, so
+ * a no-race plan interpolates across the loading block and finishes at the peak the captain
+ * already approved. It is a no-op for every other canonical curve, each of which already ends on
+ * its maximum once the taper tail is removed. Race plans never reach this path.
+ */
+function endOnPeak(values: readonly number[]): readonly number[] {
+  const peak = Math.max(...values);
+  let end = values.length;
+  while (end > 1 && values[end - 1] < peak) end -= 1;
+  return end === values.length ? values : values.slice(0, end);
 }
 
 function targetVolumeKm(

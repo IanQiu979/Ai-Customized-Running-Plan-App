@@ -91,6 +91,19 @@ operating limits": NEW/SOME ≤14, REG/EXP ≤25, COMP ≤35 km).
   PR ships no plan-shape change. For the record, the profile raised in review — advanced / 5K /
   4 days / 35 km per week / 10 weeks — **does not move**: its peak long run is 15 km in a 47 km
   week both before and after, because the curve target dominated the floor in both derivations.
+- **Found in review and fixed (2026-09-08): a no-race 10K block ended its long run on a recovery
+  dip.** Dropping the race taper was not enough on its own. `TEN_K_LONG_RUNS`' 4-week dip cadence
+  lands on its last pre-taper entry (index 11), where 5K, half and marathon all place their peak,
+  so a duration plan built on the 10K curve wound the long run down in its final week while the
+  volume curve was still rising — the same "tapering for a start line that does not exist" defect
+  `taperAwareCurve` exists to prevent, one week earlier, and the same captain's ruling (2026-08-15)
+  that a no-race plan never ends on a deload. `taperAwareCurve` now also drops trailing entries
+  below the block's own peak, so a no-race plan finishes at the peak the captain already approved.
+  No curve value changed and race plans are untouched; it is a no-op for every other canonical
+  curve, each of which already ends on its maximum once the taper tail is removed. Before/after for
+  an intermediate, 5 days, 50 km/week, 12-week 10K duration plan: the final week's long run moves
+  **17 km → 21 km** in an unchanged 67 km week, so it no longer falls below the preceding week's
+  21 km. Pinned by `planTemplates.noRace.test.ts`' "ends a no-race 10K block on its peak long run".
 
 ## 2026-09-07 — marathon share cap finalized; race-week placement corrected
 

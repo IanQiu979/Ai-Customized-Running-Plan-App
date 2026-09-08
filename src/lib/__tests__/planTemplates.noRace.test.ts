@@ -241,6 +241,26 @@ describe('a target distance with no race date', () => {
     expect(plan.raceDistance).toBeUndefined();
     expect(plan.title).toBe('12-Week Running Plan');
   });
+
+  it('ends a no-race 10K block on its peak long run, not on a recovery dip', () => {
+    // The captain's "a no-race plan never ends on a deload" ruling reaches the long run too. The
+    // 10K long-run curve's 4-week recovery cadence puts a dip on the last entry before its taper,
+    // where the other three distances put their peak — so a duration plan built on it wound the
+    // long run down in its final week while the volume curve was still rising.
+    const plan = buildTemplatePlan({
+      intake: { ...NO_RACE_INTAKE, raceDistance: '10k', daysPerWeek: 5, weeklyKm: 50 },
+      goalType: 'duration',
+      durationWeeks: 12,
+      tierAtGeneration: 'free',
+      density: 'free',
+    });
+    const longRunKm = plan.weeks.map(
+      (week) => week.days.filter(isWorkout).find((workout) => workout.isLongRun)?.distanceKm ?? 0,
+    );
+    const finalLongRunKm = longRunKm[longRunKm.length - 1];
+    expect(finalLongRunKm).toBe(Math.max(...longRunKm));
+    expect(finalLongRunKm).toBeGreaterThanOrEqual(longRunKm[longRunKm.length - 2]);
+  });
 });
 
 describe('race plans are untouched by the no-race path', () => {
