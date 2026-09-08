@@ -260,6 +260,13 @@ describe('a target distance with no race date', () => {
     const finalLongRunKm = longRunKm[longRunKm.length - 1];
     expect(finalLongRunKm).toBe(Math.max(...longRunKm));
     expect(finalLongRunKm).toBeGreaterThanOrEqual(longRunKm[longRunKm.length - 2]);
+    // Only the final week moves. The substitution keeps the curve at its full pre-taper length,
+    // so every sample position — and with it the recovery dips on the deload weeks — stays put. A
+    // shorter curve would re-scale the whole block and slide the dip onto a loading week instead.
+    const deloadWeeks = plan.weeks.filter((week) => week.isDeload).map((week) => week.weekNumber);
+    expect(deloadWeeks).toEqual([4, 8]);
+    expect(longRunKm[3]).toBe(11);
+    expect(longRunKm[7]).toBe(14);
   });
 });
 

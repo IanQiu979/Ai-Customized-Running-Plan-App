@@ -779,33 +779,39 @@ const TAPER_ENTRIES: ReadonlyMap<readonly number[], number> = new Map<readonly n
   [MARATHON_LONG_RUNS, 2],
 ]);
 
+/**
+ * `TEN_K_LONG_RUNS`' twelve pre-taper entries with the last one — its 4-week recovery dip, which
+ * for this one curve lands on the final loading week where 5K, half and marathon all place their
+ * peak — replaced by the curve's own peak, 17 km. Nothing else moves: same length, same twelve
+ * sample positions for `interpolateCanonical`, same dips on weeks 4 and 8 so they still line up
+ * with the deload cadence, and the same values everywhere else.
+ *
+ * It exists because dropping the race taper is not enough on its own for this curve: a no-race
+ * plan that finishes on a dip winds down for a start line that does not exist, the defect
+ * `taperAwareCurve` exists to prevent, and the engine already forces a no-race plan's final week
+ * to be a loading week (`endsOnForcedLoadingWeek`) — so the peak is the matching long run for it.
+ * No number is invented: 17 km is this curve's own captain-approved peak. The race read of
+ * `TEN_K_LONG_RUNS` is untouched and still tapers 12 → 11 km.
+ */
+const TEN_K_LONG_RUNS_NO_RACE = [9, 10, 11, 8, 12, 13, 14, 10, 14, 16, 17, 17] as const;
+
+/**
+ * No-race substitutes for canonical curves whose pre-taper tail is not their peak. Only the 10K
+ * long-run curve needs one; every other curve ends on its maximum once the taper tail is sliced
+ * off, so it takes the plain slice above.
+ */
+const NO_RACE_CURVES: ReadonlyMap<readonly number[], readonly number[]> = new Map<
+  readonly number[],
+  readonly number[]
+>([[TEN_K_LONG_RUNS, TEN_K_LONG_RUNS_NO_RACE]]);
+
 function taperAwareCurve(values: readonly number[], includeTaper: boolean): readonly number[] {
   if (includeTaper) return values;
   const taperEntries = TAPER_ENTRIES.get(values);
   if (taperEntries === undefined) {
     throw new Error('taperAwareCurve: no taper length registered for this canonical curve.');
   }
-  return endOnPeak(values.slice(0, values.length - taperEntries));
-}
-
-/**
- * Dropping the taper is not enough on its own: a curve may still end on one of its own recovery
- * dips, and a no-race plan that finishes on a dip winds down for a start line that does not exist
- * — the same defect `taperAwareCurve` exists to prevent, one week earlier, and the same captain's
- * ruling (2026-08-15) that a no-race plan never ends on a deload. The weekly-load curves were
- * de-dipped by hand for it; `TEN_K_LONG_RUNS` was the one curve left whose 4-week dip cadence
- * lands on its last pre-taper entry, where the other three distances all place their peak.
- *
- * No number is invented here either: trailing entries below the block's own peak are dropped, so
- * a no-race plan interpolates across the loading block and finishes at the peak the captain
- * already approved. It is a no-op for every other canonical curve, each of which already ends on
- * its maximum once the taper tail is removed. Race plans never reach this path.
- */
-function endOnPeak(values: readonly number[]): readonly number[] {
-  const peak = Math.max(...values);
-  let end = values.length;
-  while (end > 1 && values[end - 1] < peak) end -= 1;
-  return end === values.length ? values : values.slice(0, end);
+  return NO_RACE_CURVES.get(values) ?? values.slice(0, values.length - taperEntries);
 }
 
 function targetVolumeKm(

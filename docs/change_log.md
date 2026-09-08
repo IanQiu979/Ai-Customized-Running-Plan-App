@@ -97,13 +97,20 @@ operating limits": NEW/SOME ≤14, REG/EXP ≤25, COMP ≤35 km).
   so a duration plan built on the 10K curve wound the long run down in its final week while the
   volume curve was still rising — the same "tapering for a start line that does not exist" defect
   `taperAwareCurve` exists to prevent, one week earlier, and the same captain's ruling (2026-08-15)
-  that a no-race plan never ends on a deload. `taperAwareCurve` now also drops trailing entries
-  below the block's own peak, so a no-race plan finishes at the peak the captain already approved.
-  No curve value changed and race plans are untouched; it is a no-op for every other canonical
-  curve, each of which already ends on its maximum once the taper tail is removed. Before/after for
-  an intermediate, 5 days, 50 km/week, 12-week 10K duration plan: the final week's long run moves
-  **17 km → 21 km** in an unchanged 67 km week, so it no longer falls below the preceding week's
-  21 km. Pinned by `planTemplates.noRace.test.ts`' "ends a no-race 10K block on its peak long run".
+  that a no-race plan never ends on a deload. The no-race read of that one curve now substitutes
+  `TEN_K_LONG_RUNS_NO_RACE` — the same twelve pre-taper entries with the last one, and only the
+  last one, replaced by the curve's own peak (12 → 17 km). The engine already forces a no-race
+  plan's final week to be a loading week (`endsOnForcedLoadingWeek`), so the peak is the matching
+  long run for it, and 17 km is this curve's own approved value, not a new one. Deliberately a
+  substitution rather than truncating the tail: `interpolateCanonical` samples by array length, so
+  a shorter curve would re-scale every week of the block and slide the recovery dips off the deload
+  weeks. Same length, same twelve sample positions, dips still on weeks 4 and 8. The race read of
+  `TEN_K_LONG_RUNS` is untouched and still tapers 12 → 11 km, and no other distance is affected.
+  Before/after for an intermediate, 5 days, 50 km/week, 12-week 10K duration plan — the final week
+  is the only week that moves: long runs `[13, 14, 15, 11, 17, 18, 19, 14, 20, 20, 21, 17]` become
+  `[13, 14, 15, 11, 17, 18, 19, 14, 20, 20, 21, 21]`, so the closing 67 km week no longer drops
+  below the preceding 66 km week's 21 km. Pinned by `planTemplates.noRace.test.ts`' "ends a no-race
+  10K block on its peak long run", which also pins the two deload weeks against a re-scale.
 
 ## 2026-09-07 — marathon share cap finalized; race-week placement corrected
 
