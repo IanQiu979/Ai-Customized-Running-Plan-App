@@ -1530,9 +1530,9 @@ function buildGenericWeek(args: {
   // week's longest run (an earlier revision floored the result at `longRunStartFloor` to preserve
   // that instead, which is why 15 of this file's own regression tests failed — the floor was
   // silently overriding the documented cap). The share cap itself moves to
-  // `longRunShareCap(level, requestedRuns)` — see that function's own comment — specifically
-  // because a *flat* per-level cap is arithmetically impossible at low run counts (an n-run week's
-  // largest entry is never below `1/n`), which is why the audit's beginner and 3-day profiles
+  // `longRunShareCap(level, requestedRuns, ceilingDistance)` — see that function's own comment —
+  // specifically because a *flat* per-level cap is arithmetically impossible at low run counts
+  // (an n-run week's largest entry is never below `1/n`), which is why the audit's beginner and 3-day profiles
   // breached on every loading week regardless of this loop. The run-count-scaled cap is
   // satisfiable at every `normalizedRunCount` output (3–7) by construction, so — unlike the
   // flat-cap revision this replaces — the loop never chases an unreachable target and needs no

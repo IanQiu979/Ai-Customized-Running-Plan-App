@@ -524,9 +524,12 @@ Claude's output for Pro and Elite. See
 as the one with the guardrail removed would be backwards.
 
 Inside the deterministic template engine, both plan-building paths call `clampLongRun()`, but they
-preserve their intended arithmetic. The generic path supplies `longRunShareCap(level, runCount)`
+preserve their intended arithmetic. The generic path supplies `longRunShareCap(level, runCount,
+raceDistance)` and `maxSingleRunKm(level, raceDistance, { readiness, easyPaceSecPerKm })` as the
+share and absolute overrides (see `docs/reference/coaching/load-rules.md` for both marathon rules),
 and rounds the 1.10× spike ceiling up to a renderable whole kilometre; the coach-authored golden
-5K path uses the flat per-level share table and raw fractional spike ceiling. Generic easy runs are
+5K path uses the flat per-level share table, the flat absolute table, and the raw fractional spike
+ceiling. Generic easy runs are
 capped at the final clamped LR distance. Quality/tempo sessions are not: the safety cap may put LR
 below one of them rather than rewriting the authored stimulus. `reconcileVolumeToTarget()` trims
 whole kilometres without dropping scheduled training runs; an extremely small target can therefore
