@@ -23,7 +23,7 @@
 |---|---|
 | M1 — Foundation (account → empty Home) | **In progress.** Server (auth + schema + account routes) is deployed on Cloudflare (`workers/`, live `production` environment); client-side email/password works in production, and Google is registered in production since 2026-08-09 (registration only — see "How it is now" for the two unproven riders) |
 | M2 — Intake (questionnaire persists) | **In progress.** Intake is asked exactly once: Home reads the target back from the saved intake and asks only for a plan length, and only when there is no race date to derive one from (`src/lib/planRequest.ts`) |
-| M3 — Plan engine (3 tiers produce valid plans) | **In progress.** Pure template/pace engine wired into the Worker's `generate-plan` route and the client's generate-plan action; the plan view renders a real generated plan (via `GET /api/plans/:id`) alongside the permanent static golden fixture. Paid tiers still serve the quota-exempt template fallback — see "How it is now" |
+| M3 — Plan engine (3 tiers produce valid plans) | **In progress.** The engine splits by tier as of 2026-09-09: Free is served entirely from the 40-plan deterministic library (`src/lib/planLibrary/`), paying tiers keep the template/pace engine as the AI skeleton. Both are wired into the Worker's `generate-plan` route and the client's generate-plan action; the plan view renders a real generated plan (via `GET /api/plans/:id`) alongside the permanent static golden fixture. Paid tiers still serve the quota-exempt template fallback — see "How it is now" |
 | M4 — Tiers & quotas (server-side, unbypassable) | **In progress.** The quota ledger, atomic gate, fallback exemption, `quota-status` and `purchase-tier` are built and tested server-side; a Settings tab now displays tier/quota and a dummy paywall now lets a runner call `purchase-tier` (2026-08-05) |
 | M5 — My Plans (history) | **In progress.** A My Plans tab lists plans off `GET /api/plans` |
 | M6 — Polish & TestFlight | **In progress.** The visual system has been replaced twice. **Trailhead is on `main`** (PR #82, plus the fidelity follow-up #83); **Instrument replaced it on 2026-09-03 and is on `fm/v22-redesign-theme-onboarding`, not merged**. The three signed-out screens (onboarding, sign-in, sign-up) have been rendered and visually checked in both schemes on Expo **web** at phone size (430x932); no screen has ever been run on a real iOS or Android device or simulator, and the signed-in screens (Home, My Plans, Plan view, Settings, Glossary, Paywall) have still never been seen rendered in either system. See "How it is now". No EAS build exists |
@@ -73,6 +73,21 @@
   (2026-08-10) but has **never made a live model call**: `ANTHROPIC_API_KEY` is unset everywhere,
   so paid-tier requests still serve the honest, quota-exempt template fallback. That key is the
   **only** remaining critical-path item — detail in "Known debt" 🔴 and "Blocked".
+- **Free's engine is the 40-plan deterministic library (2026-09-09).** Per the captain's ruling of
+  2026-09-06 the engine splits by tier: Free users get the 40-plan library as their entire product,
+  paying users get the AI curve generator, and the library is neither a fallback for the generator
+  nor a parameter source for it. `src/lib/planLibrary/` ports
+  `planning/research/plan-blueprint-examples.md`'s "V1 deterministic template library" — the
+  register and dose ladder, the volume state machine, the placement layouts, the four canonical
+  week-by-week calendars (5K/12, 10K/14, half/16, marathon/24), the H0–H4 injury state machine with
+  all seven modules, and § 20's resolution order — with 53 tests.
+  `workers/src/lib/planEngine.ts` routes `tier === 'free'` there; `planTemplates.ts` is untouched
+  and remains the paid skeleton. **Six coaching questions must be answered before the engine is
+  complete** — most consequentially, every runner currently takes the documented conservative END
+  default (so the 20 SPD plans are unreachable from live intake) and any declared injury
+  provisionally maps to H1 (so H2–H4 are implemented and tested but unreachable). They are
+  captain-only: [`docs/reference/coaching/free-engine-open-questions.md`](reference/coaching/free-engine-open-questions.md)
+  and "Blocked" below.
 - **Intake is asked once and a race target is optional.** Home reads the target off the saved
   intake and asks only for a plan length when there is no race date. A no-race plan never ends on
   a deload; a past race date is refused on both screens (race day and a blank date remain valid);
@@ -128,7 +143,10 @@
   top-level value to `"false"` before real users arrive. Recorded in "Latest — 2026-08-09".
 - **Test counts:** 785 root tests across 39 suites on `fm/v22-3day-peak-below-base`, verified by
   running `npm test` there on 2026-09-09 (778 across 38 suites on
-  `fm/v22-distance-specific-plans`, 2026-09-07, after the rebase onto #88); 511 across 32 suites on
+  `fm/v22-distance-specific-plans`, 2026-09-07, after the rebase onto #88); separately, 832 root
+  tests across 40 suites on `fm/v22-library-free-engine`, also verified by running `npm test` there
+  on 2026-09-09 (778 across 38 on `fm/v22-distance-specific-plans` before the library landed); 511
+  across 32 suites on
   `fm/v22-redesign-theme-onboarding` (2026-09-04); `main`'s figure is the 469 across 29 suites
   recorded in the 2026-09-01 and 2026-09-03 entries below. 141 `workers/` tests across 7 files
   (`npm --prefix workers test`, verified 2026-09-09). Typecheck clean on both sides and root lint clean (`workers/` has no lint script — its
@@ -572,6 +590,21 @@ from 82. Issue #22 remains open.)
   captain — provisioned and verified in local dev 2026-08-05 (see that entry below).
 
 ### Code
+- [x] **Free's plan engine is the 40-plan deterministic library (2026-09-09).**
+      `src/lib/planLibrary/` — `registry.ts` (the 40 plan IDs, the workout vocabulary, the
+      experience-dose ladder and operating limits, the weekly-volume state machine, the 3–7-day
+      placement layouts, the long-run target ladder, the canonical durations 12/14/16/24, the
+      recovery-cadence overlay), `calendars.ts` (the four canonical week-by-week calendars
+      verbatim), `injury.ts` (the H0–H4 state machine, all seven injury modules, multiple-injury
+      composition), `engine.ts` (`buildLibraryPlan`, the source document's resolution order plus its
+      mandatory disclaimers) and `openQuestions.ts` (the six decisions the source does not make,
+      isolated so nothing else guesses). 53 tests in
+      `src/lib/planLibrary/__tests__/`. `workers/src/lib/planEngine.ts`'s
+      `createTemplateSkeletonBuilder()` routes `tier === 'free'` to it; paid tiers keep
+      `buildTemplatePlan` as the AI skeleton, and a Free request naming no race distance at all —
+      the one uncovered shape, open question Q1 — keeps the generic template engine. Recovery-week
+      depth stays at `loadRules.ts`'s 15–25%/target 20%. Full account in `docs/change_log.md`'s
+      2026-09-09 entry
 - [x] **The pulse trace animation is built (2026-09-04).** `src/components/brand/PulseTraceHero.tsx`
       (self-drawing or scroll-driven, reduced-motion aware, paints its own dark field), pure
       geometry in `src/lib/pulseTrace.ts` (23 tests), its own palette/timings in
@@ -1024,6 +1057,7 @@ to "Decided" below.
 | **Decided 2026-08-07: deploy the Worker.** How a phone reaches the backend — LAN against `wrangler dev` was the alternative and was declined; on-device testing waits on `wrangler deploy` (the row above) rather than a same-Wi-Fi workaround | all on-device testing; caused the 2026-08-07 `Network request failed` report | **Ian — ruled.** A loopback base URL is unreachable from a phone by construction, tunnel or not (see `.env.example`); once deployed, `EXPO_PUBLIC_API_BASE_URL` becomes the Worker's `https://` URL. The app now reports the unreachable case clearly instead of crashing, but cannot fix it |
 | `wrangler deploy --env production` for the 2026-08-10 (later) `INVALID_ORIGIN`/`INVALID_CALLBACK_URL` fix | email sign-up and Google sign-in against the deployed Worker | **Ian.** The fix (`workers/src/auth.ts`, `workers/wrangler.toml`) is merged and tested but not live until redeployed — see the "Last updated" entry above |
 | Google OAuth consent screen publishing status (Testing vs. production) — does it block real users, not just listed test accounts | Google sign-in for anyone other than a listed test user | **Ian**, in Google Cloud Console → OAuth consent screen. Not checkable or changeable by an agent |
+| **Six coaching questions on the Free-tier library engine**, raised 2026-09-09 while porting it: Q1 Free eligibility for intake naming no race distance; Q2 the SPD/END classification thresholds; Q3 the exact shorter/longer/no-date calendar transforms; Q4 numeric range and eligibility tie-breaks; Q5 the H0–H4 derivation, which `IntakeResponses` has no fields for; Q6 the notation/effort mapping for the seven library codes `notation.md` has no label for. Each has a provisional answer in `src/lib/planLibrary/openQuestions.ts` keyed by the same number, so the engine ships and nothing guesses silently | completeness of the Free tier's product: until Q2 is ruled on every runner takes the conservative END default and the 20 SPD plans are unreachable from live intake; until Q5 is, any declared injury maps to H1 and the tested H2–H4 states are unreachable | **Ian.** Coaching content, not engineering — the source document does not make these six decisions. Full write-up, one answerable question each: [`docs/reference/coaching/free-engine-open-questions.md`](reference/coaching/free-engine-open-questions.md) |
 | Marathon's separate absolute single-run calibration for intermediate/advanced remains open. Since 2026-09-07 `maxSingleRunKm()` returns `Infinity` only for a `prepared` marathoner whose easy pace makes the 180-minute cap enforceable; everyone else (no recent time, advanced, first-timer) keeps the flat ≤25 / ≤35 km table, so the open question is now what number should replace the table for the prepared, pace-known case. The weekly-share number is settled at 35% and is not part of this blocker | the final marathon-specific absolute kilometre ceiling, and whether the unchanged 180-minute duration cap should remain the ultimate duration bound | **Ian.** `report-source.md` says the exact absolute policy is coaching judgment and notes McMillan sometimes permits up to four hours; this work settles the share at 35%, leaving only the absolute calibration and any future time-cap change open. The current 180-minute cap and 10% spike guard remain active. Separately, the fixed-position long-run-curve dips still do not realign with `deloadEveryWeeks` when resampled onto noncanonical durations; 35% controls magnitude but does not solve that structure. Valid deloads use the last loading week's denominator, so their displayed own-week ratio is not required to be ≤35%. |
 
 None of the above blocks local work: everything in `workers/` runs offline against `wrangler dev`'s

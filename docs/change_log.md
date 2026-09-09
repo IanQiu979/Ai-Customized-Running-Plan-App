@@ -54,6 +54,57 @@ is that correction, and it closes the pending half of the pair.
 - The `retainedQuality`-based `longRunStartFloor` correction remains pending under issue #99 and
   must land only after this progression stage is verified. It is not part of this change.
 
+## 2026-09-09 — the Free tier's engine is the 40-plan deterministic library
+
+Branch `fm/v22-library-free-engine`. `npm run typecheck && npm run lint && npm test` (40 suites,
+832 tests) and `npm --prefix workers run typecheck && npm --prefix workers test` (141 tests) both
+clean.
+
+**The plan engine now splits by tier** (captain's ruling, 2026-09-06): **Free users get the 40-plan
+deterministic template library as their entire product; paying users get the existing AI curve
+generator.** The library is not a fallback for the generator and not a parameter source for it —
+the two never meet.
+
+- **New module `src/lib/planLibrary/`**, a port of `planning/research/plan-blueprint-examples.md`'s
+  "V1 deterministic template library". No coaching content was invented; every value traces to a
+  numbered section of that document:
+  - `registry.ts` — the 40 plan IDs (§ 1), the workout vocabulary (§ 3), the experience-dose ladder
+    and operating limits (§ 4), the weekly-volume state machine (§ 5), the 3–7-day placement
+    layouts (§ 6), the long-run target ladder (§ 9), the canonical durations 12/14/16/24 (§ 8) and
+    the recovery-cadence overlay (§ 10).
+  - `calendars.ts` — the four canonical week-by-week calendars verbatim (§ 11 5K/12wk, § 12
+    10K/14wk, § 13 half/16wk, § 14 marathon/24wk).
+  - `injury.ts` — the H0–H4 state machine (§ 16), all seven injury modules (§ 17), and multiple-
+    injury composition (§ 18: highest state wins, the single largest reduction is never summed,
+    workout removals are a union).
+  - `engine.ts` — `buildLibraryPlan`, implementing § 20's resolution order end to end, plus § 22's
+    mandatory disclaimers.
+  - `openQuestions.ts` — the six coaching decisions the source document does **not** make, isolated
+    in one file so nothing else in `planLibrary/` guesses.
+  - Tests: `src/lib/planLibrary/__tests__/registry.test.ts` and `engine.test.ts`, 53 tests.
+- **Wiring.** `workers/src/lib/planEngine.ts`'s `createTemplateSkeletonBuilder()` routes
+  `tier === 'free'` to `buildLibraryPlan`. Paid tiers are untouched — `buildTemplatePlan` remains
+  the AI skeleton. The single uncovered request shape, a Free runner naming no race distance at
+  all, keeps the generic template engine; that is open question Q1, not a fallback for the library.
+- **Captain rulings honoured.** Recovery-week depth is 15–25% (target 20%), matching
+  `loadRules.ts`'s `DELOAD_REDUCTION_MIN`/`MAX`, which stay authoritative and unchanged — the
+  source library's own stale "35–45% / target 40%" lines were corrected in place in
+  `plan-blueprint-examples.md` (§ 2 rule 7, § 5's `RECOVERY` row, "Resolved for the V1 library"
+  item 4). All seven injury modules ship despite § 21's unticked clinical-review box. A race date
+  that cannot be safely prepared for reports limited preparation, never compression.
+- **Six coaching questions are open and captain-only**, written up in the new
+  [`docs/reference/coaching/free-engine-open-questions.md`](reference/coaching/free-engine-open-questions.md):
+  Q1 Free eligibility for intake naming no race distance; Q2 the SPD/END classification thresholds
+  (every runner takes § 7's documented conservative END default today, so the 20 SPD plans are
+  unreachable from live intake); Q3 the exact shorter/longer/no-date calendar transforms
+  (`deriveReadinessPath`'s `prepared` verdict is the provisional "demonstrates the required base"
+  test); Q4 numeric range and eligibility tie-breaks (unnamed bands take their midpoint, "eligible"
+  = EXP/COMP); Q5 the H0–H4 derivation, since `IntakeResponses` lacks § 15's six required injury
+  fields, so any declared injury provisionally maps to H1 and H2–H4 are implemented and tested but
+  unreachable from live intake; Q6 the notation/effort mapping for the seven library codes
+  `notation.md` has no label for. Each has a provisional answer in `openQuestions.ts` keyed by the
+  same number; when one is ruled on, that file and that doc are the only two places that change.
+
 ## 2026-09-07 (later) — the no-recent-time marathoner is bounded; the readiness path is surfaced
 
 Branch `fm/v22-distance-specific-plans`, commit `bd2b0b6`, on top of the squashed `6a9f4a7` (the

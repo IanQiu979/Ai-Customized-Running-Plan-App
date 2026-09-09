@@ -217,6 +217,25 @@ Built-ins also available: `Explore`, `Plan`, `general-purpose`. Plugin agents ar
   from. Adding a race-distance or race-date control anywhere outside `/intake` recreates the
   "take the survey twice" bug the captain reported on 2026-08-15. The rule is code, not convention:
   `src/lib/planRequest.ts`.
+- **The plan engine splits by tier, and the split is one line in `planEngine.ts`.** Captain's
+  ruling, 2026-09-06: **Free is served entirely from the 40-plan deterministic library**
+  (`src/lib/planLibrary/`, a port of `planning/research/plan-blueprint-examples.md`'s "V1
+  deterministic template library"); paid tiers keep `planTemplates.ts` as the AI generator's
+  skeleton. The library is **not** a fallback for the generator and **not** a parameter source for
+  it — do not wire one into the other. Start at
+  [`src/lib/planLibrary/index.ts`](src/lib/planLibrary/index.ts); `engine.ts` implements § 20's
+  resolution order and cites the section behind every decision.
+- **`planLibrary/openQuestions.ts` is the only place that may guess.** Six coaching decisions the
+  source document does not make live there, each keyed to a numbered question in
+  [`docs/reference/coaching/free-engine-open-questions.md`](docs/reference/coaching/free-engine-open-questions.md)
+  and awaiting Ian's ruling. If you need a coaching number that is not in the source document, in
+  `loadRules.ts`, or in that file, **it does not exist yet — ask, don't pick one.** Adding a
+  seventh provisional constant means adding a seventh question to that doc in the same commit.
+- **Recovery-week depth is 15–25%, not the library's own 35–45%.** Ian reversed that band on
+  2026-09-06; `loadRules.ts`'s `DELOAD_REDUCTION_MIN`/`DELOAD_REDUCTION_MAX` are authoritative and
+  `plan-blueprint-examples.md`'s three stale lines were corrected in place, annotated rather than
+  silently overwritten. Coaching *source ports* under `docs/reference/coaching/source/` still carry
+  the old figure — that is issue #101, the captain's own to-do, not yours to edit.
 - **A race target is optional, and nothing may default one.** `buildTemplatePlan` carries
   `raceDistance?: RaceDistance` with no fallback; race week, the taper phase and the taper tail of
   the load curve are all gated on `isRacePlan`. Re-introducing a `?? '5k'` silently gives a

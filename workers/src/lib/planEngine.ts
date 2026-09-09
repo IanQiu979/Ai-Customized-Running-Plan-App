@@ -26,6 +26,7 @@
 
 import type { Engine, IntakeResponses, Plan, Tier } from '../../../src/lib/planTypes';
 import type { GoalType, RaceDistance } from '../../../src/lib/planTypes';
+import { buildLibraryPlan } from '../../../src/lib/planLibrary/engine';
 import { buildTemplatePlan } from '../../../src/lib/planTemplates';
 import { MAX_PLAN_WEEKS } from '../../../src/lib/planRequest';
 import type { ModelCaller } from './model';
@@ -139,6 +140,27 @@ export function createTemplateSkeletonBuilder(): SkeletonBuilder {
     async build(input) {
       const durationWeeks =
         input.durationWeeks ?? (input.raceDate ? weeksUntilRace(input.raceDate, input.now) : 1);
+
+      // Captain's ruling, 2026-09-06: the plan engine splits by tier. **Free is served entirely
+      // from the 40-plan deterministic library** (`src/lib/planLibrary/`, ported from
+      // `planning/research/plan-blueprint-examples.md`); paying tiers keep the AI curve generator,
+      // for which this template plan is the skeleton. The library is not a fallback for the
+      // generator and not a parameter source for it — the two never meet.
+      if (input.tier === 'free') {
+        const library = buildLibraryPlan({
+          intake: input.intake,
+          goalType: input.goalType,
+          durationWeeks,
+          ...(input.raceDistance !== undefined ? { raceDistance: input.raceDistance } : {}),
+          ...(input.raceDate !== undefined ? { raceDate: input.raceDate } : {}),
+          tierAtGeneration: input.tier,
+        });
+        if (library.ok) return { ok: true, plan: library.plan };
+        // The one uncovered request shape: a runner who named no race distance at all. The register
+        // has no plan for them and none is invented — see `planLibrary/openQuestions.ts` (Q1) and
+        // `docs/reference/coaching/free-engine-open-questions.md`. Until the captain rules, they
+        // keep the generic template engine rather than being refused a plan.
+      }
 
       const plan = buildTemplatePlan({
         intake: input.intake,

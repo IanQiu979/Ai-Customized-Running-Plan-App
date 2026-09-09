@@ -140,7 +140,13 @@ src/
     notation.ts                 # canonical — run-type/structure-string notation, the code
                                  #             counterpart of `notation.md`, 13 unit tests
     paceDerivation.ts        # pure Riegel/training-pace/goal-realism arithmetic
-    planTemplates.ts         # pure deterministic, distance-specific template + fallback engine
+    planTemplates.ts         # pure deterministic, distance-specific engine — the PAID skeleton
+                              #  and the fallback engine
+    planLibrary/             # pure (new 2026-09-09) — the FREE tier's whole engine: the 40-plan
+                              #  deterministic library, ported from
+                              #  planning/research/plan-blueprint-examples.md. registry.ts,
+                              #  calendars.ts, injury.ts, engine.ts (`buildLibraryPlan`),
+                              #  openQuestions.ts. 53 unit tests
     tierLimits.ts                # canonical — the ONE copy of Free/Pro/Elite limits + the
                                   #             fallback-exemption cap. Imported by the app AND
                                   #             by `workers/`. 8 unit tests
@@ -167,6 +173,7 @@ src/
     fixtures/examplePlan.ts  # hand-built 5K screen fixture; `plan/[id].tsx` still renders it
     __tests__/               # supabase, loadRules, notation, examplePlan.fixture, tierLimits,
                               # quotaPeriod, planTemplates (golden + general + noRace),
+                              # planLibrary/ (registry, engine — 53 tests, new 2026-09-09),
                               # paceDerivation, quotaDisplay (6 tests, new 2026-08-05),
                               # goalRealismDisclosure, planRequest, fieldInput (new 2026-08-15),
                               # pulseTrace (23 tests, new 2026-09-04)
@@ -201,7 +208,8 @@ workers/                    # a SEPARATE npm project; Metro is told to skip it (
     deps.ts                 # the only file that reads a secret; binds every seam
     lib/store.ts            # every D1 statement — authorization lives here
     lib/generate-plan-flow.ts  # the eleven pipeline steps, pure, deps injected
-    lib/planEngine.ts       # skeleton + personalizer seams (bound 2026-08-04 and 2026-08-10)
+    lib/planEngine.ts       # skeleton + personalizer seams (bound 2026-08-04 and 2026-08-10);
+                            # also the tier split — Free -> planLibrary, paid -> planTemplates
     lib/planValidation.ts   # structural validation, shape only
     lib/model.ts            # the Anthropic call, behind an injectable seam
   test/                     # vitest in real workerd + real D1 (Miniflare). No network;
@@ -288,7 +296,8 @@ restore `getCookie()`'s type, rather than bumping TypeScript (tried, broke ambie
 project-wide, reverted).
 
 `src/lib/planTypes.ts`, `src/lib/loadRules.ts`, `src/lib/notation.ts`,
-`src/lib/paceDerivation.ts`, `src/lib/planTemplates.ts`, `src/lib/tierLimits.ts`, and
+`src/lib/paceDerivation.ts`, `src/lib/planTemplates.ts`, `src/lib/planLibrary/`,
+`src/lib/tierLimits.ts`, and
 `src/lib/quotaPeriod.ts` **exist and are canonical** — pure TypeScript with no runtime
 dependencies, importable by both the Expo app and the Cloudflare Workers backend
 (`tierLimits.ts` and `quotaPeriod.ts` are imported directly by `workers/`).
@@ -373,7 +382,9 @@ src/lib/
   tierLimits.ts               # exists today — the one copy of the tier limits, app + Worker
   quotaPeriod.ts               # exists today — `currentPeriod()`, app + Worker
   fixtures/examplePlan.ts    # exists today — the 5K golden fixture as real `Plan` data
-  planTemplates.ts        # exists — the free-tier engine AND the fallback engine for Pro/Elite.
+  planTemplates.ts        # exists — the PAID skeleton AND the fallback engine for Pro/Elite.
+                            #          Since 2026-09-09 it is no longer the Free tier's engine —
+                            #          see `planLibrary/` below.
                             #          A parametric generator, not a fixed matrix: any distance,
                             #          any legal week count (per the plan-shape rules in
                             #          `planning/02-product-requirements.md`), any days/week, any
@@ -383,9 +394,9 @@ src/lib/
                             #          phase weighting from demonstrated weekly volume/recent
                             #          performance, never desired goal time. At 3–4 running days
                             #          the generic layout keeps Q1 and drops Q2 before easy
-                            #          support; Q2 may remain at 5+ days. Free's 12-week/5K limit
-                            #          is a UI/quota gate applied
-                            #          on top of this engine, not a limit of the engine itself — a
+                            #          support; Q2 may remain at 5+ days. Tier limits (Free's
+                            #          12-week/5K, for instance) are a UI/quota gate applied on top
+                            #          of this engine, never a limit of the engine itself — a
                             #          Pro/Elite fallback still needs, say, a 26-week marathon
                             #          template. Since 2026-08-15 a plan with no race is a first
                             #          class shape, not a 5K in disguise: no invented distance, no
@@ -398,6 +409,26 @@ src/lib/
                             #          high-water mark; `clampLongRun`'s safety ceilings remain
                             #          authoritative. The byte-pinned golden fixture remains its
                             #          own path.
+  planLibrary/            # exists (2026-09-09) — the Free tier's entire engine: the 40-plan
+                            #          deterministic library, a port of
+                            #          `planning/research/plan-blueprint-examples.md`'s "V1
+                            #          deterministic template library". `registry.ts` (plan
+                            #          register, workout vocabulary, experience-dose ladder and
+                            #          operating limits, weekly-volume state machine, 3-7-day
+                            #          placement layouts, long-run ladder, canonical durations
+                            #          12/14/16/24, recovery-cadence overlay), `calendars.ts` (the
+                            #          four canonical week-by-week calendars verbatim: 5K/12,
+                            #          10K/14, half/16, marathon/24), `injury.ts` (the H0-H4 state
+                            #          machine, all seven injury modules, multiple-injury
+                            #          composition), `engine.ts` (`buildLibraryPlan` — the source
+                            #          document's resolution order plus its mandatory
+                            #          disclaimers), `openQuestions.ts` (the six coaching decisions
+                            #          the source does NOT make, isolated in one file so nothing
+                            #          else guesses — see
+                            #          `docs/reference/coaching/free-engine-open-questions.md`).
+                            #          Selection is by register lookup, never by inventing a plan:
+                            #          a request the register does not cover is reported as
+                            #          uncovered, not approximated.
   paceDerivation.ts        # exists — Riegel cross-distance equivalency, source-relative training
                             #          bands, and the ruled goal-realism/race-pace cap (decision
                             #          13, 2026-07-10)
@@ -444,7 +475,9 @@ branch is unit-testable without a network or a cent of Anthropic spend.
 **Both former unbound seams are now bound.** Steps 4/5/8/9 (the deterministic skeleton, built from
 `src/lib/planTemplates.ts` and `src/lib/paceDerivation.ts`) were bound in `workers/src/deps.ts` on
 2026-08-04 via `createTemplateSkeletonBuilder()`, so `generate-plan` now returns a real plan
-instead of `503`. **Step 7's Pro/Elite personalization prompt was bound on 2026-08-10**
+instead of `503`. **Since 2026-09-09 that same builder is where the tier split lives**: a Free
+request is answered by `src/lib/planLibrary/`'s 40-plan deterministic library, paying tiers by
+`planTemplates.ts` as before — see step 5. **Step 7's Pro/Elite personalization prompt was bound on 2026-08-10**
 (`workers/src/lib/planPersonalizationPrompt.ts`) — see the corrected step 7 below for what
 actually shipped, which is narrower than the original "one representative week + expander" sketch
 this section used to describe. The remaining gap is not code: `ANTHROPIC_API_KEY` is unset
@@ -470,7 +503,17 @@ generation still falls back to the same template every tier gets, honestly marke
    produces a plan — a normal, volume-adjusted one carrying a strengthened disclaimer (captain
    ruling, 2026-08-03; see `docs/reference/coaching/plan-structure.md`), not a separate
    return-to-running protocol — never a rejection, and does not consume quota.
-5. **Build the template skeleton** — parametric, from `planTemplates.ts` and the coaching docs:
+5. **Build the plan skeleton — and this is where the tier split happens** (captain's ruling
+   2026-09-06, wired 2026-09-09 in `workers/src/lib/planEngine.ts`'s
+   `createTemplateSkeletonBuilder()`). A **Free** request is served entirely by
+   `src/lib/planLibrary/`'s `buildLibraryPlan`: the 40-plan deterministic library selects a plan
+   from the register, applies the calendar, the volume state machine, the injury state and the
+   mandatory disclaimers, and that plan is the finished product — the pipeline stops at step 6.
+   The library is not a fallback for the AI generator and not a parameter source for it; the two
+   never meet. The one request shape the register does not cover — a Free runner naming no race
+   distance at all — keeps the parametric engine below rather than being refused a plan (open
+   question Q1, see `docs/reference/coaching/free-engine-open-questions.md`). **Pro/Elite** get the
+   parametric skeleton, unchanged — from `planTemplates.ts` and the coaching docs:
    distance-specific weekly-volume/long-run curves, readiness selected from demonstrated recent
    training rather than desired goal time, phases, deload cadence, weekly volumes under
    `loadRules.ts` caps, and workout primitives from `workout-library.md`. Intermediate/advanced
@@ -481,10 +524,12 @@ generation still falls back to the same template every tier gets, honestly marke
    bound them in kilometres. The number for the lifted case is still pending calibration. Race
    plans carry `Plan.readinessPath`; a first-timer plan discloses why it took that path and, on a
    runway under the research's first-timer minimum, that it is a completion plan rather than full
-   preparation. **All three tiers build on this same coach-authored
-   skeleton — it is never removed.** What scales across tiers is how much of the runner the plan
-   reasons about and how much it explains, never how much of the coach's judgment is taken away.
-6. **Free tier stops here.** Template + effort descriptions only. No AI call, ever.
+   preparation. **Every tier's plan is coach-authored and deterministically bounded — that
+   is never removed.** What scales across tiers is how much of the runner the plan reasons about
+   and how much it explains, never how much of the coach's judgment is taken away; step 9's clamp
+   applies to both engines' output.
+6. **Free tier stops here.** The library plan (or, for the uncovered shape above, a template plan)
+   plus effort descriptions only. No AI call, ever.
 7. **Pro/Elite — one Claude call** (`claude-sonnet-5`). **Shipped 2026-08-10, narrower than
    originally sketched here.** Pace, HR zone/RPE, and every distance are already final by this
    point — the skeleton (step 5) is built at `density: 'paid'` for both Pro and Elite, so
@@ -523,8 +568,9 @@ generation still falls back to the same template every tier gets, honestly marke
     plan renders forever, so neither a model nor a client may name them.
 
 The deterministic load-rule clamp (volume caps, deload cadence, long-run caps) applies identically
-to all three tiers — while building the template for Free, and as a post-generation clamp on
-Claude's output for Pro and Elite. See
+to all three tiers — while building the plan for Free (the library's own doses are bounded by the
+same `loadRules.ts` arithmetic), and as a post-generation clamp on Claude's output for Pro and
+Elite. See
 [`docs/reference/plan-generation.md`](reference/plan-generation.md) for why: selling the top tier
 as the one with the guardrail removed would be backwards.
 
