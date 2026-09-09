@@ -60,7 +60,13 @@
   is a completion plan rather than full preparation. A 50 km/week, 16-week intermediate plan now
   peaks at 11/24/24/24 km for 3/4/5/6 days, with the constrained three-day shape disclosed and a
   fourth running day recommended — see "Decided (2026-09-07)", "Decided (2026-09-06, later)",
-  "Blocked" and "Known debt".
+  "Blocked" and "Known debt". Generic non-deload peak weeks now derive an algebraic long-run
+  capacity candidate from the already-rendered pre-peak high-water mark, retained quality distance,
+  and easy slots; the existing safety ceilings retain final authority. The Task 1 exact sweep
+  baseline is 770 broader peak-below-pre-peak-loading offenders under the accepted zero-new gate;
+  the pre-existing absolute baseline remains tracked by GitHub issue #103. The retained-quality
+  `longRunStartFloor` correction is still pending and must follow verification of this progression
+  stage rather than land with it.
   The Pro/Elite personalization prompt is built, bound, and tested
   (2026-08-10) but has **never made a live model call**: `ANTHROPIC_API_KEY` is unset everywhere,
   so paid-tier requests still serve the honest, quota-exempt template fallback. That key is the
@@ -132,7 +138,9 @@
 
 ---
 
-**Last updated:** 2026-09-03 (later) — the visual system was replaced again. **Instrument** — a
+**Last updated:** 2026-09-09 — generic peak-week capacity progression is corrected for the Task 1
+stage, while the retained-quality floor correction remains pending. The visual system was replaced
+again on 2026-09-03 (later). **Instrument** — a
 near-monochrome, cool-scientific house style shared with V2.3 ("Pace AnalysisAI") — supersedes
 Trailhead, two days after Trailhead merged to `main`. Captain-approved and grilled in detail before
 the work. On `fm/v22-redesign-theme-onboarding`, **not merged**; full account in
@@ -1252,17 +1260,17 @@ intact underneath.
   discloses it (`THREE_DAY_MARATHON_DISCLAIMER`, captain-ruled 2026-09-06) and recommends a fourth
   running day; it is not hidden, but it is not a progression either. Any fix is coaching content
   (a different three-day layout or Q1 dose), so it waits on Ian.
-- 🟡 **Three-day plans: the peak phase can render below the base phase — GitHub issue #99
-  (filed 2026-09-08).** `buildGenericWeek`'s `longRunStartFloor` derives from the full `quality`
-  array rather than `retainedQuality`, so at three and four running days the long-run candidate is
-  floored on a Q2 interval session the week does not schedule. Correcting the derivation was tried
-  and reverted on this branch: a 22,000-plan sweep showed 518 plans move, no long run ever moves
-  up, the largest long-run drop is 3 km, and 3-day weekly volume falls by up to 6 km — enough for a
-  peak week to render below its own base weeks (regular / 5K / 3 days / 20 km per week / 24 weeks:
-  weeks 17–19 go from 9/9/9 km long runs in 23/24/24 km weeks to 6/7/8 km in 17/18/20 km weeks).
-  The wrong floor is masking a genuine 3-day progression undershoot — the single easy run is itself
-  capped at the long run — so both must be fixed together, which is coaching-visible and waits on
-  Ian.
+- 🟡 **Retained-quality floor correction remains pending — GitHub issue #99 (filed 2026-09-08).**
+  `buildGenericWeek`'s `longRunStartFloor` still derives from the full `quality` array rather
+  than `retainedQuality`, so at three and four running days the long-run candidate is floored on a
+  Q2 interval session the week does not schedule. Task 1 now adds a generic non-deload peak
+  capacity candidate derived from the rendered pre-peak high-water mark, retained quality distance,
+  and easy slots; its safety ceilings still win. The exact 22,000-plan Task 1 baseline is 770 broad
+  offenders under the accepted zero-new gate, while the pre-existing absolute baseline remains
+  owned by issue #103. The retained-quality correction must land only after this progression stage
+  is verified: an earlier attempt moved 518 plans, lowered long runs by up to 3 km, and exposed the
+  separate peak-below-base defect. Downstream peak-deload and taper weeks continue to consume the
+  engine's actual rendered state.
 - 🟡 **The client's and the Worker's `better-auth` versions must match, and only the lockfile
   holds them together (2026-09-05).** They are two separate npm projects sharing one wire format
   (cookie envelope, `/sign-in/social` state, session payload). During the

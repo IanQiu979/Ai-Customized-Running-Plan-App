@@ -5,6 +5,21 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-09-09 — generic peak-week capacity progression (Task 1)
+
+- Generic non-deload peak weeks now derive the minimum long-run capacity candidate needed for the
+  existing easy-run ceiling to carry the already-rendered pre-peak high-water mark:
+  `Math.ceil((peakTrainingWeekKm - qualityKm) / (easyCount + 1))`. The candidate is folded into
+  `longRunFromCurve` before `clampLongRun`; the existing safety ceilings retain final authority.
+  Existing rendered state continues into subsequent peak-deload and taper weeks.
+- The dedicated progression suite covers the 20-week regular / 5K / 3-day / 20 km/week / no-recent-
+  time witness, the 24-week guard (peak weeks 17–19 at 23/24/24 km with 9/9/9 km long runs), and
+  an exact 22,000-plan matrix. Task 1 records 770 broad peak-below-pre-peak-loading offenders as
+  the accepted baseline for the zero-new-regression gate; the pre-existing absolute baseline is
+  tracked separately by GitHub issue #103.
+- The `retainedQuality`-based `longRunStartFloor` correction remains pending under issue #99 and
+  must land only after this progression stage is verified. It is not part of this change.
+
 ## 2026-09-07 (later) — the no-recent-time marathoner is bounded; the readiness path is surfaced
 
 Branch `fm/v22-distance-specific-plans`, commit `bd2b0b6`, on top of the squashed `6a9f4a7` (the

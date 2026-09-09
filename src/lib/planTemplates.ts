@@ -1493,8 +1493,12 @@ function buildGenericWeek(args: {
     (max, workout) => Math.max(max, (workout.distanceKm ?? 0) + 1),
     1,
   );
+  const peakCapacityLongRunKm = !isDeload && phase === 'peak'
+    ? Math.ceil((peakTrainingWeekKm - qualityKm) / (easyCount + 1))
+    : 1;
   const longRunFromCurve = Math.max(
     longRunStartFloor,
+    peakCapacityLongRunKm,
     targetLongRunKm(
       intake.weeklyKm,
       weekNumber - 1,

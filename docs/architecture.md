@@ -392,7 +392,12 @@ src/lib/
                             #          taper phase, the loading block of the curve only, and a final
                             #          week forced to be a loading week so it never ends on a deload
                             #          (captain's coaching ruling — the cadence yields for that week
-                            #          alone). The byte-pinned golden fixture remains its own path.
+                            #          alone). On generic non-deload peak weeks, the long-run
+                            #          candidate also includes the algebraic capacity needed for the
+                            #          existing easy-run ceiling to carry the rendered pre-peak
+                            #          high-water mark; `clampLongRun`'s safety ceilings remain
+                            #          authoritative. The byte-pinned golden fixture remains its
+                            #          own path.
   paceDerivation.ts        # exists — Riegel cross-distance equivalency, source-relative training
                             #          bands, and the ruled goal-realism/race-pace cap (decision
                             #          13, 2026-07-10)
@@ -527,7 +532,12 @@ Inside the deterministic template engine, both plan-building paths call `clampLo
 preserve their intended arithmetic. The generic path supplies `longRunShareCap(level, runCount,
 raceDistance)` and `maxSingleRunKm(level, raceDistance, { readiness, easyPaceSecPerKm })` as the
 share and absolute overrides (see `docs/reference/coaching/load-rules.md` for both marathon rules),
-and rounds the 1.10× spike ceiling up to a renderable whole kilometre; the coach-authored golden
+and rounds the 1.10× spike ceiling up to a renderable whole kilometre. On a generic non-deload peak
+week it also derives a minimum long-run candidate as
+`Math.ceil((peakTrainingWeekKm - qualityKm) / (easyCount + 1))`, where the inputs describe the
+already-rendered pre-peak high-water mark and the scheduled quality/easy slots. That candidate is
+only a capacity floor: `clampLongRun()` retains final authority, and the resulting rendered state
+continues into later peak-deload and taper weeks. The coach-authored golden
 5K path uses the flat per-level share table, the flat absolute table, and the raw fractional spike
 ceiling. Generic easy runs are
 capped at the final clamped LR distance. Quality/tempo sessions are not: the safety cap may put LR
