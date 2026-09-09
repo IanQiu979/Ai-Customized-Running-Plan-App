@@ -80,7 +80,7 @@
   `planning/research/plan-blueprint-examples.md`'s "V1 deterministic template library" — the
   register and dose ladder, the volume state machine, the placement layouts, the four canonical
   week-by-week calendars (5K/12, 10K/14, half/16, marathon/24), the H0–H4 injury state machine with
-  all seven modules, and § 20's resolution order — with 53 tests.
+  all seven modules, and § 20's resolution order — with 65 tests.
   `workers/src/lib/planEngine.ts` routes `tier === 'free'` there; `planTemplates.ts` is untouched
   and remains the paid skeleton. **The six coaching questions the port raised were all answered by
   Ian on 2026-09-10** and are recorded as settled rulings in
@@ -600,7 +600,7 @@ from 82. Issue #22 remains open.)
       verbatim), `injury.ts` (the H0–H4 state machine, all seven injury modules, multiple-injury
       composition), `engine.ts` (`buildLibraryPlan`, the source document's resolution order plus its
       mandatory disclaimers) and `openQuestions.ts` (the six decisions the source does not make,
-      isolated so nothing else guesses). 53 tests in
+      isolated so nothing else guesses). 65 tests in
       `src/lib/planLibrary/__tests__/`. `workers/src/lib/planEngine.ts`'s
       `createTemplateSkeletonBuilder()` routes `tier === 'free'` to it; paid tiers keep
       `buildTemplatePlan` as the AI skeleton. A Free request naming no race distance at all — the

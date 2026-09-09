@@ -173,7 +173,7 @@ src/
     fixtures/examplePlan.ts  # hand-built 5K screen fixture; `plan/[id].tsx` still renders it
     __tests__/               # supabase, loadRules, notation, examplePlan.fixture, tierLimits,
                               # quotaPeriod, planTemplates (golden + general + noRace),
-                              # planLibrary/ (registry, engine — 53 tests, new 2026-09-09),
+                              # planLibrary/ (registry, engine — 65 tests, new 2026-09-09),
                               # paceDerivation, quotaDisplay (6 tests, new 2026-08-05),
                               # goalRealismDisclosure, planRequest, fieldInput (new 2026-08-15),
                               # pulseTrace (23 tests, new 2026-09-04)
