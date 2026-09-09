@@ -62,11 +62,14 @@ taken away.
 - **Free**: `src/lib/planLibrary/`'s `buildLibraryPlan`, a port of
   `planning/research/plan-blueprint-examples.md`'s "V1 deterministic template library" — 40 plan IDs
   across four distances, five experience doses and two runner-profile lanes, resolved through its
-  § 20 order. No AI call at all for this tier; effort *descriptions* only. Six coaching decisions the
-  source document does not make are isolated in `planLibrary/openQuestions.ts` and await Ian's
-  ruling — see [`coaching/free-engine-open-questions.md`](coaching/free-engine-open-questions.md).
-  The one request shape the register does not cover (a Free user who named no race distance at all)
-  keeps `planTemplates.ts`'s generic engine; that is open question Q1.
+  § 20 order. No AI call at all for this tier; effort *descriptions* only. Six coaching decisions
+  the source document does not make are isolated in `planLibrary/openQuestions.ts`, all six ruled
+  by Ian on 2026-09-10 — see
+  [`coaching/free-engine-open-questions.md`](coaching/free-engine-open-questions.md).
+  **Free requires a target race distance**, because the library is organised by distance (Q1). A
+  Free request naming none is refused with `invalid_request` and the quota reservation is released,
+  so it costs nothing; it is never defaulted onto a calendar or handed to `planTemplates.ts`. A race
+  *date* remains optional on every tier.
 - **Pro**: the skeleton supplies the structural shape for the chosen distance/duration; Claude
   personalizes workouts, paces, HR zones, and a weekly "why" within it.
 - **Elite**: the same skeleton, customized far more heavily — the richest prompt available (injury

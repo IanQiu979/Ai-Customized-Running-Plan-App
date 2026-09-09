@@ -8,9 +8,9 @@
  *
  * Everything numeric here is either a direct read of
  * `planning/research/plan-blueprint-examples.md`, a clamp from `loadRules.ts` (the authoritative
- * safety arithmetic), or one of the six isolated provisional decisions in `openQuestions.ts`.
- * Nothing else. If you need a coaching number that is in none of those three places, it does not
- * exist yet — ask Ian, don't pick one.
+ * safety arithmetic), or one of the six decisions Ian ruled on 2026-09-10, isolated in
+ * `openQuestions.ts`. Nothing else. If you need a coaching number that is in none of those three
+ * places, it does not exist yet — ask Ian, don't pick one.
  *
  * § 20's own tie-break governs the whole file: "If two rules conflict, the earlier safety decision
  * in this resolution order wins. The output must never silently drop a warning or relabel a
@@ -55,9 +55,9 @@ import {
 import {
   bandMidpoint,
   CODE_PRESENTATION,
-  PROVISIONAL_INJURY_STATE_WITH_DECLARED_INJURY,
-  PROVISIONAL_RUNNER_PROFILE,
-  PROVISIONAL_TWO_QUALITY_TRACKS,
+  INJURY_STATE_WITH_DECLARED_INJURY,
+  DEFAULT_RUNNER_PROFILE,
+  TWO_QUALITY_TRACKS,
   type LibraryCoverageGap,
 } from './openQuestions';
 import {
@@ -205,9 +205,9 @@ export function resolveDeloadCadence(
   return EXPERIENCE_LIMITS[track].defaultDeloadWeeks;
 }
 
-/** § 4's quality policy, read through Q4's definition of "eligible". */
+/** § 4's quality policy, read through Q4's ruling that "eligible" is `EXP` and `COMP` only. */
 function allowsTwoQuality(track: ExperienceTrack): boolean {
-  return PROVISIONAL_TWO_QUALITY_TRACKS.includes(track);
+  return TWO_QUALITY_TRACKS.includes(track);
 }
 
 function meetsFloor(track: ExperienceTrack, floor: ExperienceTrack): boolean {
@@ -697,30 +697,33 @@ function buildWeek(args: {
 // ---------------------------------------------------------------------------
 
 /**
- * Q5's provisional derivation, isolated in one function so the real § 15 intake replaces exactly
- * this. `H2`–`H4` are implemented and tested but unreachable from live intake, because nothing the
- * app currently collects can evidence them.
+ * Q5, ruled 2026-09-10: any declared injury maps to `H1` and § 15's six-field injury intake is not
+ * required before Free ships. Isolated in one function so that intake, when it lands, replaces
+ * exactly this. `H2`–`H4` are implemented and tested but unreachable from live intake, because
+ * nothing the app currently collects can evidence them.
  */
-export function deriveProvisionalInjuryState(
+export function deriveInjuryState(
   injuries: readonly IntakeResponses['injuries'][number][],
 ): InjuryState {
   return declaredInjuries(injuries).length === 0
     ? 'H0'
-    : PROVISIONAL_INJURY_STATE_WITH_DECLARED_INJURY;
+    : INJURY_STATE_WITH_DECLARED_INJURY;
 }
 
 export function buildLibraryPlan(params: LibraryPlanParams): LibraryPlanResult {
   // --- validate intake -------------------------------------------------------------------------
   const raceDistance = params.raceDistance ?? params.intake.raceDistance;
   if (raceDistance === undefined) {
-    // Q1: the register has no plan for a runner who named no distance at all. Nothing is invented.
+    // Q1, ruled 2026-09-10: require a target distance before generating on Free. The register has
+    // no plan for a runner who named no distance, none is invented, and the request is refused
+    // rather than handed to another engine — the caller turns this into an `invalid_request`.
     return { ok: false, gap: 'no-race-distance' };
   }
   const distance = LIBRARY_DISTANCE[raceDistance];
   const isRacePlan = params.goalType === 'race';
 
   // --- injury state (H0–H4) --------------------------------------------------------------------
-  const injuryState = deriveProvisionalInjuryState(params.intake.injuries);
+  const injuryState = deriveInjuryState(params.intake.injuries);
   const injuryEffect = composeInjuryEffect(injuryState, params.intake.injuries);
 
   // --- race distance and canonical/adjusted duration --------------------------------------------
@@ -739,7 +742,7 @@ export function buildLibraryPlan(params: LibraryPlanParams): LibraryPlanResult {
 
   // --- safe run-frequency layout, then runner profile -------------------------------------------
   const layoutDays = resolveLayoutDays(track, params.intake.daysPerWeek);
-  const profile: RunnerProfile = PROVISIONAL_RUNNER_PROFILE;
+  const profile: RunnerProfile = DEFAULT_RUNNER_PROFILE;
 
   // --- pace/effort derivation -------------------------------------------------------------------
   const paces = deriveTrainingPaces(params.intake.recentPerformance, level);

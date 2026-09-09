@@ -11,7 +11,7 @@ import { LIBRARY_CALENDARS } from '../calendars';
 import {
   adaptCalendar,
   buildLibraryPlan,
-  deriveProvisionalInjuryState,
+  deriveInjuryState,
   LIBRARY_GENERAL_DISCLAIMER,
   LIBRARY_H4_DISCLAIMER,
   LIBRARY_INJURY_DISCLAIMER,
@@ -20,6 +20,12 @@ import {
   type LibraryPlanResult,
 } from '../engine';
 import { composeInjuryEffect, highestInjuryState, INJURY_MODULES } from '../injury';
+import {
+  DEFAULT_RUNNER_PROFILE,
+  LIBRARY_DECISIONS,
+  SPD_MATERIALLY_STRONGER_PCT,
+  TWO_QUALITY_TRACKS,
+} from '../openQuestions';
 import { CANONICAL_WEEKS, EXPERIENCE_TRACKS } from '../registry';
 
 function intake(overrides: Partial<IntakeResponses> = {}): IntakeResponses {
@@ -88,7 +94,7 @@ describe('§ 20 resolution order', () => {
       }),
     ).plan;
     // The live derivation cannot reach H4 (Q5), so the branch is proved directly.
-    expect(deriveProvisionalInjuryState(['knee'])).toBe('H1');
+    expect(deriveInjuryState(['knee'])).toBe('H1');
     expect(highestInjuryState(['H1', 'H4', 'H2'])).toBe('H4');
     expect(plan.weeks.every((week) => week.days.some((day) => day.kind === 'run'))).toBe(true);
   });
@@ -102,6 +108,54 @@ describe('§ 20 resolution order', () => {
     });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.gap).toBe('no-race-distance');
+  });
+});
+
+describe("Ian's six rulings, 2026-09-10", () => {
+  it('records all six as settled, none still open', () => {
+    expect(Object.keys(LIBRARY_DECISIONS)).toEqual(['Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'Q6']);
+    for (const decision of Object.values(LIBRARY_DECISIONS)) {
+      expect(decision.ruling.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('Q2: banks the 5% Riegel margin, still unreachable until intake takes two results', () => {
+    // Ian set the threshold ahead of the intake work so it is not re-litigated later. Nothing
+    // consumes it yet, and that is deliberate — `SPD` cannot be selected from one performance.
+    expect(SPD_MATERIALLY_STRONGER_PCT).toBe(0.05);
+    expect(DEFAULT_RUNNER_PROFILE).toBe('END');
+  });
+
+  it('Q4: a second hard session is EXP/COMP only', () => {
+    expect([...TWO_QUALITY_TRACKS]).toEqual(['EXP', 'COMP']);
+    const reg = ok(build({ experience: 'regular', daysPerWeek: 5 })).plan;
+    const exp = ok(build({ experience: 'experienced', daysPerWeek: 5 })).plan;
+    const hardDays = (plan: typeof reg): number =>
+      Math.max(
+        ...plan.weeks.map(
+          (week) =>
+            week.days.filter(
+              (day) =>
+                day.kind === 'run' &&
+                day.isLongRun !== true &&
+                (day.effort === 'tempo' || day.effort === 'interval'),
+            ).length,
+        ),
+      );
+    expect(hardDays(reg)).toBe(1);
+    expect(hardDays(exp)).toBe(2);
+  });
+
+  it('Q6: renders MP as steady and RP10 as interval, minting no new abbreviation', () => {
+    const known = new Set(['ER', 'RR', 'TR', 'INT', 'RP', 'LR', 'SR', 'ER + Strides', 'Race Day', 'Rest']);
+    for (const distance of ['5k', '10k', 'half', 'marathon'] as RaceDistance[]) {
+      const { plan } = ok(build({ experience: 'experienced' }, { distance, weeks: 24 }));
+      for (const week of plan.weeks) {
+        for (const day of week.days) {
+          if (day.kind === 'run') expect(known.has(day.label)).toBe(true);
+        }
+      }
+    }
   });
 });
 

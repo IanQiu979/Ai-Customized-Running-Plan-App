@@ -18,8 +18,8 @@ import type { DoseKey, ExperienceTrack, LibraryDistance, LongRunTarget, VolumeSt
  * - `'none'` — the document says no Q2 this week.
  * - `'twoQuality'` — "if eligible" / "for eligible runners": the tracks whose § 4 quality policy
  *   normally allows two sessions. `REG`'s second session is "only after demonstrated tolerance",
- *   and intake captures no tolerance signal, so `REG` is not eligible — see
- *   `openQuestions.ts` (Q4).
+ *   and intake captures no tolerance signal, so `REG` is not eligible — Ian's
+ *   Q4 ruling, 2026-09-10, in `openQuestions.ts`.
  * - `'REG+'`, `'EXP+'`, `'COMP'` — the document names a floor explicitly.
  */
 export type Q2Eligibility = 'none' | 'twoQuality' | 'REG+' | 'EXP+' | 'COMP';

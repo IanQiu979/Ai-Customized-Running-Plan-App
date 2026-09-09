@@ -423,12 +423,12 @@ src/lib/
                             #          composition), `engine.ts` (`buildLibraryPlan` — the source
                             #          document's resolution order plus its mandatory
                             #          disclaimers), `openQuestions.ts` (the six coaching decisions
-                            #          the source does NOT make, isolated in one file so nothing
-                            #          else guesses — see
+                            #          the source does NOT make, all six ruled by Ian 2026-09-10
+                            #          and isolated in one file — see
                             #          `docs/reference/coaching/free-engine-open-questions.md`).
                             #          Selection is by register lookup, never by inventing a plan:
-                            #          a request the register does not cover is reported as
-                            #          uncovered, not approximated.
+                            #          a request the register does not cover is refused, not
+                            #          approximated.
   paceDerivation.ts        # exists — Riegel cross-distance equivalency, source-relative training
                             #          bands, and the ruled goal-realism/race-pace cap (decision
                             #          13, 2026-07-10)
@@ -511,8 +511,11 @@ generation still falls back to the same template every tier gets, honestly marke
    mandatory disclaimers, and that plan is the finished product — the pipeline stops at step 6.
    The library is not a fallback for the AI generator and not a parameter source for it; the two
    never meet. The one request shape the register does not cover — a Free runner naming no race
-   distance at all — keeps the parametric engine below rather than being refused a plan (open
-   question Q1, see `docs/reference/coaching/free-engine-open-questions.md`). **Pro/Elite** get the
+   distance at all — is **refused** with `invalid_request`, the quota reservation released so the
+   attempt costs nothing (Ian's Q1 ruling, 2026-09-10: Free requires a target distance; a race
+   *date* stays optional on every tier). It deliberately does not fall through to the parametric
+   engine below, which would put a Free user back on the paid tiers' skeleton. See
+   `docs/reference/coaching/free-engine-open-questions.md`. **Pro/Elite** get the
    parametric skeleton, unchanged — from `planTemplates.ts` and the coaching docs:
    distance-specific weekly-volume/long-run curves, readiness selected from demonstrated recent
    training rather than desired goal time, phases, deload cadence, weekly volumes under

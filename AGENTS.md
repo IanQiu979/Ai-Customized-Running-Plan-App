@@ -225,12 +225,19 @@ Built-ins also available: `Explore`, `Plan`, `general-purpose`. Plugin agents ar
   it — do not wire one into the other. Start at
   [`src/lib/planLibrary/index.ts`](src/lib/planLibrary/index.ts); `engine.ts` implements § 20's
   resolution order and cites the section behind every decision.
-- **`planLibrary/openQuestions.ts` is the only place that may guess.** Six coaching decisions the
-  source document does not make live there, each keyed to a numbered question in
-  [`docs/reference/coaching/free-engine-open-questions.md`](docs/reference/coaching/free-engine-open-questions.md)
-  and awaiting Ian's ruling. If you need a coaching number that is not in the source document, in
-  `loadRules.ts`, or in that file, **it does not exist yet — ask, don't pick one.** Adding a
-  seventh provisional constant means adding a seventh question to that doc in the same commit.
+- **`planLibrary/openQuestions.ts` is the only place that may hold a coaching value the source
+  document does not state.** Six such decisions live there, all six ruled by Ian on 2026-09-10 and
+  written up in
+  [`docs/reference/coaching/free-engine-open-questions.md`](docs/reference/coaching/free-engine-open-questions.md).
+  If you need a coaching number that is not in the source document, in `loadRules.ts`, or in that
+  file, **it does not exist yet — ask, don't pick one.** Adding a seventh constant there means
+  adding a seventh question to that doc in the same commit.
+- **Free requires a target race distance; a race date stays optional everywhere.** Ian's Q1 ruling
+  (2026-09-10): the library is organised by distance, so a Free request naming none is refused with
+  `invalid_request` (quota released, nothing charged) rather than defaulted onto a calendar or
+  handed to `buildTemplatePlan`. The captain's 2026-08-15 "the race stage should be optional" report
+  now governs the **paid** tiers only — see `workers/test/planEngine.test.ts`'s "no race named
+  anywhere" suite, which pins both halves.
 - **Recovery-week depth is 15–25%, not the library's own 35–45%.** Ian reversed that band on
   2026-09-06; `loadRules.ts`'s `DELOAD_REDUCTION_MIN`/`DELOAD_REDUCTION_MAX` are authoritative and
   `plan-blueprint-examples.md`'s three stale lines were corrected in place, annotated rather than

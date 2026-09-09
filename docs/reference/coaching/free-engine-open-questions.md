@@ -1,66 +1,73 @@
-# Free-tier library engine — open coaching questions
+# Free-tier library engine — the six coaching decisions, and Ian's rulings
 
-**Status:** awaiting Ian's rulings. Six numbered questions, each answerable directly.
+**Status: all six answered (Ian, 2026-09-10).** Nothing on this page is open.
 **Raised:** 2026-09-09, while building the Free tier's 40-plan deterministic engine
 (`src/lib/planLibrary/`) from `planning/research/plan-blueprint-examples.md`.
-**Code counterpart:** every provisional answer below is a single constant or function in
+**Code counterpart:** every ruling below is a single constant or function in
 [`src/lib/planLibrary/openQuestions.ts`](../../../src/lib/planLibrary/openQuestions.ts), keyed by
-the same `Q` number. Nothing else in `planLibrary/` guesses — when an answer lands, that file and
-this doc are the only two places that change.
+the same `Q` number. Nothing else in `planLibrary/` holds a coaching value the source document does
+not state — a seventh decision means a seventh question to Ian in the same commit.
+
+*(The filename is kept so the links already pointing here from `docs/change_log.md` and `AGENTS.md`
+keep working. Read it as "the questions the library left open, and how they were answered".)*
 
 ## Why this file exists
 
 The captain's ruling of 2026-09-06 makes the 40-plan library the Free tier's entire product, and
 `AGENTS.md`'s standing rule is that **coaching content is never invented**. The source document
 specifies the register, the doses, the layouts, the volume states, the long-run ladder, the four
-week-by-week calendars, the injury modules, and the resolution order — all of which are now ported
-and tested. Six decisions the engine cannot avoid making are *not* in it. They are collected here
-rather than guessed at in code.
+week-by-week calendars, the injury modules, and the resolution order. Six decisions the engine
+cannot avoid making are *not* in it. They were collected here rather than guessed at in code, and
+answered a day later.
 
-Each question states what the source document does say, what it does not, what the engine does
-today, and what a one-line answer would change.
+Each entry keeps the question as it was put, so a future reader can see what was actually decided
+and on what evidence.
 
 ---
 
 ## Q1 — Free-tier eligibility for intake the register does not cover
 
 **The document says.** § 1 registers 40 plans across exactly four race distances. § 8's "No target
-race date" branch says to "run the base/build portion for the **selected distance**".
+race date" branch says to run the base/build portion for the **selected distance**.
 
 **It does not say.** What a Free user gets when intake names no target distance at all — a pure
-duration goal ("I want to train for 12 weeks") with the race-distance question left blank. The
-register has no plan for them, and § 8's no-race-date branch still needs a distance to select a
-calendar.
+duration goal with the race-distance question left blank.
 
-**Today.** The engine reports the request as uncovered and the caller keeps the existing generic
-template engine (`buildTemplatePlan`) for it. No library plan is invented.
+**Ruling (2026-09-10).** **Require a target distance before generating on Free.** Do not default to
+the 10K calendar. A duration-only Free user without a distance is not served by the library engine.
 
-**The question.** For a Free user with a duration goal and no target distance, should the engine
-(a) run the 10K calendar's base/build portion as a default general-fitness block, (b) require a
-target distance before generating on Free, or (c) keep the current generic template engine for that
-one case?
+**As implemented.** `buildLibraryPlan` returns the `no-race-distance` coverage gap, and
+`workers/src/lib/planEngine.ts` turns that into an `invalid_request` carrying
+`NO_RACE_DISTANCE_MESSAGE`, which names the fix. The flow releases the quota reservation before
+returning, so the refusal costs nothing — which matters, because Free's allowance is one plan for
+life. It deliberately does **not** fall through to `buildTemplatePlan`: that would put a Free user
+back on the paid tiers' skeleton and undo the 2026-09-06 tier split.
+
+**What this changed.** The captain's 2026-08-15 "the race stage should be optional" report now
+applies to the **paid tiers only**. A race *date* remains optional on every tier; it is the
+distance, not the booking, that Free requires. Intake asks for a target distance already, so this
+is an edge case — but the client could refuse earlier and more kindly than the server does.
 
 ---
 
 ## Q2 — SPD/END classification thresholds
 
-**The document says.** § 7 classifies on "a recent performance at **two** distances", on one being
+**The document says.** § 7 classifies on a recent performance at **two** distances, on one being
 "materially stronger" than its predicted equivalent, and on a self-reported answer about fading as
 duration rises / difficulty changing gears. It also states its own fallback: "Only one result,
 conflicting evidence, or no usable evidence → conservative default: `END` lane, but first
 occurrence of every fast workout is reduced one dose."
 
-**It does not say.** What "materially stronger" is numerically (a percentage off the Riegel
-equivalent?), nor which self-report wording the intake should carry.
+**It does not say.** What "materially stronger" is numerically.
 
-**Today.** Intake captures at most **one** recent performance and no fading/gear-change answer, so
-every runner takes § 7's own documented conservative default: the `END` lane, first fast dose
-reduced. All 20 `SPD` plans are built and tested but no live intake can currently select one.
+**Ruling (2026-09-10).** **5%.** A result 5% or more faster than the Riegel-predicted equivalent
+counts as materially stronger for `SPD` classification. Banked for when intake is expanded to two
+performances; `SPD` stays unreachable until then, and that is expected.
 
-**The question.** (a) What percentage difference from the Riegel-predicted equivalent counts as
-"materially stronger"? (b) Should intake add a second recent performance and the fading/gear-change
-question, so the `SPD` half of the register becomes reachable — and if so, is the self-report alone
-ever sufficient without two results?
+**As implemented.** `SPD_MATERIALLY_STRONGER_PCT = 0.05`, exported and pinned by a test that also
+records why nothing consumes it yet. Every runner takes § 7's conservative default — the `END` lane
+with the first occurrence of each fast workout reduced one dose. All 20 `SPD` calendars are built
+and tested; only the classifier is missing, and it needs an intake field, not a coaching decision.
 
 ---
 
@@ -70,87 +77,80 @@ ever sufficient without two results?
 exposure; remove early repeated loading weeks "only when the runner already demonstrates the
 required base and recent-long-run capacity"; otherwise retain preparation and remove later
 ambitious workouts; under four weeks, easy running plus one brief reminder plus taper/race; extend
-by adding `ENTRY/LOAD/RECOVERY` base cycles before canonical Week 1, repeating only aerobic
-foundation work.
+by adding `ENTRY/LOAD/RECOVERY` base cycles before canonical Week 1.
 
-**It does not say.** What numeric test "already demonstrates the required base" is, nor the exact
-order in which weeks are dropped once that test passes or fails.
+**It does not say.** What numeric test "already demonstrates the required base" is.
 
-**Today.** `deriveReadinessPath`'s captain-approved `prepared` verdict is used as the test: a
-`prepared` runner loses the earliest removable loading weeks first; a `first-timer` keeps the
-preparation block and loses the later ambitious weeks instead. Extension repeats canonical weeks
-1–4 (the `ENTRY`/`LOAD-1`/`LOAD-2`/`RECOVERY` base cycle) and nothing else.
+**Ruling (2026-09-10).** **Keep `deriveReadinessPath`'s `prepared` verdict as the test — approved
+as implemented, no new threshold.**
 
-**The question.** Is `deriveReadinessPath`'s `prepared` verdict the right test for "demonstrates
-the required base"? If not, what is — a weekly-kilometre floor, a recent-longest-run floor, or
-both? And when a `prepared` runner's plan must shorten, is dropping the earliest loading weeks the
-order you want, or should the recovery weeks go first?
+**As implemented.** A `prepared` runner loses the earliest removable loading weeks first; a
+`first-timer` keeps the preparation block and loses the later ambitious weeks instead. Extension
+repeats canonical weeks 1–4 (the `ENTRY`/`LOAD-1`/`LOAD-2`/`RECOVERY` base cycle) and nothing else.
+Race week and the final taper survive every shortening.
 
 ---
 
 ## Q4 — Numeric-range and workout-collision tie-breaks
 
 **The document says.** § 5 names a target inside the band for `ENTRY` (0.90), the loading states
-(1.00/1.08), and `RECOVERY`. § 9 defines `LR-low`/`LR-mid`/`LR-high`/`LR-peak` precisely as
-quarters of the ladder range. § 6 caps `REG` at 4–5 days "unless already stable at six".
+(1.00/1.08), and `RECOVERY`. § 9 defines `LR-low`/`LR-mid`/`LR-high`/`LR-peak` precisely as quarters
+of the ladder range. § 6 caps `REG` at 4–5 days "unless already stable at six".
 
 **It does not say.** A target inside `HOLD` (95–100%), `TAPER-1` (70–80%), `TAPER-2` (55–65%), or
-`RACE-WEEK` (40–60%). What "if eligible" / "for eligible runners" means in the § 11–14 calendar
-cells. What test makes a `REG` runner "already stable at six" days.
+`RACE-WEEK` (40–60%). What "if eligible" means in the § 11–14 calendar cells. What test makes a
+`REG` runner "already stable at six" days.
 
-**Today.** An unnamed band takes its **midpoint** — arithmetic, not a new coaching number.
-"Eligible" means the track's § 4 quality policy *normally* allows two sessions, i.e. `EXP` and
-`COMP`: `REG`'s second session is "only after demonstrated tolerance" and intake reports no
-tolerance signal. A `REG` runner asking for six days is clamped to five and the extra day becomes
-rest — the direction § 6 already takes for `NEW`.
+**Ruling (2026-09-10).** **All three defaults kept as implemented:** band midpoints for `HOLD`,
+`TAPER-1`, `TAPER-2` and `RACE-WEEK`; `EXP`/`COMP`-only eligibility for a second hard session; and
+the five-day clamp for a `REG` runner requesting six.
 
-**The question.** (a) Are midpoints right for `HOLD` and the two tapers, or do you want a named
-point in each? (b) Is "eligible" = `EXP`/`COMP`, or should a `REG` runner above a stated weekly
-volume also qualify? (c) Is there a test that makes a `REG` runner "stable at six", or should the
-five-day clamp stand?
+**As implemented.** `bandMidpoint` for the unnamed bands — arithmetic, not a new coaching number.
+`TWO_QUALITY_TRACKS = ['EXP', 'COMP']`, because `REG`'s second session is "only after demonstrated
+tolerance" and intake reports no tolerance signal. A `REG` runner asking for six days gets five, the
+extra day becoming rest — the direction § 6 already takes for `NEW`.
 
 ---
 
 ## Q5 — H0–H4 derivation from the intake the app actually collects
 
 **The document says.** § 15 requires six fields before any module applies: location, status
-(past/resolved · returning/cleared · active/stable · active/worsening), pain 0–10 at rest / during
-/ after / next morning, running impact, red-flag symptoms, and professional instruction. § 16
-branches on all six. It also says free text "never changes numeric training rules by itself".
+(past/resolved · returning/cleared · active/stable · active/worsening), pain 0–10 at rest / during /
+after / next morning, running impact, red-flag symptoms, and professional instruction. § 16 branches
+on all six. Free text "never changes numeric training rules by itself".
 
-**It does not say.** How to branch when only some of those fields exist.
+**It does not say.** How to branch when only some of those fields exist. `IntakeResponses` carries
+only the closed-set `injuries: InjuryFlag[]` and free-text `injuryNotes`.
 
-**Today.** `IntakeResponses` carries only the closed-set `injuries: InjuryFlag[]` and free-text
-`injuryNotes`. So: **no declared injury → `H0`; any declared injury → `H1`** ("cautious history"),
-the mildest branch that still applies a module. `H2`, `H3`, and `H4` are fully implemented and
-tested — including `H4`'s no-running output and its non-overridable disclaimer — but no live intake
-can evidence them, so no live plan reaches them. The engine never guesses a worse state than intake
-supports, and never a better one than a declared injury implies.
+**Ruling (2026-09-10).** **Keep the H0/H1 default for now.** Do not require the six-field injury
+intake before Free ships; that is a separate future task.
 
-**The question.** (a) Should intake collect § 15's six fields before Free ships, so the state
-machine becomes reachable? (b) Until then, is `H1` for any declared injury the right conservative
-default, or should a declared injury with no further evidence sit at `H0` with the module's "recent
-history starts speed and hills one dose lower" treatment instead?
+**As implemented.** No declared injury → `H0`. Any declared injury → `H1` ("cautious history"), the
+mildest branch that still applies a module. `H2`, `H3` and `H4` are fully implemented and tested —
+including `H4`'s no-running output and its non-overridable disclaimer — but no live intake can
+evidence them. The engine never derives a worse state than intake supports, and never a better one
+than a declared injury implies. `deriveInjuryState` is the single function the real intake replaces.
 
-*(All seven modules ship in v1 with the library's stated disclaimers, per your 2026-09-06 ruling,
-despite § 21's unticked "qualified clinical review of injury branching". That is settled and is not
-what this question asks.)*
+*(All seven modules ship in v1 with the library's stated disclaimers, per the 2026-09-06 ruling,
+despite § 21's unticked "qualified clinical review of injury branching". That was settled
+separately and is not what this question asked.)*
 
 ---
 
 ## Q6 — Notation and effort mapping for the seven codes `notation.md` has no label for
 
 **The document says.** § 3 defines 20 workout codes, with an explicit RPE for four of them: `REC`
-(2–3), `E` (3–4), `AER` (4–5), `LR` (3–4). The rest carry prose ("comfortably hard, even, never a
-time trial"; "current-fitness VO2/5K effort").
+(2–3), `E` (3–4), `AER` (4–5), `LR` (3–4). The rest carry prose.
 
-**It does not say.** How those codes render in the app's own notation. `notation.md` (your
-2026-07-11 notation ruling) defines nine labels — `ER`, `RR`, `TR`, `INT`, `RP`, `LR`, `SR`,
-`Strides`, `Race Day`. Seven library codes have none: `AER`, `MLR`, `FF`, `HS`, `F`, `H`, `TU`.
+**It does not say.** How those codes render in the app's own notation. `notation.md` (the 2026-07-11
+notation ruling) defines nine labels — `ER`, `RR`, `TR`, `INT`, `RP`, `LR`, `SR`, `Strides`,
+`Race Day`. Seven library codes have none: `AER`, `MLR`, `FF`, `HS`, `F`, `H`, `TU`.
 
-**Today.** Each library code maps onto an existing `notation.md` label and an `EffortLevel` read
-from § 3's own intensity column where it states one. No new abbreviation is minted, because a new
-notation entry is a notation ruling, not an engine decision. The mapping that needs your eye:
+**Ruling (2026-09-10).** **Approved as proposed — all ten mappings, including `MP` as *steady* and
+`RP10` as *interval*.** No new abbreviations.
+
+**As implemented** (`CODE_PRESENTATION`, pinned by a test that asserts no plan ever emits a label
+outside `notation.md`'s set):
 
 | Library code | Rendered label | Effort | Read from |
 |---|---|---|---|
@@ -165,23 +165,27 @@ notation entry is a notation ruling, not an engine decision. The mapping that ne
 | `HMP` | `RP` | tempo | § 3 "realistic HM effort" |
 | `MP` | `RP` | steady | § 3 "realistic marathon effort" |
 
-**The question.** (a) Are those ten mappings right, in particular `MP` as *steady* and `RP10` as
-*interval*? (b) Do you want new `notation.md` abbreviations for `AER`, `MLR`, `FF`, `HS`, `F`, `H`
-and `TU` instead of reusing the nearest existing label — and if so, what are they?
-
 ---
 
-## What is already settled and not asked here
+## Settled elsewhere, recorded here so nobody re-opens them
 
-These came with the task and are implemented as ruled — listed so no one re-opens them:
-
-- **Recovery-week depth is 15–25%, target 20%.** The source library's own "35–45% / target 40%"
-  lines are stale and have been corrected in place in `planning/research/plan-blueprint-examples.md`
-  (§ 2 rule 7, § 5's `RECOVERY` row, and "Resolved for the V1 library" item 4).
-  `loadRules.ts`'s `DELOAD_REDUCTION_MIN`/`MAX` stay authoritative and were not changed.
+- **Recovery-week depth is 15–25%, target 20%** (2026-09-06). The source library's own
+  "35–45% / target 40%" lines are stale and have been corrected in place in
+  `planning/research/plan-blueprint-examples.md` (§ 2 rule 7, § 5's `RECOVERY` row, and "Resolved
+  for the V1 library" item 4). `loadRules.ts`'s `DELOAD_REDUCTION_MIN`/`MAX` stay authoritative and
+  were not changed.
 - **All seven injury modules ship in v1** with the library's stated disclaimers, despite § 21's
   unticked clinical-review box.
 - **A race date that cannot be safely prepared for reports limited preparation** — never
   compression, never a violated cap.
 - **§ 22's disclaimers are mandatory on every plan**, plus the H1–H4 disclaimer where § 22
   specifies it.
+
+## Known follow-ups, not decisions
+
+Neither needs a coaching ruling; both are ordinary engineering work.
+
+1. **Intake could refuse a missing target distance before the server does** (Q1). Today the client
+   can send a Free request the server will reject.
+2. **§ 15's six-field injury intake** (Q5), which would make `H2`–`H4` reachable. Explicitly
+   deferred, not dropped.

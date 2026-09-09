@@ -5,6 +5,57 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-09-10 — the Free library engine's six coaching questions, all answered
+
+Branch `fm/v22-library-free-engine`. `npm run typecheck && npm run lint && npm test` (40 suites,
+844 tests) and `npm --prefix workers run typecheck && npm --prefix workers test` (144 tests) both
+clean.
+
+Ian answered all six questions yesterday's entry raised. They are recorded as settled rulings in
+[`docs/reference/coaching/free-engine-open-questions.md`](reference/coaching/free-engine-open-questions.md),
+each still shown beside the question as it was put to him, and each is one constant or function in
+`src/lib/planLibrary/openQuestions.ts` keyed by the same number. Five confirmed what shipped; one
+changed behaviour.
+
+- **Q1 — Free now requires a target race distance, and refuses without one.** Ian ruled that a
+  duration-only Free request naming no distance anywhere is not served by the library engine, and
+  must not be defaulted onto the 10K calendar. `workers/src/lib/planEngine.ts` no longer falls
+  through to `buildTemplatePlan` for that shape — falling through would have put a Free user back
+  on the paid tiers' skeleton and quietly undone the 2026-09-06 tier split. It returns
+  `invalid_request` with `NO_RACE_DISTANCE_MESSAGE`, which names the fix rather than only the
+  problem, and `generate-plan-flow` releases the quota reservation before returning, so the refusal
+  costs nothing. That last part matters: Free's allowance is one plan for life
+  (`tierLimits.ts`'s `FREE_IS_LIFETIME`), so a refusal that consumed it would be unrecoverable.
+  **This narrows an earlier ruling.** The captain's 2026-08-15 report — "the race stage should be
+  optional, it's not a mandatory thing you need to input" — now governs the **paid tiers only**. A
+  race *date* remains optional on every tier; it is the distance, not the booking, that Free needs,
+  because the library is organised by distance. `workers/test/planEngine.test.ts`'s "no race named
+  anywhere" suite now pins both halves: Pro still gets a real plan with no distance and no invented
+  5K, Free is refused, and a Free runner who named a distance but no race date is still served.
+- **Q2 — "materially stronger" is 5%.** `SPD_MATERIALLY_STRONGER_PCT = 0.05`: a result 5% or more
+  faster than its Riegel-predicted equivalent classifies the runner `SPD` under § 7. Banked
+  deliberately ahead of the intake work so it is not re-litigated later; nothing consumes it yet,
+  because § 7 needs a recent performance at *two* distances and `IntakeResponses` holds one. Every
+  runner therefore still takes § 7's own conservative `END` default, and the 20 `SPD` calendars
+  stay built, tested and unreachable — expected, not a defect. A test records why.
+- **Q3 — `deriveReadinessPath`'s `prepared` verdict stands** as the test for "already demonstrates
+  the required base", approved as implemented with no new threshold.
+- **Q4 — all three tie-breaks stand:** band midpoints for `HOLD`/`TAPER-1`/`TAPER-2`/`RACE-WEEK`,
+  `EXP`/`COMP`-only eligibility for a second hard session, and the five-day clamp for a `REG`
+  runner requesting six.
+- **Q5 — the H0/H1 default stands, and § 15's six-field injury intake is explicitly not required
+  before Free ships.** A separate future task. Any declared injury still maps to `H1`; `H2`–`H4`
+  remain implemented and tested but unreachable from live intake. `deriveInjuryState` (renamed from
+  `deriveProvisionalInjuryState`, since it is no longer provisional) is the single function the
+  real intake replaces.
+- **Q6 — the notation mapping is approved as proposed**, all ten codes including `MP` as *steady*
+  and `RP10` as *interval*. No new abbreviations were minted; a test asserts no generated plan ever
+  emits a label outside `notation.md`'s nine.
+- **Naming.** The `PROVISIONAL_*` constants are renamed to what they now are —
+  `DEFAULT_RUNNER_PROFILE`, `TWO_QUALITY_TRACKS`, `INJURY_STATE_WITH_DECLARED_INJURY` — and
+  `openQuestions.ts` documents rulings rather than provisionals. Both filenames are kept so the
+  links already pointing at them from this file and `AGENTS.md` keep working.
+
 ## 2026-09-09 (later) — the retained-quality long-run floor lands (Task 2)
 
 Branch `fm/v22-3day-peak-below-base`, on top of Task 1's `f956d11` (the entry below). That entry

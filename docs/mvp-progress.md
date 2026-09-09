@@ -82,12 +82,14 @@
   week-by-week calendars (5K/12, 10K/14, half/16, marathon/24), the H0–H4 injury state machine with
   all seven modules, and § 20's resolution order — with 53 tests.
   `workers/src/lib/planEngine.ts` routes `tier === 'free'` there; `planTemplates.ts` is untouched
-  and remains the paid skeleton. **Six coaching questions must be answered before the engine is
-  complete** — most consequentially, every runner currently takes the documented conservative END
-  default (so the 20 SPD plans are unreachable from live intake) and any declared injury
-  provisionally maps to H1 (so H2–H4 are implemented and tested but unreachable). They are
-  captain-only: [`docs/reference/coaching/free-engine-open-questions.md`](reference/coaching/free-engine-open-questions.md)
-  and "Blocked" below.
+  and remains the paid skeleton. **The six coaching questions the port raised were all answered by
+  Ian on 2026-09-10** and are recorded as settled rulings in
+  [`docs/reference/coaching/free-engine-open-questions.md`](reference/coaching/free-engine-open-questions.md).
+  Two consequences of those rulings are deliberate, not gaps: every runner takes § 7's conservative
+  END default until intake captures a second recent performance (so the 20 SPD plans stay
+  unreachable, with the 5% Riegel margin banked for then), and any declared injury maps to H1 until
+  § 15's six-field injury intake exists (so H2–H4 are implemented and tested but unreachable).
+  **Free now requires a target race distance**; a race date stays optional on every tier.
 - **Intake is asked once and a race target is optional.** Home reads the target off the saved
   intake and asks only for a plan length when there is no race date. A no-race plan never ends on
   a deload; a past race date is refused on both screens (race day and a blank date remain valid);
@@ -601,10 +603,11 @@ from 82. Issue #22 remains open.)
       isolated so nothing else guesses). 53 tests in
       `src/lib/planLibrary/__tests__/`. `workers/src/lib/planEngine.ts`'s
       `createTemplateSkeletonBuilder()` routes `tier === 'free'` to it; paid tiers keep
-      `buildTemplatePlan` as the AI skeleton, and a Free request naming no race distance at all —
-      the one uncovered shape, open question Q1 — keeps the generic template engine. Recovery-week
-      depth stays at `loadRules.ts`'s 15–25%/target 20%. Full account in `docs/change_log.md`'s
-      2026-09-09 entry
+      `buildTemplatePlan` as the AI skeleton. A Free request naming no race distance at all — the
+      one shape the register does not cover — is refused with `invalid_request`, quota released, per
+      Ian's Q1 ruling of 2026-09-10; it is never defaulted onto a calendar or handed to the generic
+      engine. Recovery-week depth stays at `loadRules.ts`'s 15–25%/target 20%. Full account in
+      `docs/change_log.md`'s 2026-09-09 and 2026-09-10 entries
 - [x] **The pulse trace animation is built (2026-09-04).** `src/components/brand/PulseTraceHero.tsx`
       (self-drawing or scroll-driven, reduced-motion aware, paints its own dark field), pure
       geometry in `src/lib/pulseTrace.ts` (23 tests), its own palette/timings in
@@ -1057,7 +1060,6 @@ to "Decided" below.
 | **Decided 2026-08-07: deploy the Worker.** How a phone reaches the backend — LAN against `wrangler dev` was the alternative and was declined; on-device testing waits on `wrangler deploy` (the row above) rather than a same-Wi-Fi workaround | all on-device testing; caused the 2026-08-07 `Network request failed` report | **Ian — ruled.** A loopback base URL is unreachable from a phone by construction, tunnel or not (see `.env.example`); once deployed, `EXPO_PUBLIC_API_BASE_URL` becomes the Worker's `https://` URL. The app now reports the unreachable case clearly instead of crashing, but cannot fix it |
 | `wrangler deploy --env production` for the 2026-08-10 (later) `INVALID_ORIGIN`/`INVALID_CALLBACK_URL` fix | email sign-up and Google sign-in against the deployed Worker | **Ian.** The fix (`workers/src/auth.ts`, `workers/wrangler.toml`) is merged and tested but not live until redeployed — see the "Last updated" entry above |
 | Google OAuth consent screen publishing status (Testing vs. production) — does it block real users, not just listed test accounts | Google sign-in for anyone other than a listed test user | **Ian**, in Google Cloud Console → OAuth consent screen. Not checkable or changeable by an agent |
-| **Six coaching questions on the Free-tier library engine**, raised 2026-09-09 while porting it: Q1 Free eligibility for intake naming no race distance; Q2 the SPD/END classification thresholds; Q3 the exact shorter/longer/no-date calendar transforms; Q4 numeric range and eligibility tie-breaks; Q5 the H0–H4 derivation, which `IntakeResponses` has no fields for; Q6 the notation/effort mapping for the seven library codes `notation.md` has no label for. Each has a provisional answer in `src/lib/planLibrary/openQuestions.ts` keyed by the same number, so the engine ships and nothing guesses silently | completeness of the Free tier's product: until Q2 is ruled on every runner takes the conservative END default and the 20 SPD plans are unreachable from live intake; until Q5 is, any declared injury maps to H1 and the tested H2–H4 states are unreachable | **Ian.** Coaching content, not engineering — the source document does not make these six decisions. Full write-up, one answerable question each: [`docs/reference/coaching/free-engine-open-questions.md`](reference/coaching/free-engine-open-questions.md) |
 | Marathon's separate absolute single-run calibration for intermediate/advanced remains open. Since 2026-09-07 `maxSingleRunKm()` returns `Infinity` only for a `prepared` marathoner whose easy pace makes the 180-minute cap enforceable; everyone else (no recent time, advanced, first-timer) keeps the flat ≤25 / ≤35 km table, so the open question is now what number should replace the table for the prepared, pace-known case. The weekly-share number is settled at 35% and is not part of this blocker | the final marathon-specific absolute kilometre ceiling, and whether the unchanged 180-minute duration cap should remain the ultimate duration bound | **Ian.** `report-source.md` says the exact absolute policy is coaching judgment and notes McMillan sometimes permits up to four hours; this work settles the share at 35%, leaving only the absolute calibration and any future time-cap change open. The current 180-minute cap and 10% spike guard remain active. Separately, the fixed-position long-run-curve dips still do not realign with `deloadEveryWeeks` when resampled onto noncanonical durations; 35% controls magnitude but does not solve that structure. Valid deloads use the last loading week's denominator, so their displayed own-week ratio is not required to be ≤35%. |
 
 None of the above blocks local work: everything in `workers/` runs offline against `wrangler dev`'s
@@ -1183,6 +1185,29 @@ guidelines scout (`/Users/Guestyyyyyyyy/firstmate/data/v22-apple-kids-guidelines
 | `plantar-arch-injury-flag` | **Already shipped** in the 2026-08-03 batch above — confirmed still wired through `planTypes.ts`, `workers/src/routes.ts` validation, `src/app/intake.tsx`'s picker, and `loadRules.ts`'s reduction table. No further change needed. |
 | `fifty-plus-golden-deload-weeks` | **Weeks 4, 8, and 12** are deload weeks for 50+ runners on the golden 12-week 5K path — not the generic every-3-weeks modulo (which would land on 3/6/9). This is a golden-path-only override; the generic path's every-3-weeks-for-50+ cadence is unchanged. Week 12 (the race week) is flagged `isDeload: true` in addition to its existing race-day structure. Implementation: `buildCanonicalFiveKWeek()` in `planTemplates.ts`. |
 | `age-floor` (App Store declared minimum age) | **13**, unified with the backend intake validator. The two were briefly treated as separate (the backend floor had been raised to 13 in an earlier, unrelated commit — `8acc27c` — while a prior ruling had separately declined touching it), but the captain resolved that tension mid-task: both the backend validator (`workers/src/routes.ts:210`, already `age < 13`) and the App Store Connect age-rating questionnaire answer are 13. There is no in-repo App Store Connect config to edit — `eas init` has never been run (`docs/apple-dev-blocked.md`) — so the declared floor is recorded here as the value to use once submission is set up; the questionnaire itself remains a captain's-account action at submission time. |
+
+## Decided (2026-09-10) — the Free library engine's six coaching questions, all answered
+
+The six decisions `planning/research/plan-blueprint-examples.md` does not make, raised 2026-09-09
+while porting the 40-plan library and answered the next day. Full write-up, with the question as it
+was put alongside each ruling:
+[`docs/reference/coaching/free-engine-open-questions.md`](reference/coaching/free-engine-open-questions.md).
+Each ruling is one constant or function in `src/lib/planLibrary/openQuestions.ts`, keyed by the same
+number, and that file remains the only place in `planLibrary/` allowed to hold a coaching value the
+source document does not state.
+
+| Question | Decision |
+|---|---|
+| **Q1** — what a Free user gets when intake names no target distance at all | **Require a target distance before generating on Free.** Not defaulted onto the 10K calendar, and not handed to `buildTemplatePlan` — that would put a Free user back on the paid tiers' skeleton and undo the 2026-09-06 tier split. The request is refused with `invalid_request` carrying `NO_RACE_DISTANCE_MESSAGE`, and the flow releases the quota reservation first, so it costs nothing — which matters, because Free's allowance is one plan for life. **Behaviour change:** the captain's 2026-08-15 "the race stage should be optional" report now governs the **paid tiers only**. A race *date* stays optional everywhere; it is the distance Free needs. Pinned by `workers/test/planEngine.test.ts`'s "no race named anywhere" suite, which now asserts both halves, and by a flow test proving no quota is charged. |
+| **Q2** — what "materially stronger" means for § 7's SPD/END classification | **5% or more faster than the Riegel-predicted equivalent.** Banked as `SPD_MATERIALLY_STRONGER_PCT` for when intake takes a second recent performance; nothing consumes it yet and that is deliberate. Until then every runner takes § 7's own conservative default — the END lane with the first occurrence of each fast workout reduced one dose — so the 20 SPD plans stay unreachable from live intake. Expected, not a defect: the classifier needs an intake field, not a coaching ruling. |
+| **Q3** — what numeric test counts as "already demonstrates the required base" when shortening | **`deriveReadinessPath`'s `prepared` verdict, approved as implemented, no new threshold.** A prepared runner loses the earliest removable loading weeks; a first-timer keeps preparation and loses the later ambitious weeks instead. Race week and the final taper survive every shortening. |
+| **Q4** — targets inside the unnamed bands, what "eligible" means, and the six-day REG runner | **All three kept as implemented.** Band midpoints for `HOLD`/`TAPER-1`/`TAPER-2`/`RACE-WEEK` (arithmetic, not a new coaching number); a second hard session is **EXP/COMP only**, since REG's second is "only after demonstrated tolerance" and intake reports no tolerance signal; a REG runner requesting six days is clamped to five, the extra day becoming rest. |
+| **Q5** — how to derive H0–H4 when `IntakeResponses` lacks § 15's six required fields | **Keep the H0/H1 default; § 15's six-field injury intake is NOT required before Free ships** — a separate future task. No declared injury → H0; any declared injury → H1, the mildest branch that still applies a module. H2–H4 stay implemented and tested but unreachable from live intake. `deriveInjuryState` is the single function the real intake replaces. |
+| **Q6** — how the seven library codes with no `notation.md` label should render | **Approved as proposed, all ten mappings, including `MP` as *steady* and `RP10` as *interval*.** No new abbreviations — a notation entry is a notation ruling, not an engine decision. A test asserts no generated plan ever emits a label outside `notation.md`'s set. |
+
+Two follow-ups fall out, neither needing a coaching ruling: intake could refuse a missing target
+distance client-side before the server does (Q1), and § 15's six-field injury intake would make
+H2–H4 reachable (Q5, explicitly deferred rather than dropped).
 
 ## Decided (2026-09-06) — distance-specific plans and the deload-band reversal
 
