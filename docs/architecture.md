@@ -537,7 +537,9 @@ week it also derives a minimum long-run candidate as
 `Math.ceil((peakTrainingWeekKm - qualityKm) / (easyCount + 1))`, where the inputs describe the
 already-rendered pre-peak high-water mark and the scheduled quality/easy slots. That candidate is
 only a capacity floor: `clampLongRun()` retains final authority, and the resulting rendered state
-continues into later peak-deload and taper weeks. The coach-authored golden
+continues into later peak-deload and taper weeks. The separate pre-clamp starting candidate is
+floored against the quality sessions the layout actually schedules (`retainedQuality`), so a three-
+or four-day week is never floored on the Q2 interval it drops. The coach-authored golden
 5K path uses the flat per-level share table, the flat absolute table, and the raw fractional spike
 ceiling. Generic easy runs are
 capped at the final clamped LR distance. Quality/tempo sessions are not: the safety cap may put LR

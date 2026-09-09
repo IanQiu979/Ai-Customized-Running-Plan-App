@@ -221,13 +221,40 @@ describe('generic peak-week capacity progression', () => {
     });
   });
 
-  it('pins the 24-week witness before retained-quality correction', () => {
+  it('holds the 24-week witness across the retained-quality floor correction', () => {
     const plan = buildRegularFiveKPlan(24, 20);
     const peakWeeks = plan.weeks.filter((week) => week.phase === 'peak' && !week.isDeload);
 
     expect(peakWeeks.map((week) => week.weekNumber)).toEqual([17, 18, 19]);
     expect(peakWeeks.map((week) => week.volumeKm)).toEqual([23, 24, 24]);
     expect(peakWeeks.map(longRunKm)).toEqual([9, 9, 9]);
+  });
+
+  it('floors a three-day long run against the quality session the week actually schedules', () => {
+    // At three running days only Q1 is retained (source §6), so the long run must be floored
+    // against that session and never against the interval workout the layout drops. Before this
+    // correction the floor read the full `quality` array and produced a 5 km long run inside an
+    // 11 km week here — a session the runner never sees, setting the week's hardest distance.
+    const plan = buildRegularFiveKPlan(6, 10);
+    const peakWeek = plan.weeks[4];
+    const scheduledLabels = peakWeek.days.filter(isWorkout).map((workout) => workout.label);
+
+    expect(peakWeek.phase).toBe('peak');
+    expect(scheduledLabels).toEqual(['ER + Strides', 'TR', 'LR']);
+    expect(longRunKm(peakWeek)).toBe(4);
+    expect(peakWeek.volumeKm).toBe(11);
+  });
+
+  it('keeps that three-day peak at its own base high-water mark after the floor correction', () => {
+    const plan = buildRegularFiveKPlan(6, 10);
+    const baseMaxKm = Math.max(
+      ...plan.weeks.filter((week) => !week.isDeload && week.phase === 'base').map((week) => week.volumeKm),
+    );
+    const peakMaxKm = Math.max(
+      ...plan.weeks.filter((week) => !week.isDeload && week.phase === 'peak').map((week) => week.volumeKm),
+    );
+
+    expect(peakMaxKm).toBeGreaterThanOrEqual(baseMaxKm);
   });
 
   it('records the exact Task 1 matrix baseline for the Task 2 zero-new-regression comparison', () => {
