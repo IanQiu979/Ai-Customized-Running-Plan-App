@@ -284,6 +284,14 @@ Built-ins also available: `Explore`, `Plan`, `general-purpose`. Plugin agents ar
   the cyan is reserved for the true primary CTA and this animation; do not reuse it for links,
   charts or badges, and do not give the animation a light-mode variant — it paints its own dark
   field in both schemes.
+- **The progression suite's 22,000-plan baseline mask is a gate, not a fixture — never regenerate
+  it.** `src/lib/__tests__/planTemplates.progression.test.ts` encodes the exact *membership* of the
+  known peak-below-pre-peak-loading offender set as a base64 mask, so a change may remove offenders
+  but never add one. Re-encoding the mask to make a failure go away silently destroys the only
+  guard that a plan-shape change did not regress a different profile; read the failing case list
+  instead. The residual offenders it pins are pre-existing and captain-scoped out (issue #103), not
+  a bug to fix in passing — see `docs/change_log.md`'s 2026-09-09 entries for the two-part fix and
+  why the long-run floor correction had to land *after* the peak-capacity one.
 - **Docs are part of the change.** After a behavior-changing commit, `doc-writer` updates
   `docs/mvp-progress.md`, `docs/change_log.md`, and `docs/architecture.md`.
 - **Coaching content is never invented.** `docs/reference/coaching/` is a port of Ian's

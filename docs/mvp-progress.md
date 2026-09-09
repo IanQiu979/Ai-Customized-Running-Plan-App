@@ -60,7 +60,15 @@
   is a completion plan rather than full preparation. A 50 km/week, 16-week intermediate plan now
   peaks at 11/24/24/24 km for 3/4/5/6 days, with the constrained three-day shape disclosed and a
   fourth running day recommended — see "Decided (2026-09-07)", "Decided (2026-09-06, later)",
-  "Blocked" and "Known debt".
+  "Blocked" and "Known debt". Generic non-deload peak weeks now derive an algebraic long-run
+  capacity candidate from the already-rendered pre-peak high-water mark, retained quality distance,
+  and easy slots; the existing safety ceilings retain final authority. With that capacity floor in
+  place, the pre-clamp `longRunStartFloor` now reads `retainedQuality` too, so a three- or four-day
+  week is no longer floored on the Q2 interval it never schedules (348 of 22,000 swept plans move,
+  each by a 1 km long-run drop). Both halves of GitHub issue #99 have landed. The sweep's residual
+  770 broad peak-below-pre-peak-loading and 470 literal peak-below-base offenders are pre-existing,
+  unchanged by either fix, and stay tracked by GitHub issue #103 — the captain scoped this pair to
+  a zero-new-regression gate, not a curve redesign.
   The Pro/Elite personalization prompt is built, bound, and tested
   (2026-08-10) but has **never made a live model call**: `ANTHROPIC_API_KEY` is unset everywhere,
   so paid-tier requests still serve the honest, quota-exempt template fallback. That key is the
@@ -118,11 +126,12 @@
   `[vars]` of `workers/wrangler.toml` (the committed `[env.production.vars]` value is `"false"`),
   so the captain's test pass runs with every account Elite and the quota gate bypassed. Set the
   top-level value to `"false"` before real users arrive. Recorded in "Latest — 2026-08-09".
-- **Test counts:** 778 root tests across 38 suites on `fm/v22-distance-specific-plans`, verified
-  by running `npm test` there on 2026-09-07 (after the rebase onto #88); 511 across 32 suites on
+- **Test counts:** 785 root tests across 39 suites on `fm/v22-3day-peak-below-base`, verified by
+  running `npm test` there on 2026-09-09 (778 across 38 suites on
+  `fm/v22-distance-specific-plans`, 2026-09-07, after the rebase onto #88); 511 across 32 suites on
   `fm/v22-redesign-theme-onboarding` (2026-09-04); `main`'s figure is the 469 across 29 suites
   recorded in the 2026-09-01 and 2026-09-03 entries below. 141 `workers/` tests across 7 files
-  (`npm --prefix workers test`, verified 2026-09-07). Typecheck clean on both sides and root lint clean (`workers/` has no lint script — its
+  (`npm --prefix workers test`, verified 2026-09-09). Typecheck clean on both sides and root lint clean (`workers/` has no lint script — its
   gate is typecheck + test). The dated entries below record each point in time's counts — this line
   is the current one.
 - **Verified by hand on an iOS 26.5 simulator**, scoped to the 2026-08-15 check: Home in both the
@@ -132,7 +141,10 @@
 
 ---
 
-**Last updated:** 2026-09-03 (later) — the visual system was replaced again. **Instrument** — a
+**Last updated:** 2026-09-09 (later) — the two-part fix behind GitHub issue #99 is complete:
+Task 1 gave generic peak weeks an algebraic capacity floor, and Task 2 corrected
+`longRunStartFloor` to read `retainedQuality`. The visual system was replaced
+again on 2026-09-03 (later). **Instrument** — a
 near-monochrome, cool-scientific house style shared with V2.3 ("Pace AnalysisAI") — supersedes
 Trailhead, two days after Trailhead merged to `main`. Captain-approved and grilled in detail before
 the work. On `fm/v22-redesign-theme-onboarding`, **not merged**; full account in
@@ -1252,17 +1264,22 @@ intact underneath.
   discloses it (`THREE_DAY_MARATHON_DISCLAIMER`, captain-ruled 2026-09-06) and recommends a fourth
   running day; it is not hidden, but it is not a progression either. Any fix is coaching content
   (a different three-day layout or Q1 dose), so it waits on Ian.
-- 🟡 **Three-day plans: the peak phase can render below the base phase — GitHub issue #99
-  (filed 2026-09-08).** `buildGenericWeek`'s `longRunStartFloor` derives from the full `quality`
-  array rather than `retainedQuality`, so at three and four running days the long-run candidate is
-  floored on a Q2 interval session the week does not schedule. Correcting the derivation was tried
-  and reverted on this branch: a 22,000-plan sweep showed 518 plans move, no long run ever moves
-  up, the largest long-run drop is 3 km, and 3-day weekly volume falls by up to 6 km — enough for a
-  peak week to render below its own base weeks (regular / 5K / 3 days / 20 km per week / 24 weeks:
-  weeks 17–19 go from 9/9/9 km long runs in 23/24/24 km weeks to 6/7/8 km in 17/18/20 km weeks).
-  The wrong floor is masking a genuine 3-day progression undershoot — the single easy run is itself
-  capped at the long run — so both must be fixed together, which is coaching-visible and waits on
-  Ian.
+- 🟢 **Resolved 2026-09-09: the retained-quality floor correction landed — GitHub issue #99
+  (filed 2026-09-08), Task 2 of two.** `buildGenericWeek`'s `longRunStartFloor` now derives from
+  `retainedQuality` rather than the full `quality` array, so at three and four running days the
+  long-run candidate is no longer floored on a Q2 interval session the week does not schedule. It
+  could only land after Task 1: the inflated floor was masking the peak-progression undershoot that
+  Task 1's `peakCapacityLongRunKm` now covers. Measured on the 22,000-plan sweep, 348 plans move
+  and long runs drop 1 km where the unscheduled Q2 had been setting the floor; the 24-week witness
+  (peak weeks 17–19 at 23/24/24 km with 9/9/9 km long runs) is unchanged, and the exact-membership
+  mask gate passes, so no plan entered the offender set. Nobody has confirmed the GitHub issue is
+  closed.
+- 🟡 **The pre-existing peak-below-base offenders are still there — GitHub issue #103.** After both
+  tasks the 22,000-plan sweep still reports **770** broad "peak below pre-peak loading" and **470**
+  literal "peak below base" plans (pre-Task-1: 954 broad, 470 literal). They predate both fixes and
+  were explicitly out of scope per the captain's 2026-09-09 decision, which scoped this pair to a
+  zero-new-regression gate rather than a curve/phase redesign. Closing them is a curve and phase
+  question, so it waits on Ian.
 - 🟡 **The client's and the Worker's `better-auth` versions must match, and only the lockfile
   holds them together (2026-09-05).** They are two separate npm projects sharing one wire format
   (cookie envelope, `/sign-in/social` state, session payload). During the

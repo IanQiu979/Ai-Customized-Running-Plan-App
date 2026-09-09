@@ -5,6 +5,55 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-09-09 (later) — the retained-quality long-run floor lands (Task 2)
+
+Branch `fm/v22-3day-peak-below-base`, on top of Task 1's `f956d11` (the entry below). That entry
+recorded the `retainedQuality` floor correction as still pending under **GitHub issue #99**; this
+is that correction, and it closes the pending half of the pair.
+
+- **`buildGenericWeek`'s `longRunStartFloor` now derives from `retainedQuality`, not the full
+  `quality` array.** At three or four running days only Q1 is retained (source § 6), so the old
+  derivation floored the pre-clamp long-run candidate on a Q2 interval session the layout never
+  schedules — inflating it for exactly those layouts. The correction was held back out of the
+  previous PR because that inflated floor was *masking* the 3-day peak-progression undershoot;
+  Task 1's `peakCapacityLongRunKm` now holds the peak floor, so the start floor can safely read the
+  week it actually builds.
+- **Plan shapes do move, in one direction and by one kilometre.** On the same 22,000-plan sweep
+  (5K/10K/half/marathon/no-race × 5 experience levels × 3–7 days × 10–110 km per week ×
+  6/8/10/12/14/16/20/24 weeks, with and without a recent 10K time), **348 of 22,000 plans change**:
+  long-run distances drop 1 km where an unscheduled Q2 had been setting the floor.
+- **Zero new regressions, by membership and not just by count.** Broad "peak below pre-peak
+  loading" offenders hold at **770** and literal "peak below base" at **470**, unchanged from
+  Task 1's baseline (pre-Task-1: 954 broad, 470 literal), and the committed exact-membership mask
+  gate — the "records the exact Task 1 matrix baseline for the Task 2 zero-new-regression
+  comparison" test — passes, so no plan enters the offender set that was not already in it.
+- **The residual 470 literal / 770 broad offenders are pre-existing and out of scope.** They
+  predate both fixes; the captain's 2026-09-09 decision scoped this pair to a zero-new-regression
+  gate, not a curve/phase redesign. They stay owned by **GitHub issue #103**.
+- **Progression suite.** The 24-week guard is renamed *"holds the 24-week witness across the
+  retained-quality floor correction"* — its pinned peak weeks 17–19 at 23/24/24 km with 9/9/9 km
+  long runs are **unchanged** by this task, and that stability is the assertion. Two tests added: a
+  three-day peak week's long run is floored against the TR session the week actually schedules
+  (4 km inside an 11 km week, where the old floor produced 5 km), and that same plan's peak volume
+  stays at or above its own base high-water mark.
+- Gates clean: root `npm run typecheck && npm run lint && npm test` (39 suites, 785 tests) and
+  `npm --prefix workers run typecheck && npm --prefix workers test` (7 files, 141 tests).
+
+## 2026-09-09 — generic peak-week capacity progression (Task 1)
+
+- Generic non-deload peak weeks now derive the minimum long-run capacity candidate needed for the
+  existing easy-run ceiling to carry the already-rendered pre-peak high-water mark:
+  `Math.ceil((peakTrainingWeekKm - qualityKm) / (easyCount + 1))`. The candidate is folded into
+  `longRunFromCurve` before `clampLongRun`; the existing safety ceilings retain final authority.
+  Existing rendered state continues into subsequent peak-deload and taper weeks.
+- The dedicated progression suite covers the 20-week regular / 5K / 3-day / 20 km/week / no-recent-
+  time witness, the 24-week guard (peak weeks 17–19 at 23/24/24 km with 9/9/9 km long runs), and
+  an exact 22,000-plan matrix. Task 1 records 770 broad peak-below-pre-peak-loading offenders as
+  the accepted baseline for the zero-new-regression gate; the pre-existing absolute baseline is
+  tracked separately by GitHub issue #103.
+- The `retainedQuality`-based `longRunStartFloor` correction remains pending under issue #99 and
+  must land only after this progression stage is verified. It is not part of this change.
+
 ## 2026-09-07 (later) — the no-recent-time marathoner is bounded; the readiness path is surfaced
 
 Branch `fm/v22-distance-specific-plans`, commit `bd2b0b6`, on top of the squashed `6a9f4a7` (the
