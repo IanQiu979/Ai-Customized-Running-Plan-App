@@ -26,6 +26,8 @@
 
 import type { Engine, IntakeResponses, Plan, Tier } from '../../../src/lib/planTypes';
 import type { GoalType, RaceDistance } from '../../../src/lib/planTypes';
+import { buildLibraryPlan } from '../../../src/lib/planLibrary/engine';
+import { NO_RACE_DISTANCE_MESSAGE } from '../../../src/lib/planLibrary/openQuestions';
 import { buildTemplatePlan } from '../../../src/lib/planTemplates';
 import { MAX_PLAN_WEEKS } from '../../../src/lib/planRequest';
 import type { ModelCaller } from './model';
@@ -140,6 +142,36 @@ export function createTemplateSkeletonBuilder(): SkeletonBuilder {
       const durationWeeks =
         input.durationWeeks ?? (input.raceDate ? weeksUntilRace(input.raceDate, input.now) : 1);
 
+      // Captain's ruling, 2026-09-06: the plan engine splits by tier. **Free is served entirely
+      // from the 40-plan deterministic library** (`src/lib/planLibrary/`, ported from
+      // `planning/research/plan-blueprint-examples.md`); paying tiers keep the AI curve generator,
+      // for which this template plan is the skeleton. The library is not a fallback for the
+      // generator and not a parameter source for it — the two never meet.
+      if (input.tier === 'free') {
+        const library = buildLibraryPlan({
+          intake: input.intake,
+          goalType: input.goalType,
+          durationWeeks,
+          ...(input.raceDistance !== undefined ? { raceDistance: input.raceDistance } : {}),
+          ...(input.raceDate !== undefined ? { raceDate: input.raceDate } : {}),
+          tierAtGeneration: input.tier,
+        });
+        if (library.ok) return { ok: true, plan: library.plan };
+        // The one uncovered request shape: a runner who named no race distance at all. Ian's Q1
+        // ruling (2026-09-10) is that Free **requires** a target distance — the register has no
+        // plan for that runner, none is invented, and the request must NOT fall through to
+        // `buildTemplatePlan`, which would put a Free user back on the paid tiers' skeleton and
+        // undo the 2026-09-06 tier split. Refusing here costs the runner nothing: the flow
+        // releases the reservation before returning, so no quota slot is charged, and the message
+        // tells them how to fix it. Paid tiers keep the optional-race behaviour of the captain's
+        // 2026-08-15 report, unchanged, on the path below.
+        return {
+          ok: false,
+          reason: 'invalid_request',
+          message: NO_RACE_DISTANCE_MESSAGE,
+        };
+      }
+
       const plan = buildTemplatePlan({
         intake: input.intake,
         goalType: input.goalType,
@@ -147,7 +179,10 @@ export function createTemplateSkeletonBuilder(): SkeletonBuilder {
         raceDistance: input.raceDistance,
         raceDate: input.raceDate,
         tierAtGeneration: input.tier,
-        density: input.tier === 'free' ? 'free' : 'paid',
+        // Only Pro and Elite reach here — Free either got a library plan above or was refused for
+        // want of a target distance — so the density is always `'paid'`. This is the AI
+        // generator's skeleton, not a plan anyone is served directly.
+        density: 'paid',
       });
 
       return { ok: true, plan };

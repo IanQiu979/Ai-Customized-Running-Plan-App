@@ -48,16 +48,28 @@ protocol.
 
 | Tier | Plans | Engine | Quality |
 |---|---|---|---|
-| Free | 1 total | Template only — no AI call | Basic hard-coded plan for the chosen distance/duration |
+| Free | 1 total | The 40-plan deterministic library (`src/lib/planLibrary/`) — no AI call | A complete coach-authored week-by-week plan for the runner's distance, experience track and runner profile, in effort language, with no numeric pace or HR zone |
 | Pro | 3 / period | Template skeleton + Claude personalization | Personalized paces, HR zones, warm-ups/drills, coach-style "why" per week |
 | Elite | 10 / period | Same skeleton, customized far more heavily — richest prompt | Everything in Pro plus a per-workout "why" — the richest personalization prompt, nothing more. **Extras (mid-plan adjustment, race-day strategy, deeper periodization) are cut for MVP (decision, 2026-07-10)**; `Plan.extras` (`PlanSection[]`) can carry them later without a schema change. |
 
-**All three tiers build on the same coach-authored template skeleton. The skeleton is never
-removed.** What scales across tiers is how much of the runner the plan reasons about and how much
-it explains — never how much of the coach's judgment is taken away.
+**The engine splits by tier (captain's ruling, 2026-09-06).** Free is served *entirely* from the
+40-plan deterministic library; Pro and Elite build on the coach-authored template skeleton, which is
+never removed from their path. The library is **not** a fallback for the generator and **not** a
+parameter source for it — the two never meet. What scales across the paid tiers is how much of the
+runner the plan reasons about and how much it explains — never how much of the coach's judgment is
+taken away.
 
-- **Free**: select and lightly parametrize the skeleton from `src/lib/planTemplates.ts`.
-  No AI call at all for this tier; effort *descriptions* only.
+- **Free**: `src/lib/planLibrary/`'s `buildLibraryPlan`, a port of
+  `planning/research/plan-blueprint-examples.md`'s "V1 deterministic template library" — 40 plan IDs
+  across four distances, five experience doses and two runner-profile lanes, resolved through its
+  § 20 order. No AI call at all for this tier; effort *descriptions* only. Six coaching decisions
+  the source document does not make are isolated in `planLibrary/openQuestions.ts`, all six ruled
+  by Ian on 2026-09-10 — see
+  [`coaching/free-engine-open-questions.md`](coaching/free-engine-open-questions.md).
+  **Free requires a target race distance**, because the library is organised by distance (Q1). A
+  Free request naming none is refused with `invalid_request` and the quota reservation is released,
+  so it costs nothing; it is never defaulted onto a calendar or handed to `planTemplates.ts`. A race
+  *date* remains optional on every tier.
 - **Pro**: the skeleton supplies the structural shape for the chosen distance/duration; Claude
   personalizes workouts, paces, HR zones, and a weekly "why" within it.
 - **Elite**: the same skeleton, customized far more heavily — the richest prompt available (injury
@@ -96,7 +108,9 @@ is unit-tested with no network and no Anthropic spend:
    `workout-library.md`, Day 1–7 slots with real rest days. A plan with no target race is a first
    class shape, not a 5K in disguise: no invented distance, no taper phase, and a final week that
    is never a deload — see `src/lib/planTemplates.ts` and its `noRace` suite.
-6. **Free tier stops here.** Template + effort descriptions. No AI call, ever.
+6. **Free tier stops here** — and, since 2026-09-09, took a different road to get here: its
+   plan came from `planLibrary/`, not from step 5's skeleton. Library plan + effort
+   descriptions. No AI call, ever.
 7. **Pro/Elite — one Claude call** (`claude-sonnet-5`, verified live 2026-07-10). **SHIPPED
    2026-08-10, in a deliberately narrower shape than the paragraph below originally sketched** —
    read the correction first, then the original design intent it replaces.

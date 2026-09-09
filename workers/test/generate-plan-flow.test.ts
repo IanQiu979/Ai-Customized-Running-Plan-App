@@ -272,6 +272,21 @@ describe('the skeleton', () => {
     expect(store.settled).toHaveLength(0);
   });
 
+  it('releases the reservation and charges nothing when Free named no race distance', async () => {
+    // Ian's Q1 ruling (2026-09-10): Free requires a target distance. The refusal must cost the
+    // runner nothing — Free's allowance is one plan for life (`tierLimits.ts`'s `FREE_IS_LIFETIME`),
+    // so a refusal that consumed it would be unrecoverable.
+    const { deps, store } = makeDeps({
+      skeleton: { ok: false, reason: 'invalid_request', message: 'name a target distance' },
+    });
+
+    const outcome = await generatePlan(USER, VALID_REQUEST, deps);
+
+    expect(outcome).toEqual({ kind: 'invalid_request', message: 'name a target distance' });
+    expect(store.released).toEqual([{ planId: 'plan-1', reason: 'skeleton_invalid_request' }]);
+    expect(store.settled).toHaveLength(0);
+  });
+
   it('releases the reservation on an unexpected throw', async () => {
     const { deps, store } = makeDeps({
       skeleton: async () => {

@@ -15,6 +15,7 @@ import {
   createUnavailableSkeletonBuilder,
   type PromptBuilder,
 } from '../src/lib/planEngine';
+import { NO_RACE_DISTANCE_MESSAGE } from '../../src/lib/planLibrary/openQuestions';
 import { INTAKE, makePlan } from './fakes';
 
 const INPUT = { skeleton: makePlan(), tier: 'pro' as const, intake: INTAKE };
@@ -131,11 +132,13 @@ describe('createUnavailableSkeletonBuilder', () => {
 
 describe('createTemplateSkeletonBuilder', () => {
   it('builds a real plan from an explicit duration', async () => {
+    // Free needs a target distance (Ian's Q1 ruling, 2026-09-10) — the library is organised by
+    // distance — but not a race date. This is the "training, no race booked" Free runner.
     const result = await createTemplateSkeletonBuilder().build({
       tier: 'free',
       goalType: 'duration',
       durationWeeks: 8,
-      intake: INTAKE,
+      intake: { ...INTAKE, raceDistance: '10k' },
       now: '2026-08-01T00:00:00.000Z',
     });
 
@@ -191,6 +194,7 @@ describe('createTemplateSkeletonBuilder', () => {
   it('gates numeric pace fields on tier density — free gets none, pro gets them', async () => {
     const intakeWithRecent = {
       ...INTAKE,
+      raceDistance: '5k' as const,
       recentPerformance: { distance: '5k' as const, timeSec: 1200 },
     };
 
@@ -227,10 +231,15 @@ describe('createTemplateSkeletonBuilder — no race named anywhere', () => {
    * thing you need to input." Home used to refuse to generate without one. `INTAKE` here has no
    * `raceDistance`, which is exactly that runner — the request must produce a real plan, and it
    * must not have a 5K (or any other distance) invented for it on the way through.
+   *
+   * **That rule now applies to the paid tiers only.** Ian's Q1 ruling (2026-09-10) requires a
+   * target distance on Free, because Free is served entirely from the 40-plan library and the
+   * library is organised by distance. A race *date* stays optional on every tier — it is the
+   * distance, not the booking, that Free needs.
    */
-  it('builds a real plan for a runner who named no race', async () => {
+  it('builds a real plan for a paid runner who named no race', async () => {
     const result = await createTemplateSkeletonBuilder().build({
-      tier: 'free',
+      tier: 'pro',
       goalType: 'duration',
       durationWeeks: 12,
       intake: INTAKE,
@@ -242,6 +251,40 @@ describe('createTemplateSkeletonBuilder — no race named anywhere', () => {
     expect(result.plan.weeks).toHaveLength(12);
     expect(result.plan.title).toBe('12-Week Running Plan');
     expect(result.plan.weeklyLoad.every((km) => km > 0)).toBe(true);
+  });
+
+  it('refuses a Free request with no distance rather than inventing or borrowing one', async () => {
+    // Two wrong answers this guards against: defaulting onto the 10K calendar (Ian ruled it out
+    // explicitly), and falling through to `buildTemplatePlan`, which would put a Free user back on
+    // the paid tiers' skeleton and undo the 2026-09-06 tier split. `invalid_request` makes the
+    // flow release the reservation, so the refusal costs the runner no quota.
+    const result = await createTemplateSkeletonBuilder().build({
+      tier: 'free',
+      goalType: 'duration',
+      durationWeeks: 12,
+      intake: INTAKE,
+      now: '2026-08-01T00:00:00.000Z',
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.reason).toBe('invalid_request');
+    expect(result.message).toBe(NO_RACE_DISTANCE_MESSAGE);
+  });
+
+  it('still serves a Free runner who named a distance but no race date', async () => {
+    const result = await createTemplateSkeletonBuilder().build({
+      tier: 'free',
+      goalType: 'duration',
+      durationWeeks: 12,
+      intake: { ...INTAKE, raceDistance: 'half' },
+      now: '2026-08-01T00:00:00.000Z',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.plan.raceDate).toBeUndefined();
+    expect(result.plan.weeks).toHaveLength(12);
   });
 
   it('leaves the race fields off the plan instead of defaulting them to 5K', async () => {
@@ -264,7 +307,7 @@ describe('createTemplateSkeletonBuilder — no race named anywhere', () => {
     // reached through a silent `?? '5k'`, winding a general-fitness runner down for a race that
     // did not exist.
     const result = await createTemplateSkeletonBuilder().build({
-      tier: 'free',
+      tier: 'pro',
       goalType: 'duration',
       durationWeeks: 12,
       intake: INTAKE,
