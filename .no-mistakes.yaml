@@ -1,0 +1,4 @@
+# no-mistakes repository config. This repo has no CI checks (no GitHub Actions workflows), so the
+# gate's CI step would otherwise wait for checks that never register. Read from the trusted
+# default branch only, so it takes effect for runs started after this file is on main.
+no_ci: true
