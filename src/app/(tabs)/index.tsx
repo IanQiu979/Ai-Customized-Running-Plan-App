@@ -73,6 +73,7 @@ export default function HomeScreen() {
   const router = useRouter();
 
   const [checkingIntake, setCheckingIntake] = useState(true);
+  const [hasLoadedIntake, setHasLoadedIntake] = useState(false);
   const [intake, setIntake] = useState<IntakeResponses | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -137,6 +138,7 @@ export default function HomeScreen() {
           const { intake: fetchedIntake } = await getIntake();
           if (cancelled) return;
           setIntake(fetchedIntake);
+          setHasLoadedIntake(true);
         } catch (fetchError) {
           // Only `loadError` — the last known intake stays. A failed fetch is not an answer, and
           // rendering the empty state ("Answer a few questions… You only do this once") tells a
@@ -233,7 +235,7 @@ export default function HomeScreen() {
           */}
           {loadError && <Text style={[styles.error, { color: theme.status.error }]}>{loadError}</Text>}
 
-          {checkingIntake ? (
+          {checkingIntake && !hasLoadedIntake ? (
             <ActivityIndicator color={theme.text.primary} style={styles.checkingSpinner} />
           ) : !hasIntake ? (
             <View style={styles.section}>
