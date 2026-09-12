@@ -61,7 +61,7 @@ distribution was absurd, the long run barely moved while the easy runs collapsed
 - **Observed, not fixed (out of this item's lane):** the Free library under a declared injury
   (`H1`) applies the injury volume reduction every week on top of a `lastLoadingKm` that already
   carries it, so a 35 km/week runner's plan collapses 24 → 26 → 24 → 16 → … → 10 km across 14 weeks
-  and its rest weeks land ~32% down. Filed as an issue for the captain.
+  and its rest weeks land ~32% down. Filed as GitHub issue #106 for the captain.
 
 ## 2026-09-10 — the Free library engine's six coaching questions, all answered
 
