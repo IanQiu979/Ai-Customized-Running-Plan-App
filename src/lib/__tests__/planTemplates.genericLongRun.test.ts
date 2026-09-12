@@ -446,9 +446,11 @@ describe('generic path — the long run must still be able to grow', () => {
     // 10K curve's own volume (17, 19, 21, 17d, 23, 26, 26) and never exceeds floor(0.275 × week).
     // On the stretched-5K curve this plan used to read, F peaked at 5 km and ended where it began;
     // the 10K curve climbs through the block, so the long run climbs with it. Pinned so a change
-    // that breaks this correct behaviour still fails something.
+    // that breaks this correct behaviour still fails something. Week 4 is the deload: since
+    // 2026-09-12 a rest week's long run is `deloadLongRun` of the preceding loading week's
+    // (0.65 × 5 → 3), not a point on the curve.
     const series = longRunSeries(PROFILES.find((p) => p.name.startsWith('F'))!);
-    expect(series.map((point) => point.longRunKm)).toEqual([4, 5, 5, 5, 6, 7, 7]);
+    expect(series.map((point) => point.longRunKm)).toEqual([4, 5, 5, 3, 6, 7, 7]);
     const cap = longRunShareCap('beginner', 4, '10k');
     for (const point of series.filter((p) => !p.isDeload)) {
       expect(point.longRunKm).toBeLessThanOrEqual(Math.floor(cap * point.volumeKm));
@@ -457,9 +459,10 @@ describe('generic path — the long run must still be able to grow', () => {
 
   it('pins profile J to the trajectory the share cap actually allows it', () => {
     // Same shape as F: a 3-day beginner at 15 km/wk sits on the 0.3667 cap at a flat 11 km week,
-    // so a flat 4 km long run is the cap holding it, not the spike ceiling freezing it.
+    // so a flat 4 km long run is the cap holding it, not the spike ceiling freezing it. Week 4 is
+    // the deload — `deloadLongRun(4)` = 2.6 → 3 — and is the one entry the cap does not set.
     const series = longRunSeries(PROFILES.find((p) => p.name.startsWith('J'))!);
-    expect(series.map((point) => point.longRunKm)).toEqual([4, 4, 4, 4, 4]);
+    expect(series.map((point) => point.longRunKm)).toEqual([4, 4, 4, 3, 4]);
     const cap = longRunShareCap('beginner', 3);
     for (const point of series.filter((p) => !p.isDeload)) {
       expect(point.longRunKm).toBe(Math.floor(cap * point.volumeKm));
@@ -539,22 +542,33 @@ describe('generic path — no run outgrows the week\'s safety-clamped long run',
   // for the final distribution, so the easy days stayed bounded by a long run that never shipped:
   // a 3-day beginner at 15 km/wk drew `ER 5 | TR 3 | LR 4` — a 5 km easy day at 41.7% of a 12 km
   // week, over its 36.7% cap, and the week's longest run by a kilometre.
+  //
+  // On a rest week the bound is the *last loading week's* long run, not the rest week's own: a
+  // rest week deliberately shortens Day 7 to 60–70% of the preceding long run (2026-09-12,
+  // `deloadLongRun`), and at three runs a week the 80% total cannot be covered by three runs of
+  // that size — bounding the easy days by it would cut the week below the deload band, from the
+  // easy runs the rule says to keep. R1c already measures a genuine deload's share cap against the
+  // last loading week, so its long run — a distance already run inside every ceiling — is the run
+  // no rest-week easy day may outgrow.
   it.each(PROFILES.map((profile) => [profile.name, profile] as const))(
     'keeps every easy run of %s at or under that week\'s long run',
     (_name, profile) => {
       const plan = buildFor(profile);
       const breaches: string[] = [];
+      let lastLoadingLongRunKm = 0;
       for (const week of plan.weeks) {
         const longRun = findLongRun(week);
         if (!longRun) continue;
+        const boundKm = week.isDeload && lastLoadingLongRunKm > 0 ? lastLoadingLongRunKm : (longRun.distanceKm ?? 0);
         for (const day of week.days.filter(isWorkout)) {
           if (day === longRun || !(day.label ?? '').startsWith('ER')) continue;
-          if ((day.distanceKm ?? 0) > (longRun.distanceKm ?? 0)) {
+          if ((day.distanceKm ?? 0) > boundKm) {
             breaches.push(
-              `week ${week.weekNumber}: ${day.label} ${day.distanceKm} km against a ${longRun.distanceKm} km long run`,
+              `week ${week.weekNumber}: ${day.label} ${day.distanceKm} km against a ${boundKm} km ${week.isDeload ? 'last-loading-week' : ''} long run`,
             );
           }
         }
+        if (!week.isDeload) lastLoadingLongRunKm = longRun.distanceKm ?? 0;
       }
       expect(breaches).toEqual([]);
     },

@@ -204,7 +204,9 @@ describe('generic peak-week capacity progression', () => {
       phase: 'peak',
       isDeload: true,
       volumeKm: 15,
-      longRunKm: 8,
+      // `deloadLongRun` of week 15's 8 km (2026-09-12): a rest week shortens Day 7 to § 9's 60–70%
+      // of the preceding long run instead of carrying the peak long run through the rest week.
+      longRunKm: 5,
     });
     expect({
       weekNumber: taper.weekNumber,

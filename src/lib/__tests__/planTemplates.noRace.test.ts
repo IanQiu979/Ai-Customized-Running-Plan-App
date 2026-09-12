@@ -1,3 +1,4 @@
+import { deloadLongRun } from '../loadRules';
 import { buildTemplatePlan } from '../planTemplates';
 import type { Day, IntakeResponses, Phase, Plan, Workout } from '../planTypes';
 
@@ -261,12 +262,17 @@ describe('a target distance with no race date', () => {
     expect(finalLongRunKm).toBe(Math.max(...longRunKm));
     expect(finalLongRunKm).toBeGreaterThanOrEqual(longRunKm[longRunKm.length - 2]);
     // Only the final week moves. The substitution keeps the curve at its full pre-taper length,
-    // so every sample position — and with it the recovery dips on the deload weeks — stays put. A
-    // shorter curve would re-scale the whole block and slide the dip onto a loading week instead.
+    // so every sample position stays put and the loading weeks around each deload keep climbing;
+    // a shorter curve would re-scale the whole block instead. The deload weeks themselves no
+    // longer read the curve at all: since 2026-09-12 a rest week's long run is `deloadLongRun` of
+    // the preceding loading week's (§ 9's 60–70%), so they are asserted against that rule, not
+    // against the curve's dip positions.
     const deloadWeeks = plan.weeks.filter((week) => week.isDeload).map((week) => week.weekNumber);
     expect(deloadWeeks).toEqual([4, 8]);
-    expect(longRunKm[3]).toBe(11);
-    expect(longRunKm[7]).toBe(14);
+    expect(longRunKm[2]).toBeLessThan(longRunKm[4]);
+    expect(longRunKm[6]).toBeLessThan(longRunKm[8]);
+    expect(longRunKm[3]).toBe(Math.round(deloadLongRun(longRunKm[2])));
+    expect(longRunKm[7]).toBe(Math.round(deloadLongRun(longRunKm[6])));
   });
 });
 
