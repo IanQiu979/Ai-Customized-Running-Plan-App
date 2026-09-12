@@ -46,18 +46,18 @@ import { useTheme } from '@/hooks/use-theme';
 const SECTIONS = [
   {
     label: 'THE INTAKE',
-    heading: 'Ten questions.',
-    body: 'Your goal, your age, how long you have been running, the days you can train and the volume you already carry. Nothing you have to look up, and nothing asked twice.',
+    heading: 'Tell us about your running.',
+    body: 'Share your goal, age, running experience, weekly training, race target, recent performance, and injuries.',
   },
   {
     label: 'THE PLAN',
-    heading: 'A week at a time.',
-    body: 'Every week comes back as Day 1 through Day 7 — runs and rest days, in order, with the paces and efforts written out. The days are unnamed on purpose: you place them on your own calendar.',
+    heading: 'See every week.',
+    body: 'Your plan shows each week’s runs and rest days; you choose the calendar days.',
   },
   {
     label: 'THE PRICE',
-    heading: 'No subscription.',
-    body: 'Your first plan is free. Nothing to log, nothing to check in on, no monthly coaching fee — just the plan, and it stays yours.',
+    heading: 'One plan is free.',
+    body: 'Pro and Elite add more plans and coaching notes, plus paces when you share a recent time.',
   },
 ] as const;
 
@@ -115,7 +115,7 @@ export default function OnboardingScreen() {
               Your training plan, built around you.
             </Text>
             <Text style={[styles.coverSupporting, { color: theme.text.secondary }]}>
-              No monthly coaching fees, no bloated app — just your plan, week by week.
+              Answer a short intake, then get a week-by-week running plan.
             </Text>
 
             {/* The scroll cue. A mono label and a hairline, not a bouncing chevron: this system

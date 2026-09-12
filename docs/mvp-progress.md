@@ -130,7 +130,11 @@
   simulator, and the signed-in screens have still never been seen at all. Note this is the dev
   server, not `npx expo export` — the static export does not inline the root `.env`, so that bundle
   throws `Missing EXPO_PUBLIC_API_BASE_URL` and never hydrates. The branch has now had a review
-  pass, and its findings were fixed (`change_log.md`, 2026-09-04).
+  pass, and its findings were fixed (`change_log.md`, 2026-09-04). **The captain's 2026-09-12
+  first-time-user audit then found the signed-out journey too wordy.** Onboarding, the auth hand-off
+  and the Intake start now use shorter copy while keeping the Instrument visuals, components,
+  layout, animation behaviour and 01/02/03 structure unchanged. Pro/Elite pace wording now makes
+  its real condition explicit: the runner must supply a recent time.
 - **The pulse trace — the redesign's signature animation — is built, and the screens do not mount
   it yet (2026-09-04, `fm/v22-redesign-animation-r2`).** `src/components/brand/PulseTraceHero.tsx`:
   an ECG-style icy-cyan trace drawing itself across its own near-black field, self-drawing on mount
@@ -603,6 +607,12 @@ from 82. Issue #22 remains open.)
       week's long run from the last loading week's and bounds its easy runs by that long run;
       `planTemplates.deload.test.ts` and `planLibrary/__tests__/engine.recovery.test.ts` sweep
       every rest week on both engines against the same three invariants. Change log 2026-09-12.
+- [x] **First-run copy reduced after the captain's 2026-09-12 audit.** The audit found that the
+      onboarding journey overloaded a stranger with detail. Its cover and 01/02/03 beats now keep
+      one headline and one support sentence each; the sign-up hand-off and Intake header are
+      shorter. The price beat remains factual: Pro/Elite add paces only when the runner shares a
+      recent time. Copy only — no font, colour, spacing, component, layout, animation or step-
+      structure change.
 - [x] **Free's plan engine is the 40-plan deterministic library (2026-09-09).**
       `src/lib/planLibrary/` — `registry.ts` (the 40 plan IDs, the workout vocabulary, the
       experience-dose ladder and operating limits, the weekly-volume state machine, the 3–7-day

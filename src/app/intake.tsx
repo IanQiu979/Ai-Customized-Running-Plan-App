@@ -106,12 +106,12 @@ export default function IntakeScreen() {
 
   const intakeHeaderOptions = {
     headerShown: true,
-    headerTitle: 'Intake',
+    headerTitle: 'About your running',
     headerShadowVisible: false,
     headerStyle: { backgroundColor: theme.surface.base },
     // The one place in the app that renders a native header *title*. The nav theme deliberately
     // leaves its `fonts` block stock (`constants/navigation-theme.ts` says why), so without this
-    // the word "Intake" would be the only San Francisco / Roboto glyphs on the screen.
+    // the header title would be the only San Francisco / Roboto glyphs on the screen.
     headerTitleStyle: { fontFamily: FontFamily.body.semiBold, fontSize: FontSize.md },
     headerRight: () => (
       <IntakeExitAction

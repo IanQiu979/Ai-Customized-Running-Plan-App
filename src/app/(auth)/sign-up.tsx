@@ -107,7 +107,7 @@ export default function SignUpScreen() {
               <View style={styles.formHeader}>
                 <Text style={[styles.title, { color: theme.text.primary }]}>Create account</Text>
                 <Text style={[styles.subtitle, { color: theme.text.secondary }]}>
-                  Ten questions, then your first plan.
+                  A short running intake comes next.
                 </Text>
               </View>
 

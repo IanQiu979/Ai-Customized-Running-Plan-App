@@ -5,6 +5,19 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-09-12 — first-run copy reduced after the captain's audit
+
+- **Cause:** the captain's first-time-user audit found that the onboarding journey gave a stranger
+  too much information at once. The signed-out route through onboarding and auth into the Intake
+  start was inventoried before rewriting it.
+- **Onboarding now says only what the runner needs to continue.** The cover and each existing
+  01/02/03 beat keep one headline and one supporting sentence; the sign-up hand-off and Intake
+  header are shorter too. The plan description still explains weeks, runs and rest days, while the
+  tier copy now says accurately that Pro/Elite pace guidance depends on the runner supplying a
+  recent time.
+- **Copy only.** Instrument fonts, colours and spacing, the existing components and layout, the
+  pulse-trace animation behaviour, and the 01/02/03 structure are unchanged.
+
 ## 2026-09-12 — rest weeks shorten the long run first, on both engines
 
 Branch `fm/v22-deload-rest-week-bug`. The captain's 2026-09-12 user-audit item: a 10 km plan
