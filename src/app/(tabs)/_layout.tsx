@@ -1,9 +1,9 @@
 import { Tabs } from 'expo-router';
-import { StyleSheet, Text, View, type ColorValue } from 'react-native';
+import { StyleSheet, View, type ColorValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { TabBarIcon, type TabIconName } from '@/components/nav/TabBarIcon';
-import { FontFamily, FontSize, Spacing, Stroke, Tracking } from '@/constants/theme';
+import { Spacing, Stroke } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 /**
@@ -11,31 +11,25 @@ import { useTheme } from '@/hooks/use-theme';
  * route outside this group by design: the plan view is a full-screen destination, not a tab.
  *
  * The bar (`docs/design/instrument-visual-system.md`): flat `surface.raised`, one top
- * hairline, no shadow, and four thin-stroke line icons — the previous pass rendered
- * `tabBarIcon: () => null` and shipped no icons at all. The active tab draws its icon and label
- * in `text.primary` above an **ink tick**, a short hard rule rather than a filled pill or a
- * coloured dot; inactive tabs use `progress.informative`, a token that exists precisely because
- * this is a meaningful navigational state rather than decoration.
+ * hairline, no shadow, and four thin-stroke line icons. The active tab draws its icon above an
+ * **ink tick**, a short hard rule rather than a filled pill or a coloured dot; inactive tabs use
+ * `progress.informative`, a token that exists precisely because this is a meaningful navigational
+ * state rather than decoration. Visible labels are intentionally omitted; each tab keeps an
+ * explicit screen-reader label.
  *
  * **The signal colour never touches this bar.** One accent, one forward-action per screen, and
  * navigation is not that action.
  */
 /**
- * The bar has to be told how tall it is. React Navigation sizes it for a stock item — a compact
- * icon over a caption — and this system's item is taller than that: `Spacing.two` of top padding, a
- * `Spacing.four` icon, the mono label, and the active tick beneath it. Left at the default the
- * extra ran off the bottom of the bar and the labels were sheared in half; measured in the web
- * build 2026-09-01, the item's content ended 19pt below the bar's own bottom edge.
- *
- * This is the smallest height that fits the item *inside its own padding box* rather than merely
- * inside the bar: `Spacing.seven + Spacing.one` stops the shearing but leaves the tick sitting
- * exactly on the bar's bottom edge, which reads as clipped on a device with no home indicator.
+ * The icon-only bar uses the system's 48pt control field. Its `Spacing.four` icon and active tick
+ * fit inside that field with the tokenized item padding and gap; the removed caption no longer
+ * needs the previous 72pt allowance.
  *
  * The safe-area inset is added on top (and repeated as padding) because overriding `height` opts
  * out of the height React Navigation would otherwise compute *including* that inset — without it
- * the labels would sit under the home indicator on a notched phone.
+ * the icon controls would sit under the home indicator on a notched phone.
  */
-const TabBarContentHeight = Spacing.seven + Spacing.two;
+const TabBarContentHeight = Spacing.six;
 
 export default function TabLayout() {
   const theme = useTheme();
@@ -73,35 +67,43 @@ export default function TabLayout() {
 function tabOptions(title: string, icon: TabIconName) {
   return {
     title,
+    tabBarShowLabel: false,
+    tabBarAccessibilityLabel: title,
     // React Navigation's bottom-tabs types this callback's `color` as `ColorValue`, which also
     // covers platform-color objects; this app's theme tokens (`theme.text.primary`,
     // `theme.progress.informative`) are always plain hex strings, never `PlatformColor()`, so the
     // cast down to `string` for `TabBarIcon`'s SVG stroke is safe.
-    tabBarIcon: ({ color }: { color: ColorValue }) => <TabBarIcon name={icon} color={color as string} />,
-    tabBarLabel: ({
-      focused,
-      color,
-      children,
-    }: {
-      focused: boolean;
-      color: ColorValue;
-      children: string;
-    }) => (
-      <TabLabel focused={focused} color={color as string}>
-        {children}
-      </TabLabel>
+    tabBarIcon: ({ focused, color }: { focused: boolean; color: ColorValue }) => (
+      <TabIcon focused={focused} color={color as string} name={icon} />
     ),
   };
 }
 
-/** The active state: a short ink tick beneath the label. Never a filled pill, never a coloured
+/** The active state: a short ink tick beneath the icon. Never a filled pill, never a coloured
  * dot, and never the signal colour. */
-function TabLabel({ focused, color, children }: { focused: boolean; color: string; children: string }) {
+function TabIcon({
+  focused,
+  color,
+  name,
+}: {
+  focused: boolean;
+  color: string;
+  name: TabIconName;
+}) {
   const theme = useTheme();
   return (
-    <View style={styles.labelWrap}>
-      <Text style={[styles.label, { color }]}>{children}</Text>
-      <View style={[styles.tick, { backgroundColor: focused ? theme.text.primary : 'transparent' }]} />
+    <View
+      style={styles.iconWrap}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
+      <TabBarIcon name={name} color={color} />
+      <View
+        style={[
+          styles.tick,
+          { backgroundColor: theme.text.primary, opacity: focused ? 1 : 0 },
+        ]}
+      />
     </View>
   );
 }
@@ -110,15 +112,9 @@ const styles = StyleSheet.create({
   item: {
     paddingTop: Spacing.two,
   },
-  labelWrap: {
+  iconWrap: {
     alignItems: 'center',
     gap: Spacing.one,
-  },
-  label: {
-    fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.xs,
-    letterSpacing: Tracking.label,
-    textTransform: 'uppercase',
   },
   tick: {
     width: Spacing.three,

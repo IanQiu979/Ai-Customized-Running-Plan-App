@@ -1,9 +1,17 @@
 import type { ReactNode } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from '@/components/layout/ScreenHeader';
-import { FontFamily, FontSize, Spacing, Stroke, Tracking } from '@/constants/theme';
+import {
+  FontFamily,
+  FontSize,
+  PressedOpacity,
+  Spacing,
+  Stroke,
+  Tracking,
+} from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { GlossaryEntry, StructureSymbolEntry } from '@/lib/notation';
 import { RUN_TYPE_ABBREVIATIONS, STRUCTURE_SHORTHAND, UNABBREVIATED_RUN_TYPES } from '@/lib/notation';
@@ -59,53 +67,102 @@ function GlossarySection({ title, children }: { title: string; children: ReactNo
   const theme = useTheme();
   return (
     <View style={styles.section}>
-      <Text style={[styles.sectionTitle, { color: theme.text.secondary }]}>{title.toUpperCase()}</Text>
+      <Text
+        accessibilityRole="header"
+        style={[styles.sectionTitle, { color: theme.text.secondary }]}
+      >
+        {title.toUpperCase()}
+      </Text>
       <View style={[styles.sectionBody, { borderTopColor: theme.hairline }]}>{children}</View>
     </View>
   );
 }
 
-/** "ER, Easy Run — Comfortable, conversational-pace aerobic run — the base of every week." */
+/** "ER, Easy Run", expanding to the full description inline. */
 function RunTypeRow({ code, entry }: { code: string; entry: GlossaryEntry }) {
   const theme = useTheme();
+  const [expanded, setExpanded] = useState(false);
   const isAbbreviated = code !== entry.fullName;
-  const accessibilityLabel = isAbbreviated
-    ? `${code}, ${entry.fullName} — ${entry.description}`
-    : `${entry.fullName} — ${entry.description}`;
+  const accessibilityLabel = isAbbreviated ? `${code}, ${entry.fullName}` : entry.fullName;
 
   return (
-    <View
-      style={[styles.row, { borderBottomColor: theme.hairline }]}
-      accessible
-      accessibilityLabel={accessibilityLabel}
-    >
-      <Text style={styles.heading}>
-        {isAbbreviated ? (
-          <>
-            <Text style={[styles.code, { color: theme.text.primary }]}>{code}</Text>
-            <Text style={[styles.fullName, { color: theme.text.secondary }]}> · </Text>
-          </>
-        ) : null}
-        <Text style={[styles.fullName, { color: theme.text.primary }]}>{entry.fullName}</Text>
-      </Text>
-      <Text style={[styles.description, { color: theme.text.secondary }]}>{entry.description}</Text>
+    <View style={[styles.row, { borderBottomColor: theme.hairline }]}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
+        accessibilityHint={expanded ? 'Collapses this definition' : 'Expands this definition'}
+        accessibilityState={{ expanded }}
+        onPress={() => setExpanded((value) => !value)}
+        style={({ pressed }) => [styles.rowToggle, pressed && styles.pressed]}
+      >
+        <Text style={styles.heading}>
+          {isAbbreviated ? (
+            <>
+              <Text style={[styles.code, { color: theme.text.primary }]}>{code}</Text>
+              <Text style={[styles.fullName, { color: theme.text.secondary }]}> · </Text>
+            </>
+          ) : null}
+          <Text style={[styles.fullName, { color: theme.text.primary }]}>{entry.fullName}</Text>
+        </Text>
+        <DisclosureArrow expanded={expanded} color={theme.text.secondary} />
+      </Pressable>
+      {expanded ? (
+        <Text style={[styles.description, styles.expandedBody, { color: theme.text.secondary }]}>
+          {entry.description}
+        </Text>
+      ) : null}
     </View>
   );
 }
 
-/** "WU — Warm-up." */
+/** "WU", expanding to its meaning inline. */
 function StructureRow({ symbol, entry }: { symbol: string; entry: StructureSymbolEntry }) {
   const theme = useTheme();
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <View style={[styles.row, { borderBottomColor: theme.hairline }]}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={symbol}
+        accessibilityHint={expanded ? 'Collapses this definition' : 'Expands this definition'}
+        accessibilityState={{ expanded }}
+        onPress={() => setExpanded((value) => !value)}
+        style={({ pressed }) => [styles.rowToggle, pressed && styles.pressed]}
+      >
+        <Text style={[styles.symbol, { color: theme.text.primary }]}>{symbol}</Text>
+        <DisclosureArrow expanded={expanded} color={theme.text.secondary} />
+      </Pressable>
+      {expanded ? (
+        <Text
+          style={[
+            styles.description,
+            styles.expandedBody,
+            styles.structureBody,
+            { color: theme.text.secondary },
+          ]}
+        >
+          {entry.meaning}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+/** A local, drawn disclosure arrow whose size and stroke come from the Instrument tokens. */
+function DisclosureArrow({ expanded, color }: { expanded: boolean; color: string }) {
   return (
     <View
-      style={[styles.row, styles.compactRow, { borderBottomColor: theme.hairline }]}
-      accessible
-      accessibilityLabel={`${symbol} — ${entry.meaning}`}
+      style={styles.arrow}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
     >
-      <Text style={[styles.symbol, { color: theme.text.primary }]}>{symbol}</Text>
-      <Text style={[styles.description, styles.symbolMeaning, { color: theme.text.secondary }]}>
-        {entry.meaning}
-      </Text>
+      <View
+        style={[
+          styles.arrowMark,
+          { borderColor: color },
+          expanded ? styles.arrowMarkUp : styles.arrowMarkDown,
+        ]}
+      />
     </View>
   );
 }
@@ -135,30 +192,26 @@ const styles = StyleSheet.create({
     borderTopWidth: Stroke.hairline,
   },
   row: {
-    paddingVertical: Spacing.three,
-    gap: Spacing.one,
     borderBottomWidth: Stroke.hairline,
   },
-  // Structure shorthand is a symbol and a short gloss, so the two sit on one line with the symbol
-  // in a fixed gutter — the same column treatment `WeekAccordion` gives its week numbers.
-  compactRow: {
+  rowToggle: {
     flexDirection: 'row',
-    alignItems: 'baseline',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: Spacing.six,
     gap: Spacing.three,
+    paddingVertical: Spacing.two,
   },
   heading: {
+    flexShrink: 1,
     fontSize: FontSize.md,
   },
   code: {
     fontFamily: FontFamily.mono.bold,
   },
   symbol: {
-    width: Spacing.six,
     fontFamily: FontFamily.mono.bold,
     fontSize: FontSize.md,
-  },
-  symbolMeaning: {
-    flex: 1,
   },
   fullName: {
     fontFamily: FontFamily.body.semiBold,
@@ -166,5 +219,32 @@ const styles = StyleSheet.create({
   description: {
     fontFamily: FontFamily.body.regular,
     fontSize: FontSize.sm,
+  },
+  expandedBody: {
+    paddingBottom: Spacing.three,
+  },
+  structureBody: {
+    paddingLeft: Spacing.six + Spacing.three,
+  },
+  arrow: {
+    width: Spacing.three,
+    height: Spacing.three,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  arrowMark: {
+    width: Spacing.two,
+    height: Spacing.two,
+    borderRightWidth: Stroke.mark,
+    borderBottomWidth: Stroke.mark,
+  },
+  arrowMarkDown: {
+    transform: [{ rotate: '45deg' }],
+  },
+  arrowMarkUp: {
+    transform: [{ rotate: '225deg' }],
+  },
+  pressed: {
+    opacity: PressedOpacity,
   },
 });

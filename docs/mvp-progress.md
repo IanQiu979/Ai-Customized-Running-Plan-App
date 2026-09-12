@@ -24,8 +24,8 @@
 | M1 — Foundation (account → empty Home) | **In progress.** Server (auth + schema + account routes) is deployed on Cloudflare (`workers/`, live `production` environment); client-side email/password works in production, and Google is registered in production since 2026-08-09 (registration only — see "How it is now" for the two unproven riders) |
 | M2 — Intake (questionnaire persists) | **In progress.** Intake is asked exactly once: Home reads the target back from the saved intake and asks only for a plan length, and only when there is no race date to derive one from (`src/lib/planRequest.ts`) |
 | M3 — Plan engine (3 tiers produce valid plans) | **In progress.** The engine splits by tier as of 2026-09-09: Free is served entirely from the 40-plan deterministic library (`src/lib/planLibrary/`), paying tiers keep the template/pace engine as the AI skeleton. Both are wired into the Worker's `generate-plan` route and the client's generate-plan action; the plan view renders a real generated plan (via `GET /api/plans/:id`) alongside the permanent static golden fixture. Paid tiers still serve the quota-exempt template fallback — see "How it is now" |
-| M4 — Tiers & quotas (server-side, unbypassable) | **In progress.** The quota ledger, atomic gate, fallback exemption, `quota-status` and `purchase-tier` are built and tested server-side; a Settings tab now displays tier/quota and a dummy paywall now lets a runner call `purchase-tier` (2026-08-05) |
-| M5 — My Plans (history) | **In progress.** A My Plans tab lists plans off `GET /api/plans` |
+| M4 — Tiers & quotas (server-side, unbypassable) | **In progress.** The quota ledger, atomic gate, fallback exemption, `quota-status` and `purchase-tier` are built and tested server-side; Home now leads with the server-backed tier/quota line, Settings also displays it, and a dummy paywall lets a runner call `purchase-tier` |
+| M5 — My Plans (history) | **In progress.** My Plans keeps the permanent Example Plan, lists generated plans off `GET /api/plans`, and links MOST RECENT to the newest generated plan; there is no contradictory empty state |
 | M6 — Polish & TestFlight | **In progress.** The visual system has been replaced twice. **Trailhead is on `main`** (PR #82, plus the fidelity follow-up #83); **Instrument replaced it on 2026-09-03 and is on `fm/v22-redesign-theme-onboarding`, not merged**. The three signed-out screens (onboarding, sign-in, sign-up) have been rendered and visually checked in both schemes on Expo **web** at phone size (430x932); no screen has ever been run on a real iOS or Android device or simulator, and the signed-in screens (Home, My Plans, Plan view, Settings, Glossary, Paywall) have still never been seen rendered in either system. See "How it is now". No EAS build exists |
 
 ### How it is now
@@ -110,6 +110,14 @@
   a deload; a past race date is refused on both screens (race day and a blank date remain valid);
   numeric inputs are structured (`src/components/inputs/` + `src/lib/fieldInput.ts`). Full
   account: the "Last updated" entry below.
+- **Home and navigation now follow the captain's 2026-09-12 audit.** Home's header shows tier and
+  server-backed quota in place of the static product eyebrow, and its Create plan action is the
+  first control. Before `GET /api/plans` confirms a persisted generated plan, Home stays focused
+  on the target, conditional plan length and creation basics; Notes and subscription disclosures
+  appear only after that first plan. My Plans always has the Example Plan, never says the library
+  is empty, and links MOST RECENT to the newest generated plan. The four tabs are icon-only but
+  retain explicit screen-reader labels. Glossary definitions keep their existing `notation.ts`
+  content behind independent, collapsed-by-default, accessible disclosure rows.
 - **The design system is now "Instrument" — live in a branch; `main` carries Trailhead.**
   Trailhead *did* land on `main` (PR #82, plus the fidelity follow-up #83), so `main`'s
   `src/constants/theme.ts` is warm chalk and espresso ink with a scheme-aware ember accent, a
@@ -127,9 +135,10 @@
   bold moment is now the pulse trace, whose animation lives on a parallel branch and is not here
   yet. Onboarding is rebuilt as a scroll-down read, sign-in and sign-up carry the same field at
   `band` height and finally have a link back to onboarding, and one `ActionButton` module replaces
-  eight hand-rolled button stylesheets. Free-tier Notes stay locked in the UI, as under Trailhead —
-  a display correction, not new enforcement, since Free is template-only and those notes were
-  already discarded server-side. Source of truth for every value:
+  eight hand-rolled button stylesheets. After the first persisted plan, Free-tier Notes stay
+  locked in the UI, as under Trailhead — a display correction, not new enforcement, since Free is
+  template-only and those notes were already discarded server-side. Before that first plan, the
+  Notes and paid-content panels are hidden entirely. Source of truth for every value:
   [`docs/design/instrument-visual-system.md`](design/instrument-visual-system.md), which supersedes
   `frontend-design-brief.md` Parts 2 and 3 and replaces the deleted `trailhead-visual-system.md`.
   Full account: `change_log.md`, 2026-09-03 (later). **What has and has not been looked at:** the
@@ -180,7 +189,35 @@
 
 ---
 
-**Last updated:** 2026-09-09 (later) — the two-part fix behind GitHub issue #99 is complete:
+**Last updated:** 2026-09-12 — the captain's Home and navigation audit batch is implemented,
+without new design assets and without touching the heartbeat/graph animations, onboarding or auth
+screens.
+
+- **Home leads with the task and the runner's current account state.** "Create plan" moved from
+  below the rest of the form to immediately under the header. The header's static "Pace Blueprint"
+  eyebrow is now the current tier plus `formatQuotaLine()`'s server-backed used/limit reading; the
+  duplicate stat plate lower down was removed.
+- **Subscription surfaces wait for real plan state.** The old gate was only "quota has loaded," so
+  Notes and the paid-content teaser could appear before a runner had generated anything. Home now
+  reads `GET /api/plans` on focus and hides every Notes/subscription panel until at least one plan
+  is persisted. After that point paid tiers see editable Notes, while Free sees locked Notes and
+  the Pro/Elite teaser. A transient list failure does not clear a previously confirmed plan state.
+- **My Plans has no fictional empty state.** Its permanent Example Plan remains available even
+  when `GET /api/plans` returns an empty list, so "Nothing here yet" was contradictory and is gone.
+  When generated plans exist, MOST RECENT is a link to the actual newest id by `max(createdAt)`,
+  independent of response ordering.
+- **Navigation is visually compact and remains accessible.** The tab bar shows only the four
+  existing icons and the active ink tick, with explicit Home / Glossary / My Plans / Settings
+  labels retained for screen readers. Glossary rows now show only the abbreviation or term until
+  their arrow is pressed; each full definition expands inline independently, with button role,
+  expand/collapse hints and `accessibilityState.expanded`.
+- **The state changes have tests that can go red.** The new Home suite proves disclosures are
+  absent before a saved plan and appear after a refocus finds one; the My Plans suite proves the
+  permanent example/no-empty-state contract and resolves the latest link from an unsorted list;
+  the Glossary suite proves definitions are absent before expansion and that each disclosure
+  toggles independently. Files: `src/app/(tabs)/__tests__/{home,my-plans,glossary}.test.tsx`.
+
+Previous entry: 2026-09-09 (later) — the two-part fix behind GitHub issue #99 is complete:
 Task 1 gave generic peak weeks an algebraic capacity floor, and Task 2 corrected
 `longRunStartFloor` to read `retainedQuality`. The visual system was replaced
 again on 2026-09-03 (later). **Instrument** — a
@@ -611,6 +648,15 @@ from 82. Issue #22 remains open.)
   captain — provisioned and verified in local dev 2026-08-05 (see that entry below).
 
 ### Code
+- [x] **Home and navigation layout audit batch (2026-09-12).** Home puts Create plan first, carries
+      tier + server quota in its header, and reveals Notes/subscription panels only after
+      `GET /api/plans` confirms a persisted generated plan. My Plans treats the permanent Example
+      Plan as its baseline, has no empty-state copy, and links MOST RECENT to the newest generated
+      plan. The four tabs are icon-only with explicit accessibility labels; Glossary definitions
+      are collapsed by default and expand independently inline without changing their
+      `notation.ts` content. Stateful renderer tests cover the persisted-plan transition, the
+      example/latest-plan contracts and the disclosure transitions. No new design assets; no
+      animation, onboarding or auth changes. Full account: `docs/change_log.md`, 2026-09-12
 - [x] **Rest weeks are real, sane reductions on both engines (2026-09-12).** `loadRules.ts`
       owns `DELOAD_LONG_RUN_SHARE_MIN`/`_MAX` and `deloadLongRun`; `buildGenericWeek` sizes a rest
       week's long run from the last loading week's and bounds its easy runs by that long run;

@@ -23,8 +23,8 @@ import { EXAMPLE_PLAN_ID } from '@/lib/fixtures/examplePlan';
 /**
  * My Plans. A pinned "Example Plan" row (the static `examplePlan` fixture — the captain's
  * explicit "never remove the sample plan" call) always renders at the top, whatever `listPlans()`
- * returns or fails with. Below it: loading, an inline error, an empty state, or one row per
- * `PlanSummary`. Every row pushes to `plan/[id]`, which knows to render the fixture for
+ * returns or fails with. Below it: loading, an inline error, or one row per `PlanSummary`.
+ * Every row pushes to `plan/[id]`, which knows to render the fixture for
  * `EXAMPLE_PLAN_ID` and fetch everything else.
  *
  * The register here is the formal one — a stat-row header counting what the runner has
@@ -39,6 +39,7 @@ export default function MyPlansScreen() {
   const [hasLoadedPlans, setHasLoadedPlans] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [plans, setPlans] = useState<PlanSummary[]>([]);
+  const mostRecentPlan = latestPlan(plans);
 
   // A mount-only effect would never refresh after generating a new plan and tabbing back here —
   // Expo Router's tab navigator keeps this screen mounted across navigation, the same staleness
@@ -93,15 +94,34 @@ export default function MyPlansScreen() {
                 </Text>
               </View>
               <View style={[styles.statDivider, { backgroundColor: theme.hairline }]} />
-              <View style={styles.stat}>
-                {/* Both stats are plain readings of the list. Nothing here infers a quality the
-                    data doesn't state — an earlier draft counted non-`isFallback` plans as
-                    "personalized", which is the client deciding what a tier means. */}
-                <Text style={[styles.statValueDate, { color: theme.text.primary }]}>
-                  {latestPlanDate(plans) ?? '—'}
-                </Text>
-                <Text style={[styles.statLabel, { color: theme.text.secondary }]}>MOST RECENT</Text>
-              </View>
+              {/* Both stats are plain readings of the list. Nothing here infers a quality the
+                  data doesn't state — an earlier draft counted non-`isFallback` plans as
+                  "personalized", which is the client deciding what a tier means. */}
+              {mostRecentPlan ? (
+                <Link href={{ pathname: '/plan/[id]', params: { id: mostRecentPlan.planId } }} asChild>
+                  <Pressable
+                    accessibilityRole="link"
+                    accessibilityLabel={`Open most recent plan from ${formatPlanDate(
+                      mostRecentPlan.createdAt.slice(0, 10)
+                    )}`}
+                    style={({ pressed }) => [
+                      styles.stat,
+                      styles.mostRecentLink,
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    <Text style={[styles.statValueDate, { color: theme.text.primary }]}>
+                      {formatPlanDate(mostRecentPlan.createdAt.slice(0, 10))}
+                    </Text>
+                    <Text style={[styles.statLabel, { color: theme.text.secondary }]}>MOST RECENT</Text>
+                  </Pressable>
+                </Link>
+              ) : (
+                <View style={styles.stat}>
+                  <Text style={[styles.statValueDate, { color: theme.text.primary }]}>—</Text>
+                  <Text style={[styles.statLabel, { color: theme.text.secondary }]}>MOST RECENT</Text>
+                </View>
+              )}
             </View>
           )}
 
@@ -136,16 +156,9 @@ export default function MyPlansScreen() {
               {error ? (
                 <Text style={[styles.error, { color: theme.status.error }]}>{error}</Text>
               ) : null}
-              {hasLoadedPlans && plans.length === 0 ? (
-                <View style={styles.empty}>
-                  <Text style={[styles.emptyTitle, { color: theme.text.primary }]}>Nothing here yet.</Text>
-                  <Text style={[styles.rowBody, { color: theme.text.secondary }]}>
-                    Your generated plans will collect here. Start one from Home.
-                  </Text>
-                </View>
-              ) : (
-                plans.map((plan) => <PlanRow key={plan.planId} plan={plan} />)
-              )}
+              {plans.map((plan) => (
+                <PlanRow key={plan.planId} plan={plan} />
+              ))}
             </>
           )}
         </ScrollView>
@@ -154,14 +167,13 @@ export default function MyPlansScreen() {
   );
 }
 
-/** The newest `createdAt` in the list, formatted, or `null` when there are none.
+/** The plan with the newest `createdAt`, or `null` when there are none.
  *
  * Computed rather than read off `plans[0]`: `GET /api/plans`'s ordering is the server's business
  * and this stat would silently become "the first row" the day that changes. */
-function latestPlanDate(plans: readonly PlanSummary[]): string | null {
+function latestPlan(plans: readonly PlanSummary[]): PlanSummary | null {
   if (plans.length === 0) return null;
-  const newest = plans.reduce((latest, plan) => (plan.createdAt > latest.createdAt ? plan : latest));
-  return formatPlanDate(newest.createdAt.slice(0, 10));
+  return plans.reduce((latest, plan) => (plan.createdAt > latest.createdAt ? plan : latest));
 }
 
 function PlanRow({ plan }: { plan: PlanSummary }) {
@@ -223,6 +235,9 @@ const styles = StyleSheet.create({
   stat: {
     flex: 1,
     gap: Spacing.half,
+  },
+  mostRecentLink: {
+    minHeight: Spacing.six,
   },
   statDivider: {
     width: Stroke.hairline,
@@ -288,15 +303,6 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.mono.bold,
     fontSize: FontSize.xs,
     letterSpacing: Tracking.label,
-  },
-  empty: {
-    paddingVertical: Spacing.four,
-    gap: Spacing.two,
-  },
-  emptyTitle: {
-    fontFamily: FontFamily.display.bold,
-    fontSize: FontSize.xl,
-    letterSpacing: Tracking.display,
   },
   error: {
     fontFamily: FontFamily.body.medium,
