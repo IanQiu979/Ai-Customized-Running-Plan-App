@@ -36,6 +36,7 @@ export default function MyPlansScreen() {
   const theme = useTheme();
 
   const [loading, setLoading] = useState(true);
+  const [hasLoadedPlans, setHasLoadedPlans] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [plans, setPlans] = useState<PlanSummary[]>([]);
 
@@ -51,7 +52,10 @@ export default function MyPlansScreen() {
       (async () => {
         try {
           const response = await listPlans();
-          if (!cancelled) setPlans(response.plans);
+          if (!cancelled) {
+            setPlans(response.plans);
+            setHasLoadedPlans(true);
+          }
         } catch (fetchError) {
           if (!cancelled) {
             setError(describeError(fetchError, 'Could not load your plans.', API_BASE_URL));
@@ -73,9 +77,9 @@ export default function MyPlansScreen() {
         <ScrollView contentContainerStyle={styles.content}>
           <ScreenHeader eyebrow="Your library" title="My Plans" routeLine />
 
-          {/* The count is only honest once the fetch has settled — a "0 PLANS" that flips to "3"
-              a moment later is worse than no number at all. */}
-          {!loading && !error && (
+          {/* The count is only honest after a successful response. Once known, keep the last
+              value visible while a focus refresh runs in the background. */}
+          {hasLoadedPlans && (
             <View
               style={[
                 styles.statRow,
@@ -125,19 +129,24 @@ export default function MyPlansScreen() {
             </Pressable>
           </Link>
 
-          {loading ? (
+          {loading && !hasLoadedPlans ? (
             <ActivityIndicator color={theme.text.primary} style={styles.spinner} />
-          ) : error ? (
-            <Text style={[styles.error, { color: theme.status.error }]}>{error}</Text>
-          ) : plans.length === 0 ? (
-            <View style={styles.empty}>
-              <Text style={[styles.emptyTitle, { color: theme.text.primary }]}>Nothing here yet.</Text>
-              <Text style={[styles.rowBody, { color: theme.text.secondary }]}>
-                Your generated plans will collect here. Start one from Home.
-              </Text>
-            </View>
           ) : (
-            plans.map((plan) => <PlanRow key={plan.planId} plan={plan} />)
+            <>
+              {error ? (
+                <Text style={[styles.error, { color: theme.status.error }]}>{error}</Text>
+              ) : null}
+              {hasLoadedPlans && plans.length === 0 ? (
+                <View style={styles.empty}>
+                  <Text style={[styles.emptyTitle, { color: theme.text.primary }]}>Nothing here yet.</Text>
+                  <Text style={[styles.rowBody, { color: theme.text.secondary }]}>
+                    Your generated plans will collect here. Start one from Home.
+                  </Text>
+                </View>
+              ) : (
+                plans.map((plan) => <PlanRow key={plan.planId} plan={plan} />)
+              )}
+            </>
           )}
         </ScrollView>
       </SafeAreaView>

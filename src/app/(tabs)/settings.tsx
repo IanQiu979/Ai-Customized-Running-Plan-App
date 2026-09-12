@@ -108,7 +108,7 @@ export default function SettingsScreen() {
         <ScrollView contentContainerStyle={styles.content}>
           <ScreenHeader title="Settings" />
 
-          {loading ? (
+          {loading && quota === null ? (
             <ActivityIndicator color={theme.text.primary} style={styles.spinner} />
           ) : (
             <Group title="Account">

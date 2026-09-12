@@ -54,14 +54,17 @@ src/
                              #  duplicated intake and blocked a runner with no race. The only field
                              #  left is a plan length, shown only when there is no race date to
                              #  derive one from; "Change" routes to /intake. Decision logic lives in
-                             #  src/lib/planRequest.ts, not here.
+                             #  src/lib/planRequest.ts, not here. Intake refreshes on focus, with
+                             #  last-known content retained while the request runs.
       settings.tsx           # Settings tab (new 2026-08-05) — tier + quota (GET
                               #  /api/quota-status, src/lib/quotaDisplay.ts), sign-out (moved off
                               #  Home), a Free-tier "Upgrade" entry point to /paywall, and Delete
-                              #  Account (native confirm -> deleteAccount() -> authClient.signOut())
+                              #  Account (native confirm -> deleteAccount() -> authClient.signOut()).
+                              #  Quota refreshes cache-first on every focus.
       glossary.tsx           # abbreviations glossary — sourced from notation.ts, nothing hardcoded
       my-plans.tsx           # My Plans — lists plans off GET /api/plans, refetched on every tab
-                              #            focus (useFocusEffect), not just on mount
+                              #            focus (useFocusEffect), with the last-known list visible
+                              #            during the background request
     intake.tsx               # onboarding questionnaire — THE ONLY place a target race is asked
                               # for (2026-08-15). Numeric answers use src/components/inputs/
                               # (segmented YYYY-MM-DD and H:MM:SS boxes, digit-filtered).
@@ -179,6 +182,15 @@ src/
                               # pulseTrace (23 tests, new 2026-09-04)
                               # — the two engine contracts included
 ```
+
+Expo Router SDK 57 retains these tab screens when focus moves between them; the tab navigator does
+not unmount and remount each screen on every switch. Home, My Plans, and Settings therefore use
+`useFocusEffect` to refresh on return while preserving their last successful result. Their full
+loading indicator is a first-load state only: once a response succeeds, cached `null` intake and a
+cached empty plan list are data too. Later refreshes are silent, and a refresh error does not erase
+the last-known UI. Glossary performs no data fetch. The rendered My Plans regression test drives two
+focus cycles on one mounted renderer and asserts that an unresolved second refresh shows the cached
+plan without an `ActivityIndicator`.
 
 `src/lib/tierLimits.ts` and `src/lib/quotaPeriod.ts` are, like `planTypes.ts`, **pure and
 dual-consumed** — no React, no Node, no Cloudflare globals — because `workers/src/` imports them

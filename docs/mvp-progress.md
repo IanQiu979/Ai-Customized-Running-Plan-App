@@ -30,6 +30,15 @@
 
 ### How it is now
 
+- **Tab returns no longer flash a redundant loading state (2026-09-12).** Expo Router SDK 57 keeps
+  the four bottom-tab screens mounted. Home, My Plans, and Settings still refresh through
+  `useFocusEffect` whenever they regain focus, but now render the last successful intake, plan list,
+  or quota immediately while that request runs; Glossary has no fetch and is unchanged. The full
+  spinner is reserved for the first load with no successful data. A successful `null` intake and
+  empty plan list count as loaded, and refresh failures retain the cached UI. The rendered My Plans
+  regression test exercises two focus cycles on one mounted renderer and holds the second refresh
+  unresolved while asserting the cached plan remains visible with no `ActivityIndicator`. Root
+  verification is green at 42 suites / 851 tests; no manual device test was performed.
 - **Backend is live and reachable from a phone.** Cloudflare D1 + Workers + better-auth in
   `workers/`, deployed to the named `production` environment at
   `https://pace-blueprint-production.i78979848.workers.dev`. `wrangler login`, `wrangler d1

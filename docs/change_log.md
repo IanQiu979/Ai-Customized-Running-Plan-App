@@ -76,6 +76,25 @@ distribution was absurd, the long run barely moved while the easy runs collapsed
   carries it, so a 35 km/week runner's plan collapses 24 → 26 → 24 → 16 → … → 10 km across 14 weeks
   and its rest weeks land ~32% down. Filed as GitHub issue #106 for the captain.
 
+## 2026-09-12 — tab returns keep their last-known content while refreshing
+
+- **Cause diagnosed.** Expo Router SDK 57 keeps bottom-tab screens mounted. Home, My Plans, and
+  Settings intentionally use `useFocusEffect` to refresh when focused, but their request-in-flight
+  flags also controlled the full loading branch, so every return hid data the mounted screen
+  still held. Glossary has no fetch and was not part of the failure.
+- **Loading is now cache-first.** A full spinner appears only on a tab's first load, before it has
+  any successful response. Later returns show the last-known Home intake, My Plans list, or Settings
+  quota immediately while the focus refresh runs silently. A successful `null` intake and an empty
+  plan list both count as loaded data, and a refresh error leaves the cached UI visible alongside
+  the error.
+- **Regression proof.** `src/app/(tabs)/__tests__/tab-cache-first.test.tsx` drives two focus cycles
+  through one mounted My Plans renderer. While the second request is deliberately unresolved, it
+  asserts that the cached plan remains visible and no `ActivityIndicator` renders. The root gate is
+  clean: 42 suites, 851 tests.
+- **PR/manual observation note (not yet device-tested):** “After a tab’s first load, returning to
+  Home, My Plans, or Settings shows the last-known content immediately while it refreshes silently.
+  A spinner appears only on the first visit when that tab has no data yet; Glossary is unchanged.”
+
 ## 2026-09-10 — the Free library engine's six coaching questions, all answered
 
 Branch `fm/v22-library-free-engine`. `npm run typecheck && npm run lint && npm test` (40 suites,
