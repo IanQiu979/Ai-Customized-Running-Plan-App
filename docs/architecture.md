@@ -750,6 +750,14 @@ so it can never write its own tier or quota.
 > sign-in and sign-up, in both schemes, on Expo web at phone size. No screen has been run on a
 > device or simulator, and the signed-in screens have never been seen rendered in either system.
 
+**First-run copy is deliberately sparse (captain audit, 2026-09-12).** The audit found that the
+signed-out journey overloaded a stranger with information. The onboarding cover and each existing
+01/02/03 beat now carry one clear headline and one supporting sentence; the auth hand-off and
+Intake start use brief transition wording. This is a copy contract, not a visual redesign:
+Instrument fonts, colours and spacing, the existing components and layout, and all pulse-trace
+animation behaviour stay unchanged. The price beat also states the pace entitlement precisely:
+Pro/Elite add paces only when the runner supplies a recent time.
+
 `src/constants/theme.ts` holds the Instrument tokens: a near-monochrome, cool-scientific field —
 white and graphite in light mode, deep charcoal in dark — carrying every button, rule and piece of
 chrome in near-black, with one much brighter highlight in it. It is a house style, shared with the
