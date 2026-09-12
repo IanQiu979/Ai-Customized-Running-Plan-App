@@ -243,6 +243,14 @@ Built-ins also available: `Explore`, `Plan`, `general-purpose`. Plugin agents ar
   `plan-blueprint-examples.md`'s three stale lines were corrected in place, annotated rather than
   silently overwritten. Coaching *source ports* under `docs/reference/coaching/source/` still carry
   the old figure — that is issue #101, the captain's own to-do, not yours to edit.
+- **A rest week shortens the long run first, and `loadRules.ts` owns that band too.**
+  `DELOAD_LONG_RUN_SHARE_MIN`/`_MAX` (§ 9's 60–70% of the preceding long run) and `deloadLongRun`
+  are read by both engines — the library's `LONG_RUN_RECOVERY_SHARE` is a re-export, not a copy.
+  On the skeleton, a rest week's easy runs are bounded by the *last loading week's* long run, not
+  the rest week's own shortened one; bounding them by the shortened one makes a 3-day rest week
+  fall below the band (captain's 2026-09-12 audit, `docs/change_log.md`). Both property suites —
+  `planTemplates.deload.test.ts` and `planLibrary/__tests__/engine.recovery.test.ts` — pin every
+  rest week on both engines; if one fails, read which invariant before touching either engine.
 - **A race target is optional, and nothing may default one.** `buildTemplatePlan` carries
   `raceDistance?: RaceDistance` with no fallback; race week, the taper phase and the taper tail of
   the load curve are all gated on `isRacePlan`. Re-introducing a `?? '5k'` silently gives a
