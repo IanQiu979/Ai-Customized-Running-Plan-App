@@ -68,7 +68,13 @@
   each by a 1 km long-run drop). Both halves of GitHub issue #99 have landed. The sweep's residual
   770 broad peak-below-pre-peak-loading and 470 literal peak-below-base offenders are pre-existing,
   unchanged by either fix, and stay tracked by GitHub issue #103 — the captain scoped this pair to
-  a zero-new-regression gate, not a curve redesign.
+  a zero-new-regression gate, not a curve redesign. **Rest weeks shorten the long run first
+  (2026-09-12):** the skeleton's recovery weeks now size Day 7 at `loadRules.ts`'s
+  `deloadLongRun` (§ 9's 60–70% of the preceding long run — the band the Free library already
+  used) instead of leaving it on the loading curve while the easy runs absorbed the whole cut; the
+  captain's audited `14 + 2 + 3 km` rest week was the pre-2026-09-06 band on top of that, and the
+  last-deployed Worker still predates both fixes. Two property suites pin every rest week on both
+  engines — `docs/change_log.md` 2026-09-12.
   The Pro/Elite personalization prompt is built, bound, and tested
   (2026-08-10) but has **never made a live model call**: `ANTHROPIC_API_KEY` is unset everywhere,
   so paid-tier requests still serve the honest, quota-exempt template fallback. That key is the
@@ -592,6 +598,11 @@ from 82. Issue #22 remains open.)
   captain — provisioned and verified in local dev 2026-08-05 (see that entry below).
 
 ### Code
+- [x] **Rest weeks are real, sane reductions on both engines (2026-09-12).** `loadRules.ts`
+      owns `DELOAD_LONG_RUN_SHARE_MIN`/`_MAX` and `deloadLongRun`; `buildGenericWeek` sizes a rest
+      week's long run from the last loading week's and bounds its easy runs by that long run;
+      `planTemplates.deload.test.ts` and `planLibrary/__tests__/engine.recovery.test.ts` sweep
+      every rest week on both engines against the same three invariants. Change log 2026-09-12.
 - [x] **Free's plan engine is the 40-plan deterministic library (2026-09-09).**
       `src/lib/planLibrary/` — `registry.ts` (the 40 plan IDs, the workout vocabulary, the
       experience-dose ladder and operating limits, the weekly-volume state machine, the 3–7-day

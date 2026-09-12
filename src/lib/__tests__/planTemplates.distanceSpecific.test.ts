@@ -388,17 +388,23 @@ describe('distance-aware ceilings and the curves that feed them', () => {
     // candidate, so a 3-day marathon week shipped a 31 km "easy run" beside a 28 km long run.
     for (const daysPerWeek of [3, 4, 5, 6]) {
       const plan = marathonPlan({ daysPerWeek }, 16);
+      let lastLoadingLongRunKm = 0;
       for (const week of plan.weeks) {
         const runs = week.days.filter(isWorkout);
         const long = runs.find((run) => run.isLongRun === true);
         if (!long) continue;
         // Easy runs only. A quality session may legitimately exceed the long run — the captain's
         // `longrun-share-cap-floor` ruling makes the safety cap win even when that costs the long
-        // run its "longest run of the week" status.
+        // run its "longest run of the week" status. On a rest week the bound is the last loading
+        // week's long run: the rest week shortens its own to 60–70% of that (2026-09-12), and the
+        // easy days it keeps at a runnable length are bounded by the run already done, not by the
+        // shortened one — see `planTemplates.deload.test.ts`.
+        const boundKm = week.isDeload && lastLoadingLongRunKm > 0 ? lastLoadingLongRunKm : (long.distanceKm ?? 0);
         for (const run of runs) {
           if (run.isLongRun === true || run.effort !== 'easy') continue;
-          expect(run.distanceKm ?? 0).toBeLessThanOrEqual(long.distanceKm ?? 0);
+          expect(run.distanceKm ?? 0).toBeLessThanOrEqual(boundKm);
         }
+        if (!week.isDeload) lastLoadingLongRunKm = long.distanceKm ?? 0;
       }
     }
   });

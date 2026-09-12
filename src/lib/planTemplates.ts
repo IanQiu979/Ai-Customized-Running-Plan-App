@@ -10,6 +10,7 @@ import {
   clampLongRun,
   clampWeeklyVolume,
   deloadEveryWeeks,
+  deloadLongRun,
   deloadVolume,
   hasDeclaredInjury,
   hasRedFlagInjury,
@@ -214,8 +215,10 @@ const FIVE_K_WEEKLY_LOAD_GENERIC = [34, 35, 37, 38, 40, 41, 43, 44, 46, 48, 40, 
  * inside the curve collided with that whenever a runner's real cadence (3 weeks for advanced and
  * for 50+, 4 otherwise) did not line up with the array's positions — the dip landed on a week
  * that was not flagged `isDeload`, became the growth base, and throttled the rest of the plan.
- * The LONG_RUN arrays keep their dips: there is no separate deload formula for the long run the
- * way `deloadVolume` is one for weekly volume. The exact per-week
+ * The LONG_RUN arrays keep their dips, but a rest week no longer reads them: since 2026-09-12
+ * `buildGenericWeek` sizes a rest week's long run with `deloadLongRun` — the long run's own
+ * `deloadVolume` — off the last loading week, so the dips only ever shape loading weeks. The
+ * exact per-week
  * *workout content* in that same document (§§ 11–14's Q1/Q2 dose tables) is explicitly NOT
  * implemented here — that document's own status line marks it "coach-review source... not yet
  * application behavior" with Ian's review and "translation into code" both still unchecked. Only
@@ -1323,6 +1326,8 @@ function buildGenericWeek(args: {
   level: ExperienceLevel;
   previousLongestKm: number;
   lastLoadingWeekKm: number;
+  /** The rendered long run of the last loading week — what a rest week's long run is 60–70% of. */
+  lastLoadingLongRunKm: number;
   peakTrainingWeekKm: number;
   injuryReductionPct: number;
   redFlagReductionPct: number;
@@ -1345,6 +1350,7 @@ function buildGenericWeek(args: {
     level,
     previousLongestKm,
     lastLoadingWeekKm,
+    lastLoadingLongRunKm,
     peakTrainingWeekKm,
     injuryReductionPct,
     redFlagReductionPct,
@@ -1497,18 +1503,31 @@ function buildGenericWeek(args: {
   const peakCapacityLongRunKm = !isDeload && phase === 'peak'
     ? Math.ceil((peakTrainingWeekKm - qualityKm) / (easyCount + 1))
     : 1;
-  const longRunFromCurve = Math.max(
-    longRunStartFloor,
-    peakCapacityLongRunKm,
-    targetLongRunKm(
-      intake.weeklyKm,
-      weekNumber - 1,
-      durationWeeks,
-      singleRunCeilingKm,
-      isRacePlan,
-      raceDistance,
-    ),
-  );
+  // A rest week's long run is not a point on the loading curve. `plan-blueprint-examples.md` § 9:
+  // "`LR-recovery` is 60–70% of the preceding long run"; § 6: "During `RECOVERY` … shorten Day 7";
+  // § 2 rule 7: "Remove hard volume before removing easy frequency." Until 2026-09-12 this path had
+  // no deload formula for the long run at all — the comment above `TEN_K_WEEKLY_LOAD` said so —
+  // so the rest week's long run stayed on (or, where the curve was still climbing, *above*) the
+  // loading week's, and the easy runs absorbed the entire 20% cut: the captain's audit finding of
+  // a `14 km long run + 2 km + 3 km` rest week. `deloadLongRun` is the long run's `deloadVolume`,
+  // and it reads the same `loadRules.ts` band the Free library's `LR-recovery` does. Week 1 can
+  // never be a rest week (`weekNumber % deloadCadence`), so a rest week always has a loading long
+  // run to recover from; the `> 0` guard is defensive only, and falls back to the curve.
+  const isRecoveryLongRun = isDeload && lastLoadingLongRunKm > 0;
+  const longRunFromCurve = isRecoveryLongRun
+    ? Math.max(1, Math.round(deloadLongRun(lastLoadingLongRunKm)))
+    : Math.max(
+        longRunStartFloor,
+        peakCapacityLongRunKm,
+        targetLongRunKm(
+          intake.weeklyKm,
+          weekNumber - 1,
+          durationWeeks,
+          singleRunCeilingKm,
+          isRacePlan,
+          raceDistance,
+        ),
+      );
   const longRunVolumeBudget = Math.max(
     longRunStartFloor,
     desiredVolumeKm - qualityKm - easyCount,
@@ -1544,6 +1563,34 @@ function buildGenericWeek(args: {
   // "skip the clamp" guard.
   const shareCap = longRunShareCap(level, requestedRuns, ceilingDistance);
   let longDistanceKm = Math.min(singleRunCeilingKm, longRunFromCurve, longRunVolumeBudget);
+  // On a rest week the easy runs may not be bounded by the deliberately-shortened long run: at
+  // three runs a week, `0.8 × total` cannot be covered by three runs of `0.65 × long run`, so the
+  // week would fall out of the 15–25% band on the low side — a deeper cut than the band allows,
+  // taken from the easy runs the rule says to keep. The ceiling that actually matters is the
+  // share cap, and on a genuine deload R1c measures that against the last *loading* week, so the
+  // last loading week's own long run — a distance the runner has already covered inside every
+  // ceiling — is the bound, run once more through this week's `clampLongRun` so an invalid
+  // (mis-rounded) deload still gets the conservative own-volume denominator. Loading weeks keep
+  // the ordinary rule: no easy run outgrows that week's long run.
+  const recoveryEasyRunCapKm = isRecoveryLongRun
+    ? Math.max(
+        1,
+        Math.floor(
+          clampLongRun({
+            proposedKm: lastLoadingLongRunKm,
+            weeklyKm: desiredVolumeKm,
+            level,
+            previousLongestKm,
+            easyPaceSecPerKm: easyPace?.highSecPerKm,
+            isDeload,
+            lastLoadingWeekKm,
+            shareCapOverride: shareCap,
+            roundSpikeCeilingUp: true,
+            maxSingleRunKmOverride: singleRunCeilingKm,
+          }).km,
+        ),
+      )
+    : undefined;
   // The easy ceiling tracks `longDistanceKm` on purpose: the ceiling *is* the long run, so the
   // week the loop measures is the week it will render. That is only safe because the ceiling no
   // longer subtracts a kilometre — `runCount` runs at the ceiling always clear the target, per the
@@ -1554,7 +1601,7 @@ function buildGenericWeek(args: {
     const easyDistances = distributeDistance(
       desiredVolumeKm - longDistanceKm - qualityKm,
       easyCount,
-      easyRunCapKm(longDistanceKm),
+      recoveryEasyRunCapKm ?? easyRunCapKm(longDistanceKm),
     );
     const easyWorkouts = easyDistances.map((distanceKm) =>
       easyRun({
@@ -1638,6 +1685,7 @@ export function buildTemplatePlan(params: TemplatePlanParams): Plan {
     durationWeeks === 12 &&
     normalizedRunCount(params.intake.daysPerWeek) === 4;
   let lastLoadingWeekKm = 0;
+  let lastLoadingLongRunKm = 0;
   let previousLongestKm = 0;
   let peakTrainingWeekKm = 0;
   const weeks = phases.map((phase, index) => {
@@ -1678,19 +1726,22 @@ export function buildTemplatePlan(params: TemplatePlanParams): Plan {
           level,
           previousLongestKm,
           lastLoadingWeekKm,
+          lastLoadingLongRunKm,
           peakTrainingWeekKm,
           injuryReductionPct,
           redFlagReductionPct,
         });
-    if (!week.isDeload) lastLoadingWeekKm = week.volumeKm;
+    const weekLongRunKm = week.days
+      .filter((day): day is Workout => day.kind === 'run')
+      .filter((day) => day.isLongRun === true)
+      .reduce((max, day) => Math.max(max, day.distanceKm ?? 0), 0);
+    if (!week.isDeload) {
+      lastLoadingWeekKm = week.volumeKm;
+      // Race week has no long run; a rest week never follows it, so the stale value is unread.
+      if (weekLongRunKm > 0) lastLoadingLongRunKm = weekLongRunKm;
+    }
     peakTrainingWeekKm = Math.max(peakTrainingWeekKm, week.volumeKm);
-    previousLongestKm = Math.max(
-      previousLongestKm,
-      week.days
-        .filter((day): day is Workout => day.kind === 'run')
-        .filter((day) => day.isLongRun === true)
-        .reduce((max, day) => Math.max(max, day.distanceKm ?? 0), 0),
-    );
+    previousLongestKm = Math.max(previousLongestKm, weekLongRunKm);
     return week;
   });
 

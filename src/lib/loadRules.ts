@@ -45,6 +45,22 @@ export const WEEKLY_INCREASE_RECALC_AT = 0.10;
 export const DELOAD_REDUCTION_MIN = 0.15;
 export const DELOAD_REDUCTION_MAX = 0.25;
 
+/**
+ * How much of the preceding loading week's long run a recovery week keeps — 60–70%, midpoint 65%.
+ *
+ * `plan-blueprint-examples.md` § 9: "`LR-recovery` is 60–70% of the preceding long run"; § 6:
+ * "During `RECOVERY` … shorten Day 7"; § 2 rule 7: "Remove hard volume before removing easy
+ * frequency." This is the long run's counterpart to `DELOAD_REDUCTION_MIN`/`_MAX`: the band above
+ * sizes the week's *total*, this band sizes its *long run*, and the easy runs get whatever the
+ * total leaves — which is what keeps them at a runnable length. Before this constant existed the
+ * generic template path had no deload formula for the long run at all (its own comment said so),
+ * so the rest week's long run followed the loading curve and the easy runs absorbed the entire
+ * cut — the captain's 2026-09-12 audit finding of a `14 km + 2 km + 3 km` rest week. Both plan
+ * engines read this one band; the Free library's `LONG_RUN_RECOVERY_SHARE` is this pair.
+ */
+export const DELOAD_LONG_RUN_SHARE_MIN = 0.6;
+export const DELOAD_LONG_RUN_SHARE_MAX = 0.7;
+
 /** No long run may exceed this multiple of the plan's own previous longest. */
 export const LONG_RUN_SPIKE_MULTIPLE = 1.10;
 
@@ -401,6 +417,16 @@ export function clampWeeklyVolume({
 export function deloadVolume(previousKm: number): number {
   const midpoint = (DELOAD_REDUCTION_MIN + DELOAD_REDUCTION_MAX) / 2;
   return previousKm * (1 - midpoint);
+}
+
+/**
+ * A recovery week's long run: the midpoint of `DELOAD_LONG_RUN_SHARE_MIN`/`_MAX` applied to the
+ * preceding loading week's long run. The long run's counterpart to `deloadVolume`; a caller that
+ * has no preceding long run (week 1) has nothing to recover from and should not call this.
+ */
+export function deloadLongRun(previousLongRunKm: number): number {
+  const midpoint = (DELOAD_LONG_RUN_SHARE_MIN + DELOAD_LONG_RUN_SHARE_MAX) / 2;
+  return previousLongRunKm * midpoint;
 }
 
 /** Whether a proposed deload week sits inside the band. Used to clamp model output. */

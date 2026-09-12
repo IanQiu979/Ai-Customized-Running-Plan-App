@@ -5,6 +5,64 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-09-12 — rest weeks shorten the long run first, on both engines
+
+Branch `fm/v22-deload-rest-week-bug`. The captain's 2026-09-12 user-audit item: a 10 km plan
+averaging ~35 km/week produced a rest week of **14 km long run + 2 km + 3 km** — a ~45% drop whose
+distribution was absurd, the long run barely moved while the easy runs collapsed to warm-up length.
+
+- **Diagnosis, with evidence.** The plan came from `src/lib/planTemplates.ts`'s `buildGenericWeek`,
+  not the Free library — `buildLibraryPlan` already sizes every recovery week's Day 7 at § 9's
+  60–70% of the preceding long run and was correct on every plan in the register. Two defects
+  stacked in the skeleton. (1) The *total*: the 45% drop is the pre-2026-09-06 35–45% band. The
+  code at `adc3aa0` (2026-09-05, the last commit before the band change) reproduces the exact
+  `14 + 2 + 3 = 19 km` rest week in 1,014 parameter combinations at 35 km/week on 10K; `main`
+  reproduces it in none, because the band change fixed the total. The last-deployed Worker
+  predates that change, which is why the captain saw it live. (2) The *distribution*, still on
+  `main`: the file's own comment said "there is no separate deload formula for the long run the
+  way `deloadVolume` is one for weekly volume", so a rest week's long run followed the *loading*
+  curve — on `main`, across 34,560 generated plans, the long run was cut proportionally less than
+  the easy runs in 97% of rest weeks and actually **grew** into the rest week in 12.5% — and the
+  easy runs absorbed the entire cut. Neither defect was a rounding floor or a per-run scaler.
+- **Fix — `loadRules.ts` owns a long-run deload band, and both engines read it.**
+  `DELOAD_LONG_RUN_SHARE_MIN`/`_MAX` (0.6/0.7) and `deloadLongRun(previousLongRunKm)` (midpoint,
+  65%) are the long run's counterpart to `DELOAD_REDUCTION_MIN`/`_MAX` and `deloadVolume`. The
+  numbers are `plan-blueprint-examples.md` § 9's, already ported in the library as
+  `LONG_RUN_RECOVERY_SHARE`, which is now that pair re-exported rather than a second copy — the same
+  arrangement `RECOVERY`'s weekly total already had with `deloadVolume`. Nothing new was invented.
+- **`buildGenericWeek` on a rest week:** the long run is `deloadLongRun` of the last loading week's
+  rendered long run (a new `lastLoadingLongRunKm` tracked beside `lastLoadingWeekKm`), not a point
+  on the curve; quality is already removed, so "remove hard volume before removing easy frequency"
+  (§ 2 rule 7) is now what the arithmetic does. The easy-run ceiling on a rest week is the last
+  loading week's long run — a distance already run inside every ceiling, and the denominator R1c
+  measures a genuine deload's share cap against — rather than the deliberately-shortened long run,
+  because at three runs a week the 80% total cannot be covered by three runs of 65% of the long run
+  and the week would otherwise fall below the band on the low side, taken from exactly the easy
+  runs the rule says to keep. Loading weeks keep the ordinary "no easy run outgrows the long run"
+  rule unchanged; the golden 12-week/4-day 5K path is untouched and still byte-pinned. The
+  captain's case now renders `11 / 10Q / 11L → 10 / 9 / 7L` (26 of 32 km).
+- **R1c's wording, noted not changed.** The 2026-07-12 denominator ruling was reasoned from "a
+  deload cuts the week's total while largely preserving the long run". The *mechanism* it ruled on
+  — measure a genuine deload's share against the last loading week — is untouched and still what
+  keeps every rest-week run inside the cap; only the premise is superseded by the captain's
+  2026-09-12 finding and § 6/§ 9, which shorten Day 7. Flagged in the PR for the captain.
+- **Tests.** `src/lib/__tests__/planTemplates.deload.test.ts` reproduces the captain's case and
+  sweeps 4 distances × 5 levels × 4 layouts × 4 volumes × 3 durations × race/duration on the
+  skeleton; `src/lib/planLibrary/__tests__/engine.recovery.test.ts` sweeps the whole 40-plan
+  register. Both assert the same three invariants on every rest week: total 75–85% of the preceding
+  loading week; no easy run below `1 − DELOAD_REDUCTION_MAX` of the loading week's shortest non-long
+  run (the band's own deepest permitted cut, applied per run — not a new number); and the long run
+  inside 60–70% of, and cut proportionally more than, the easy runs. The skeleton suite fails six of
+  seven on the unfixed engine. Four existing suites had literal pins or "easy ≤ this week's long
+  run" assertions that encoded the old rest-week shape; each now derives the rest-week value from
+  `deloadLongRun` or bounds rest-week easy runs by the last loading week's long run, with the reason
+  beside it. The progression suite's 22,000-plan baseline mask was **not** regenerated and passes
+  unchanged.
+- **Observed, not fixed (out of this item's lane):** the Free library under a declared injury
+  (`H1`) applies the injury volume reduction every week on top of a `lastLoadingKm` that already
+  carries it, so a 35 km/week runner's plan collapses 24 → 26 → 24 → 16 → … → 10 km across 14 weeks
+  and its rest weeks land ~32% down. Filed as an issue for the captain.
+
 ## 2026-09-10 — the Free library engine's six coaching questions, all answered
 
 Branch `fm/v22-library-free-engine`. `npm run typecheck && npm run lint && npm test` (40 suites,

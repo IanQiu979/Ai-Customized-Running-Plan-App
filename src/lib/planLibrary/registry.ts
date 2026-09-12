@@ -13,6 +13,7 @@
  * both the Expo app and `workers/`.
  */
 
+import { DELOAD_LONG_RUN_SHARE_MAX, DELOAD_LONG_RUN_SHARE_MIN } from '../loadRules';
 import type { ExperienceAnswer, RaceDistance } from '../planTypes';
 
 // ---------------------------------------------------------------------------
@@ -525,8 +526,16 @@ export const LONG_RUN_LADDER_FRACTION: Record<'LR-low' | 'LR-mid' | 'LR-high' | 
   'LR-peak': 1,
 };
 
-/** § 9: "`LR-recovery` is 60–70% of the preceding long run." Midpoint of the stated band. */
-export const LONG_RUN_RECOVERY_SHARE: readonly [number, number] = [0.6, 0.7];
+/**
+ * § 9: "`LR-recovery` is 60–70% of the preceding long run." The band itself lives in
+ * `loadRules.ts` (`DELOAD_LONG_RUN_SHARE_MIN`/`_MAX`) since 2026-09-12, so that this library and
+ * the paid-tier skeleton in `planTemplates.ts` recover the long run by the same rule — exactly as
+ * `RECOVERY`'s weekly total defers to `deloadVolume` above. Same value, one owner.
+ */
+export const LONG_RUN_RECOVERY_SHARE: readonly [number, number] = [
+  DELOAD_LONG_RUN_SHARE_MIN,
+  DELOAD_LONG_RUN_SHARE_MAX,
+];
 
 // ---------------------------------------------------------------------------
 // § 8. Canonical durations
