@@ -46,25 +46,30 @@ src/
                             #   both auth screens scroll (KeyboardAvoidingView + ScrollView) as of
                             #   2026-08-08 — centred content used to be unreachable under a keyboard
     (tabs)/
-      _layout.tsx          # tab bar — all four tabs today: Home, Glossary, My Plans, Settings
-                            #           (Settings added 2026-08-05)
-      index.tsx             # Home — quota line, the runner's target READ BACK from saved intake
-                             #  (never re-asked), and Generate plan. As of 2026-08-15 it no longer
-                             #  carries its own goal-type / race-distance / race-date panel: that
-                             #  duplicated intake and blocked a runner with no race. The only field
-                             #  left is a plan length, shown only when there is no race date to
-                             #  derive one from; "Change" routes to /intake. Decision logic lives in
-                             #  src/lib/planRequest.ts, not here. Intake refreshes on focus, with
-                             #  last-known content retained while the request runs.
+      _layout.tsx          # icon-only tab bar — Home, Glossary, My Plans, Settings. Every icon
+                            #  keeps an explicit screen-reader label; the active state is an ink
+                            #  tick, never the signal colour
+      index.tsx             # Home — the top header replaces the static product eyebrow with the
+                             #  server-provided tier + formatted quota, followed immediately by the
+                             #  primary Create plan action. The runner's target is READ BACK from
+                             #  saved intake (never re-asked); the only field left is plan length,
+                             #  shown only when there is no race date to derive one from. Notes and
+                             #  Free's paid-plan teaser appear only after GET /api/plans confirms a
+                             #  persisted plan, refreshed on focus; "Change" routes to /intake.
+                             #  Decision logic lives in src/lib/planRequest.ts, not here.
       settings.tsx           # Settings tab (new 2026-08-05) — tier + quota (GET
                               #  /api/quota-status, src/lib/quotaDisplay.ts), sign-out (moved off
                               #  Home), a Free-tier "Upgrade" entry point to /paywall, and Delete
                               #  Account (native confirm -> deleteAccount() -> authClient.signOut()).
                               #  Quota refreshes cache-first on every focus.
-      glossary.tsx           # abbreviations glossary — sourced from notation.ts, nothing hardcoded
-      my-plans.tsx           # My Plans — lists plans off GET /api/plans, refetched on every tab
-                              #            focus (useFocusEffect), with the last-known list visible
-                              #            during the background request
+      glossary.tsx           # compact accessible disclosure rows, collapsed by default; terms and
+                              #  expanded definitions are sourced from notation.ts, nothing hardcoded
+      my-plans.tsx           # My Plans — the permanent Example Plan is always present; generated
+                              #  plans come from GET /api/plans and refetch on every tab focus, with
+                              #  the last-known list visible during the background request. There is
+                              #  no empty state; the most-recent stat links to max(createdAt)
+      __tests__/             # state render tests for Home's persisted-plan gate, My Plans' permanent
+                              #  example/latest link, and the Glossary's independent disclosures
     intake.tsx               # onboarding questionnaire — THE ONLY place a target race is asked
                               # for (2026-08-15). Numeric answers use src/components/inputs/
                               # (segmented YYYY-MM-DD and H:MM:SS boxes, digit-filtered).
@@ -88,7 +93,8 @@ src/
     brand/                  # RouteLine — the in-app contour ornament, two variants (header, card).
                              # The dusk-era DuskHero/DuskSpark were deleted 2026-09-03 with the
                              # gradient they drew on
-    home/                   # LockedPanel, PlanContentTeaser — the Free-tier lock and its teaser
+    home/                   # LockedPanel, PlanContentTeaser — the post-first-plan Free-tier lock
+                             #  and its paid-content teaser
     intake/                 # IntakeExitAction — the questionnaire's header "Skip for now" / "Done"
     layout/                 # ScreenHeader, GroupedRows (Group / Row / ActionRow)
     nav/                    # TabBarIcon — the four tab glyphs, drawn not shipped as assets
@@ -322,8 +328,9 @@ direction" below.
 
 `src/lib/fixtures/examplePlan.ts` is the 5K golden fixture rendered as real `Plan` data —
 `src/app/plan/[id].tsx` and `src/components/plan/` render it end to end on a real screen
-(ugly-beyond-tokens caveats aside), and `src/app/(tabs)/glossary.tsx` explains its abbreviations,
-reading its copy from `notation.ts`. **As of 2026-08-04, the pure generator is also wired into the
+(ugly-beyond-tokens caveats aside), and `src/app/(tabs)/glossary.tsx` explains its abbreviations
+through collapsed-by-default disclosure rows, reading every definition from `notation.ts`.
+**As of 2026-08-04, the pure generator is also wired into the
 route**: `src/app/plan/[id].tsx` renders a real generated plan fetched via `GET /api/plans/:id` for
 any real plan id, and falls back to the static fixture only for the example-plan id — the fixture
 is the permanent demo/glossary example, not a stand-in for missing wiring.
@@ -332,7 +339,9 @@ There is no `subscription.ts` file — that planned module was never needed as i
 `apiClient.ts`'s `getQuotaStatus()`/`purchaseTier()` wrappers cover the same ground, now consumed
 by `src/app/(tabs)/settings.tsx` and `src/app/paywall.tsx` (both new 2026-08-05) as well as Home.
 Intake now has a screen (`src/app/intake/`, against `GET`/`PUT /api/intake`), and My Plans now has
-one too (`src/app/(tabs)/my-plans.tsx`, against `GET /api/plans`) — both as of 2026-08-04. No
+one too (`src/app/(tabs)/my-plans.tsx`, against `GET /api/plans`) — the latter always includes the
+static example, appends generated rows, and links its newest-date stat to the corresponding plan.
+Both screens date from 2026-08-04. No
 `supabase/functions/`; no `supabase/migrations/`. Auth screens (`src/app/(auth)/`) and the
 client-side API module (`src/lib/apiClient.ts`) now exist — see above.
 `tsconfig.json` maps `@/*` → `./src/*` and `@/assets/*` → `./assets/*`, and **excludes `workers/`**
@@ -348,10 +357,12 @@ src/app/
   (auth)/sign-in, sign-up  # exists today — email/password; Google provider live in production
                            # since 2026-08-09. Gated in by root Stack.Protected when there is no
                            # session.
-  (tabs)/index          # Home / Create plan — exists today (placeholder shell + demo link)
-  (tabs)/glossary       # exists today — abbreviations glossary, not in the original blueprint's
-                         # tab list; added for Ian's 2026-07-11 notation ruling (see change_log.md)
-  (tabs)/my-plans       # My Plans (history) — exists today, lists GET /api/plans
+  (tabs)/index          # Home / Create plan — tier + quota and the primary action lead the screen;
+                         # Notes/subscription disclosures wait for a persisted generated plan
+  (tabs)/glossary       # compact, collapsed-by-default abbreviation disclosures; not in the
+                         # original blueprint's tab list; added for Ian's 2026-07-11 notation ruling
+  (tabs)/my-plans       # My Plans — permanent Example Plan plus GET /api/plans rows; no empty
+                         # state, and MOST RECENT links to the newest generated plan
   (tabs)/settings       # exists today (2026-08-05) — tier + quota display, sign-out, delete
                          # account, an "Upgrade" entry point to /paywall (decision 1, 2026-07-10)
   intake/                # onboarding questionnaire (stack) — exists today, against GET/PUT
@@ -372,10 +383,12 @@ restore purchases) are restored to MVP scope, using the blueprint's reserved thi
 counterpart yet since v1's in-app purchase flow is dummy-only, with no real store receipt to
 restore.
 
-**Decision 5 (2026-07-10):** Home shows the plan link (or "Create a plan") and quota state only —
-no "next workout" or "current week" card. No current-week arithmetic exists in v1; days are
-unnamed and there are no check-offs, so "next" has no well-defined meaning without one. This is
-Ian's override of the recommended `floor(days since created_at / 7) + 1` design.
+**Decision 5 (2026-07-10):** Home leads with "Create plan" and quota state, then shows the saved
+intake target and only the input needed to build the next plan. Notes and subscription disclosures
+are a second-stage surface, hidden until `GET /api/plans` confirms that the runner has generated a
+plan. There is still no "next workout" or "current week" card: no current-week arithmetic exists
+in v1; days are unnamed and there are no check-offs, so "next" has no well-defined meaning without
+one. This is Ian's override of the recommended `floor(days since created_at / 7) + 1` design.
 
 ## Current + planned — `src/lib/` layout
 
@@ -643,7 +656,7 @@ it `getSession()` ignores the header and every route 403s a user who just signed
 | `POST /api/delete-account` | session | — | `{ deleted: true }` | Really deletes; no soft-delete flag, because the app's own copy promises erasure. The only route that deletes a plan. Called from Settings' Delete Account flow (new 2026-08-05), followed client-side by `authClient.signOut()` to invalidate the local session store. |
 | `GET /api/intake` | session | — | `{ intake }` or `{ intake: null }` | Was a direct client read under Supabase. |
 | `PUT /api/intake` | session | `IntakeResponses` | `{ saved: true }` | Was a direct client upsert under Supabase. |
-| `GET /api/plans` | session | — | `{ plans: [summary] }` | My Plans. Summaries only — full documents would be megabytes for a heavy user. |
+| `GET /api/plans` | session | — | `{ plans: [summary] }` | Drives My Plans and Home's persisted-plan stage. My Plans keeps the permanent static example outside this response, links its most-recent stat to `max(createdAt)`, and has no empty-library state. Home uses only whether the list is non-empty to reveal its post-first-plan Notes/subscription panels. Summaries only — full documents would be megabytes for a heavy user. |
 | `GET /api/plans/:id` | session | — | `{ plan, planId, isFallback, quotaConsumed }` or `404` | Someone else's plan id is a `404`, not a `403`: it does not exist to you. |
 
 There is deliberately **no `DELETE /api/plans/:id`**. Count-based quota depends on plans being

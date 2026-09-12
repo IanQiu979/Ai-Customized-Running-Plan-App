@@ -28,7 +28,15 @@ import {
 } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { PrimaryAction } from '@/components/ui/ActionButton';
-import { API_BASE_URL, ApiError, describeError, generatePlan, getIntake, getQuotaStatus } from '@/lib/apiClient';
+import {
+  API_BASE_URL,
+  ApiError,
+  describeError,
+  generatePlan,
+  getIntake,
+  getQuotaStatus,
+  listPlans,
+} from '@/lib/apiClient';
 import { mintIdempotencyKey } from '@/lib/idempotencyKey';
 import { assessGoalRealism } from '@/lib/paceDerivation';
 import {
@@ -48,7 +56,7 @@ const MAX_NOTES_LENGTH = 1000;
 /**
  * Home. Checks whether the signed-in runner has completed intake (`getIntake()`). No intake yet: a
  * prompt links to `/intake`. Intake done: their target, read back from what they already answered,
- * and a single "Generate plan".
+ * and a single "Create plan".
  *
  * **This screen asks no question intake has already asked.** It used to carry its own goal
  * type / race distance / race date panel, which the captain met as a second run through the same
@@ -59,9 +67,10 @@ const MAX_NOTES_LENGTH = 1000;
  * Three states here, plus the two the network forces:
  *
  *  - **Empty** — no intake yet.
- *  - **Populated** — the target, the one signal-marked "Generate plan", and a row pushing to My Plans.
- *  - **Free tier** — the same, with Notes locked behind a dashed `LockedPanel` and a second panel
- *    teasing what a Pro/Elite plan actually contains.
+ *  - **Populated, no plans** — the target, plan length where needed, and the one signal-marked
+ *    "Create plan". Subscription disclosures stay out of the runner's way.
+ *  - **Populated, plan exists** — paid runners get Notes; Free runners get the locked Notes panel
+ *    and a second panel teasing what a Pro/Elite plan contains.
  *  - Loading, and a load error that keeps the last known intake on screen.
  *
  * The Free-tier lock is a **display** of `getQuotaStatus().tier`, never a decision made here.
@@ -79,6 +88,7 @@ export default function HomeScreen() {
 
   const [quota, setQuota] = useState<QuotaStatus | null>(null);
   const [quotaError, setQuotaError] = useState<string | null>(null);
+  const [hasPersistedPlan, setHasPersistedPlan] = useState(false);
 
   const [planLengthWeeks, setPlanLengthWeeks] = useState(String(DEFAULT_PLAN_WEEKS));
   const [notes, setNotes] = useState('');
@@ -89,7 +99,7 @@ export default function HomeScreen() {
   // Held across retries of the SAME attempt (a dropped connection, a re-press before the first
   // reply lands) so the backend's idempotency replay returns that attempt's own result rather than
   // reserving a second quota slot. Re-minted only once a generation actually settles, so the next
-  // *distinct* "Generate plan" press isn't silently replayed as the previous one
+  // *distinct* "Create plan" press isn't silently replayed as the previous one
   // (`generate-plan-flow.ts`'s replay path matches on this key alone, not on the request body).
   const [idempotencyKey, setIdempotencyKey] = useState(() => mintIdempotencyKey());
 
@@ -102,6 +112,7 @@ export default function HomeScreen() {
   // paying runner for as long as the request takes.
   const notesLocked = quota?.tier === 'free';
   const tierKnown = quota !== null;
+  const showPlanOptions = tierKnown && hasPersistedPlan;
 
   // Read-only preview of the same `assessGoalRealism()` the server runs — no new request field,
   // computed client-side from the runner's already-saved intake. Both the goal time and the
@@ -157,6 +168,14 @@ export default function HomeScreen() {
           if (!cancelled) {
             setQuotaError(describeError(quotaFetchError, 'Could not load your quota.', API_BASE_URL));
           }
+        }
+
+        try {
+          const { plans } = await listPlans();
+          if (!cancelled) setHasPersistedPlan(plans.length > 0);
+        } catch {
+          // A failed refresh is not proof that the runner has no plan. Keep a previously
+          // confirmed `true` so a transient network error cannot make paid controls disappear.
         }
       })();
 
@@ -226,7 +245,11 @@ export default function HomeScreen() {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
         >
-          <ScreenHeader eyebrow="Pace Blueprint" title="Today" routeLine />
+          <ScreenHeader
+            eyebrow={quota ? `${quota.tier} · ${formatQuotaLine(quota)}` : undefined}
+            title="Today"
+            routeLine
+          />
 
           {/*
             Outside the branches on purpose. A failed refresh keeps the last known intake, so the
@@ -268,28 +291,21 @@ export default function HomeScreen() {
             <View style={styles.section}>
               {quotaError && <Text style={[styles.error, { color: theme.status.error }]}>{quotaError}</Text>}
 
-              {/* The stat row: tier and remaining quota as a plate, not a caption. */}
-              {quota && (
-                <View
-                  style={[
-                    styles.statRow,
-                    { borderTopColor: theme.hairline, borderBottomColor: theme.hairline },
-                  ]}
+              <PrimaryAction
+                label="Create plan"
+                disabled={generating}
+                busy={generating}
+                onPress={handleGenerate}
+              />
+
+              {generateError && (
+                <Text
+                  accessibilityRole="alert"
+                  accessibilityLiveRegion="assertive"
+                  style={[styles.error, { color: theme.status.error }]}
                 >
-                  <View style={styles.stat}>
-                    <Text style={[styles.statLabel, { color: theme.text.secondary }]}>TIER</Text>
-                    <Text style={[styles.statValue, { color: theme.text.primary }]}>
-                      {quota.tier.toUpperCase()}
-                    </Text>
-                  </View>
-                  <View style={[styles.statDivider, { backgroundColor: theme.hairline }]} />
-                  <View style={styles.stat}>
-                    <Text style={[styles.statLabel, { color: theme.text.secondary }]}>PLANS</Text>
-                    <Text style={[styles.statValue, { color: theme.text.primary }]}>
-                      {formatQuotaLine(quota)}
-                    </Text>
-                  </View>
-                </View>
+                  {generateError}
+                </Text>
               )}
 
               <View
@@ -334,8 +350,9 @@ export default function HomeScreen() {
                 </View>
               )}
 
-              {/* Held back until the server has answered — see `tierKnown`. */}
-              {tierKnown && (
+              {/* Persisted plan state, not a local "has generated" flag, unlocks this second-stage
+                  form. It refreshes whenever Home regains focus. */}
+              {showPlanOptions && (
                 <LockedPanel
                   locked={notesLocked}
                   label="Notes"
@@ -367,7 +384,7 @@ export default function HomeScreen() {
                 </LockedPanel>
               )}
 
-              {notesLocked && (
+              {showPlanOptions && notesLocked && (
                 <LockedPanel
                   locked
                   label="Pace targets, HR zones and coach's notes"
@@ -381,17 +398,6 @@ export default function HomeScreen() {
                   </View>
                 </LockedPanel>
               )}
-
-              {generateError && (
-                <Text style={[styles.error, { color: theme.status.error }]}>{generateError}</Text>
-              )}
-
-              <PrimaryAction
-                label="Generate plan"
-                disabled={generating}
-                busy={generating}
-                onPress={handleGenerate}
-              />
 
               {/* The push toward My Plans. A row, not a second button — this screen already spent
                   its one accent above, and a competing CTA is exactly what that rule prevents. */}
@@ -445,30 +451,6 @@ const styles = StyleSheet.create({
   body: {
     fontFamily: FontFamily.body.regular,
     fontSize: FontSize.sm,
-  },
-  statRow: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    borderTopWidth: Stroke.hairline,
-    borderBottomWidth: Stroke.hairline,
-    paddingVertical: Spacing.three,
-    gap: Spacing.four,
-  },
-  stat: {
-    flex: 1,
-    gap: Spacing.half,
-  },
-  statDivider: {
-    width: Stroke.hairline,
-  },
-  statLabel: {
-    fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.xs,
-    letterSpacing: Tracking.label,
-  },
-  statValue: {
-    fontFamily: FontFamily.display.bold,
-    fontSize: FontSize.lg,
   },
   previewCard: {
     borderWidth: Stroke.hairline,

@@ -5,6 +5,47 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-09-12 — Home and navigation layout audit batch
+
+Captain-audit scope only: Home, the tab bar, My Plans and the Glossary. No new design assets, and
+no heartbeat/graph animation, onboarding or auth-screen work.
+
+- **Create plan now leads Home.** The primary action previously followed the target, plan-length,
+  Notes/subscription panels and library link in source order, leaving it at the bottom of the
+  screen. It now sits immediately below the header, before the target and optional fields, and the
+  action is consistently named "Create plan". Generation failures stay next to that action and are
+  exposed as an assertive accessibility alert.
+- **The Home header now carries live account status.** The static "Pace Blueprint" eyebrow is
+  replaced by `getQuotaStatus()`'s tier and `formatQuotaLine()`'s server-backed used/limit reading.
+  The duplicate tier/quota stat plate lower down is gone; "Today" remains the screen title.
+- **Notes and subscription disclosures are a post-first-plan stage.** The old gate was only
+  `quota !== null`, so those panels appeared as soon as tier data loaded even when the runner had
+  never generated anything. Home now checks persisted state through `GET /api/plans` on every
+  focus and reveals the panels only when that list contains a plan. Paid runners then get editable
+  Notes; Free runners get the locked Notes and paid-content teaser. A transient plan-list failure
+  does not erase a previously confirmed `true` state.
+- **My Plans no longer contradicts its own permanent example.** "Nothing here yet" was keyed only
+  to an empty generated-plan response even though the Example Plan rendered unconditionally above
+  it. That unreachable product state is removed: the example is always the library's baseline,
+  followed by any fetched plans. The MOST RECENT reading now links to the actual newest generated
+  plan, selected with `max(createdAt)` rather than assuming the response is ordered.
+- **The four tabs are icon-only without becoming nameless to assistive technology.** Visible text
+  labels are disabled; Home, Glossary, My Plans and Settings each keep an explicit tab-bar
+  accessibility label. The active ink tick remains, and the decorative icon/tick subtree is hidden
+  from screen readers so it does not duplicate the tab name.
+- **Glossary rows are compact disclosures.** Run-type, unabbreviated-term and structure-shorthand
+  rows show only their abbreviation/term line initially. Each row's drawn arrow expands its full,
+  unchanged `notation.ts` definition inline and toggles independently. The toggle is exposed as a
+  button with `accessibilityState.expanded` and an expand/collapse hint; section titles are exposed
+  as headings.
+- **State-dependent tests exercise absence before presence.**
+  `src/app/(tabs)/__tests__/home.test.tsx` proves the plan basics remain while both paid and Free
+  disclosures are absent with no persisted plan, then proves a refocus revealing the first saved
+  plan changes that state. `my-plans.test.tsx` proves an empty API list still has the Example Plan
+  and no contradictory empty copy, and that an unsorted response links MOST RECENT to the newest
+  id. `glossary.test.tsx` proves definitions are absent initially and appear only for the row that
+  is expanded, covering abbreviated, unabbreviated and structure rows.
+
 ## 2026-09-12 — first-run copy reduced after the captain's audit
 
 - **Cause:** the captain's first-time-user audit found that the onboarding journey gave a stranger
