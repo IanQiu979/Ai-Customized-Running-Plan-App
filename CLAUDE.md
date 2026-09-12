@@ -145,12 +145,14 @@ clean `typecheck && lint && test`. Never force-push without explicit user approv
 ## Testing
 
 jest-expo is installed. New logic added to `src/lib/` gets a test alongside it (see
-`src/lib/__tests__/supabase.test.ts`). Screens are not unit-tested for now. The two rendered-screen
-suites in `src/app/(auth)/__tests__/` are deliberate exceptions (2026-09-04), both because the
-screen's whole behaviour is a dispatched action with no logic layer underneath it to test instead:
-`onboarding.test.tsx` (the CTA gate and its bounded ceiling) and `auth-back-link.test.tsx` (the
-four pre-auth links' navigation action). Each file's header states the reason; add a third only on
-the same grounds.
+`src/lib/__tests__/supabase.test.ts`). Screens are not unit-tested for now. Three rendered-screen
+suites are deliberate exceptions, each because the bug or behaviour under test lives in the
+screen's own render branches with no logic layer underneath to test instead: the two in
+`src/app/(auth)/__tests__/` (2026-09-04) — `onboarding.test.tsx` (the CTA gate and its bounded
+ceiling) and `auth-back-link.test.tsx` (the four pre-auth links' navigation action) — and
+`src/app/(tabs)/__tests__/tab-cache-first.test.tsx` (2026-09-12, the cache-first-on-refocus
+regression proof cited in `docs/change_log.md`'s same-dated entry). Each file's header states the
+reason; add a fourth only on the same grounds.
 
 ## Keep these docs updated — this is a standing rule, not a suggestion
 
