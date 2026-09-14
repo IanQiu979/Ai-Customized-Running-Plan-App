@@ -18,10 +18,10 @@
  * active state is an ink tick, drawn in `(tabs)/_layout.tsx`.
  *
  * The `Theme`'s `fonts` block is deliberately left stock, and that is a choice, not an oversight:
- * nothing renders a header title today (`plan/[id].tsx` sets `headerTitle: ''`; every other screen
- * is `headerShown: false`), so there is no way to see it. The day a real header title lands, map
- * this to `FontFamily.body` — the system mandates Public Sans for UI chrome, and the stock block
- * resolves to system San Francisco / Roboto.
+ * no screen relies on it (`paywall.tsx` sets `headerTitle: ''`, `intake.tsx` styles its own title
+ * with `FontFamily.body`, and every other screen is `headerShown: false`), so there is no way to
+ * see it. The day a stock header title lands, map this to `FontFamily.body` — the system mandates
+ * IBM Plex Sans for UI chrome, and the stock block resolves to system San Francisco / Roboto.
  *
  * SDK 56: `expo-router` forked away from `@react-navigation/*` (most direct imports of those
  * packages stop resolving once expo-router no longer pulls them in transitively). `DarkTheme`,

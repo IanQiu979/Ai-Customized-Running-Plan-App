@@ -125,6 +125,8 @@ src/
     plan/                   # PlanTopBar (back arrow + mono eyebrow), PlanListRow (a My Plans
                              # row: miniature strip, title, meta), planScreen.ts (the three detail
                              # screens' shared derivations: current week/day, week tag, day label),
+                             # PlanPlaceholder (a detail screen's loading / nothing-to-show state,
+                             # with its own PlanTopBar so the runner always has a way back),
                              # EffortChip, ReadoutBracket, DisclaimerFooter, FallbackNotice,
                              # GoalRealismNotice, format.ts. WeekAccordion / WorkoutRow /
                              # PlanNameplate were deleted 2026-09-14 with the ribbon view

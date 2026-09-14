@@ -7,8 +7,8 @@ import { Spacing, Stroke } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 /**
- * The tab group — Home / Glossary / My Plans / Settings. `src/app/plan/[id].tsx` stays a Stack
- * route outside this group by design: the plan view is a full-screen destination, not a tab.
+ * The tab group — Home / Glossary / My Plans / Settings. The `src/app/plan/[id]/` screens stay
+ * Stack routes outside this group by design: the plan view is a full-screen destination, not a tab.
  *
  * The bar (`docs/design/instrument-visual-system.md`): flat `surface.raised`, one top
  * hairline, no shadow, and four thin-stroke line icons. The active tab draws its icon above an
