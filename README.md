@@ -107,8 +107,9 @@ src/
     _layout.tsx
     (auth)/
       index.tsx            # redirect anchor -> onboarding
-      onboarding.tsx        # scroll-down landing read: pulse-trace cover, three beats, then
-                             #   "Get started" -> sign-up
+      onboarding.tsx        # scroll-down landing read: the build hero ("the plan builds itself"),
+                             #   three steps with their own small builds, then "Get started"
+                             #   -> sign-up
       sign-in.tsx, sign-up.tsx  # email/password + "Continue with Google"; provider live in
                                  #   production since 2026-08-09
     (tabs)/
@@ -117,16 +118,19 @@ src/
       glossary.tsx        # run-type abbreviations glossary
       my-plans.tsx          # My Plans — lists GET /api/plans
       settings.tsx           # Settings — tier/quota display, sign-out, delete account
-    intake.tsx              # onboarding questionnaire, against GET/PUT /api/intake
+    intake.tsx              # survey intro (first time), then the questionnaire, against
+                             #  GET/PUT /api/intake
     paywall.tsx              # dummy paywall — calls POST /api/purchase-tier
-    plan/[id].tsx          # plan view — real plans via GET /api/plans/:id, plus the permanent
-                            #  golden-fixture example
+    plan/[id]/              # plan detail: overview (index) -> week/[week] -> week/[week]/day/[day];
+                            #  real plans via GET /api/plans/:id, plus the permanent golden-fixture
+                            #  example
   components/
-    plan/                  # plan-view UI: nameplate, effort chip, workout row, week accordion, ...
-    onboarding/            # PulseTraceSlot — the integration point for the signature animation
+    build/                 # the build animations and the week strip at every size —
+                            #  see docs/design/build-animations.md
+    plan/                  # plan-detail UI: top bar, list row, effort chip, notices, ...
     ui/                     # ActionButton — the one implementation of the primary/secondary CTA
   constants/
-    theme.ts                # "Instrument" design tokens — see docs/design/instrument-visual-system.md
+    theme.ts                # "Blueprint" design tokens — see docs/design/instrument-visual-system.md
   hooks/
     use-color-scheme.ts, use-color-scheme.web.ts, use-theme.ts
   lib/

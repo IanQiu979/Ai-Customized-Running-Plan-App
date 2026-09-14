@@ -1,15 +1,20 @@
 import {
-  BigShoulders_600SemiBold,
-  BigShoulders_700Bold,
-  BigShoulders_800ExtraBold,
-} from '@expo-google-fonts/big-shoulders';
+  BarlowCondensed_500Medium,
+  BarlowCondensed_600SemiBold,
+  BarlowCondensed_700Bold,
+  BarlowCondensed_800ExtraBold,
+} from '@expo-google-fonts/barlow-condensed';
 import {
-  PublicSans_400Regular,
-  PublicSans_500Medium,
-  PublicSans_600SemiBold,
-  PublicSans_700Bold,
-} from '@expo-google-fonts/public-sans';
-import { SpaceMono_400Regular, SpaceMono_700Bold } from '@expo-google-fonts/space-mono';
+  IBMPlexMono_400Regular,
+  IBMPlexMono_500Medium,
+  IBMPlexMono_700Bold,
+} from '@expo-google-fonts/ibm-plex-mono';
+import {
+  IBMPlexSans_400Regular,
+  IBMPlexSans_500Medium,
+  IBMPlexSans_600SemiBold,
+  IBMPlexSans_700Bold,
+} from '@expo-google-fonts/ibm-plex-sans';
 import { useFonts } from 'expo-font';
 import { Stack, ThemeProvider, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -29,19 +34,21 @@ export default function RootLayout() {
   const router = useRouter();
   const { data: session, isPending: sessionPending } = authClient.useSession();
 
-  // The nine faces `FontFamily` (`src/constants/theme.ts`) names, and only those — the keys here
-  // ARE the `fontFamily` strings the rest of the app writes, so the two lists cannot drift
+  // The eleven faces `FontFamily` (`src/constants/theme.ts`) names, and only those — the keys
+  // here ARE the `fontFamily` strings the rest of the app writes, so the two lists cannot drift
   // without a missing font silently falling back to the system face.
   const [fontsLoaded] = useFonts({
-    BigShoulders_600SemiBold,
-    BigShoulders_700Bold,
-    BigShoulders_800ExtraBold,
-    PublicSans_400Regular,
-    PublicSans_500Medium,
-    PublicSans_600SemiBold,
-    PublicSans_700Bold,
-    SpaceMono_400Regular,
-    SpaceMono_700Bold,
+    BarlowCondensed_500Medium,
+    BarlowCondensed_600SemiBold,
+    BarlowCondensed_700Bold,
+    BarlowCondensed_800ExtraBold,
+    IBMPlexSans_400Regular,
+    IBMPlexSans_500Medium,
+    IBMPlexSans_600SemiBold,
+    IBMPlexSans_700Bold,
+    IBMPlexMono_400Regular,
+    IBMPlexMono_500Medium,
+    IBMPlexMono_700Bold,
   });
 
   // `sessionPending` is not a one-shot "still loading" flag — better-auth re-raises it on every
@@ -108,6 +115,8 @@ export default function RootLayout() {
           <Stack.Protected guard={!!session}>
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="plan/[id]" />
+            <Stack.Screen name="plan/[id]/week/[week]" />
+            <Stack.Screen name="plan/[id]/week/[week]/day/[day]" />
             <Stack.Screen name="intake" />
             <Stack.Screen name="paywall" />
           </Stack.Protected>

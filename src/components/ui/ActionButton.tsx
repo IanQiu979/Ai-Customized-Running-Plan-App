@@ -1,7 +1,18 @@
 import type { ReactNode } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
+import Animated, { useAnimatedProps, useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
+import Svg, { Rect } from 'react-native-svg';
 
 import {
+  Accent,
   FontFamily,
   FontSize,
   PressedOpacity,
@@ -11,34 +22,29 @@ import {
   Tracking,
 } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { draw, enter } from '@/lib/buildMotion';
 
 /**
- * The two button shapes the Instrument system allows, in one module so that the "one signal per
+ * The button shapes the Blueprint system allows, in one module so that the "one accent per
  * screen" rule is enforceable by reading imports rather than by auditing eight hand-rolled
  * `StyleSheet` blocks — which is what the app had before, and why the accent's treatment drifted
  * between Home, intake and the auth screens.
  *
- * `PrimaryAction` IS the signal. A screen gets at most one, and the review question is simply
- * "how many `<PrimaryAction>` does this file render?".
+ * `PrimaryAction` IS the accent. A screen gets at most one, and the review question is simply
+ * "how many `<PrimaryAction>` (or `<RevealPrimaryAction>`) does this file render?".
  */
 
+/** The V22 sheet: buttons 12pt radius, 48–52pt tall. */
+const BUTTON_HEIGHT = 52;
+
 /**
- * The screen's single forward action: a near-black slab (`Accent.field`) with a 1.5pt icy-cyan
- * edge and an icy-cyan label, identical in light and dark mode.
+ * The screen's single forward action: an ink slab (`Accent.fill`, the sheet's near-white) with
+ * the page colour as its label, so it reads as a cut-out of the field rather than as a coloured
+ * object on it. Same in every scheme — the app has one.
  *
- * Why the fill is never the cyan: `Accent.signal` measures 1.27:1 against a white page, so a cyan
- * slab in light mode would have no boundary at all. Splitting it — near-black slab, cyan edge —
- * gives the control a boundary in both schemes through different channels (light: the slab, at
- * 19.35:1 against the page; dark: the edge, at 14.74:1), which is what lets one appearance serve
- * both. Both ratios are asserted in `constants/__tests__/theme.contrast.test.ts`.
- *
- * Disabled drops the signal entirely rather than dimming it: the highlight is spent on a live
- * action or not at all, so a disabled control is an inert `progress.disabled` slab with an
- * ordinary ink label (7.63:1 light / 7.24:1 dark — dead-looking, still readable).
- *
- * It renders on `surface.base`, on `surface.raised`, and on a `surface.inverse` slab. On the last
- * of those the fill matches the slab exactly and the cyan edge is the whole control — deliberate,
- * and the reason Paywall's recommended tier needs no special case.
+ * Disabled drops the fill entirely rather than dimming it: the accent is spent on a live action
+ * or not at all, so a disabled control is an inert `progress.disabled` slab with an ordinary ink
+ * label (dead-looking, still readable — asserted in `theme.contrast.test.ts`).
  */
 export function PrimaryAction({
   label,
@@ -73,16 +79,16 @@ export function PrimaryAction({
       style={({ pressed }) => [
         styles.button,
         inert
-          ? { backgroundColor: theme.progress.disabled, borderColor: 'transparent' }
-          : { backgroundColor: theme.accent.field, borderColor: theme.accent.signal },
+          ? { backgroundColor: theme.progress.disabled }
+          : { backgroundColor: theme.accent.fill },
         pressed && !inert && styles.pressed,
         style,
       ]}
     >
       {busy ? (
-        <ActivityIndicator color={theme.text.primary} />
+        <ActivityIndicator color={inert ? theme.text.primary : theme.accent.onFill} />
       ) : (
-        <Text style={[styles.label, { color: inert ? theme.text.primary : theme.accent.signal }]}>
+        <Text style={[styles.label, { color: inert ? theme.text.primary : theme.accent.onFill }]}>
           {label}
         </Text>
       )}
@@ -90,9 +96,97 @@ export function PrimaryAction({
   );
 }
 
+const AnimatedRect = Animated.createAnimatedComponent(Rect);
+
+/**
+ * The primary action as the last beat of onboarding (V22-02 "Get started"): its outline draws
+ * itself around the slab over 0.6 s, the ink fill sweeps in from the left (0.65 s → 1.1 s), and
+ * the label fades up (0.85 s → 1.15 s). Same slab, same label, same press — only the arrival is
+ * choreographed, and it is driven by the caller's build clock `T` (seconds, see
+ * `lib/buildMotion.ts`) so it plays when the step scrolls into view and holds its end frame.
+ *
+ * Pressable only once the fill has landed: a button that is still an outline is not yet an
+ * action. Under reduced motion the caller's clock sits at its end and the control is simply the
+ * finished button.
+ */
+export function RevealPrimaryAction({
+  T,
+  startAt = 0,
+  label,
+  onPress,
+  disabled = false,
+  accessibilityHint,
+  style,
+}: {
+  T: SharedValue<number>;
+  /** Where on the caller's clock the reveal begins. */
+  startAt?: number;
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+  accessibilityHint?: string;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const theme = useTheme();
+  // The page draws a 345 × 52 rounded rect; the perimeter is what the dash offset counts down.
+  const width = REVEAL_WIDTH;
+  const perimeter = 2 * (width + BUTTON_HEIGHT) - 8 * Radius.button + 2 * Math.PI * Radius.button;
+
+  const outline = useAnimatedProps(() => ({
+    strokeDashoffset: perimeter * (1 - draw(T.value, startAt, 0.6)),
+  }));
+  const fill = useAnimatedStyle(() => ({
+    transform: [{ scaleX: enter(T.value, startAt + 0.65, 0.45) }],
+  }));
+  const text = useAnimatedStyle(() => ({
+    opacity: enter(T.value, startAt + 0.85, 0.3),
+  }));
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled }}
+      accessibilityHint={accessibilityHint}
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [styles.reveal, { width }, pressed && !disabled && styles.pressed, style]}
+    >
+      <Animated.View
+        style={[styles.revealFill, { backgroundColor: disabled ? theme.progress.disabled : theme.accent.fill }, fill]}
+      />
+      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+        <Svg width={width} height={BUTTON_HEIGHT}>
+          <AnimatedRect
+            x={0.5}
+            y={0.5}
+            width={width - 1}
+            height={BUTTON_HEIGHT - 1}
+            rx={Radius.button}
+            fill="none"
+            stroke={theme.text.primary}
+            strokeWidth={Stroke.thin}
+            strokeDasharray={[perimeter]}
+            animatedProps={outline}
+          />
+        </Svg>
+      </View>
+      <Animated.Text
+        style={[styles.label, { color: disabled ? theme.text.primary : theme.accent.onFill }, text]}
+      >
+        {label}
+      </Animated.Text>
+    </Pressable>
+  );
+}
+
+/** The page's button width (393 − 2 × 24). The reveal is drawn at this width and centred by its
+ * caller; a wider screen keeps the page's proportions rather than stretching the outline. */
+export const REVEAL_WIDTH = 345;
+
 /**
  * Everything that is a real action but not THE action: the Google buttons on the auth screens, a
- * non-recommended tier on Paywall. A hairline-bordered ink outline, no fill, no signal — the
+ * non-recommended tier on Paywall. A hairline-bordered ink outline, no fill, no accent — the
  * system's near-monochrome default.
  *
  * `tone="onInverse"` is for a secondary action sitting on a `surface.inverse` slab, where the
@@ -181,17 +275,33 @@ export function LinkAction({
   );
 }
 
+/** Exported for the contrast/render tests, which assert the fill rather than a colour literal. */
+export const PRIMARY_FILL = Accent.fill;
+
 const styles = StyleSheet.create({
   button: {
-    minHeight: Spacing.six,
-    borderRadius: Radius.control,
-    borderWidth: Stroke.mark,
+    minHeight: BUTTON_HEIGHT,
+    borderRadius: Radius.button,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: Spacing.three,
   },
   secondary: {
     backgroundColor: 'transparent',
+    borderWidth: Stroke.thin,
+  },
+  reveal: {
+    height: BUTTON_HEIGHT,
+    alignSelf: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    borderRadius: Radius.button,
+  },
+  revealFill: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    borderRadius: Radius.button,
+    transformOrigin: 'left',
   },
   label: {
     fontFamily: FontFamily.body.semiBold,

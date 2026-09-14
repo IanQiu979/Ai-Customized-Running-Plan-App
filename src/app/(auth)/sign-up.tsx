@@ -8,33 +8,29 @@ import {
   Text,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AuthField } from '@/components/auth/AuthField';
-import { PulseTraceSlot } from '@/components/onboarding/PulseTraceSlot';
 import {
   ActionDivider,
   LinkAction,
   PrimaryAction,
   SecondaryAction,
 } from '@/components/ui/ActionButton';
-import {
-  Accent,
-  FontFamily,
-  FontSize,
-  MaxContentWidth,
-  Spacing,
-  Tracking,
-} from '@/constants/theme';
+import { FontFamily, FontSize, MaxContentWidth, Spacing, Tracking } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { API_BASE_URL, authClient, describeError, signInWithGoogle } from '@/lib/apiClient';
 import { markPostSignupRedirect } from '@/lib/postSignupRedirect';
 
-/** Sign-up. Peer of `sign-in.tsx` — same pulse-trace band, same page form, same single signal
+/** Sign-up. Peer of `sign-in.tsx` — same wordmark, same page form, same single ink-filled
  * action, same link back to onboarding. See that file's header for the shared rationale. */
+/** The wordmark's size on the V22 pages (`v22-0N-scene.jsx`: 21pt Barlow Condensed 600). */
+const WORDMARK_SIZE = 21;
+
 export default function SignUpScreen() {
   const theme = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -99,9 +95,16 @@ export default function SignUpScreen() {
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
           >
-            <PulseTraceSlot size="band">
-              <Text style={[styles.eyebrow, { color: Accent.onFieldMuted }]}>PACE BLUEPRINT</Text>
-            </PulseTraceSlot>
+            {/* The wordmark sits on the page itself: the SafeAreaView excludes the top edge (the
+                old field bled into it), so the inset is added here. */}
+            <Text
+              style={[
+                styles.wordmark,
+                { color: theme.text.primary, paddingTop: insets.top + Spacing.four },
+              ]}
+            >
+              Pace Blueprint
+            </Text>
 
             <View style={styles.form}>
               <View style={styles.formHeader}>
@@ -186,10 +189,12 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: MaxContentWidth,
   },
-  eyebrow: {
-    fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.xs,
-    letterSpacing: Tracking.label,
+  wordmark: {
+    fontFamily: FontFamily.display.semiBold,
+    fontSize: WORDMARK_SIZE,
+    letterSpacing: 0.5,
+    textAlign: 'center',
+    paddingBottom: Spacing.four,
   },
   formHeader: {
     gap: Spacing.one,

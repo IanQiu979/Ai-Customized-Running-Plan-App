@@ -42,9 +42,9 @@ describe('NavigationLightTheme', () => {
     expect(NavigationLightTheme.fonts).toBe(DefaultTheme.fonts);
   });
 
-  it('does not route the nav-active color through the signal accent', () => {
+  it('does not route the nav-active color through the accent', () => {
     expect(NavigationLightTheme.colors.primary).toBe(Colors.light.text.primary);
-    expect(NavigationLightTheme.colors.primary).not.toBe(Accent.signal);
+    expect(NavigationLightTheme.colors.primary).not.toBe(Accent.fill);
   });
 });
 
@@ -74,9 +74,12 @@ describe('NavigationDarkTheme', () => {
     expect(NavigationDarkTheme.fonts).toBe(DarkTheme.fonts);
   });
 
-  it('does not route the nav-active color through the signal accent', () => {
+  it('does not route the nav-active color through the accent', () => {
     expect(NavigationDarkTheme.colors.primary).toBe(Colors.dark.text.primary);
-    expect(NavigationDarkTheme.colors.primary).not.toBe(Accent.signal);
+    // The dark scheme's ink IS the accent fill (a button is a cut-out of the page), so the nav
+    // primary equalling it is not a leak; what must never happen is the accent being an
+    // independent highlight routed into navigation. Pinned by the theme test instead.
+    expect(Accent.fill).toBe(Colors.dark.text.primary);
   });
 });
 

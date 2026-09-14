@@ -1,16 +1,14 @@
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import type { ReactElement } from 'react';
-import { Text, processColor } from 'react-native';
+import { Text } from 'react-native';
 
 import { Accent, Colors } from '@/constants/theme';
 
-import { RouteLine } from '../brand/RouteLine';
 import { LockedPanel } from '../home/LockedPanel';
 import { PlanContentTeaser } from '../home/PlanContentTeaser';
 import { ActionRow, Group, Row } from '../layout/GroupedRows';
 import { ScreenHeader } from '../layout/ScreenHeader';
 import { TabBarIcon, type TabIconName } from '../nav/TabBarIcon';
-import { PulseTraceSlot } from '../onboarding/PulseTraceSlot';
 import { ActionDivider, LinkAction, PrimaryAction, SecondaryAction } from '../ui/ActionButton';
 
 /**
@@ -49,44 +47,8 @@ function findProp(node: unknown, key: string): unknown {
   return undefined;
 }
 
-describe('RouteLine', () => {
-  it('renders every variant without measuring first', () => {
-    // The pre-layout pass is the real risk: width is 0 until `onLayout` fires, and `routePath([])`
-    // returns '' rather than a malformed `d`. If this ever throws, the ornament crashes the first
-    // frame of Home, My Plans and Plan view simultaneously.
-    for (const variant of ['header', 'card'] as const) {
-      const tree = render(<RouteLine variant={variant} />);
-      expect(tree.toJSON()).toBeTruthy();
-    }
-  });
-
-  it('draws nothing before layout, and a real path after it', () => {
-    const tree = render(<RouteLine variant="header" showSummit baseline />);
-
-    // Pre-layout: width is 0, so there is no `<Svg>` at all rather than one with an empty `d`.
-    expect(JSON.stringify(tree.toJSON())).not.toContain('"d":');
-
-    const measurable = tree.root.findAll(
-      (node) => typeof (node.props as { onLayout?: unknown }).onLayout === 'function'
-    );
-    act(() => {
-      (measurable[0].props as { onLayout: (event: unknown) => void }).onLayout({
-        nativeEvent: { layout: { width: 320, height: 24 } },
-      });
-    });
-
-    // Post-layout: a `d` that actually starts with a moveto and carries cubic segments. An empty
-    // or malformed `d` renders as nothing at all, which is precisely the failure a screenshot of
-    // a 1.5pt ornament would not catch.
-    const svg = JSON.parse(JSON.stringify(tree.toJSON()));
-    const path = findProp(svg, 'd');
-    expect(typeof path).toBe('string');
-    expect(path as string).toMatch(/^M [\d.]+ [\d.]+ C /);
-  });
-});
-
 describe('TabBarIcon', () => {
-  const names: TabIconName[] = ['route', 'book', 'cards', 'gear'];
+  const names: TabIconName[] = ['strip', 'book', 'cards', 'gear'];
 
   it.each(names)('renders the %s icon', (name) => {
     const tree = render(<TabBarIcon name={name} color="#241C17" />);
@@ -102,8 +64,8 @@ describe('TabBarIcon', () => {
 });
 
 describe('ScreenHeader', () => {
-  it('renders with and without the route line', () => {
-    expect(render(<ScreenHeader title="My Plans" routeLine />).toJSON()).toBeTruthy();
+  it('renders with the hairline rule', () => {
+    expect(render(<ScreenHeader title="My Plans" />).toJSON()).toBeTruthy();
     expect(render(<ScreenHeader title="Settings" />).toJSON()).toBeTruthy();
   });
 
@@ -207,28 +169,26 @@ function styleOf(node: unknown): Record<string, unknown> {
 }
 
 describe('PrimaryAction', () => {
-  it('spends the signal on a live action: near-black field, cyan edge, cyan label', () => {
-    // The whole two-tier accent in one assertion. If the fill ever becomes the cyan, this fails —
-    // and it should, because `Accent.signal` has no boundary on a light page (1.27:1). See
-    // `constants/__tests__/theme.contrast.test.ts`.
+  it('spends the accent on a live action: an ink slab with the page colour as its label', () => {
+    // The V22 sheet: Ink is the primary button's fill, and the label is the field it is cut out
+    // of. See `constants/__tests__/theme.contrast.test.ts` for the ratios.
     const tree = render(<PrimaryAction label="Get started" onPress={jest.fn()} />);
     const style = styleOf(tree.toJSON());
 
-    expect(style.backgroundColor).toBe(Accent.field);
-    expect(style.borderColor).toBe(Accent.signal);
+    expect(style.backgroundColor).toBe(Accent.fill);
 
     const label = tree.root.findAllByType(Text)[0];
-    expect(styleOf({ props: label.props })).toMatchObject({ color: Accent.signal });
+    expect(styleOf({ props: label.props })).toMatchObject({ color: Accent.onFill });
   });
 
-  it('withdraws the signal entirely when disabled — an inert slab, not a dim cyan one', () => {
+  it('withdraws the accent entirely when disabled — an inert slab, not a dim ink one', () => {
     const tree = render(<PrimaryAction label="Get started" disabled onPress={jest.fn()} />);
     const style = styleOf(tree.toJSON());
 
-    expect(style.backgroundColor).toBe(Colors.light.progress.disabled);
-    expect(style.backgroundColor).not.toBe(Accent.field);
-    expect(style.borderColor).toBe('transparent');
-    expect(JSON.stringify(tree.toJSON())).not.toContain(Accent.signal);
+    expect(style.backgroundColor).toBe(Colors.dark.progress.disabled);
+    expect(style.backgroundColor).not.toBe(Accent.fill);
+    const label = tree.root.findAllByType(Text)[0];
+    expect(styleOf({ props: label.props })).toMatchObject({ color: Colors.dark.text.primary });
   });
 
   it('announces its disabled state, so the dead fill is never the only channel carrying it', () => {
@@ -248,17 +208,17 @@ describe('PrimaryAction', () => {
 });
 
 describe('SecondaryAction', () => {
-  it('never carries the signal — that is the whole point of it being secondary', () => {
+  it('never carries the fill — that is the whole point of it being secondary', () => {
     const tree = render(<SecondaryAction label="Sign in with Google" onPress={jest.fn()} />);
-    expect(JSON.stringify(tree.toJSON())).not.toContain(Accent.signal);
-    expect(styleOf(tree.toJSON()).borderColor).toBe(Colors.light.text.primary);
+    expect(styleOf(tree.toJSON()).backgroundColor).toBe('transparent');
+    expect(styleOf(tree.toJSON()).borderColor).toBe(Colors.dark.text.primary);
   });
 
   it('takes light ink on an inverse slab, where the ordinary border would be invisible', () => {
     const tree = render(
       <SecondaryAction label="Choose Pro" tone="onInverse" onPress={jest.fn()} />
     );
-    expect(styleOf(tree.toJSON()).borderColor).toBe(Colors.light.text.onInverse);
+    expect(styleOf(tree.toJSON()).borderColor).toBe(Colors.dark.text.onInverse);
   });
 });
 
@@ -267,46 +227,5 @@ describe('ActionDivider and LinkAction', () => {
     expect(JSON.stringify(render(<ActionDivider />).toJSON())).toContain('OR');
     const link = render(<LinkAction onPress={jest.fn()}>Already have an account?</LinkAction>);
     expect(JSON.stringify(link.toJSON())).toContain('Already have an account?');
-  });
-});
-
-describe('PulseTraceSlot', () => {
-  it('paints its own dark field and draws the trace in the signal colour', () => {
-    // The field is deliberately NOT scheme-resolved: the bold moment looks the same in light and
-    // dark mode, which is what makes it read as a signature rather than as a themed decoration.
-    const tree = render(<PulseTraceSlot />);
-
-    expect(styleOf(tree.toJSON()).backgroundColor).toBe(Accent.field);
-    // `react-native-svg` resolves a stroke to a processed colour payload rather than keeping the
-    // hex, so the expectation is processed the same way instead of hard-coding the integer.
-    expect(findProp(tree.toJSON(), 'stroke')).toEqual({
-      type: 0,
-      payload: processColor(Accent.signal),
-    });
-  });
-
-  it('renders the copy laid over the field', () => {
-    const tree = render(
-      <PulseTraceSlot size="band">
-        <Text>PACE BLUEPRINT</Text>
-      </PulseTraceSlot>
-    );
-    expect(JSON.stringify(tree.toJSON())).toContain('PACE BLUEPRINT');
-  });
-
-  it('settles immediately when nothing drives it, so a gated CTA is never stranded', () => {
-    // The placeholder has no draw to wait for, and the real `<PulseTraceHero>` behaves the same
-    // way under reduced motion. Onboarding gates "Get started" on this callback, so a slot that
-    // never raised it would leave the only forward action permanently disabled.
-    const onSettled = jest.fn();
-    render(<PulseTraceSlot onSettled={onSettled} />);
-    expect(onSettled).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not self-settle when a caller drives it — the runner owns that timeline', () => {
-    const onSettled = jest.fn();
-    const progress = { value: 0 } as { value: number };
-    render(<PulseTraceSlot progress={progress as never} onSettled={onSettled} />);
-    expect(onSettled).not.toHaveBeenCalled();
   });
 });

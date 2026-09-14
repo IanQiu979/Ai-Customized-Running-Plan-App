@@ -286,38 +286,38 @@ Built-ins also available: `Explore`, `Plan`, `general-purpose`. Plugin agents ar
   Every numeric input goes through `src/components/inputs/`, which filters keystrokes via
   `src/lib/fieldInput.ts`; dates and times are segmented boxes with the `-`/`:` printed, never
   typed. Do not add a raw `<TextInput keyboardType="...">` for a numeric answer.
-- **The design system is "Instrument", and its accent has exactly one legal shape.** Near-
-  monochrome white/graphite and charcoal, with a theme-invariant two-tier accent: a near-black
-  `Accent.field` slab carrying ONE icy-cyan `Accent.signal`, spent on one call-to-action per
-  screen and on the onboarding pulse trace. **The cyan is never a fill** — it measures 1.27:1
-  against a white page, so a cyan button would have no boundary at all; that measurement, not
-  taste, is why the primary CTA is a dark slab with a cyan edge and label. Render it through
-  `src/components/ui/ActionButton.tsx`'s `PrimaryAction` and never hand-roll it, so "one accent
-  per screen" stays a question about imports. Values and reasoning:
-  [`docs/design/instrument-visual-system.md`](docs/design/instrument-visual-system.md).
+- **The design system is "Blueprint" — the captain's V22 theme sheet — and the accent is ink.**
+  One near-black field (dark scheme only), ink `#EEF1F4` for headings, numbers and the primary
+  button's fill, dim `#8B9299` for labels, and two session colours (easy `#4DB58C`, hard
+  `#E0864E`) that touch bars and tiles only, never text or chrome. There is no cyan and no second
+  highlight. Render the primary action through `src/components/ui/ActionButton.tsx`'s
+  `PrimaryAction` / `RevealPrimaryAction` and never hand-roll it, so "one accent per screen" stays
+  a question about imports. Fonts are Barlow Condensed / IBM Plex Mono / IBM Plex Sans. Values:
+  the "Blueprint" section of
+  [`docs/design/instrument-visual-system.md`](docs/design/instrument-visual-system.md); the
+  Instrument text beneath it is superseded history, kept for its rules.
 - **Contrast is enforced, not documented.** `src/constants/__tests__/theme.contrast.test.ts`
-  recomputes every ratio in `theme.ts` from the hexes, asserts the effort ramp's Lab distance from
-  the signal colour, and asserts the three ratios that are deliberately *below* the floor
-  (`progress.disabled`; the signal on a light page, which is why it is never a fill; the dark-mode
-  slab that the cyan edge exists to compensate for). Do not "fix" a failing below-floor assertion —
-  read what it is for first. A new colour token fails the token count until it is given a floor on
-  purpose.
-- **`Accent.field`/`Accent.signal` are duplicated in `src/constants/pulseTrace.ts`** (the
-  onboarding animation's own palette, written in parallel with the token rewrite). The contrast
-  test pins the `theme.ts` side only — `pulseTrace.ts` is not on this branch, so it cannot be
-  imported or asserted against, and the animation's copy can still drift. The pin becomes
-  two-sided once `fm/v22-redesign-animation` lands; folding that palette into a re-export from
-  `theme.ts` is the tidy-up once both branches have landed.
+  recomputes every ratio in `theme.ts` from the hexes — both schemes, the accent, the session
+  tones, the effort ramp — and asserts `progress.disabled`, which is deliberately *below* the
+  floor, against a ceiling. Do not "fix" a failing below-floor assertion — read what it is for
+  first. A new colour token fails the token count until it is given a floor on purpose.
+- **The build animations are ports, not designs.** Every one (onboarding hero, the step pieces,
+  the survey intro, the Home header mark, the My Plans hero) derives from a single clock in
+  seconds through `src/lib/buildMotion.ts`, whose cue tables and easings are the approved V22
+  pages' own numbers, and renders `src/lib/weekStrip.ts`'s strip. Timings never live in a
+  component; reduced motion is the end frame (`useBuildClock` starts at the end); a build plays
+  once and holds, and only the header mark may re-run, only when its data changes. Guide:
+  [`docs/design/build-animations.md`](docs/design/build-animations.md). The design handoff (pages,
+  scene sources, `V22 theme.md`) is read-only reference on the captain's USB, not in the repo.
 - **AI output validation is structural, not strict-content.** `ai-feature-builder` and
   `prompt-engineer` follow [`docs/reference/plan-generation.md`](docs/reference/plan-generation.md):
   validate shape, retry once, fall back to a template.
-- **The pulse trace owns its palette, and the icy cyan is not a decoration colour.**
-  `src/components/brand/PulseTraceHero.tsx` (the redesign's signature onboarding animation) reads
-  colour ONLY from `src/constants/pulseTrace.ts`, never from `theme.ts` — see that file's header
-  for why, and `docs/design/pulse-trace.md` for how to mount it. Under the redesigned house style
-  the cyan is reserved for the true primary CTA and this animation; do not reuse it for links,
-  charts or badges, and do not give the animation a light-mode variant — it paints its own dark
-  field in both schemes.
+- **The heartbeat/pulse-trace and graph motifs are retired app-wide (2026-09-14, spec §V22-06),
+  and the week strip is the app's one drawing.** `PulseTraceHero`, `RouteLine`, the accordion's
+  effort ribbon and their libs are deleted; do not reintroduce a waveform, a contour line or a
+  chart as ornament. A strip is `WeekStrip` (animated), `StaticWeekStrip`, `MiniWeekStrip` or
+  `HeaderMark` — the same drawing at four sizes — and days under it are `01 … 07`, never Mon–Sun,
+  even where an approved page prints MON…SUN.
 - **The progression suite's 22,000-plan baseline mask is a gate, not a fixture — never regenerate
   it.** `src/lib/__tests__/planTemplates.progression.test.ts` encodes the exact *membership* of the
   known peak-below-pre-peak-loading offender set as a base64 mask, so a change may remove offenders

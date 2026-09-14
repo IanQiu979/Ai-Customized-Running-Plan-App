@@ -86,23 +86,32 @@ clean `typecheck && lint && test`. Never force-push without explicit user approv
 
 - TypeScript strict everywhere (already on in `tsconfig.json`).
 - Theme tokens only — no hardcoded colors or spacing in components; use
-  `src/constants/theme.ts`. It holds the **"Instrument"** token system (2026-09-03, replacing
-  "Trailhead", which replaced "Instrument & Matter"): near-monochrome white/graphite and charcoal,
-  with a theme-invariant two-tier accent — a near-black `Accent.field` slab carrying ONE icy-cyan
-  `Accent.signal`, spent on exactly one call-to-action per screen and on the onboarding pulse
-  trace, never anywhere else. Source of truth for every value:
+  `src/constants/theme.ts`. It holds the **"Blueprint"** token system (2026-09-14 — the captain's
+  own `V22 theme.md` sheet from the design handoff, replacing "Instrument" of 2026-09-03): one
+  near-black field, rendered as the **dark scheme only** (the light palette is kept but
+  `use-theme.ts` never resolves to it), ink for every heading, number and the primary button's
+  fill, a dim grey for labels and units, and exactly TWO session colours — easy green and hard
+  orange — applied to bars and tiles, never to text or chrome. There is no second highlight
+  colour anywhere. Source of truth for every value: the "Blueprint" section of
   [`docs/design/instrument-visual-system.md`](docs/design/instrument-visual-system.md); see also
   `docs/architecture.md`'s "Current — visual direction". **Never edit a hex there without
-  re-verifying contrast** — and note that rule now has teeth:
+  re-verifying contrast** — and note that rule has teeth:
   `src/constants/__tests__/theme.contrast.test.ts` recomputes every ratio from the hexes and
-  asserts it against its **floor** (and, for the three values that are deliberately below the
+  asserts it against its **floor** (and, for `progress.disabled`, which is deliberately below the
   floor, against a ceiling), so a hex that breaks legibility fails the suite instead of shipping.
   It does NOT pin the exact documented numbers — that is deliberate, so a legitimate re-tune is not
   a test edit — which means re-running the table and updating the comments is still a human step (the
   ratios were documented-only under Trailhead and drifted anyway — issue #70).
-- The primary CTA's shape is `src/components/ui/ActionButton.tsx`'s `PrimaryAction`, and nothing
-  else may spend the signal colour. "One accent per screen" is therefore a question about imports,
-  not a review of eight hand-rolled stylesheets.
+- The primary CTA's shape is `src/components/ui/ActionButton.tsx`'s `PrimaryAction` (or
+  `RevealPrimaryAction`, the same slab drawing itself in), and nothing else may paint
+  `Accent.fill`. "One accent per screen" is therefore a question about imports, not a review of
+  eight hand-rolled stylesheets.
+- **Motion is "the plan builds itself"**, and its numbers are the captain-approved pages', not
+  yours: every build animation derives from one clock in seconds through `src/lib/buildMotion.ts`
+  (cue tables, easings, the 350 ms snap) and renders `src/lib/weekStrip.ts`'s strip shape. Read
+  [`docs/design/build-animations.md`](docs/design/build-animations.md) before adding or changing
+  one. The heartbeat/pulse-trace and graph motifs were retired app-wide on 2026-09-14; the week
+  strip is the app's one drawing.
 - No business rules in the client. Tier, quota, and plan generation are server-only (`workers/`);
   the client may display tier state but is never the authority for it. **D1 has no row-level
   security**, so every D1 statement must bind a `userId` from the verified session — see

@@ -30,6 +30,13 @@ jest.mock('expo-router', () => {
   };
 });
 
+// The screen fills each row's miniature (and the hero) from the plan cache; hold those details
+// unresolved so the assertion is purely about the list's cache-first branch.
+jest.mock('@/hooks/use-plan', () => ({
+  peekPlan: () => undefined,
+  loadPlan: () => new Promise(() => {}),
+}));
+
 jest.mock('@/lib/apiClient', () => {
   const errors = jest.requireActual<typeof import('@/lib/apiErrors')>('@/lib/apiErrors');
   return {

@@ -33,6 +33,13 @@ jest.mock('expo-router', () => {
   };
 });
 
+// The header mark reads the newest plan's length through the plan cache; hold it unresolved so
+// these cases stay about the subscription disclosures.
+jest.mock('@/hooks/use-plan', () => ({
+  peekPlan: () => undefined,
+  loadPlan: () => new Promise(() => {}),
+}));
+
 jest.mock('@/lib/apiClient', () => ({
   API_BASE_URL: 'https://example.invalid',
   ApiError: class MockApiError extends Error {},

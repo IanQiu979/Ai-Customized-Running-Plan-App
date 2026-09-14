@@ -1,4 +1,98 @@
-# Instrument — V2.2 visual system
+# Blueprint — V2.2 visual system (2026-09-14), over Instrument (2026-09-03)
+
+> **Read this section first; the Instrument document below it is superseded for every colour,
+> type and accent value, and kept for its rules and its record.**
+>
+> Blueprint is the captain's own V2.2 theme sheet — `V22 theme.md` in the 2026-09-13 design
+> handoff, the sheet every approved Claude Design page (`V22-01` … `V22-06`) was composed on —
+> transcribed here verbatim and implemented in `src/constants/theme.ts`. The captain's
+> instruction with the handoff: the sheet wins over any earlier spec where they differ. The
+> animations built on it are documented in [`build-animations.md`](build-animations.md).
+>
+> What carries over from Instrument unchanged: one accent per screen, spent only through
+> `src/components/ui/ActionButton.tsx`; tokens only, never a hex in a component; the effort ramp's
+> `barHeight` as the non-hue channel; and **contrast enforced by test** —
+> `src/constants/__tests__/theme.contrast.test.ts` recomputes every ratio below from `theme.ts`'s
+> hexes and asserts it against its floor, so a hex edited into illegibility fails the suite. It
+> still does not pin the printed numbers; re-running the table is still a human step.
+
+## B.1 The sheet
+
+| Token | Value | Role |
+|---|---|---|
+| Background | `#0B0E12` | the field — `surface.base` |
+| Raised | `#141920` | cards, inputs — `surface.raised` |
+| Hairline | `rgba(255,255,255,0.10)` | rules, baselines, row separators — `hairline` |
+| Empty slot | `rgba(255,255,255,0.14)` | a rest day's dash, an unfilled cell of the header mark — `grid.slot` |
+| Ink | `#EEF1F4` | all headings, numbers, and the primary button's fill — `text.primary`, `Accent.fill` |
+| Dim | `#8B9299` | labels, units, secondary copy — `text.secondary` |
+| Easy effort | `#4DB58C` | easy, recovery, long run — `Session.easy` |
+| Hard effort | `#E0864E` | tempo, intervals (and steady) — `Session.hard` |
+
+**Session colour — two only, applied to bars and tiles, never to text or chrome.**
+`sessionToneFor(effort)` in `theme.ts` is the one place the five-level effort scale collapses onto
+them: everything at or below easy on `EFFORT_ORDINAL` is easy, everything above is hard. The
+five-hue `Effort` ramp is retained for the places that still name all five levels (glossary, the
+effort chip, the paid-content teaser).
+
+**The accent is ink.** The primary action is a near-white slab (`Accent.fill`) with the page
+colour as its label (`Accent.onFill`), so it reads as a cut-out of the field. Instrument's icy
+cyan went with the pulse trace it belonged to; there is no second highlight colour anywhere.
+
+**The app renders the dark scheme only.** The sheet defines one field and every approved page is
+composed on it, so `src/hooks/use-theme.ts` resolves to `dark` regardless of the OS setting. The
+`light` palette in `theme.ts` is kept intact and still measured by the contrast suite; re-enabling
+it is a one-line change in the hook.
+
+Ratios (WCAG 2.x, against the dark surfaces), all asserted by the suite: Ink 17.06:1 on base /
+15.57:1 on raised · Dim 6.14:1 / 5.61:1 · Easy 7.65:1 on base · Hard 7.08:1 on base ·
+`Accent.onFill` on `Accent.fill` 17.06:1 · `status.error` 7.08:1 · `status.success` 9.24:1 ·
+`progress.disabled` 1.82:1 (inert only, deliberately sub-floor).
+
+## B.2 Type
+
+| Role | Face | Where |
+|---|---|---|
+| Display | **Barlow Condensed** 600 (500 quieter; 700/800 kept for the existing hierarchy) | numbers, titles — and every numeral in the app |
+| Label | **IBM Plex Mono** 400/500, uppercase, tracked | labels, units, day numerals, pace splits |
+| Body | **IBM Plex Sans** 400–600 | body copy and UI chrome |
+
+Loaded in `src/app/_layout.tsx`; the `FontFamily` keys in `theme.ts` are the exact `fontFamily`
+strings. Scale: `tiny` 10 · `xxs` 11 · `xs` 13 · `sm` 15 · `md` 17 · `lg` 20 · `xl` 24 · `xxl` 32 ·
+`hero` 44 · `numeral` 64 · `giant` 96 — the last two are the one counting Number a hero carries.
+`Tracking.wide` (2.5) is the sheet's most tracked setting (KM / WEEK, PRESS TO CONTINUE); body copy
+is never tracked.
+
+## B.3 Shape and motion
+
+Bars 5pt top radius (`Radius.bar`); cards 10–14pt (`Radius.card` 14, `control` 8 for inputs and
+chips); buttons 12pt radius, 48–52pt tall (52 in `ActionButton.tsx`).
+
+Motion follows the 2026-09-12 spec §0 and the pages themselves: ease-out for things arriving,
+ease-in-out for things moving, linear only for progress; stagger siblings 40–80 ms; **snap = 350 ms
+rise to 1.03, one settle, nothing bounces twice**; every build plays once, 2–4 s, and holds its
+end frame, with cue text appearing only after the hold begins; under reduced motion the end frame
+is shown directly. The numbers live in `src/lib/buildMotion.ts`, ported from the pages — see
+[`build-animations.md`](build-animations.md).
+
+## B.4 What Blueprint retired
+
+- The two-tier cyan accent (`Accent.field` / `Accent.signal`) and the rule "the cyan is never a
+  fill" — there is no cyan.
+- The pulse trace (`PulseTraceHero`, `PulseTraceSlot`, `lib/pulseTrace.ts`,
+  `constants/pulseTrace.ts`, `/dev/pulse-trace`, `docs/design/pulse-trace.md`) and the contour
+  route line (`RouteLine`, `lib/routeProfile.ts`): spec §V22-06 — "the heartbeat/pulse-trace and
+  the graph are retired everywhere they appear". The week strip is the app's one drawing.
+- The accordion plan view and its effort ribbon (`WeekAccordion`, `WorkoutRow`, `PlanNameplate`),
+  replaced by the three static plan-detail screens.
+- Big Shoulders / Public Sans / Space Mono.
+- The light scheme, as a rendered state (the tokens remain).
+
+Everything below this line is the Instrument document as approved on 2026-09-03, unedited.
+
+---
+
+# Instrument — V2.2 visual system (superseded 2026-09-14, see above)
 
 > Captain-approved 2026-09-03. Replaces **Trailhead** (warm paper/espresso ink, ember-orange
 > accent, dusk-gradient bold exception), which replaced "Instrument & Matter" before it. The house

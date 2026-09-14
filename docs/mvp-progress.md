@@ -26,10 +26,32 @@
 | M3 — Plan engine (3 tiers produce valid plans) | **In progress.** The engine splits by tier as of 2026-09-09: Free is served entirely from the 40-plan deterministic library (`src/lib/planLibrary/`), paying tiers keep the template/pace engine as the AI skeleton. Both are wired into the Worker's `generate-plan` route and the client's generate-plan action; the plan view renders a real generated plan (via `GET /api/plans/:id`) alongside the permanent static golden fixture. Paid tiers still serve the quota-exempt template fallback — see "How it is now" |
 | M4 — Tiers & quotas (server-side, unbypassable) | **In progress.** The quota ledger, atomic gate, fallback exemption, `quota-status` and `purchase-tier` are built and tested server-side; Home now leads with the server-backed tier/quota line, Settings also displays it, and a dummy paywall lets a runner call `purchase-tier` |
 | M5 — My Plans (history) | **In progress.** My Plans keeps the permanent Example Plan, lists generated plans off `GET /api/plans`, and links MOST RECENT to the newest generated plan; there is no contradictory empty state |
-| M6 — Polish & TestFlight | **In progress.** The visual system has been replaced twice. **Trailhead is on `main`** (PR #82, plus the fidelity follow-up #83); **Instrument replaced it on 2026-09-03 and is on `fm/v22-redesign-theme-onboarding`, not merged**. The three signed-out screens (onboarding, sign-in, sign-up) have been rendered and visually checked in both schemes on Expo **web** at phone size (430x932); no screen has ever been run on a real iOS or Android device or simulator, and the signed-in screens (Home, My Plans, Plan view, Settings, Glossary, Paywall) have still never been seen rendered in either system. See "How it is now". No EAS build exists |
+| M6 — Polish & TestFlight | **In progress.** The visual system is **Blueprint** (2026-09-14, `fm/v22-animations-lane3`): the captain's V22 theme sheet plus the six approved build animations, replacing Instrument (2026-09-03, on `main`) which replaced Trailhead. Every screen — signed-out and signed-in — has now been rendered on Expo **web** at 393×852 and compared against the approved Claude Design pages (the visual-match pass, 2026-09-14); no screen has ever been run on a real iOS or Android device or simulator. See "How it is now". No EAS build exists |
 
 ### How it is now
 
+- **"The plan builds itself" — the V22 build animations are in, the theme is Blueprint, and the
+  heartbeat/graph motif is gone from the whole app (2026-09-14, `fm/v22-animations-lane3`).** The
+  six captain-approved Claude Design pages (`V22-01` … `V22-06`, 2026-09-13) are rebuilt natively
+  in Reanimated from one shared vocabulary (`src/lib/buildMotion.ts`, `src/lib/weekStrip.ts`,
+  `src/components/build/`): the onboarding hero (a week strip draws itself, blocks snap in, the total
+  counts, three faint weeks stack below), the three step pieces and the button that draws itself
+  in, the survey intro before a first intake, the Home tier row's header mark (fills to the
+  current week's elapsed days — `src/lib/planProgress.ts`; the app logs nothing, so elapsed is what
+  "completed" can honestly mean), the My Plans hero built from the runner's real first week, and
+  the three static plan-detail screens (overview → week → session/rest day) that replace the
+  accordion view. Each plays once and holds its end frame; reduced motion shows the end frame
+  directly. `theme.ts` is now the captain's `V22 theme.md` — one near-black field (the app renders
+  the dark scheme only; the light palette is kept and still contrast-tested), ink for headings,
+  numbers and the primary button's fill (the icy cyan went with the pulse trace), two session
+  colours for bars and tiles only, Barlow Condensed / IBM Plex Mono / IBM Plex Sans. `PulseTraceHero`,
+  `PulseTraceSlot`, `RouteLine`, `routeProfile`, both `pulseTrace` modules, `/dev/pulse-trace` and
+  `docs/design/pulse-trace.md` are deleted; sign-in and sign-up carry nothing; the Home tab glyph is
+  the strip. **Verification:** the Opus visual-match pass compared every screen's end frame
+  pixel-over-pixel against the approved pages on Expo web at 393×852 and sampled the motion
+  in-page against the pages' timings (one divergence found and fixed, the survey intro's W1 label);
+  root gate green at 48 suites / 870 tests. Still never run on a device or simulator. Full account:
+  `change_log.md`, 2026-09-14; token summary: `architecture.md` "Current — visual direction".
 - **Tab returns no longer flash a redundant loading state (2026-09-12).** Expo Router SDK 57 keeps
   the four bottom-tab screens mounted. Home, My Plans, and Settings still refresh through
   `useFocusEffect` whenever they regain focus, but now render the last successful intake, plan list,
@@ -118,7 +140,9 @@
   is empty, and links MOST RECENT to the newest generated plan. The four tabs are icon-only but
   retain explicit screen-reader labels. Glossary definitions keep their existing `notation.ts`
   content behind independent, collapsed-by-default, accessible disclosure rows.
-- **The design system is now "Instrument" — live in a branch; `main` carries Trailhead.**
+- **The design system was "Instrument" from 2026-09-03 to 2026-09-14 — superseded by Blueprint
+  (first bullet above) for colour, type and the accent; its rules carry over.** The record below
+  is kept as written on 2026-09-03/04, and the pulse trace it describes is now deleted.
   Trailhead *did* land on `main` (PR #82, plus the fidelity follow-up #83), so `main`'s
   `src/constants/theme.ts` is warm chalk and espresso ink with a scheme-aware ember accent, a
   route-line contour, and a dusk gradient on the signed-out screens. **Instrument replaced it on
@@ -153,8 +177,8 @@
   and the Intake start now use shorter copy while keeping the Instrument visuals, components,
   layout, animation behaviour and 01/02/03 structure unchanged. Pro/Elite pace wording now makes
   its real condition explicit: the runner must supply a recent time.
-- **The pulse trace — the redesign's signature animation — is built, and the screens do not mount
-  it yet (2026-09-04, `fm/v22-redesign-animation-r2`).** `src/components/brand/PulseTraceHero.tsx`:
+- **The pulse trace — retired 2026-09-14 (see the first bullet); the record below is historical.**
+  Built 2026-09-04 on `fm/v22-redesign-animation-r2`: `src/components/brand/PulseTraceHero.tsx`,
   an ECG-style icy-cyan trace drawing itself across its own near-black field, self-drawing on mount
   or driven by a scroll `SharedValue` (through `usePulseTraceScroll`, which seeds from layout as
   well as scroll — a handler-only integration is blank on any page shorter than its viewport),
@@ -165,13 +189,14 @@
   The auth screens still render `PulseTraceSlot`'s static end state; swapping it is one import line
   (see that file's header). Seen rendered on web in both modes; the dev-only `/dev/pulse-trace`
   preview shows both drive modes. Guide for the worker who mounts it:
-  [`docs/design/pulse-trace.md`](design/pulse-trace.md); full account: `change_log.md`,
+  `docs/design/pulse-trace.md` (deleted with the trace on 2026-09-14); full account: `change_log.md`,
   2026-09-04.
 - **Test-mode override:** `ALL_USERS_UNLIMITED_ACCESS = "true"` still sits in the top-level
   `[vars]` of `workers/wrangler.toml` (the committed `[env.production.vars]` value is `"false"`),
   so the captain's test pass runs with every account Elite and the quota gate bypassed. Set the
   top-level value to `"false"` before real users arrive. Recorded in "Latest — 2026-08-09".
-- **Test counts:** 785 root tests across 39 suites on `fm/v22-3day-peak-below-base`, verified by
+- **Test counts:** 870 root tests across 48 suites on `fm/v22-animations-lane3`, verified by running
+  the root gate there on 2026-09-14. Earlier figures, for the record: 785 root tests across 39 suites on `fm/v22-3day-peak-below-base`, verified by
   running `npm test` there on 2026-09-09 (778 across 38 suites on
   `fm/v22-distance-specific-plans`, 2026-09-07, after the rebase onto #88); separately, 832 root
   tests across 40 suites on `fm/v22-library-free-engine`, also verified by running `npm test` there
@@ -684,7 +709,13 @@ from 82. Issue #22 remains open.)
       Ian's Q1 ruling of 2026-09-10; it is never defaulted onto a calendar or handed to the generic
       engine. Recovery-week depth stays at `loadRules.ts`'s 15–25%/target 20%. Full account in
       `docs/change_log.md`'s 2026-09-09 and 2026-09-10 entries
-- [x] **The pulse trace animation is built (2026-09-04).** `src/components/brand/PulseTraceHero.tsx`
+- [x] **The V22 build animations, the Blueprint theme, and the plan-detail rebuild (2026-09-14).**
+      Six approved pages rebuilt natively in Reanimated (`src/components/build/`,
+      `src/lib/buildMotion.ts`, `src/lib/weekStrip.ts`, `src/lib/planProgress.ts`), the theme
+      replaced by the captain's `V22 theme.md`, the plan view rebuilt as overview → week → day, and
+      the heartbeat/graph motif removed app-wide; visually matched against the pages on Expo web.
+      Full account in `docs/change_log.md`'s 2026-09-14 entry
+- [x] **The pulse trace animation was built (2026-09-04) — and retired 2026-09-14.** `src/components/brand/PulseTraceHero.tsx`
       (self-drawing or scroll-driven, reduced-motion aware, paints its own dark field), pure
       geometry in `src/lib/pulseTrace.ts` (23 tests), its own palette/timings in
       `src/constants/pulseTrace.ts` (not `theme.ts` — see "In flight"), 11 render smoke tests in
@@ -995,25 +1026,14 @@ view to `buildTemplatePlan()` instead of the static fixture; intake and server w
 
 ## In flight
 
-**The Instrument redesign, on `fm/v22-redesign-theme-onboarding`.** The token system, onboarding,
-the two auth screens and the Paywall's badge are rebuilt and the branch is clean on its own gate,
-but it is unmerged and unfinished in three specific ways: only the three signed-out screens have
-been seen rendered (Expo web at phone size, both schemes) — nothing on a device or simulator, and
-none of the signed-in screens; its review pass is done and its findings fixed, but it has not been
-re-reviewed since; and the signature pulse-trace animation it was designed
-around is on a parallel branch (`fm/v22-redesign-animation`) that has not landed —
-`PulseTraceSlot.tsx` renders that animation's static end state until it does. Detail in "Current
-state" above and `change_log.md`, 2026-09-03 (later). Trailhead, its predecessor, is already on
-`main` (PR #82, #83) and carries the same "never seen rendered" caveat.
-
-**The pulse trace, on `fm/v22-redesign-animation` (2026-09-04).** The component, its geometry,
-palette, tests and dev preview are done and green; what remains is not this branch's to do.
-Mounting it is the onboarding rebuild's job — `v22-redesign-theme-onboarding`, a separate task that
-also replaces `theme.ts` — and when that token system lands, `src/constants/pulseTrace.ts`'s
-palette should be folded into it (or re-exported from it), with `PulseTracePalette.trace`
-becoming the system's single bright highlight shared only with the primary CTA. The
-`/dev/pulse-trace` route is that worker's to delete or keep as a component gallery. Recipe for
-both modes: [`docs/design/pulse-trace.md`](design/pulse-trace.md).
+**The V22 build animations and the Blueprint theme, on `fm/v22-animations-lane3` (2026-09-14).**
+Built, gated and visually matched against the approved pages (see "Current state"); awaiting the
+no-mistakes pipeline and a PR. What it does not do, on purpose: run on a device or simulator
+(nothing in this project ever has), draw a segmented STRUCTURE bar on a session (the `Workout`
+model carries `structure` as free text, so the page's segment bar has no data — a structured
+segment model would be a plan-engine change, not a screen one), or mark days as done (the header
+mark fills to *elapsed* days; a real day-marking flow is Ian's call). The Instrument redesign and
+the pulse trace that preceded it are both landed-and-superseded history now, not open work.
 
 Nothing else is in flight. The one remaining critical-path item — `ANTHROPIC_API_KEY`, without which
 paid-tier requests serve the quota-exempt template fallback — is a captain-only action, not work

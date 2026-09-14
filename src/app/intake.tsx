@@ -9,8 +9,12 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { SurveyIntro } from '@/components/build/SurveyIntro';
+import { useBuildClock } from '@/components/build/useBuildClock';
 
 import { ClockField } from '@/components/inputs/ClockField';
 import { DateField } from '@/components/inputs/DateField';
@@ -42,6 +46,7 @@ import {
   type ClockParts,
   type DateParts,
 } from '@/lib/fieldInput';
+import { SURVEY_TIMELINE } from '@/lib/buildMotion';
 import { getGoalRealismIntakeCopy } from '@/lib/goalRealismDisclosure';
 import { assessGoalRealism } from '@/lib/paceDerivation';
 import { intakeRaceDateError } from '@/lib/planRequest';
@@ -90,6 +95,12 @@ const DAY_OPTIONS = [1, 2, 3, 4, 5, 6, 7];
  *
  * This screen is the ONLY place the runner is asked for their target race. Home reads it back
  * from the saved intake and never re-asks — see `src/lib/planRequest.ts`.
+ *
+ * A first-time runner sees the survey intro first (V22-03, `components/build/SurveyIntro.tsx`):
+ * a full-viewport build of a week stacking into a plan that holds, then PRESS TO CONTINUE; a tap
+ * reveals the questions below exactly as they render otherwise. It shows only when `getIntake()`
+ * returns nothing — a runner editing an existing intake (Home's "Change") goes straight to the
+ * form — and the questions themselves never animate.
  */
 export default function IntakeScreen() {
   const theme = useTheme();
@@ -103,6 +114,14 @@ export default function IntakeScreen() {
   // initial load, so the header reads "Done" for a runner revisiting an already-completed intake
   // even before they touch anything.
   const [hadIntakeOnLoad, setHadIntakeOnLoad] = useState(false);
+  // The intro is dismissed by a tap on its settled end frame and never comes back this visit.
+  const [introDone, setIntroDone] = useState(false);
+  const showIntro = !loading && !hadIntakeOnLoad && !introDone;
+  const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
+  const { T: introClock, settled: introSettled } = useBuildClock({
+    total: SURVEY_TIMELINE.total,
+    play: showIntro,
+  });
 
   const intakeHeaderOptions = {
     headerShown: true,
@@ -311,6 +330,22 @@ export default function IntakeScreen() {
       <View style={[styles.loadingContainer, { backgroundColor: theme.surface.base }]}>
         <Stack.Screen options={intakeHeaderOptions} />
         <ActivityIndicator color={theme.text.primary} />
+      </View>
+    );
+  }
+
+  if (showIntro) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.surface.base }]}>
+        {/* The intro's canvas carries its own top safe area, so the native header steps aside. */}
+        <Stack.Screen options={{ headerShown: false }} />
+        <SurveyIntro
+          T={introClock}
+          width={viewportWidth}
+          height={viewportHeight}
+          settled={introSettled}
+          onContinue={() => setIntroDone(true)}
+        />
       </View>
     );
   }

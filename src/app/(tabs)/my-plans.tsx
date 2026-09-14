@@ -1,49 +1,56 @@
-import { Link, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { RouteLine } from '@/components/brand/RouteLine';
+import { FadeIn } from '@/components/build/FadeIn';
+import { PlanHero } from '@/components/build/PlanHero';
+import { useBuildClock } from '@/components/build/useBuildClock';
 import { ScreenHeader } from '@/components/layout/ScreenHeader';
-import { formatPlanDate } from '@/components/plan/format';
-import {
-  FontFamily,
-  FontSize,
-  PressedOpacity,
-  Radius,
-  Spacing,
-  Stroke,
-  Tracking,
-} from '@/constants/theme';
+import { PlanListRow } from '@/components/plan/PlanListRow';
+import { PrimaryAction } from '@/components/ui/ActionButton';
+import { FontFamily, FontSize, Spacing } from '@/constants/theme';
+import { loadPlan, type LoadedPlan } from '@/hooks/use-plan';
 import { useTheme } from '@/hooks/use-theme';
 import { API_BASE_URL, describeError, listPlans } from '@/lib/apiClient';
 import type { PlanSummary } from '@/lib/apiClient';
-import { EXAMPLE_PLAN_ID } from '@/lib/fixtures/examplePlan';
+import { PLAN_HERO_TIMELINE } from '@/lib/buildMotion';
+import { EXAMPLE_PLAN_ID, examplePlan } from '@/lib/fixtures/examplePlan';
+import type { Plan } from '@/lib/planTypes';
+import { EMPTY_STRIP_WEEK, stripFromWeek } from '@/lib/weekStrip';
 
 /**
- * My Plans. A pinned "Example Plan" row (the static `examplePlan` fixture — the captain's
- * explicit "never remove the sample plan" call) always renders at the top, whatever `listPlans()`
- * returns or fails with. Below it: loading, an inline error, or one row per `PlanSummary`.
- * Every row pushes to `plan/[id]`, which knows to render the fixture for
- * `EXAMPLE_PLAN_ID` and fetch everything else.
+ * My Plans (V22-05). The hero is the runner's REAL most recent plan building itself: its actual
+ * first week's blocks snap in with their real distances and the total counts to the real
+ * number, once per screen open. If no plan exists yet the hero plays the pinned example plan —
+ * there is no empty state, because the example plan is always there (the captain's explicit
+ * "never remove the sample plan" call). Below it, once the build holds: "Open plan", and the
+ * whole library as rows, the example plan pinned first.
  *
- * The register here is the formal one — a stat-row header counting what the runner has
- * built, then rows that read like entries in a ledger rather than cards in a feed. No signal: the
- * screen's forward action is generating a plan, and that lives on Home. A row is a destination,
- * not a call to action.
+ * `listPlans()` returns summaries with no weeks, so the first-week miniatures come from
+ * `loadPlan` (a session-long cache — a plan is immutable) for up to `DETAIL_LIMIT` plans,
+ * filled in as each one lands; a row whose detail has not arrived draws the empty strip.
+ *
+ * The list is cache-first across focus refreshes: a second focus keeps the last known plans on
+ * screen while the request runs (`__tests__/tab-cache-first.test.tsx`).
  */
+
+/** How many listed plans get their detail fetched for a miniature. */
+const DETAIL_LIMIT = 12;
+
 export default function MyPlansScreen() {
   const theme = useTheme();
+  const router = useRouter();
 
   const [loading, setLoading] = useState(true);
   const [hasLoadedPlans, setHasLoadedPlans] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [plans, setPlans] = useState<PlanSummary[]>([]);
+  // Details land here as `loadPlan` resolves; keyed by plan id so each row re-renders alone.
+  const [details, setDetails] = useState<Record<string, LoadedPlan>>({});
+  const [detailFailed, setDetailFailed] = useState<Record<string, true>>({});
   const mostRecentPlan = latestPlan(plans);
 
-  // A mount-only effect would never refresh after generating a new plan and tabbing back here —
-  // Expo Router's tab navigator keeps this screen mounted across navigation, the same staleness
-  // class already fixed on Home's intake check.
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
@@ -72,95 +79,122 @@ export default function MyPlansScreen() {
     }, [])
   );
 
+  // Fetch details for the miniatures — the most recent plan first, since the hero waits on it.
+  useEffect(() => {
+    let cancelled = false;
+    const wanted = [...plans]
+      .sort((a, b) => (a.createdAt > b.createdAt ? -1 : 1))
+      .slice(0, DETAIL_LIMIT);
+    for (const summary of wanted) {
+      // A cached plan resolves on the next microtask, so the same path serves both cases.
+      loadPlan(summary.planId)
+        .then((loaded) => {
+          if (!cancelled) setDetails((current) => ({ ...current, [summary.planId]: loaded }));
+        })
+        .catch(() => {
+          // One miniature stays empty; the row is still a working link to the plan.
+          if (!cancelled) setDetailFailed((current) => ({ ...current, [summary.planId]: true }));
+        });
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [plans]);
+
+  // The hero's plan: the most recent real plan once its detail has arrived, otherwise — no plans
+  // at all, or a list that failed to load — the example plan. While the list or the most recent
+  // detail is still in flight, the hero waits rather than playing the example and then swapping.
+  const mostRecentDetail = mostRecentPlan ? details[mostRecentPlan.planId] : undefined;
+  let heroPlan: Plan | null = null;
+  let heroId: string | null = null;
+  if (mostRecentDetail && mostRecentPlan) {
+    heroPlan = mostRecentDetail.plan;
+    heroId = mostRecentPlan.planId;
+  } else if (
+    (hasLoadedPlans && plans.length === 0) ||
+    (!hasLoadedPlans && error) ||
+    (mostRecentPlan && detailFailed[mostRecentPlan.planId])
+  ) {
+    heroPlan = examplePlan;
+    heroId = EXAMPLE_PLAN_ID;
+  }
+  const heroReady = heroPlan !== null;
+
+  const { T, restart } = useBuildClock({ total: PLAN_HERO_TIMELINE.total, play: heroReady });
+  // Plays once per screen open, and again only when the plan the hero shows changes.
+  const playedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!heroId) return;
+    if (playedFor.current !== null && playedFor.current !== heroId) restart();
+    playedFor.current = heroId;
+  }, [heroId, restart]);
+
+  const heroWeek = heroPlan?.weeks[0] ? stripFromWeek(heroPlan.weeks[0]) : EMPTY_STRIP_WEEK;
+  const listed = [...plans].sort((a, b) => (a.createdAt > b.createdAt ? -1 : 1));
+
   return (
     <View style={[styles.container, { backgroundColor: theme.surface.base }]}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         <ScrollView contentContainerStyle={styles.content}>
-          <ScreenHeader eyebrow="Your library" title="My Plans" routeLine />
+          <ScreenHeader eyebrow="Your library" title="My Plans" />
 
-          {/* The count is only honest after a successful response. Once known, keep the last
-              value visible while a focus refresh runs in the background. */}
-          {hasLoadedPlans && (
-            <View
-              style={[
-                styles.statRow,
-                { borderTopColor: theme.hairline, borderBottomColor: theme.hairline },
-              ]}
-            >
-              <View style={styles.stat}>
-                <Text style={[styles.statValue, { color: theme.text.primary }]}>{plans.length}</Text>
-                <Text style={[styles.statLabel, { color: theme.text.secondary }]}>
-                  {plans.length === 1 ? 'PLAN GENERATED' : 'PLANS GENERATED'}
-                </Text>
-              </View>
-              <View style={[styles.statDivider, { backgroundColor: theme.hairline }]} />
-              {/* Both stats are plain readings of the list. Nothing here infers a quality the
-                  data doesn't state — an earlier draft counted non-`isFallback` plans as
-                  "personalized", which is the client deciding what a tier means. */}
-              {mostRecentPlan ? (
-                <Link href={{ pathname: '/plan/[id]', params: { id: mostRecentPlan.planId } }} asChild>
-                  <Pressable
-                    accessibilityRole="link"
-                    accessibilityLabel={`Open most recent plan from ${formatPlanDate(
-                      mostRecentPlan.createdAt.slice(0, 10)
-                    )}`}
-                    style={({ pressed }) => [
-                      styles.stat,
-                      styles.mostRecentLink,
-                      pressed && styles.pressed,
-                    ]}
-                  >
-                    <Text style={[styles.statValueDate, { color: theme.text.primary }]}>
-                      {formatPlanDate(mostRecentPlan.createdAt.slice(0, 10))}
-                    </Text>
-                    <Text style={[styles.statLabel, { color: theme.text.secondary }]}>MOST RECENT</Text>
-                  </Pressable>
-                </Link>
-              ) : (
-                <View style={styles.stat}>
-                  <Text style={[styles.statValueDate, { color: theme.text.primary }]}>—</Text>
-                  <Text style={[styles.statLabel, { color: theme.text.secondary }]}>MOST RECENT</Text>
-                </View>
-              )}
-            </View>
-          )}
-
-          <Link href={{ pathname: '/plan/[id]', params: { id: EXAMPLE_PLAN_ID } }} asChild>
-            <Pressable
-              accessibilityRole="link"
-              accessibilityLabel="Example Plan, 5K — a sample plan, always available"
-              style={({ pressed }) => [
-                styles.row,
-                styles.sampleRow,
-                { borderColor: theme.progress.informative, backgroundColor: theme.surface.raised },
-                pressed && styles.pressed,
-              ]}
-            >
-              <View style={styles.rowHeader}>
-                <Text style={[styles.rowTitle, { color: theme.text.primary }]}>Example Plan (5K)</Text>
-                <View style={[styles.tag, { borderColor: theme.progress.informative }]}>
-                  <Text style={[styles.tagText, { color: theme.text.secondary }]}>SAMPLE</Text>
-                </View>
-              </View>
-              <Text style={[styles.rowBody, { color: theme.text.secondary }]}>
-                Always available — a hand-built plan to see the app in action.
-              </Text>
-              <RouteLine variant="header" style={styles.rowRoute} />
-            </Pressable>
-          </Link>
-
-          {loading && !hasLoadedPlans ? (
-            <ActivityIndicator color={theme.text.primary} style={styles.spinner} />
-          ) : (
+          {heroPlan ? (
             <>
-              {error ? (
-                <Text style={[styles.error, { color: theme.status.error }]}>{error}</Text>
-              ) : null}
-              {plans.map((plan) => (
-                <PlanRow key={plan.planId} plan={plan} />
-              ))}
+              <PlanHero
+                T={T}
+                week={heroWeek}
+                eyebrow={heroId === EXAMPLE_PLAN_ID ? 'EXAMPLE' : 'MOST RECENT'}
+                title={heroPlan.title}
+                weekCount={heroPlan.durationWeeks}
+              />
+              <FadeIn T={T} at={PLAN_HERO_TIMELINE.cues.Hold} duration={0.5} lift={8} style={styles.afterHero}>
+                <PrimaryAction
+                  label="Open plan"
+                  onPress={() =>
+                    router.push({ pathname: '/plan/[id]', params: { id: heroId ?? EXAMPLE_PLAN_ID } })
+                  }
+                />
+              </FadeIn>
             </>
-          )}
+          ) : loading && !hasLoadedPlans ? (
+            <ActivityIndicator color={theme.text.primary} style={styles.spinner} />
+          ) : null}
+
+          <FadeIn T={T} at={PLAN_HERO_TIMELINE.cues.Hold} duration={0.5} lift={8} style={styles.list}>
+            <Text style={[styles.listLabel, { color: theme.text.secondary }]}>
+              ALL PLANS · {listed.length + 1}
+            </Text>
+
+            {error ? <Text style={[styles.error, { color: theme.status.error }]}>{error}</Text> : null}
+
+            <PlanListRow
+              planId={EXAMPLE_PLAN_ID}
+              title="Example Plan (5K)"
+              meta={`${examplePlan.durationWeeks} WEEKS · SAMPLE`}
+              week={stripFromWeek(examplePlan.weeks[0])}
+              accessibilityLabel="Example Plan, 5K — a sample plan, always available"
+            />
+
+            {listed.map((plan) => {
+              const detail = details[plan.planId];
+              const meta = [
+                detail ? `${detail.plan.durationWeeks} WEEKS` : null,
+                plan.tierAtGeneration.toUpperCase(),
+                plan.isFallback ? 'FALLBACK' : null,
+              ]
+                .filter(Boolean)
+                .join(' · ');
+              return (
+                <PlanListRow
+                  key={plan.planId}
+                  planId={plan.planId}
+                  title={plan.title ?? 'Untitled plan'}
+                  meta={meta}
+                  week={detail?.plan.weeks[0] ? stripFromWeek(detail.plan.weeks[0]) : EMPTY_STRIP_WEEK}
+                />
+              );
+            })}
+          </FadeIn>
         </ScrollView>
       </SafeAreaView>
     </View>
@@ -170,45 +204,10 @@ export default function MyPlansScreen() {
 /** The plan with the newest `createdAt`, or `null` when there are none.
  *
  * Computed rather than read off `plans[0]`: `GET /api/plans`'s ordering is the server's business
- * and this stat would silently become "the first row" the day that changes. */
+ * and this would silently become "the first row" the day that changes. */
 function latestPlan(plans: readonly PlanSummary[]): PlanSummary | null {
   if (plans.length === 0) return null;
   return plans.reduce((latest, plan) => (plan.createdAt > latest.createdAt ? plan : latest));
-}
-
-function PlanRow({ plan }: { plan: PlanSummary }) {
-  const theme = useTheme();
-
-  // One glyph, one job: `·` separates peer fields. Same convention as `PlanNameplate`'s serial
-  // plate, so the two read as the same system.
-  const metadata = [plan.isFallback ? 'FALLBACK' : null, formatPlanDate(plan.createdAt.slice(0, 10))]
-    .filter(Boolean)
-    .join('   ·   ');
-
-  return (
-    <Link href={{ pathname: '/plan/[id]', params: { id: plan.planId } }} asChild>
-      <Pressable
-        accessibilityRole="link"
-        style={({ pressed }) => [
-          styles.row,
-          { borderColor: theme.hairline, backgroundColor: theme.surface.raised },
-          pressed && styles.pressed,
-        ]}
-      >
-        <View style={styles.rowHeader}>
-          <Text style={[styles.rowTitle, { color: theme.text.primary }]}>
-            {plan.title ?? 'Untitled plan'}
-          </Text>
-          <View style={[styles.tag, { borderColor: theme.hairline }]}>
-            <Text style={[styles.tagText, { color: theme.text.secondary }]}>
-              {plan.tierAtGeneration.toUpperCase()}
-            </Text>
-          </View>
-        </View>
-        <Text style={[styles.rowMeta, { color: theme.text.secondary }]}>{metadata}</Text>
-      </Pressable>
-    </Link>
-  );
 }
 
 const styles = StyleSheet.create({
@@ -222,87 +221,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.four,
     paddingTop: Spacing.four,
     paddingBottom: Spacing.six,
-    gap: Spacing.three,
-  },
-  statRow: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    borderTopWidth: Stroke.hairline,
-    borderBottomWidth: Stroke.hairline,
-    paddingVertical: Spacing.three,
     gap: Spacing.four,
   },
-  stat: {
-    flex: 1,
-    gap: Spacing.half,
+  afterHero: {
+    marginTop: Spacing.three,
   },
-  mostRecentLink: {
-    minHeight: Spacing.six,
-  },
-  statDivider: {
-    width: Stroke.hairline,
-  },
-  statValue: {
-    fontFamily: FontFamily.display.extraBold,
-    fontSize: FontSize.xxl,
-    letterSpacing: Tracking.display,
-  },
-  // A date is several glyphs where the count is one, so it takes the step below rather than
-  // wrapping at `xxl`. Same family and weight — it still reads as the pair's other half.
-  statValueDate: {
-    fontFamily: FontFamily.display.bold,
-    fontSize: FontSize.lg,
-    letterSpacing: Tracking.display,
-  },
-  statLabel: {
-    fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.xs,
-    letterSpacing: Tracking.label,
-  },
-  row: {
-    borderWidth: Stroke.hairline,
-    borderRadius: Radius.card,
-    padding: Spacing.three,
+  list: {
     gap: Spacing.two,
   },
-  sampleRow: {
-    borderWidth: Stroke.mark,
-    borderStyle: 'dashed',
-  },
-  rowRoute: {
-    marginTop: Spacing.one,
-    opacity: 0.7,
-  },
-  rowHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Spacing.two,
-  },
-  rowTitle: {
-    flexShrink: 1,
-    fontFamily: FontFamily.display.bold,
-    fontSize: FontSize.lg,
-    letterSpacing: Tracking.display,
-  },
-  rowBody: {
-    fontFamily: FontFamily.body.regular,
-    fontSize: FontSize.sm,
-  },
-  rowMeta: {
+  listLabel: {
     fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.xs,
-  },
-  tag: {
-    borderWidth: Stroke.thin,
-    borderRadius: Radius.pill,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: Spacing.half,
-  },
-  tagText: {
-    fontFamily: FontFamily.mono.bold,
-    fontSize: FontSize.xs,
-    letterSpacing: Tracking.label,
+    fontSize: FontSize.tiny,
+    letterSpacing: 2,
+    marginBottom: Spacing.half,
   },
   error: {
     fontFamily: FontFamily.body.medium,
@@ -310,8 +241,5 @@ const styles = StyleSheet.create({
   },
   spinner: {
     marginTop: Spacing.four,
-  },
-  pressed: {
-    opacity: PressedOpacity,
   },
 });

@@ -5,28 +5,42 @@ import OnboardingScreen from '../onboarding';
 
 /**
  * `CLAUDE.md` says screens are not unit-tested, and this is the one deliberate exception: the
- * signed-out landing screen gates "Get started" — its ONLY forward action — on a callback raised
- * by `<PulseTraceHero>`, a component owned by another branch. If that callback never arrives the
- * runner is stranded on a permanently disabled button with nowhere else to go, so the screen
- * carries its own bounded ceiling and this suite is what proves the ceiling holds.
+ * signed-out landing screen gates "Create your first plan" — its ONLY forward action — on the
+ * hero's build clock reporting settled. If that never arrives the runner is stranded on a
+ * permanently disabled button with nowhere else to go, so the screen carries its own bounded
+ * ceiling and this suite is what proves the ceiling holds.
  */
 
-// A pulse trace that mounts, renders its copy, and never raises `onSettled` — an interrupted
-// draw, an unmount mid-draw, or a reduced-motion branch that misses. It ignores the prop
-// entirely, which is exactly the failure being reproduced.
-jest.mock('@/components/onboarding/PulseTraceSlot', () => ({
-  PulseTraceSlot: ({ children }: { children?: React.ReactNode }) => children ?? null,
+// A hero that mounts and never settles, and a clock that never reports it did — an interrupted
+// animation, an unmount mid-build, or a reduced-motion branch that misses. Exactly the failure
+// being reproduced.
+jest.mock('@/components/build/OnboardingHero', () => ({
+  OnboardingHero: () => null,
 }));
+jest.mock('@/components/build/useBuildClock', () => ({
+  useBuildClock: () => ({ T: { value: 0 }, settled: false, restart: jest.fn() }),
+}));
+// The step pieces and the reveal button drive Reanimated styles off that clock; they are not what
+// is under test, and a stub keeps the tree to the gate it proves.
+jest.mock('@/components/build/steps', () => ({
+  StepIntake: () => null,
+  StepEngine: () => null,
+  StepMiniPlan: () => null,
+}));
+jest.mock('@/components/build/RunnerFigure', () => ({ RunnerFigure: () => null }));
 
 jest.mock('expo-router', () => ({ useRouter: () => ({ push: jest.fn(), navigate: jest.fn() }) }));
 
-/** The rendered "Get started" control's `accessibilityState.disabled` — the flag that actually
- * makes the `Pressable` inert, read off the tree rather than off component state. */
+/** The rendered primary control's `accessibilityState.disabled` — the flag that actually makes
+ * the `Pressable` inert, read off the tree rather than off component state. */
 function ctaDisabled(node: unknown): boolean | undefined {
   if (!node || typeof node !== 'object') return undefined;
   const candidate = node as { props?: Record<string, unknown>; children?: unknown[] };
   const props = candidate.props ?? {};
-  if (props.accessibilityRole === 'button' && props.accessibilityLabel === 'Get started') {
+  if (
+    props.accessibilityRole === 'button' &&
+    props.accessibilityLabel === 'Create your first plan'
+  ) {
     return (props.accessibilityState as { disabled?: boolean } | undefined)?.disabled;
   }
   for (const child of candidate.children ?? []) {
@@ -58,7 +72,7 @@ describe('OnboardingScreen', () => {
     // The captain's constraint still holds up front: settled first, interactive second.
     expect(ctaDisabled(tree.toJSON())).toBe(true);
 
-    // 4s is past any healthy draw, so reaching it means something is genuinely wrong — and the
+    // 4s is past any healthy build, so reaching it means something is genuinely wrong — and the
     // runner gets the button back rather than a dead end.
     act(() => {
       jest.advanceTimersByTime(4000);

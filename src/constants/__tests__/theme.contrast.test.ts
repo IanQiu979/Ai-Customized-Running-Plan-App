@@ -1,23 +1,26 @@
-import { Accent, Colors, Effort, EffortOrder, type ColorScheme } from '../theme';
+import { Accent, Colors, Effort, EffortOrder, Session, type ColorScheme } from '../theme';
 
 /**
- * The Instrument system's contrast table, executable.
+ * The Blueprint system's contrast table, executable.
  *
  * `CLAUDE.md` has always carried the rule "never edit a hex without re-verifying contrast", and
  * `theme.ts` has always carried the ratios as comments. Comments do not fail a build: issue #70
  * ("light-mode effort hexes have no contrast headroom, and dark `interval` is below 3:1") is
  * exactly what a documented-but-unenforced table produces after a few edits. This file recomputes
- * every ratio from the hexes themselves and asserts it against its FLOOR — and, for the three
- * values that are deliberately below the floor, against a ceiling. So a hex edited into
- * illegibility fails here instead of shipping. It does NOT pin the exact numbers written in `theme.ts`'s
+ * every ratio from the hexes themselves and asserts it against its FLOOR — and, for the values
+ * that are deliberately below the floor, against a ceiling. So a hex edited into illegibility
+ * fails here instead of shipping. It does NOT pin the exact numbers written in `theme.ts`'s
  * comments, which is deliberate: pinning them would make every legitimate re-tune a test edit.
- * Re-running the table and updating those comments therefore remains a human step.
  *
  * The floors, from `docs/design/instrument-visual-system.md` §2:
  *   - text on the surface it sits on: >= 4.5:1 (WCAG AA)
- *   - meaningful non-text — the effort ramp, a control's boundary: >= 3:1
+ *   - meaningful non-text — a session bar, a control's boundary: >= 3:1
  *   - `progress.disabled`: deliberately BELOW 3:1. "You cannot use this" is what it means, so
  *     this is asserted as an upper bound, not a lower one.
+ *
+ * The `light` scheme is measured even though `use-theme.ts` renders only `dark` (the V22 sheet
+ * defines one field): the palette is kept so re-enabling it is a hook change, not a re-derivation,
+ * and a palette that is kept is a palette that is kept legible.
  */
 
 // --- WCAG 2.x relative luminance and contrast ratio -------------------------------------------
@@ -42,10 +45,9 @@ function ratio(a: string, b: string): number {
 // --- CIE76 dE, for the one question contrast ratio cannot answer -------------------------------
 
 /**
- * Contrast ratio is blind to hue: an icy-cyan `recovery` would pass every ratio assertion in this
- * file while being indistinguishable from `Accent.signal` at a glance. Distance in Lab is what
- * actually answers "could a runner mistake this bar for the highlight", so the signal-collision
- * rule is measured that way.
+ * Contrast ratio is blind to hue. Distance in Lab is what answers "could a runner mistake this
+ * bar for that one", so the two session tones — and the retained five-step effort ramp — are
+ * checked for separation that way.
  */
 function lab(hex: string): [number, number, number] {
   const h = hex.replace('#', '');
@@ -70,7 +72,7 @@ const SCHEMES: ColorScheme[] = ['light', 'dark'];
 const isOpaqueHex = (value: unknown): value is string =>
   typeof value === 'string' && /^#[0-9A-Fa-f]{6}$/.test(value);
 
-describe('Instrument contrast — docs/design/instrument-visual-system.md §2', () => {
+describe('Blueprint contrast — docs/design/instrument-visual-system.md §2', () => {
   describe.each(SCHEMES)('%s scheme', (scheme) => {
     const c = Colors[scheme];
 
@@ -96,8 +98,8 @@ describe('Instrument contrast — docs/design/instrument-visual-system.md §2', 
     });
 
     it('a disabled control keeps a readable label despite the dead fill', () => {
-      // `PrimaryAction` drops the signal when disabled and labels the inert slab in ordinary ink.
-      // The fill is allowed to be invisible; the word on it is not.
+      // `PrimaryAction` drops the ink fill when disabled and labels the inert slab in ordinary
+      // ink. The fill is allowed to be invisible; the word on it is not.
       expect(ratio(c.text.primary, c.progress.disabled)).toBeGreaterThanOrEqual(4.5);
     });
 
@@ -112,52 +114,43 @@ describe('Instrument contrast — docs/design/instrument-visual-system.md §2', 
         expect(ratio(status, c.surface.raised)).toBeGreaterThanOrEqual(4.5);
       }
     });
+  });
 
-    it('the load curve clears the non-text floor on both base and raised', () => {
-      expect(ratio(c.chart.loadLine, c.surface.base)).toBeGreaterThanOrEqual(3);
-      expect(ratio(c.chart.loadLine, c.surface.raised)).toBeGreaterThanOrEqual(3);
+  describe('the accent — ink, the primary action’s fill', () => {
+    it('is the sheet’s Ink, and its label is the sheet’s Background', () => {
+      // Pinned, because the sheet fixes both and the primary button is the one place they meet
+      // as fill and label rather than as page and text.
+      expect(Accent.fill).toBe(Colors.dark.text.primary);
+      expect(Accent.onFill).toBe(Colors.dark.surface.base);
+    });
+
+    it('the label is legible on the fill', () => {
+      expect(ratio(Accent.onFill, Accent.fill)).toBeGreaterThanOrEqual(4.5);
+    });
+
+    it('the fill has a boundary against the page and against a card', () => {
+      expect(ratio(Accent.fill, Colors.dark.surface.base)).toBeGreaterThanOrEqual(3);
+      expect(ratio(Accent.fill, Colors.dark.surface.raised)).toBeGreaterThanOrEqual(3);
     });
   });
 
-  describe('the accent — theme-invariant, and legible in both schemes', () => {
-    it('the signal is the locked icy cyan, and the field the locked near-black', () => {
-      // Both are duplicated in `constants/pulseTrace.ts` (`PulseTracePalette.trace` / `.field`),
-      // which the onboarding animation owns. This pin is ONE-SIDED today: that file is not on
-      // this branch, so it cannot be imported here, and these assertions catch a drift in
-      // `theme.ts` only — an edit to `PulseTracePalette` would still ship two different cyans.
-      // The pin becomes two-sided once `fm/v22-redesign-animation` lands and the palette can be
-      // imported and asserted equal; see the swap checklist in `PulseTraceSlot.tsx`.
-      expect(Accent.signal).toBe('#A8F0FF');
-      expect(Accent.field).toBe('#0A0E13');
+  describe('the two session tones — bars and tiles, never text or chrome', () => {
+    it('each clears the non-text floor on the dark base and raised planes, with headroom', () => {
+      for (const tone of Object.values(Session)) {
+        expect(ratio(tone, Colors.dark.surface.base)).toBeGreaterThanOrEqual(3);
+        expect(ratio(tone, Colors.dark.surface.raised)).toBeGreaterThanOrEqual(3);
+      }
     });
 
-    it('the signal is legible as a label on the field', () => {
-      expect(ratio(Accent.signal, Accent.field)).toBeGreaterThanOrEqual(4.5);
-      expect(ratio(Accent.onField, Accent.field)).toBeGreaterThanOrEqual(4.5);
-      expect(ratio(Accent.onFieldMuted, Accent.field)).toBeGreaterThanOrEqual(4.5);
+    it('easy and hard cannot be mistaken for each other', () => {
+      expect(deltaE(Session.easy, Session.hard)).toBeGreaterThanOrEqual(25);
     });
 
-    it('is why the signal is never a fill: it has no boundary on a light page', () => {
-      // The measurement that shaped the whole two-tier accent. If this ever clears 3:1 the
-      // constraint has changed and `PrimaryAction` could be reconsidered; until then, a cyan slab
-      // in light mode is a button with no visible edge.
-      expect(ratio(Accent.signal, Colors.light.surface.base)).toBeLessThan(3);
-    });
-
-    it('gives the primary action a boundary in BOTH schemes, through different channels', () => {
-      // Light: the near-black slab itself separates the control from the page.
-      expect(ratio(Accent.field, Colors.light.surface.base)).toBeGreaterThanOrEqual(3);
-      expect(ratio(Accent.field, Colors.light.surface.raised)).toBeGreaterThanOrEqual(3);
-      // Dark: the slab is invisible against the page — asserted, because that is the whole reason
-      // the cyan edge exists and not an accident to be "fixed" later.
-      expect(ratio(Accent.field, Colors.dark.surface.base)).toBeLessThan(3);
-      // ...so the cyan edge is what carries it.
-      expect(ratio(Accent.signal, Colors.dark.surface.base)).toBeGreaterThanOrEqual(3);
-      expect(ratio(Accent.signal, Colors.dark.surface.raised)).toBeGreaterThanOrEqual(3);
-    });
-
-    it('shares one dark plane with surface.inverse, so a CTA on a pricing slab has no seam', () => {
-      expect(Colors.light.surface.inverse).toBe(Accent.field);
+    it('is the same green and orange the effort ramp draws easy and tempo in', () => {
+      // The ramp is retained for the places that still name five levels; where the two systems
+      // overlap they must agree, or a session chip and its bar would disagree about colour.
+      expect(Effort.easy.dark).toBe(Session.easy);
+      expect(Effort.tempo.dark).toBe(Session.hard);
     });
   });
 
@@ -167,15 +160,6 @@ describe('Instrument contrast — docs/design/instrument-visual-system.md §2', 
         const hex = Effort[level][scheme];
         expect(ratio(hex, Colors[scheme].surface.base)).toBeGreaterThanOrEqual(4.5);
         expect(ratio(hex, Colors[scheme].surface.raised)).toBeGreaterThanOrEqual(4.5);
-      }
-    });
-
-    it.each(SCHEMES)('%s: no level is confusable with the signal', (scheme) => {
-      // The floor is 25 dE. For reference the ramp's own tightest adjacent pair is 33.3 (light
-      // recovery/easy) and the tightest value here is dark `recovery` at 28.3, so a hue that
-      // fails this is closer to the highlight than the ramp's own steps are to each other.
-      for (const level of EffortOrder) {
-        expect(deltaE(Effort[level][scheme], Accent.signal)).toBeGreaterThanOrEqual(25);
       }
     });
 
@@ -200,10 +184,9 @@ describe('Instrument contrast — docs/design/instrument-visual-system.md §2', 
           : Object.values(group).filter(isOpaqueHex)
       )
     );
-    // 12 per scheme: 3 surfaces (base/raised/inverse), 4 text, 2 progress, 2 status, 1 chart
-    // line, and nothing else — `surface.overlay`, `hairline`, the whole `grid` group and
-    // `chart.loadFill` are rgba, so they composite and are measured against what they sit on
-    // rather than in isolation.
-    expect(opaque).toHaveLength(24);
+    // 11 per scheme: 3 surfaces (base/raised/inverse), 4 text, 2 progress, 2 status, and nothing
+    // else — `surface.overlay`, `hairline` and the whole `grid` group are rgba, so they composite
+    // and are measured against what they sit on rather than in isolation.
+    expect(opaque).toHaveLength(22);
   });
 });

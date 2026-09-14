@@ -3,7 +3,6 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { RouteLine } from '@/components/brand/RouteLine';
 import {
   FontFamily,
   FontSize,
@@ -85,7 +84,7 @@ export default function PaywallScreen() {
                 ? `You've used ${formatQuotaLine(quota)}. Pro and Elite add pace targets, HR zones and a coach's note on every week.`
                 : 'Pro and Elite add pace targets, HR zones and a coach’s note on every week.'}
             </Text>
-            <RouteLine variant="header" showSummit baseline style={styles.rule} />
+            <View style={[styles.rule, { backgroundColor: theme.hairline }]} />
           </View>
 
           {error && <Text style={[styles.error, { color: theme.status.error }]}>{error}</Text>}
