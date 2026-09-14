@@ -3,13 +3,13 @@ import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { Spacing, Stroke } from '@/constants/theme';
 
 /**
- * The four tab icons (`docs/design/instrument-visual-system.md` §1) — route, book, stacked cards,
- * gear. Before the 2026-09-01 redesign the tab bar rendered `tabBarIcon: () => null`; there were no icons at
- * all.
+ * The four tab icons (`docs/design/instrument-visual-system.md` §1) — week strip, book, stacked
+ * cards, gear. Before the 2026-09-01 redesign the tab bar rendered `tabBarIcon: () => null`;
+ * there were no icons at all.
  *
  * All four are thin-stroke line drawings on a shared 24×24 grid, at `Stroke.mark` weight, with no
  * fills. They take their colour from the tab bar's active/inactive tint, which is `text.primary`
- * or `progress.informative` — **never the signal colour.** The signal is reserved for the single
+ * or `progress.informative` — never the accent. The accent is reserved for the single
  * forward-action on a screen and is barred from navigation.
  */
 
@@ -18,7 +18,7 @@ import { Spacing, Stroke } from '@/constants/theme';
 const VIEWBOX = 24;
 const RENDERED_SIZE = Spacing.four;
 
-export type TabIconName = 'route' | 'book' | 'cards' | 'gear';
+export type TabIconName = 'strip' | 'book' | 'cards' | 'gear';
 
 export function TabBarIcon({ name, color }: { name: TabIconName; color: string }) {
   return (
@@ -27,10 +27,9 @@ export function TabBarIcon({ name, color }: { name: TabIconName; color: string }
       height={RENDERED_SIZE}
       viewBox={`0 0 ${VIEWBOX} ${VIEWBOX}`}
       fill="none"
-      // The bar composes its own accessible label from the tab's title; an icon that announced
-      // itself as well would read the destination twice.
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
+      // The bar composes its own accessible label from the tab's title, and the wrapper in
+      // `(tabs)/_layout.tsx` hides this drawing from assistive tech; the SVG itself carries no
+      // accessibility props (on web they reach the DOM as unknown attributes).
     >
       {renderIcon(name, color)}
     </Svg>
@@ -47,14 +46,17 @@ function renderIcon(name: TabIconName, color: string) {
   };
 
   switch (name) {
-    // Home. The same contour gesture as the route-line motif, reduced to one ridge between a
-    // start node and a summit node — the app's own mark, not a house.
-    case 'route':
+    // Home. The week strip — the app's one drawing since the contour "route line" was retired
+    // with the graph motif (2026-09-14): four bars of different heights on a baseline, with the
+    // rest days as gaps, the way every strip in the app reads.
+    case 'strip':
       return (
         <>
-          <Path d="M4.5 18.5 C 7 18.5 7.5 13 10 13 C 12.5 13 12.5 7 15 6" {...stroke} />
-          <Circle cx={4.5} cy={18.5} r={2} {...stroke} />
-          <Circle cx={16.8} cy={5.4} r={2} {...stroke} />
+          <Path d="M3.5 19.5 H20.5" {...stroke} />
+          <Path d="M6 19.5 V13" {...stroke} />
+          <Path d="M10 19.5 V15.5" {...stroke} />
+          <Path d="M14 19.5 V10" {...stroke} />
+          <Path d="M18 19.5 V5.5" {...stroke} />
         </>
       );
 

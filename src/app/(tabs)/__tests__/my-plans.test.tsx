@@ -2,14 +2,19 @@ import type { ReactElement, ReactNode } from 'react';
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { examplePlan } from '@/lib/fixtures/examplePlan';
+
 import MyPlansScreen from '../my-plans';
 
 const mockListPlans = jest.fn();
+const mockPush = jest.fn();
+const mockLoadPlan = jest.fn();
 
 jest.mock('expo-router', () => {
   const React = jest.requireActual<typeof import('react')>('react');
 
   return {
+    useRouter: () => ({ push: mockPush }),
     Link: ({ href, children }: { href: unknown; children: ReactNode }) =>
       React.createElement('mock-link', { href }, children),
     useFocusEffect: (effect: () => void | (() => void)) => {
@@ -19,6 +24,12 @@ jest.mock('expo-router', () => {
     },
   };
 });
+
+// The hero and the row miniatures read plan details through the plan cache.
+jest.mock('@/hooks/use-plan', () => ({
+  peekPlan: () => undefined,
+  loadPlan: (...args: unknown[]) => mockLoadPlan(...args),
+}));
 
 jest.mock('@/lib/apiClient', () => ({
   API_BASE_URL: 'https://example.invalid',
@@ -65,15 +76,28 @@ function flatten(children: unknown): string {
   return '';
 }
 
-function linksContaining(tree: ReactTestRenderer, text: string): ReactTestInstance[] {
+/** The plan rows are `Pressable`s with `accessibilityRole="link"` that push their plan — not
+ * `<Link>`s, which drop a function-form style on web (see `PlanListRow.tsx`). */
+function rowsContaining(tree: ReactTestRenderer, text: string): ReactTestInstance[] {
   return tree.root.findAll(
-    (node) => String(node.type) === 'mock-link' && flatten(node.props.children).includes(text)
+    (node) =>
+      node.props.accessibilityRole === 'link' &&
+      typeof node.props.onPress === 'function' &&
+      typeof node.type !== 'string' &&
+      flatten(node.props.children).includes(text)
   );
 }
 
 describe('My Plans library', () => {
   beforeEach(() => {
     mockListPlans.mockReset();
+    mockPush.mockReset();
+    mockLoadPlan.mockReset();
+    // Every real plan's detail resolves to the example fixture's shape — the screens only need a
+    // `Plan`; which one is irrelevant here.
+    mockLoadPlan.mockImplementation(() =>
+      Promise.resolve({ plan: examplePlan, quotaConsumed: false })
+    );
   });
 
   afterEach(() => {
@@ -87,12 +111,12 @@ describe('My Plans library', () => {
 
     const tree = await renderScreen(<MyPlansScreen />);
 
-    expect(linksContaining(tree, 'Example Plan (5K)')).toHaveLength(1);
-    expect(linksContaining(tree, 'MOST RECENT')).toHaveLength(0);
+    expect(rowsContaining(tree, 'Example Plan (5K)')).toHaveLength(1);
+    expect(rowsContaining(tree, 'MOST RECENT')).toHaveLength(0);
     expect(flatten(tree.root)).not.toContain('Nothing here yet.');
   });
 
-  it('links the MOST RECENT stat to the newest plan from an unsorted response', async () => {
+  it('opens the newest plan from an unsorted response as the MOST RECENT hero', async () => {
     mockListPlans.mockResolvedValue({
       plans: [
         {
@@ -123,19 +147,40 @@ describe('My Plans library', () => {
     });
 
     const tree = await renderScreen(<MyPlansScreen />);
-    const recentLinks = linksContaining(tree, 'MOST RECENT');
 
-    expect(recentLinks).toHaveLength(1);
-    if (recentLinks.length !== 1) return;
+    // The hero is the runner's real most recent plan, and its one action opens that plan —
+    // the newest by `createdAt`, whatever order the server listed them in.
+    expect(flatten(tree.root)).toContain('MOST RECENT');
+    const openPlan = tree.root.findAll(
+      (node) =>
+        node.props.accessibilityLabel === 'Open plan' && typeof node.props.onPress === 'function'
+    );
+    expect(openPlan.length).toBeGreaterThanOrEqual(1);
+    if (openPlan.length === 0) return;
 
-    expect(recentLinks[0].props.href).toEqual({
-      pathname: '/plan/[id]',
-      params: { id: 'newest-plan' },
+    act(() => {
+      openPlan[0].props.onPress();
     });
-    expect(
-      recentLinks[0].findAll(
-        (node) => typeof node.type === 'string' && node.props.accessibilityRole === 'link'
-      )
-    ).toHaveLength(1);
+    // `createdAt` rides along so the overview can derive elapsed days (`planProgress.ts`)
+    // without a second fetch.
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/plan/[id]',
+      params: { id: 'newest-plan', createdAt: '2026-09-12T09:30:00.000Z' },
+    });
+
+    // Every listed plan is a row that pushes to itself.
+    for (const [id, title, createdAt] of [
+      ['middle-plan', 'Middle plan', '2026-09-10T12:00:00.000Z'],
+      ['newest-plan', 'Newest plan', '2026-09-12T09:30:00.000Z'],
+      ['oldest-plan', 'Oldest plan', '2026-09-08T06:00:00.000Z'],
+    ]) {
+      const rows = rowsContaining(tree, title);
+      expect(rows).toHaveLength(1);
+      mockPush.mockClear();
+      act(() => {
+        rows[0].props.onPress();
+      });
+      expect(mockPush).toHaveBeenCalledWith({ pathname: '/plan/[id]', params: { id, createdAt } });
+    }
   });
 });

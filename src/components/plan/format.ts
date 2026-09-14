@@ -43,9 +43,10 @@ export function describeDays(days: readonly Day[]): string {
 }
 
 /**
- * The single flattened `accessibilityLabel` for one workout row. `WorkoutRow.tsx` marks the row
- * `accessible`, which collapses its whole subtree into this one string — so every fact a runner
- * needs must be spoken here, or it never reaches them at all. Lives here rather than in the
+ * The single flattened `accessibilityLabel` for one workout row. The day row in
+ * `src/app/plan/[id]/week/[week].tsx` is one pressable, which collapses its whole subtree into
+ * this one string — so every fact a runner needs must be spoken here, or it never reaches them at
+ * all. Lives here rather than in the
  * component because it is pure (day number + `Workout` in, string out, no React) and so can be
  * tested without a renderer.
  *

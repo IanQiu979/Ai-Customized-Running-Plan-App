@@ -5,6 +5,92 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-09-14 — "The plan builds itself": the V22 build animations, the Blueprint theme, and the heartbeat/graph motif retired
+
+Implements the six captain-approved Claude Design pages (`V22-01` … `V22-06`, approved
+2026-09-13, design handoff of the same date) natively in `react-native-reanimated`, with the
+handoff's `V22 theme.md` as the colour/type authority. Where a page and the 2026-09-12 animation
+spec disagreed, the page won. Nothing is dropped in as web/HTML.
+
+- **One shared vocabulary, ported verbatim from the pages' runtime.** `src/lib/buildMotion.ts`
+  holds the easings, the `enter` / `draw` / `move` / `snap` primitives (snap = 350 ms rise to 1.03
+  with one settle, never a second bounce) and each page's cue table resolved to seconds;
+  `src/lib/weekStrip.ts` holds the strip's data shape and `stripFromWeek`, which normalises a real
+  week so its longest session fills 90% of the track. Every build derives everything from one
+  master clock `T` (`components/build/useBuildClock`) on the UI thread, exactly as the pages derive
+  theirs from the page timeline, so the choreography is one number rather than chained timers.
+  Under reduced motion the clock starts at its end and the end frame is shown directly. Each
+  composition plays once and holds; only the header mark may re-run, and only when its data changes.
+- **V22-01 · onboarding hero** (`OnboardingHero`): the wordmark; a 96pt Number that counts the
+  week's kilometres; a 7-slot strip whose baseline draws left to right and whose blocks snap in one
+  every 220 ms (Easy 8 · Rest · Rest · Tempo 7 · Rest · Long 10 · Rest, the page's week), the total
+  ticking 8 → 15 → 25 with each landing; three faint copies (0.28 / 0.18 / 0.10) slide down beneath
+  it; legend; then "Continue" 0.8 s into the hold. 3.0 s of build, 2.2 s hold. Laid out in the
+  page's own 393×852 coordinates on a `DesignCanvas` that scales down (never up) and centres.
+- **V22-02 · step pieces** (`components/build/steps`, `RevealPrimaryAction`): 01 Intake — three
+  input rows arrive, a segmented control is pressed 3 → 4 → 5, a field counts to 10 km, another to
+  51 min; 02 Engine — three candidate tiles arrive and the middle one grows into a full session
+  card ("EASY RUN · DAY 03 · 8 KM · 5:40 /KM" — `DAY 03`, not the page's `WED`: days are unnamed
+  here) while the other two fade; 03 Plan — the plan-detail week in miniature builds in 1.0 s;
+  Get started — the primary action's outline draws itself over 0.6 s, the ink fill sweeps in from
+  0.65 s, the label fades up from 0.85 s. Each plays once when its step scrolls into view. The
+  stick-runner figure above the button is the page's own SVG. The old pricing beat is gone; the
+  page has exactly three steps.
+- **V22-03 · survey intro** (`SurveyIntro`, mounted by `intake.tsx` for a runner with no saved
+  intake): heading, then week 1 builds (1.4 s) and weeks 2–6 stack beneath it fading toward the
+  bottom, W1 … W6 labels 4pt under each baseline; PRESS TO CONTINUE fades in 0.8 s into the hold
+  and a tap reveals the questions, which never animate. A runner editing an existing intake goes
+  straight to the form.
+- **V22-04 · home header mark** (`HeaderMark`, in Home's tier row): seven 6×10pt slots at 4pt gap,
+  drawn at 1.4×; the current week's completed days fill bottom-up in ink, 300 ms each at a 70 ms
+  stagger, on screen open, and re-run only when the count changes. "Completed" means *elapsed*:
+  the app logs nothing, so `src/lib/planProgress.ts` reads Day 1 of Week 1 as the day the plan was
+  generated and fills one slot per calendar day since — the only honest derivation without a log,
+  and the one place it lives.
+- **V22-05 · My Plans hero** (`PlanHero`): the runner's real most-recent plan — eyebrow, title, a
+  64pt Number counting to the real first week's total, the real week's bars snapping in 180 ms
+  apart with their real distances and codes, one faint copy beneath — then "Open plan" and the list
+  fade in on the hold. With no generated plan it plays the permanent example; there is no empty
+  state. List rows (`PlanListRow`) carry a 60×28 miniature of the plan's first week.
+- **V22-06 · plan detail, static, three read-only pushes** (`plan/[id]/index`, `week/[week]`,
+  `week/[week]/day/[day]`): A — the whole plan, one row per week with a 120×22 miniature strip,
+  RECOVERY / TAPER / RACE WEEK tag and total, the current week highlighted and the others' bars
+  dimmed to 55%; B — the week's static strip with the current day's numeral in ink, then the seven
+  days as hairline rows; C/D — a session (eyebrow with a session-tone dot, headline, km / zone or
+  RPE / pace, STRUCTURE, EFFORT, WHY as they exist on the `Workout`) or a rest day (No run today,
+  WHY). Rows keep the spec's 44pt hit-target floor over the page's 41pt. The page's "OPTIONAL …
+  walk or mobility" block on a rest day is deliberately not built — plans are running only. The
+  accordion/ribbon plan view (`WeekAccordion`, `WorkoutRow`, `PlanNameplate`) is deleted.
+- **The heartbeat/graph motif is gone from the whole app, not only the six screens** (spec
+  §V22-06's inventory, confirmed by sweep): `PulseTraceHero`, `PulseTraceSlot`, `RouteLine`,
+  `routeProfile.ts`, `pulseTrace.ts` (lib and constants), the `/dev/pulse-trace` route and
+  `docs/design/pulse-trace.md` are deleted; `ScreenHeader` lost its `routeLine` prop and every
+  screen's header is the same hairline; the Paywall's rule is a hairline; the Home tab's glyph is
+  the week strip; sign-in and sign-up carry nothing (the page inventory: "→ nothing, the pages are
+  minimal"). The week strip is the app's one drawing.
+- **The theme is now "Blueprint" — the captain's V22 sheet.** `theme.ts`: background `#0B0E12`,
+  raised `#141920`, hairline 10% white, empty slot 14% white, ink `#EEF1F4`, dim `#8B9299`, and
+  exactly two session colours — easy `#4DB58C`, hard `#E0864E` — applied to bars and tiles, never
+  to text or chrome (`sessionToneFor` collapses the five-level effort scale onto them; steady is
+  hard). **The accent is ink**: the primary action is a near-white slab with the page colour as its
+  label, and the icy cyan went with the pulse trace — there is no second highlight anywhere. Fonts
+  are Barlow Condensed (display, every numeral), IBM Plex Mono (tracked labels, units, day
+  numerals) and IBM Plex Sans (body), replacing Big Shoulders / Public Sans / Space Mono; bars have a
+  5pt top radius, buttons are 12pt / 52pt tall. **The app renders the dark scheme only**
+  (`use-theme.ts`): the sheet defines one field and every page is composed on it; the light palette
+  is kept and still contrast-tested so re-enabling it is one line. The contrast suite was rewritten
+  for the new tokens and still enforces every floor from the hexes.
+- **Visual-match pass (the spec's acceptance step) done before the captain sees it.** Every screen
+  was rendered on Expo web at 393×852 and compared pixel-over-pixel against the approved pages —
+  end frames via the pages' own seek event, motion via in-page sampling (hero bars 220 ms apart
+  with the 1.03 overshoot, total ticking on each landing; button outline 0–0.6 s, fill from 0.65 s,
+  label from 0.85 s; mark filling at a 70 ms stagger). One divergence found and fixed: the survey
+  intro's W1 label sat 15pt low because it was anchored to a box that also held the numerals row;
+  it is now anchored to the baseline like W2–W6. Remaining differences are deliberate and listed
+  above (`DAY 03`, 44pt rows, no mobility block, the app's own screen header on My Plans, the
+  fallback notice on a template plan).
+- Verification: root `typecheck && lint && test` green (48 suites / 870 tests); `workers/` untouched.
+
 ## 2026-09-12 — Home and navigation layout audit batch
 
 Captain-audit scope only: Home, the tab bar, My Plans and the Glossary. No new design assets, and

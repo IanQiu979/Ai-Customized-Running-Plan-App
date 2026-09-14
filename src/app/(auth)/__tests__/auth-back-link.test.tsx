@@ -1,5 +1,6 @@
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import type { ReactElement } from 'react';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import SignInScreen from '../sign-in';
 import SignUpScreen from '../sign-up';
@@ -28,10 +29,21 @@ jest.mock('@/lib/apiClient', () => ({
   signInWithGoogle: jest.fn(),
 }));
 
+// Both screens read the top inset for their wordmark, so they need a provider above them, as
+// they have in the app.
 function render(element: ReactElement): ReactTestRenderer {
   let tree!: ReactTestRenderer;
   act(() => {
-    tree = create(element);
+    tree = create(
+      <SafeAreaProvider
+        initialMetrics={{
+          frame: { x: 0, y: 0, width: 430, height: 932 },
+          insets: { top: 59, left: 0, right: 0, bottom: 34 },
+        }}
+      >
+        {element}
+      </SafeAreaProvider>
+    );
   });
   return tree;
 }

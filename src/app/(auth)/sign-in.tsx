@@ -8,33 +8,25 @@ import {
   Text,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AuthField } from '@/components/auth/AuthField';
-import { PulseTraceSlot } from '@/components/onboarding/PulseTraceSlot';
 import {
   ActionDivider,
   LinkAction,
   PrimaryAction,
   SecondaryAction,
 } from '@/components/ui/ActionButton';
-import {
-  Accent,
-  FontFamily,
-  FontSize,
-  MaxContentWidth,
-  Spacing,
-  Tracking,
-} from '@/constants/theme';
+import { FontFamily, FontSize, MaxContentWidth, Spacing, Tracking } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { API_BASE_URL, authClient, describeError, signInWithGoogle } from '@/lib/apiClient';
 
 /**
- * Sign-in. Same visual treatment as onboarding — the near-black pulse-trace field at the top, the
- * form on the page below it, one signal-marked action — but the field is the short `band` variant
- * and it does not gate anything. That is the deliberate difference: onboarding is a cover a runner
- * is invited to read, this is a form they came here to fill in, so the bold moment is present as
- * identity and never in the way. Nothing on this screen waits for an animation.
+ * Sign-in. Minimal by design (spec §V22-06: the create-account and sign-in pages get "nothing" —
+ * the pulse-trace band they used to carry was retired with the heartbeat/graph motif on
+ * 2026-09-14). A centred wordmark, the form, one ink-filled action. Nothing on this screen waits
+ * for an animation: onboarding is a cover a runner is invited to read, this is a form they came
+ * here to fill in.
  *
  * The back link to onboarding is a peer of the sign-up link at the bottom. `(auth)/onboarding` is
  * the only pre-auth screen there is — it IS home for a signed-out runner — and before this screen
@@ -44,9 +36,13 @@ import { API_BASE_URL, authClient, describeError, signInWithGoogle } from '@/lib
  * `Stack.Protected` in the root layout does the actual navigation once a session exists; this
  * screen only needs to make the sign-in call.
  */
+/** The wordmark's size on the V22 pages (`v22-0N-scene.jsx`: 21pt Barlow Condensed 600). */
+const WORDMARK_SIZE = 21;
+
 export default function SignInScreen() {
   const theme = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -105,12 +101,16 @@ export default function SignInScreen() {
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
           >
-            {/* Wordmark only on the field; the screen's title lives on the page below it. Same
-                reason as onboarding — see that screen's header — plus this one has a keyboard to
-                fight, so every point of fixed hero height is one the form does not get. */}
-            <PulseTraceSlot size="band">
-              <Text style={[styles.eyebrow, { color: Accent.onFieldMuted }]}>PACE BLUEPRINT</Text>
-            </PulseTraceSlot>
+            {/* The wordmark sits on the page itself: the SafeAreaView excludes the top edge (the
+                old field bled into it), so the inset is added here. */}
+            <Text
+              style={[
+                styles.wordmark,
+                { color: theme.text.primary, paddingTop: insets.top + Spacing.four },
+              ]}
+            >
+              Pace Blueprint
+            </Text>
 
             <View style={styles.form}>
               <View style={styles.formHeader}>
@@ -185,10 +185,12 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: MaxContentWidth,
   },
-  eyebrow: {
-    fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.xs,
-    letterSpacing: Tracking.label,
+  wordmark: {
+    fontFamily: FontFamily.display.semiBold,
+    fontSize: WORDMARK_SIZE,
+    letterSpacing: 0.5,
+    textAlign: 'center',
+    paddingBottom: Spacing.four,
   },
   formHeader: {
     gap: Spacing.one,

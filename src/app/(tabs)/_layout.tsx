@@ -7,8 +7,8 @@ import { Spacing, Stroke } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 /**
- * The tab group — Home / Glossary / My Plans / Settings. `src/app/plan/[id].tsx` stays a Stack
- * route outside this group by design: the plan view is a full-screen destination, not a tab.
+ * The tab group — Home / Glossary / My Plans / Settings. The `src/app/plan/[id]/` screens stay
+ * Stack routes outside this group by design: the plan view is a full-screen destination, not a tab.
  *
  * The bar (`docs/design/instrument-visual-system.md`): flat `surface.raised`, one top
  * hairline, no shadow, and four thin-stroke line icons. The active tab draws its icon above an
@@ -17,7 +17,7 @@ import { useTheme } from '@/hooks/use-theme';
  * state rather than decoration. Visible labels are intentionally omitted; each tab keeps an
  * explicit screen-reader label.
  *
- * **The signal colour never touches this bar.** One accent, one forward-action per screen, and
+ * **The accent never touches this bar.** One accent, one forward-action per screen, and
  * navigation is not that action.
  */
 /**
@@ -53,7 +53,7 @@ export default function TabLayout() {
         tabBarItemStyle: styles.item,
       }}
     >
-      <Tabs.Screen name="index" options={tabOptions('Home', 'route')} />
+      <Tabs.Screen name="index" options={tabOptions('Home', 'strip')} />
       <Tabs.Screen name="glossary" options={tabOptions('Glossary', 'book')} />
       <Tabs.Screen name="my-plans" options={tabOptions('My Plans', 'cards')} />
       <Tabs.Screen name="settings" options={tabOptions('Settings', 'gear')} />
@@ -80,7 +80,7 @@ function tabOptions(title: string, icon: TabIconName) {
 }
 
 /** The active state: a short ink tick beneath the icon. Never a filled pill, never a coloured
- * dot, and never the signal colour. */
+ * dot, and never the accent. */
 function TabIcon({
   focused,
   color,

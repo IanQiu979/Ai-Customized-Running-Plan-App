@@ -1,5 +1,5 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -11,7 +11,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { RouteLine } from '@/components/brand/RouteLine';
+import { HeaderMark } from '@/components/build/HeaderMark';
+import { StaticWeekStrip } from '@/components/build/StaticWeekStrip';
+import { useBuildClock } from '@/components/build/useBuildClock';
 import { LockedPanel } from '@/components/home/LockedPanel';
 import { PlanContentTeaser } from '@/components/home/PlanContentTeaser';
 import { NumberField } from '@/components/inputs/NumberField';
@@ -26,6 +28,7 @@ import {
   Stroke,
   Tracking,
 } from '@/constants/theme';
+import { loadPlan } from '@/hooks/use-plan';
 import { useTheme } from '@/hooks/use-theme';
 import { PrimaryAction } from '@/components/ui/ActionButton';
 import {
@@ -36,7 +39,9 @@ import {
   getIntake,
   getQuotaStatus,
   listPlans,
+  type PlanSummary,
 } from '@/lib/apiClient';
+import { MARK_TIMELINE } from '@/lib/buildMotion';
 import { mintIdempotencyKey } from '@/lib/idempotencyKey';
 import { assessGoalRealism } from '@/lib/paceDerivation';
 import {
@@ -46,7 +51,9 @@ import {
   needsPlanLength,
   planTargetFromIntake,
 } from '@/lib/planRequest';
+import { planProgress } from '@/lib/planProgress';
 import { formatQuotaLine } from '@/lib/quotaDisplay';
+import { EMPTY_STRIP_WEEK } from '@/lib/weekStrip';
 import type { IntakeResponses, QuotaStatus } from '@/lib/planTypes';
 
 /** `generate-plan-flow.ts`'s own cap on free-text `notes` — mirrored here only so the field
@@ -89,6 +96,10 @@ export default function HomeScreen() {
   const [quota, setQuota] = useState<QuotaStatus | null>(null);
   const [quotaError, setQuotaError] = useState<string | null>(null);
   const [hasPersistedPlan, setHasPersistedPlan] = useState(false);
+  // The newest plan, for the header mark (V22-04): the mark fills to the day of the current plan
+  // week, counted from the day that plan was created (`planProgress.ts` — the app logs nothing).
+  const [mostRecentPlan, setMostRecentPlan] = useState<PlanSummary | null>(null);
+  const [mostRecentWeeks, setMostRecentWeeks] = useState<number | null>(null);
 
   const [planLengthWeeks, setPlanLengthWeeks] = useState(String(DEFAULT_PLAN_WEEKS));
   const [notes, setNotes] = useState('');
@@ -172,7 +183,10 @@ export default function HomeScreen() {
 
         try {
           const { plans } = await listPlans();
-          if (!cancelled) setHasPersistedPlan(plans.length > 0);
+          if (!cancelled) {
+            setHasPersistedPlan(plans.length > 0);
+            setMostRecentPlan(newestPlan(plans));
+          }
         } catch {
           // A failed refresh is not proof that the runner has no plan. Keep a previously
           // confirmed `true` so a transient network error cannot make paid controls disappear.
@@ -184,6 +198,40 @@ export default function HomeScreen() {
       };
     }, [])
   );
+
+  // The plan's length comes from its detail (summaries carry no weeks); cached after the first
+  // read, so a focus refresh costs nothing.
+  useEffect(() => {
+    if (!mostRecentPlan) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- synchronising with the newest plan
+      setMostRecentWeeks(null);
+      return;
+    }
+    let cancelled = false;
+    loadPlan(mostRecentPlan.planId)
+      .then((loaded) => {
+        if (!cancelled) setMostRecentWeeks(loaded.plan.durationWeeks);
+      })
+      .catch(() => {
+        // Unknown length: the mark stays empty rather than guessing.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [mostRecentPlan]);
+
+  const completedDays =
+    mostRecentPlan && mostRecentWeeks !== null
+      ? planProgress(mostRecentPlan.createdAt, mostRecentWeeks, new Date()).completedDays
+      : 0;
+
+  // The mark fills once on screen open and re-runs only when the data changes — never a loop.
+  const mark = useBuildClock({ total: MARK_TIMELINE.total });
+  const lastMarked = useRef<number | null>(null);
+  useEffect(() => {
+    if (lastMarked.current !== null && lastMarked.current !== completedDays) mark.restart();
+    lastMarked.current = completedDays;
+  }, [completedDays, mark]);
 
   async function handleGenerate() {
     setGenerateError(null);
@@ -248,7 +296,6 @@ export default function HomeScreen() {
           <ScreenHeader
             eyebrow={quota ? `${quota.tier} · ${formatQuotaLine(quota)}` : undefined}
             title="Today"
-            routeLine
           />
 
           {/*
@@ -270,16 +317,16 @@ export default function HomeScreen() {
                 do this once.
               </Text>
 
-              {/* The mockup's plan-shape preview: the route line pencilled in as dots over its
-                  baseline, because the plan it previews doesn't exist yet. Pure ornament — the
-                  caption below it carries the meaning for assistive tech. */}
+              {/* The plan-shape preview: an empty week strip — seven slots, no blocks — because
+                  the plan it previews doesn't exist yet. Pure ornament; the caption below it
+                  carries the meaning for assistive tech. */}
               <View
                 style={[
                   styles.previewCard,
                   { borderColor: theme.hairline, backgroundColor: theme.surface.raised },
                 ]}
               >
-                <RouteLine variant="card" dashed baseline />
+                <StaticWeekStrip week={EMPTY_STRIP_WEEK} height={72} />
                 <Text style={[styles.previewCaption, { color: theme.text.secondary }]}>
                   A preview of what your plan&apos;s shape will look like — no plan yet.
                 </Text>
@@ -416,12 +463,48 @@ export default function HomeScreen() {
                 </Text>
                 <Text style={[styles.navRowHint, { color: theme.text.secondary }]}>My Plans →</Text>
               </Pressable>
+
+              {/* The tier row (V22-04): the header mark beside the tier / plans-used counter.
+                  Only once the quota is known — an unknown tier is not "free". */}
+              {quota ? (
+                <Pressable
+                  accessibilityRole="link"
+                  accessibilityLabel={`${tierName(quota.tier)}, ${formatQuotaLine(quota)}. See plans`}
+                  onPress={() => router.push('/paywall')}
+                  style={({ pressed }) => [
+                    styles.tierRow,
+                    { borderColor: theme.hairline },
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <HeaderMark T={mark.T} completedDays={completedDays} />
+                  <View style={styles.tierCopy}>
+                    <Text style={[styles.tierName, { color: theme.text.primary }]}>
+                      {tierName(quota.tier)}
+                    </Text>
+                    <Text style={[styles.tierQuota, { color: theme.text.secondary }]}>
+                      {formatQuotaLine(quota).toUpperCase()}
+                    </Text>
+                  </View>
+                  <Text style={[styles.tierName, { color: theme.text.primary }]}>See plans →</Text>
+                </Pressable>
+              ) : null}
             </View>
           )}
         </ScrollView>
       </SafeAreaView>
     </View>
   );
+}
+
+/** The newest plan by `createdAt`, or `null` — the server's list order is its own business. */
+function newestPlan(plans: readonly PlanSummary[]): PlanSummary | null {
+  if (plans.length === 0) return null;
+  return plans.reduce((latest, plan) => (plan.createdAt > latest.createdAt ? plan : latest));
+}
+
+function tierName(tier: QuotaStatus['tier']): string {
+  return `${tier.charAt(0).toUpperCase()}${tier.slice(1)} plan`;
 }
 
 const styles = StyleSheet.create({
@@ -525,6 +608,27 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.mono.regular,
     fontSize: FontSize.xs,
     letterSpacing: Tracking.label,
+  },
+  tierRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    borderWidth: Stroke.thin,
+    borderRadius: Radius.button,
+  },
+  tierCopy: {
+    flex: 1,
+    gap: 3,
+  },
+  tierName: {
+    fontFamily: FontFamily.body.semiBold,
+    fontSize: FontSize.xs,
+  },
+  tierQuota: {
+    fontFamily: FontFamily.mono.regular,
+    fontSize: 9,
+    letterSpacing: 1,
   },
   pressed: {
     opacity: PressedOpacity,

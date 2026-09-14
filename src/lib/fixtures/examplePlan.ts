@@ -1,7 +1,8 @@
 /**
  * Local fixture — a hand-built 12-week 5K plan at Pro-tier density, modeled on
- * `docs/reference/coaching/example-plan-5k-pro.md`. `src/app/plan/[id].tsx` renders this,
- * un-fetched, whenever the route id equals `EXAMPLE_PLAN_ID` below — the captain's explicit
+ * `docs/reference/coaching/example-plan-5k-pro.md`. `src/hooks/use-plan.ts` resolves the
+ * `src/app/plan/[id]/` screens to this, un-fetched, whenever the route id equals
+ * `EXAMPLE_PLAN_ID` below — the captain's explicit
  * "never remove the sample plan" call, kept permanently reachable from the pinned row atop
  * `src/app/(tabs)/my-plans.tsx` now that real, backend-fetched plans render alongside it. It
  * exists to prove the plan-view screen against a real, source-derived plan shape — it is a
@@ -114,8 +115,8 @@
 import type { Day, Pace, Phase, Plan, RestDay, Week, Week7, Workout } from '@/lib/planTypes';
 
 /**
- * Fixed route param `src/app/plan/[id].tsx` checks for to render this fixture instead of
- * fetching a real plan, and the id the pinned "Example Plan" row on
+ * Fixed route param `src/hooks/use-plan.ts` checks for to serve this fixture to the
+ * `src/app/plan/[id]/` screens instead of fetching a real plan, and the id the pinned "Example Plan" row on
  * `src/app/(tabs)/my-plans.tsx` always links to. The captain has required this static example
  * stay permanently viewable, real backend or not.
  */
