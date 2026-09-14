@@ -161,16 +161,18 @@ describe('My Plans library', () => {
     act(() => {
       openPlan[0].props.onPress();
     });
+    // `createdAt` rides along so the overview can derive elapsed days (`planProgress.ts`)
+    // without a second fetch.
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/plan/[id]',
-      params: { id: 'newest-plan' },
+      params: { id: 'newest-plan', createdAt: '2026-09-12T09:30:00.000Z' },
     });
 
     // Every listed plan is a row that pushes to itself.
-    for (const [id, title] of [
-      ['middle-plan', 'Middle plan'],
-      ['newest-plan', 'Newest plan'],
-      ['oldest-plan', 'Oldest plan'],
+    for (const [id, title, createdAt] of [
+      ['middle-plan', 'Middle plan', '2026-09-10T12:00:00.000Z'],
+      ['newest-plan', 'Newest plan', '2026-09-12T09:30:00.000Z'],
+      ['oldest-plan', 'Oldest plan', '2026-09-08T06:00:00.000Z'],
     ]) {
       const rows = rowsContaining(tree, title);
       expect(rows).toHaveLength(1);
@@ -178,7 +180,7 @@ describe('My Plans library', () => {
       act(() => {
         rows[0].props.onPress();
       });
-      expect(mockPush).toHaveBeenCalledWith({ pathname: '/plan/[id]', params: { id } });
+      expect(mockPush).toHaveBeenCalledWith({ pathname: '/plan/[id]', params: { id, createdAt } });
     }
   });
 });
