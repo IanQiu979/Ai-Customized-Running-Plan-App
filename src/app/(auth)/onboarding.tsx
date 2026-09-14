@@ -16,7 +16,7 @@ import type { SharedValue } from 'react-native-reanimated';
 import { OnboardingHero } from '@/components/build/OnboardingHero';
 import { RunnerFigure } from '@/components/build/RunnerFigure';
 import { StepEngine, StepIntake, StepMiniPlan } from '@/components/build/steps';
-import { useBuildClock } from '@/components/build/useBuildClock';
+import { SETTLE_SLACK_MS, useBuildClock } from '@/components/build/useBuildClock';
 import { LinkAction, RevealPrimaryAction } from '@/components/ui/ActionButton';
 import { FontFamily, FontSize, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -71,13 +71,16 @@ const STEPS = [
   },
 ] as const;
 
+/** The hero's build is done when its hold begins (3.0 s); the hold is the end frame standing. */
+const HERO_BUILD_END = HERO_TIMELINE.cues.Hold;
+
 /**
- * The ceiling on waiting for the hero to settle. The hero's authored timeline is 5.2 s including
- * its hold, but the build itself is done at 3.0 s and `useBuildClock` reports `settled` at the
- * end of the hold with its own slack; 4 s sits past a healthy build and only ever fires when
- * something has actually gone wrong.
+ * The fallback ceiling on waiting for the hero's build to end. On a healthy run the clock
+ * reports `ready` at `HERO_BUILD_END` and this never fires: it sits past the hero's whole
+ * authored timeline (build and hold, 5.2 s) plus the clock's own slack, so reaching it means the
+ * clock never completed at all, and the runner gets the button back rather than a dead end.
  */
-const HERO_SETTLE_CEILING_MS = 4000;
+const HERO_READY_CEILING_MS = HERO_TIMELINE.total * 1000 + 2 * SETTLE_SLACK_MS;
 
 /** A step counts as on screen once its top is this far inside the bottom of the viewport. */
 const STEP_VISIBLE_MARGIN = 120;
@@ -89,10 +92,11 @@ export default function OnboardingScreen() {
   const scrollRef = useRef<ScrollView>(null);
 
   /**
-   * The captain's constraint, carried over from the previous hero: the hero must already be
-   * settled, not mid-build, by the time the CTA is interactive. The build clock raises that from
-   * its own completion — and the CTA is below the fold anyway, so on a real device the build has
-   * finished long before the button is on screen.
+   * The captain's constraint, carried over from the previous hero: the hero must already have
+   * finished building, not be mid-build, by the time the CTA is interactive. The build clock
+   * raises that from the clock reaching the hold (`HERO_BUILD_END`) — the hold itself is the end
+   * frame standing, not more build — and the CTA is below the fold anyway, so on a real device
+   * the build has finished long before the button is on screen.
    *
    * The constraint stands; the ceiling below is only so it cannot hang forever. This screen owns
    * that ceiling itself rather than trusting the clock to have one, because "Create your first
@@ -100,53 +104,56 @@ export default function OnboardingScreen() {
    * arrives — an interrupted animation, an unmount mid-build, a reduced-motion branch that misses —
    * is a silent, total dead end, and that failure must not depend on another component's internals.
    */
-  const hero = useBuildClock({ total: HERO_TIMELINE.total });
-  const [heroSettled, setHeroSettled] = useState(false);
+  const hero = useBuildClock({ total: HERO_TIMELINE.total, readyAt: HERO_BUILD_END });
+  const [heroReady, setHeroReady] = useState(false);
   useEffect(() => {
-    if (hero.settled) {
+    if (hero.ready) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- latching a clock's completion
-      setHeroSettled(true);
+      setHeroReady(true);
     }
-  }, [hero.settled]);
+  }, [hero.ready]);
   useEffect(() => {
-    if (heroSettled) return;
-    const ceiling = setTimeout(() => setHeroSettled(true), HERO_SETTLE_CEILING_MS);
+    if (heroReady) return;
+    const ceiling = setTimeout(() => setHeroReady(true), HERO_READY_CEILING_MS);
     return () => clearTimeout(ceiling);
-  }, [heroSettled]);
+  }, [heroReady]);
 
   // Which sections have scrolled into view, by index (0..2 the steps, 3 the Get started beat).
-  // Once visible always visible: a piece plays once and holds, never rewinds.
-  const [scrollY, setScrollY] = useState(0);
-  const [sectionTops, setSectionTops] = useState<Record<number, number>>({});
+  // Once visible always visible: a piece plays once and holds, never rewinds. The scroll offset
+  // and the section tops live in refs and the latch is computed in the handlers, so a scroll
+  // frame re-renders the tree only when it first reveals a section — never at 60 Hz.
+  const scrollY = useRef(0);
+  const sectionTops = useRef<Record<number, number>>({});
+  const seenRef = useRef<Record<number, boolean>>({});
   const [seen, setSeen] = useState<Record<number, boolean>>({});
-  useEffect(() => {
-    const threshold = scrollY + viewportHeight - STEP_VISIBLE_MARGIN;
-    const next: Record<number, boolean> = {};
+  const reveal = useCallback(() => {
+    const threshold = scrollY.current + viewportHeight - STEP_VISIBLE_MARGIN;
     let changed = false;
-    for (const [key, top] of Object.entries(sectionTops)) {
+    for (const [key, top] of Object.entries(sectionTops.current)) {
       const index = Number(key);
-      if (!seen[index] && top <= threshold) {
-        next[index] = true;
+      if (!seenRef.current[index] && top <= threshold) {
+        seenRef.current[index] = true;
         changed = true;
       }
     }
-    if (changed) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- derived from scroll + layout
-      setSeen((current) => ({ ...current, ...next }));
-    }
-  }, [scrollY, sectionTops, viewportHeight, seen]);
+    if (changed) setSeen({ ...seenRef.current });
+  }, [viewportHeight]);
 
-  const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    setScrollY(event.nativeEvent.contentOffset.y);
-  }, []);
+  const handleScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      scrollY.current = event.nativeEvent.contentOffset.y;
+      reveal();
+    },
+    [reveal]
+  );
   // The step sections are laid out inside a wrapper below the hero, so their `y` is offset by
   // the hero's height (one viewport) to land in scroll-content coordinates.
   const sectionLayout = useCallback(
     (index: number) => (event: LayoutChangeEvent) => {
-      const top = event.nativeEvent.layout.y + viewportHeight;
-      setSectionTops((current) => (current[index] === top ? current : { ...current, [index]: top }));
+      sectionTops.current[index] = event.nativeEvent.layout.y + viewportHeight;
+      reveal();
     },
-    [viewportHeight]
+    [viewportHeight, reveal]
   );
 
   const scrollToSteps = useCallback(() => {
@@ -199,7 +206,7 @@ export default function OnboardingScreen() {
             >
               <GetStarted
                 visible={Boolean(seen[STEPS.length])}
-                disabled={!heroSettled}
+                disabled={!heroReady}
                 onPress={() => router.push('/(auth)/sign-up')}
               />
               <LinkAction onPress={() => router.push('/(auth)/sign-in')}>

@@ -5,6 +5,7 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
@@ -105,9 +106,14 @@ const AnimatedRect = Animated.createAnimatedComponent(Rect);
  * choreographed, and it is driven by the caller's build clock `T` (seconds, see
  * `lib/buildMotion.ts`) so it plays when the step scrolls into view and holds its end frame.
  *
- * Pressable only once the fill has landed: a button that is still an outline is not yet an
- * action. Under reduced motion the caller's clock sits at its end and the control is simply the
- * finished button.
+ * Pressable whenever the caller's `disabled` is false — the reveal choreographs the arrival, not
+ * the availability, which the caller gates on its own clock (onboarding's hero build). Under
+ * reduced motion the caller's clock sits at its end and the control is simply the finished
+ * button.
+ *
+ * Drawn at the page's width where the viewport allows it and capped at the viewport minus the
+ * section's gutters where it does not: a 375 pt or 360 pt phone gets a narrower slab, never one
+ * that runs into the margins or is clipped.
  */
 export function RevealPrimaryAction({
   T,
@@ -128,8 +134,9 @@ export function RevealPrimaryAction({
   style?: StyleProp<ViewStyle>;
 }) {
   const theme = useTheme();
+  const { width: viewportWidth } = useWindowDimensions();
   // The page draws a 345 × 52 rounded rect; the perimeter is what the dash offset counts down.
-  const width = REVEAL_WIDTH;
+  const width = revealWidth(viewportWidth);
   const perimeter = 2 * (width + BUTTON_HEIGHT) - 8 * Radius.button + 2 * Math.PI * Radius.button;
 
   const outline = useAnimatedProps(() => ({
@@ -183,6 +190,13 @@ export function RevealPrimaryAction({
 /** The page's button width (393 − 2 × 24). The reveal is drawn at this width and centred by its
  * caller; a wider screen keeps the page's proportions rather than stretching the outline. */
 export const REVEAL_WIDTH = 345;
+/** The section's gutter on either side of the reveal — the page's 24 pt. */
+export const REVEAL_GUTTER = Spacing.four;
+
+/** The reveal's drawn width on a given viewport: the page's, or what fits inside the gutters. */
+export function revealWidth(viewportWidth: number): number {
+  return Math.max(0, Math.min(REVEAL_WIDTH, viewportWidth - 2 * REVEAL_GUTTER));
+}
 
 /**
  * Everything that is a real action but not THE action: the Google buttons on the auth screens, a

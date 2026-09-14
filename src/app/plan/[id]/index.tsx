@@ -1,5 +1,5 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { MiniWeekStrip } from '@/components/build/MiniWeekStrip';
@@ -7,6 +7,7 @@ import { DisclaimerFooter } from '@/components/plan/DisclaimerFooter';
 import { FallbackNotice } from '@/components/plan/FallbackNotice';
 import { formatPlanDate } from '@/components/plan/format';
 import { GoalRealismNotice } from '@/components/plan/GoalRealismNotice';
+import { PlanPlaceholder } from '@/components/plan/PlanPlaceholder';
 import { PlanTopBar } from '@/components/plan/PlanTopBar';
 import { currentWeekIndex, firstParam, planTotalKm, weekTag } from '@/components/plan/planScreen';
 import { FontFamily, FontSize, PressedOpacity, Radius, Spacing, Stroke } from '@/constants/theme';
@@ -40,25 +41,9 @@ export default function PlanOverviewScreen() {
   const createdAt = firstParam(params.createdAt);
   const { loaded, loading, error } = usePlan(planId);
 
-  if (loading) {
-    return (
-      <View style={[styles.centered, { backgroundColor: theme.surface.base }]}>
-        <Stack.Screen options={{ headerShown: false }} />
-        <ActivityIndicator color={theme.text.primary} />
-      </View>
-    );
-  }
-
+  if (loading) return <PlanPlaceholder label="PLAN" />;
   if (error || !loaded) {
-    return (
-      <View style={[styles.centered, { backgroundColor: theme.surface.base }]}>
-        <Stack.Screen options={{ headerShown: false }} />
-        <Text style={[styles.errorTitle, { color: theme.text.primary }]}>Nothing to show</Text>
-        <Text style={[styles.error, { color: theme.status.error }]}>
-          {error ?? 'This plan could not be found.'}
-        </Text>
-      </View>
-    );
+    return <PlanPlaceholder label="PLAN" message={error ?? 'This plan could not be found.'} />;
   }
 
   const { plan, quotaConsumed } = loaded;
@@ -171,13 +156,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.two,
-  },
   content: {
     paddingHorizontal: 20,
     paddingBottom: Spacing.six,
@@ -239,15 +217,6 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     fontFamily: FontFamily.mono.regular,
     fontSize: 12,
-  },
-  errorTitle: {
-    fontFamily: FontFamily.display.semiBold,
-    fontSize: FontSize.xl,
-  },
-  error: {
-    fontFamily: FontFamily.body.medium,
-    fontSize: FontSize.sm,
-    textAlign: 'center',
   },
   pressed: {
     opacity: PressedOpacity,

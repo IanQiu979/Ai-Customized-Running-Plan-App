@@ -118,6 +118,9 @@ export default function MyPlansScreen() {
     heroPlan = examplePlan;
     heroId = EXAMPLE_PLAN_ID;
   }
+  // The plan's creation date rides along so the overview can tell which week is current; the
+  // example plan has none and legitimately omits it.
+  const heroCreatedAt = heroId !== null && heroId !== EXAMPLE_PLAN_ID ? mostRecentPlan?.createdAt : undefined;
   const heroReady = heroPlan !== null;
 
   const { T, restart } = useBuildClock({ total: PLAN_HERO_TIMELINE.total, play: heroReady });
@@ -151,7 +154,13 @@ export default function MyPlansScreen() {
                 <PrimaryAction
                   label="Open plan"
                   onPress={() =>
-                    router.push({ pathname: '/plan/[id]', params: { id: heroId ?? EXAMPLE_PLAN_ID } })
+                    router.push({
+                      pathname: '/plan/[id]',
+                      params: {
+                        id: heroId ?? EXAMPLE_PLAN_ID,
+                        ...(heroCreatedAt ? { createdAt: heroCreatedAt } : {}),
+                      },
+                    })
                   }
                 />
               </FadeIn>
@@ -188,6 +197,7 @@ export default function MyPlansScreen() {
                 <PlanListRow
                   key={plan.planId}
                   planId={plan.planId}
+                  createdAt={plan.createdAt}
                   title={plan.title ?? 'Untitled plan'}
                   meta={meta}
                   week={detail?.plan.weeks[0] ? stripFromWeek(detail.plan.weeks[0]) : EMPTY_STRIP_WEEK}

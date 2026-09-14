@@ -3,6 +3,7 @@ import {
   Easing,
   cancelAnimation,
   runOnJS,
+  useAnimatedReaction,
   useReducedMotion,
   useSharedValue,
   withTiming,
@@ -16,11 +17,19 @@ import {
  * timeline, so the choreography is one number and not a tree of chained timers.
  *
  * Reduced motion: the clock starts AT `total` and never runs — the end frame is shown directly
- * (spec §0: "every page has a static end frame that stands alone"). `settled` is true on mount.
+ * (spec §0: "every page has a static end frame that stands alone"). `settled` and `ready` are
+ * true on mount.
  *
  * `settled` flips when the clock reaches `total`, and never later than `total + slack` even if
  * the animation callback is lost (a backgrounded app, dropped cold-start frames): a caller that
  * gates a control on it can never be stranded.
+ *
+ * `ready` is the same latch for an earlier point on the clock, `readyAt` (default `total`, so
+ * without one `ready` and `settled` agree). A page's hold is part of its authored timeline but
+ * not part of its build — the build is done, and a cue is showing, before the hold ends — so a
+ * caller that gates a control on the build reaching its cue passes the cue's time here rather
+ * than waiting out the hold. It flips from the clock crossing `readyAt` on the UI thread, and
+ * never later than `readyAt + slack`.
  *
  * `play` false holds the clock at 0 — for a step piece waiting to scroll into view — and the
  * run starts the first time it turns true. It never re-runs on its own (no loops on heroes);
@@ -29,19 +38,23 @@ import {
 export function useBuildClock({
   total,
   play = true,
+  readyAt = total,
 }: {
   total: number;
   play?: boolean;
-}): { T: SharedValue<number>; settled: boolean; restart: () => void } {
+  /** Seconds on the clock at which `ready` flips; defaults to the authored end. */
+  readyAt?: number;
+}): { T: SharedValue<number>; settled: boolean; ready: boolean; restart: () => void } {
   const reduceMotion = useReducedMotion();
   const T = useSharedValue(reduceMotion ? total : 0);
   const [settled, setSettled] = useState(reduceMotion);
+  const [ready, setReady] = useState(reduceMotion);
   const [run, setRun] = useState(0);
   const started = useRef(false);
 
   useEffect(() => {
-    // Under reduced motion the clock was initialised at `total` and `settled` at true; there is
-    // nothing to run.
+    // Under reduced motion the clock was initialised at `total` and both latches at true; there
+    // is nothing to run.
     if (!play || reduceMotion) return;
     started.current = true;
     T.value = 0;
@@ -52,22 +65,36 @@ export function useBuildClock({
         if (finished) runOnJS(setSettled)(true);
       }
     );
+    const readyCeiling = setTimeout(
+      () => setReady(true),
+      Math.min(readyAt, total) * 1000 + SETTLE_SLACK_MS
+    );
     const ceiling = setTimeout(() => setSettled(true), total * 1000 + SETTLE_SLACK_MS);
     return () => {
+      clearTimeout(readyCeiling);
       clearTimeout(ceiling);
       cancelAnimation(T);
     };
     // `T` is a stable shared-value handle; `run` re-fires the effect on `restart()`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [play, total, reduceMotion, run]);
+  }, [play, total, readyAt, reduceMotion, run]);
+
+  useAnimatedReaction(
+    () => T.value >= readyAt,
+    (reached, previous) => {
+      if (reached && !previous) runOnJS(setReady)(true);
+    },
+    [readyAt]
+  );
 
   const restart = useCallback(() => {
     if (reduceMotion || !started.current) return;
     setSettled(false);
+    setReady(false);
     setRun((n) => n + 1);
   }, [reduceMotion]);
 
-  return { T, settled, restart };
+  return { T, settled, ready, restart };
 }
 
 /** Slack past the authored end before `settled` is forced, in ms. */

@@ -3,7 +3,7 @@ import { Text } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import { Colors, Session } from '@/constants/theme';
-import { HERO_TIMELINE, PLAN_HERO_TIMELINE, SURVEY_TIMELINE } from '@/lib/buildMotion';
+import { CUE_DELAY, HERO_TIMELINE, PLAN_HERO_TIMELINE, SURVEY_TIMELINE } from '@/lib/buildMotion';
 import { EMPTY_STRIP_WEEK, HERO_WEEK, stripFromWeek } from '@/lib/weekStrip';
 import { examplePlan } from '@/lib/fixtures/examplePlan';
 
@@ -17,7 +17,7 @@ import { StaticWeekStrip } from '../build/StaticWeekStrip';
 import { SurveyIntro } from '../build/SurveyIntro';
 import { WeekStrip } from '../build/WeekStrip';
 import { StepEngine, StepIntake, StepMiniPlan } from '../build/steps';
-import { useBuildClock } from '../build/useBuildClock';
+import { SETTLE_SLACK_MS, useBuildClock } from '../build/useBuildClock';
 import { RevealPrimaryAction } from '../ui/ActionButton';
 
 /**
@@ -71,8 +71,8 @@ const text = (tree: ReactTestRenderer) =>
     .join(' | ');
 
 /** A host that owns a clock the way a screen does, so a composition can be mounted alone. */
-function Clocked({ total, play = true, children }: { total: number; play?: boolean; children: (clock: ReturnType<typeof useBuildClock>) => ReactElement }) {
-  const clock = useBuildClock({ total, play });
+function Clocked({ total, play = true, readyAt, children }: { total: number; play?: boolean; readyAt?: number; children: (clock: ReturnType<typeof useBuildClock>) => ReactElement }) {
+  const clock = useBuildClock({ total, play, readyAt });
   return children(clock);
 }
 
@@ -110,6 +110,36 @@ describe('useBuildClock', () => {
     expect(seen?.settled).toBe(false);
     act(() => tree.unmount());
     expect(cancelAnimation).toHaveBeenCalled();
+  });
+
+  it('reports `ready` at `readyAt` — the cue, not the end of the hold — and never later than its slack', () => {
+    mockReduceMotion = false;
+    jest.useFakeTimers();
+    try {
+      let seen: ReturnType<typeof useBuildClock> | undefined;
+      render(
+        <Clocked total={SURVEY_TIMELINE.total} readyAt={SURVEY_TIMELINE.cues.Hold + CUE_DELAY}>
+          {(clock) => {
+            seen = clock;
+            return <Text>ok</Text>;
+          }}
+        </Clocked>
+      );
+      expect(seen?.ready).toBe(false);
+      expect(seen?.settled).toBe(false);
+      // Just past the cue plus the clock's slack: ready, while the hold is still running.
+      act(() => {
+        jest.advanceTimersByTime((SURVEY_TIMELINE.cues.Hold + CUE_DELAY) * 1000 + SETTLE_SLACK_MS);
+      });
+      expect(seen?.ready).toBe(true);
+      expect(seen?.settled).toBe(false);
+      act(() => {
+        jest.advanceTimersByTime(SURVEY_TIMELINE.total * 1000);
+      });
+      expect(seen?.settled).toBe(true);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('holds at 0 while `play` is false — a step waits to scroll into view', () => {
@@ -240,12 +270,12 @@ describe('step pieces — V22-02', () => {
 });
 
 describe('SurveyIntro — V22-03', () => {
-  it('holds on the heading, W1–W6 and PRESS TO CONTINUE, and continues only once settled', () => {
+  it('holds on the heading, W1–W6 and PRESS TO CONTINUE, and continues once the cue is shown', () => {
     const onContinue = jest.fn();
     const tree = render(
-      <Clocked total={SURVEY_TIMELINE.total}>
-        {({ T, settled }) => (
-          <SurveyIntro T={T} width={393} height={852} onContinue={onContinue} settled={settled} />
+      <Clocked total={SURVEY_TIMELINE.total} readyAt={SURVEY_TIMELINE.cues.Hold + CUE_DELAY}>
+        {({ T, ready }) => (
+          <SurveyIntro T={T} width={393} height={852} onContinue={onContinue} cueShown={ready} />
         )}
       </Clocked>
     );
@@ -259,11 +289,11 @@ describe('SurveyIntro — V22-03', () => {
     expect(onContinue).toHaveBeenCalledTimes(1);
   });
 
-  it('ignores a tap before the build has settled', () => {
+  it('ignores a tap before the cue is shown', () => {
     const onContinue = jest.fn();
     const tree = render(
       <Clocked total={SURVEY_TIMELINE.total}>
-        {({ T }) => <SurveyIntro T={T} width={393} height={852} onContinue={onContinue} settled={false} />}
+        {({ T }) => <SurveyIntro T={T} width={393} height={852} onContinue={onContinue} cueShown={false} />}
       </Clocked>
     );
     const press = tree.root.findByProps({ accessibilityLabel: 'Press to continue' }).props.onPress;

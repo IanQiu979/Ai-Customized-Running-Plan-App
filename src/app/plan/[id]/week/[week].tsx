@@ -1,9 +1,10 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { StaticWeekStrip } from '@/components/build/StaticWeekStrip';
 import { formatPace } from '@/components/plan/format';
+import { PlanPlaceholder } from '@/components/plan/PlanPlaceholder';
 import { PlanTopBar } from '@/components/plan/PlanTopBar';
 import {
   currentDayIndex,
@@ -22,9 +23,11 @@ import { stripFromWeek, stripRunCount } from '@/lib/weekStrip';
 const SHORT_STRUCTURE = 14;
 
 /**
- * V22-06 B · Week, compact. The static strip replaces the graph; the seven days follow as
- * hairline rows — every day, rest days included, because rest days are real slots. Tapping a
- * row pushes C (a session) or D (a rest day). Static; no animation.
+ * V22-06 B · Week, compact. The static strip replaces the graph; on a paid tier the coach's
+ * note for the week (`Week.why`, the "weekly why" the personaliser writes and the Paywall sells)
+ * sits under it; the seven days follow as hairline rows — every day, rest days included, because
+ * rest days are real slots. Tapping a row pushes C (a session) or D (a rest day). Static; no
+ * animation.
  */
 export default function WeekScreen() {
   const theme = useTheme();
@@ -38,26 +41,10 @@ export default function WeekScreen() {
   const weekNumber = Number(firstParam(params.week));
   const { loaded, loading, error } = usePlan(planId);
 
-  if (loading) {
-    return (
-      <View style={[styles.centered, { backgroundColor: theme.surface.base }]}>
-        <Stack.Screen options={{ headerShown: false }} />
-        <ActivityIndicator color={theme.text.primary} />
-      </View>
-    );
-  }
-
+  if (loading) return <PlanPlaceholder label="WEEK" />;
   const week = loaded?.plan.weeks.find((candidate) => candidate.weekNumber === weekNumber);
   if (error || !loaded || !week) {
-    return (
-      <View style={[styles.centered, { backgroundColor: theme.surface.base }]}>
-        <Stack.Screen options={{ headerShown: false }} />
-        <Text style={[styles.errorTitle, { color: theme.text.primary }]}>Nothing to show</Text>
-        <Text style={[styles.error, { color: theme.status.error }]}>
-          {error ?? 'This week could not be found.'}
-        </Text>
-      </View>
-    );
+    return <PlanPlaceholder label="WEEK" message={error ?? 'This week could not be found.'} />;
   }
 
   const { plan } = loaded;
@@ -86,6 +73,13 @@ export default function WeekScreen() {
           </View>
 
           <StaticWeekStrip week={strip} currentDay={currentDay} />
+
+          {week.why ? (
+            <View style={styles.why}>
+              <Text style={[styles.whyLabel, { color: theme.text.secondary }]}>WHY</Text>
+              <Text style={[styles.whyBody, { color: theme.text.primary }]}>{week.why}</Text>
+            </View>
+          ) : null}
 
           <View>
             {week.days.map((day, index) => (
@@ -204,13 +198,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.two,
-  },
   content: {
     paddingHorizontal: 20,
     paddingBottom: Spacing.six,
@@ -229,6 +216,19 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.mono.regular,
     fontSize: FontSize.tiny,
     letterSpacing: 1.5,
+  },
+  why: {
+    gap: 12,
+  },
+  whyLabel: {
+    fontFamily: FontFamily.mono.regular,
+    fontSize: FontSize.tiny,
+    letterSpacing: 2,
+  },
+  whyBody: {
+    fontFamily: FontFamily.body.regular,
+    fontSize: 14,
+    lineHeight: 21,
   },
   row: {
     flexDirection: 'row',
@@ -273,15 +273,6 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     fontFamily: FontFamily.mono.regular,
     fontSize: 12,
-  },
-  errorTitle: {
-    fontFamily: FontFamily.display.semiBold,
-    fontSize: FontSize.xl,
-  },
-  error: {
-    fontFamily: FontFamily.body.medium,
-    fontSize: FontSize.sm,
-    textAlign: 'center',
   },
   pressed: {
     opacity: PressedOpacity,

@@ -46,7 +46,7 @@ import {
   type ClockParts,
   type DateParts,
 } from '@/lib/fieldInput';
-import { SURVEY_TIMELINE } from '@/lib/buildMotion';
+import { CUE_DELAY, SURVEY_TIMELINE } from '@/lib/buildMotion';
 import { getGoalRealismIntakeCopy } from '@/lib/goalRealismDisclosure';
 import { assessGoalRealism } from '@/lib/paceDerivation';
 import { intakeRaceDateError } from '@/lib/planRequest';
@@ -114,13 +114,15 @@ export default function IntakeScreen() {
   // initial load, so the header reads "Done" for a runner revisiting an already-completed intake
   // even before they touch anything.
   const [hadIntakeOnLoad, setHadIntakeOnLoad] = useState(false);
-  // The intro is dismissed by a tap on its settled end frame and never comes back this visit.
+  // The intro is dismissed by a tap once its PRESS TO CONTINUE cue is showing and never comes
+  // back this visit.
   const [introDone, setIntroDone] = useState(false);
   const showIntro = !loading && !hadIntakeOnLoad && !introDone;
   const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
-  const { T: introClock, settled: introSettled } = useBuildClock({
+  const { T: introClock, ready: introCueShown } = useBuildClock({
     total: SURVEY_TIMELINE.total,
     play: showIntro,
+    readyAt: SURVEY_TIMELINE.cues.Hold + CUE_DELAY,
   });
 
   const intakeHeaderOptions = {
@@ -343,7 +345,7 @@ export default function IntakeScreen() {
           T={introClock}
           width={viewportWidth}
           height={viewportHeight}
-          settled={introSettled}
+          cueShown={introCueShown}
           onContinue={() => setIntroDone(true)}
         />
       </View>

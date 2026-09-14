@@ -62,17 +62,25 @@ export function stripCodeFor(label: string): string {
   return head.toUpperCase();
 }
 
-/** A real week as a strip. Heights are normalised within the week. */
+/** A real week as a strip. Heights are normalised within the week, per unit: kilometres
+ * against the week's longest distance session, minutes against its longest time-based one, so a
+ * 30-minute run never towers over a 14 km one because 30 is the bigger number. */
 export function stripFromWeek(week: Pick<Week, 'days'>): StripWeek {
-  const magnitudes = week.days.map((day) =>
-    day.kind === 'run' ? (day.distanceKm ?? day.durationMin ?? 0) : 0
-  );
-  const max = Math.max(0, ...magnitudes);
-  return week.days.map((day, index): StripBlock | null => {
+  const measured = week.days.map((day) => {
     if (day.kind !== 'run') return null;
-    const magnitude = magnitudes[index];
-    const unit = day.distanceKm !== undefined ? 'km' : 'min';
-    const share = max > 0 ? (magnitude / max) * REAL_WEEK_MAX_SHARE : MIN_BLOCK_SHARE;
+    if (day.distanceKm !== undefined) return { unit: 'km' as const, magnitude: day.distanceKm };
+    return { unit: 'min' as const, magnitude: day.durationMin ?? 0 };
+  });
+  const max = { km: 0, min: 0 };
+  for (const entry of measured) {
+    if (entry) max[entry.unit] = Math.max(max[entry.unit], entry.magnitude);
+  }
+  return week.days.map((day, index): StripBlock | null => {
+    const entry = measured[index];
+    if (day.kind !== 'run' || !entry) return null;
+    const { unit, magnitude } = entry;
+    const longest = max[unit];
+    const share = longest > 0 ? (magnitude / longest) * REAL_WEEK_MAX_SHARE : MIN_BLOCK_SHARE;
     return {
       h: Math.max(MIN_BLOCK_SHARE, Math.min(1, share)),
       value: roundHeadline(magnitude),

@@ -103,6 +103,28 @@ describe('stripFromWeek', () => {
     expect(stripTotalKm(strip)).toBe(0);
   });
 
+  it('normalises each unit against its own longest session in a mixed week', () => {
+    const mixed: Week7<Day> = [
+      run({ label: 'ER', distanceKm: 7 }),
+      run({ label: 'RR', effort: 'recovery', distanceKm: undefined, durationMin: 30 }),
+      rest,
+      run({ label: 'ER', distanceKm: undefined, durationMin: 45 }),
+      rest,
+      run({ label: 'LR', distanceKm: 14, isLongRun: true }),
+      rest,
+    ];
+    const strip = stripFromWeek({ days: mixed });
+    // Kilometres against the 14 km long run.
+    expect(strip[5]?.h).toBeCloseTo(REAL_WEEK_MAX_SHARE, 9);
+    expect(strip[0]?.h).toBeCloseTo((7 / 14) * REAL_WEEK_MAX_SHARE, 9);
+    // Minutes against the 45-minute run — the 30-minute run is not taller than the long run.
+    expect(strip[3]?.h).toBeCloseTo(REAL_WEEK_MAX_SHARE, 9);
+    expect(strip[1]?.h).toBeCloseTo((30 / 45) * REAL_WEEK_MAX_SHARE, 9);
+    expect(strip[1]?.h).toBeLessThan(strip[5]!.h);
+    expect(strip[1]).toMatchObject({ value: 30, unit: 'min' });
+    expect(stripTotalKm(strip)).toBe(21);
+  });
+
   it('floors a tiny session so it is still a visible block', () => {
     const strip = stripFromWeek({
       days: [run({ label: 'SR', distanceKm: 1 }), rest, rest, rest, rest, run({ label: 'LR', distanceKm: 30 }), rest],

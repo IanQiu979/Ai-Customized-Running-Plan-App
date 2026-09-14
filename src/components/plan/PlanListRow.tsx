@@ -17,12 +17,16 @@ import type { StripWeek } from '@/lib/weekStrip';
  */
 export function PlanListRow({
   planId,
+  createdAt,
   title,
   meta,
   week,
   accessibilityLabel,
 }: {
   planId: string;
+  /** When the plan was generated, passed through to the plan screens so they can tell which
+   * week and day are current. The example plan has none. */
+  createdAt?: string;
   title: string;
   /** Already-formatted, already-uppercased. */
   meta: string;
@@ -38,7 +42,12 @@ export function PlanListRow({
     <Pressable
       accessibilityRole="link"
       accessibilityLabel={accessibilityLabel ?? `${title}, ${meta.toLowerCase()}`}
-      onPress={() => router.push({ pathname: '/plan/[id]', params: { id: planId } })}
+      onPress={() =>
+        router.push({
+          pathname: '/plan/[id]',
+          params: { id: planId, ...(createdAt ? { createdAt } : {}) },
+        })
+      }
       style={({ pressed }) => [
         styles.row,
         { borderColor: theme.hairline, backgroundColor: theme.surface.raised },

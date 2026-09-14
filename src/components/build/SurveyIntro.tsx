@@ -50,7 +50,7 @@ export function SurveyIntro({
   width,
   height,
   onContinue,
-  settled,
+  cueShown,
   heading = 'A few questions first',
   supporting = 'Two minutes. Your plan is built from the answers.',
   appName = 'Pace Blueprint',
@@ -59,8 +59,9 @@ export function SurveyIntro({
   width: number;
   height: number;
   onContinue: () => void;
-  /** The build has reached its end frame — the cue is showing and a tap may continue. */
-  settled: boolean;
+  /** The clock has reached the cue (`cues.Hold + CUE_DELAY`): PRESS TO CONTINUE is showing and a
+   * tap may continue — from the moment the cue appears, not the end of the hold. */
+  cueShown: boolean;
   heading?: string;
   supporting?: string;
   appName?: string;
@@ -74,10 +75,10 @@ export function SurveyIntro({
 
   return (
     <Pressable
-      onPress={settled ? onContinue : undefined}
+      onPress={cueShown ? onContinue : undefined}
       accessibilityRole="button"
       accessibilityLabel="Press to continue"
-      accessibilityState={{ disabled: !settled }}
+      accessibilityState={{ disabled: !cueShown }}
       style={{ backgroundColor: theme.surface.base }}
     >
       <DesignCanvas width={width} height={height}>

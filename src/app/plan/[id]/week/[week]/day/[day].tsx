@@ -1,24 +1,27 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { formatPace } from '@/components/plan/format';
+import { PlanPlaceholder } from '@/components/plan/PlanPlaceholder';
 import { PlanTopBar } from '@/components/plan/PlanTopBar';
 import { dayLabel, firstParam } from '@/components/plan/planScreen';
 import { FontFamily, FontSize, Spacing, Stroke, sessionToneFor } from '@/constants/theme';
 import { usePlan } from '@/hooks/use-plan';
 import { useTheme } from '@/hooks/use-theme';
 import { RUN_TYPE_ABBREVIATIONS, UNABBREVIATED_RUN_TYPES, expandLabel } from '@/lib/notation';
-import type { Week, Workout } from '@/lib/planTypes';
+import type { Workout } from '@/lib/planTypes';
 
-/** The copy a rest day carries when the plan has no `why` of its own — the row copy the plan
- * view has always used, not new coaching content. */
+/** The copy a rest day carries under WHY — the row copy the plan view has always used, not new
+ * coaching content. Only ever this: the week's own `why` is the week's rationale, shown on the
+ * week screen, and would mislabel itself as the reason this day is a rest day. */
 const REST_WHY = 'Rest day — recovery is training too.';
 
 /**
  * V22-06 C · Session detail, and D · Rest day. One read-only screen for one unnamed day: what
  * the session is, its measured numbers where the plan measured them, its structure, its effort
- * description and — on paid tiers — why. A rest day says why it is one and nothing else: no
+ * description and — on paid tiers — why. A rest day says why it is one and nothing else: not
+ * the week's `why` (that is the week screen's), no
  * "optional" section, because plans are running-only and the app never suggests cross-training
  * or mobility (`CLAUDE.md`, coaching domain).
  */
@@ -34,27 +37,11 @@ export default function DayScreen() {
   const dayIndex = Number(firstParam(params.day)) - 1;
   const { loaded, loading, error } = usePlan(planId);
 
-  if (loading) {
-    return (
-      <View style={[styles.centered, { backgroundColor: theme.surface.base }]}>
-        <Stack.Screen options={{ headerShown: false }} />
-        <ActivityIndicator color={theme.text.primary} />
-      </View>
-    );
-  }
-
+  if (loading) return <PlanPlaceholder label="DAY" />;
   const week = loaded?.plan.weeks.find((candidate) => candidate.weekNumber === weekNumber);
   const day = week?.days[dayIndex];
   if (error || !week || !day) {
-    return (
-      <View style={[styles.centered, { backgroundColor: theme.surface.base }]}>
-        <Stack.Screen options={{ headerShown: false }} />
-        <Text style={[styles.errorTitle, { color: theme.text.primary }]}>Nothing to show</Text>
-        <Text style={[styles.error, { color: theme.status.error }]}>
-          {error ?? 'This day could not be found.'}
-        </Text>
-      </View>
-    );
+    return <PlanPlaceholder label="DAY" message={error ?? 'This day could not be found.'} />;
   }
 
   return (
@@ -63,7 +50,7 @@ export default function DayScreen() {
       <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
         <ScrollView contentContainerStyle={styles.content}>
           <PlanTopBar label={`DAY ${dayLabel(dayIndex)} · WEEK ${week.weekNumber}`} />
-          {day.kind === 'run' ? <Session day={day} /> : <RestDay week={week} />}
+          {day.kind === 'run' ? <Session day={day} /> : <RestDay />}
         </ScrollView>
       </SafeAreaView>
     </View>
@@ -130,7 +117,7 @@ function Session({ day }: { day: Workout }) {
   );
 }
 
-function RestDay({ week }: { week: Week }) {
+function RestDay() {
   const theme = useTheme();
   return (
     <View style={styles.sections}>
@@ -142,7 +129,7 @@ function RestDay({ week }: { week: Week }) {
         <Text style={[styles.headline, { color: theme.text.primary }]}>No run today</Text>
       </View>
       <View style={[styles.rule, { backgroundColor: theme.hairline }]} />
-      <Section label="WHY" body={week.why ?? REST_WHY} />
+      <Section label="WHY" body={REST_WHY} />
     </View>
   );
 }
@@ -160,13 +147,6 @@ function Section({ label, body }: { label: string; body: string }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.two,
   },
   content: {
     paddingHorizontal: 20,
@@ -234,14 +214,5 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.body.regular,
     fontSize: 14,
     lineHeight: 21,
-  },
-  errorTitle: {
-    fontFamily: FontFamily.display.semiBold,
-    fontSize: FontSize.xl,
-  },
-  error: {
-    fontFamily: FontFamily.body.medium,
-    fontSize: FontSize.sm,
-    textAlign: 'center',
   },
 });
