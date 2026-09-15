@@ -97,9 +97,9 @@
   place, the pre-clamp `longRunStartFloor` now reads `retainedQuality` too, so a three- or four-day
   week is no longer floored on the Q2 interval it never schedules (348 of 22,000 swept plans move,
   each by a 1 km long-run drop). Both halves of GitHub issue #99 have landed. The sweep's residual
-  770 broad peak-below-pre-peak-loading and 470 literal peak-below-base offenders are pre-existing,
-  unchanged by either fix, and stay tracked by GitHub issue #103 — the captain scoped this pair to
-  a zero-new-regression gate, not a curve redesign. **Rest weeks shorten the long run first
+  peak-below-pre-peak-loading and peak-below-base offenders are pre-existing, unchanged by either
+  fix, and stay tracked by GitHub issue #103 — the captain scoped this pair to a zero-new-regression
+  gate, not a curve redesign (current counts: "Known debt" below). **Rest weeks shorten the long run first
   (2026-09-12):** the skeleton's recovery weeks now size Day 7 at `loadRules.ts`'s
   `deloadLongRun` (§ 9's 60–70% of the preceding long run — the band the Free library already
   used) instead of leaving it on the loading curve while the easy runs absorbed the whole cut; the
