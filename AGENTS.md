@@ -325,7 +325,20 @@ Built-ins also available: `Explore`, `Plan`, `general-purpose`. Plugin agents ar
   guard that a plan-shape change did not regress a different profile; read the failing case list
   instead. The residual offenders it pins are pre-existing and captain-scoped out (issue #103), not
   a bug to fix in passing — see `docs/change_log.md`'s 2026-09-09 entries for the two-part fix and
-  why the long-run floor correction had to land *after* the peak-capacity one.
+  why the long-run floor correction had to land *after* the peak-capacity one. It has been
+  re-encoded exactly once, on the captain's own `golden-cadence3-route` ruling (2026-09-16,
+  770 → 758): the two intakes that ruling admitted are listed by name in the file's
+  `POST_BASELINE_NAMED_OFFENDERS` and asserted, so an addition is only ever a captain decision
+  written down, never a count that drifted.
+- **The coach-authored golden 5K path serves only a runner whose recovery cadence lands on its
+  authored dips.** `FIVE_K_WEEKLY_LOAD` dips at weeks 4 and 8, so `buildTemplatePlan` admits a
+  12-week / 4-day / 5K race intake to `buildCanonicalFiveKWeek` only on the 4-week cadence or the
+  50+ ruling's 4/8/12; the under-50 advanced runner's 3-week cadence goes to `buildGenericWeek`,
+  keeping 3/6/9 (captain's `golden-cadence3-route` ruling, option A, 2026-09-16 — audit §1.3, where
+  those flagged weeks had gone *up* 14–51%). Do not re-admit that cadence, and do not author a
+  week-3/6/9 recovery for the curve: the coach never wrote one. Race week 12 stays flagged
+  `isDeload` for 50+ (2026-08-06) and is excluded from the band property, not un-flagged.
+  `planTemplates.goldenDeload.test.ts` pins every flagged week of all eight golden-shape profiles.
 - **Docs are part of the change.** After a behavior-changing commit, `doc-writer` updates
   `docs/mvp-progress.md`, `docs/change_log.md`, and `docs/architecture.md`.
 - **Coaching content is never invented.** `docs/reference/coaching/` is a port of Ian's

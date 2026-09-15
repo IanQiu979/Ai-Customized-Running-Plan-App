@@ -589,7 +589,13 @@ describe('buildTemplatePlan — deload cadence on the golden 12-week/5K/4-day pa
     expect(deloadWeekNumbers(goldenFiveKPlanFor(55, 'competitive'))).toEqual([4, 8, 12]);
   });
 
-  it('deloads an under-50 advanced/competitive runner every 3 weeks (3, 6, 9) — the pro cadence', () => {
+  // Since the captain's `golden-cadence3-route` ruling (2026-09-16, audit §1.3) this intake is
+  // no longer built by `buildCanonicalFiveKWeek` at all: the coach-authored curve dips only at
+  // weeks 4 and 8, so a 3-week cadence on it flagged loading weeks as rest weeks. The under-50
+  // advanced runner is served by `buildGenericWeek`, which keeps the same 3/6/9 cadence and
+  // sizes each rest week inside the 15–25% band — `planTemplates.goldenDeload.test.ts` pins
+  // both. This case now proves the reroute did not lose the pro cadence.
+  it('still deloads an under-50 advanced/competitive runner every 3 weeks (3, 6, 9) — the pro cadence, served off the golden path since 2026-09-16', () => {
     expect(deloadWeekNumbers(goldenFiveKPlanFor(30, 'competitive'))).toEqual([3, 6, 9]);
   });
 

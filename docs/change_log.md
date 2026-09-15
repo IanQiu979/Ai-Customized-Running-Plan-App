@@ -5,6 +5,68 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-09-16 — The golden 5K path serves only the cadence it was authored for (audit §1.3, `golden-cadence3-route`)
+
+Core-purpose audit §1.3, found 2026-09-06 and deliberately left open by the §1.2/§1.4 task: on
+the golden 12-week / 4-day / 5K path (`buildCanonicalFiveKWeek` in `src/lib/planTemplates.ts`),
+an under-50 advanced (`competitive`) runner's weeks flagged `isDeload` were not reductions.
+`isDeload` came from the runner's recovery cadence — every 3 weeks for advanced under 50, per
+Ian's 2026-08-03 "pro runners = 3 weeks" ruling, so weeks 3/6/9 — while the week's volume was read
+from the coach-authored `FIVE_K_WEEKLY_LOAD` curve by array position, whose authored dips sit only
+at weeks 4 and 8. Weeks 3/6/9 were therefore flagged rest weeks carrying loading volume (quality
+stripped, the easy runs absorbing it), and the real dips at 4/8 were unflagged loading weeks that
+then became the growth base. For a 30-year-old competitive runner at 60 km/week on the paid-tier
+skeleton (`density: 'paid'`) the weeks ran 54, 56, 64*, 39, 62, 74*, 72, 51, 77*, 55, 65, 41 km
+(* = flagged deload): the three "rest" weeks were **up** 14%, 19% and 51% on the loading week
+before. The captain's 15–25% band (2026-09-06) could not have caught it — the band was not what
+was broken. The other golden profiles the audit had listed (experienced/27 km weeks 4+8, some/30 km
+week 12) were already correct on current `main`; the 50+ runner's week 12 is race week, ruled on
+below.
+
+- **Captain's ruling, `golden-cadence3-route` (2026-09-16, option A of three): the coach-authored
+  golden plan admits only a runner whose recovery cadence lands on its authored dips.**
+  `FIVE_K_WEEKLY_LOAD`, `FIVE_K_LONG_RUNS` and the tempo/interval tables are one artefact written
+  for a runner who recovers on weeks 4 and 8, so `buildTemplatePlan` routes a 12-week / 4-day / 5K
+  race intake to `buildCanonicalFiveKWeek` only on the 4-week cadence or the 50+ ruling's explicit
+  4/8/12 (2026-08-06, `fifty-plus-golden-deload-weeks`, unchanged): a new
+  `FIVE_K_AUTHORED_DIP_CADENCE = 4` and one extra clause on `useGoldenFiveKShape`,
+  `(params.intake.age >= 50 || deloadCadence === FIVE_K_AUTHORED_DIP_CADENCE)`. The under-50
+  advanced runner is served by `buildGenericWeek` like every other intake off the golden path,
+  with the 3-week pro cadence intact. Rejected: authoring a week-3/6/9 recovery for the curve
+  (option C — it needed tempo/interval doses the coach never wrote) and reversing the 2026-08-03
+  pro cadence (option B). No coaching content was added.
+- **Sub-ruling, same key: the 50+ runner's race week 12 stays flagged `isDeload`** per the
+  2026-08-06 ruling. Its volume includes the 10 km race day, so it cannot satisfy a reduction
+  band; it is excluded from the band property rather than un-flagged, and the UI keeps calling it
+  a recovery week.
+- **Who receives a different plan: only a `competitive` runner under 50 asking for a 12-week,
+  4-day 5K race plan on the paid-tier skeleton.** Free is served by the plan library and is
+  untouched; the byte-pinned example-plan fixture (25-year-old `regular`) is untouched; the other
+  seven golden-shape profiles are byte-identical before and after. The 30-year-old competitive
+  60 km/week runner now gets 58, 60, 48*, 52, 57, 46*, 63, 61, 49*, 67, 69, 41 km — rest weeks
+  are cuts of 20%, 19% and 20%, inside the band; deloads still 3/6/9; peak loading week 72 → 69 km;
+  peak long run 24 → 23 km; long runs by week 17, 19, 12, 14, 19, 12, 21, 17, 11, 23, 21.
+- **New `src/lib/__tests__/planTemplates.goldenDeload.test.ts`** sweeps all eight golden-shape
+  profiles (every level, both age bands, 12–80 km/week) and asserts every flagged non-race week
+  has a preceding loading week, is a real reduction, sits inside 15–25% (authored-dip weeks 4/8:
+  between the band floor and the authored ~39.5% depth, the 2026-09-08 exception), and never
+  grows the long run. Verified to fail against `main`'s engine (competitive/60: weeks 3/6/9 up
+  14%/19%/51%) and pass after. `planTemplates.longRunCap.test.ts`'s golden sweep gained a
+  `servedBy: 'golden' | 'generic'` field, judges the rerouted profile by the generic path's
+  whole-km spike ceiling, and re-pins its progression 72/24 → 69/23.
+  `planTemplates.golden.test.ts`'s "under-50 competitive deloads 3/6/9" case is kept and
+  re-described: it now proves the reroute did not lose the cadence.
+- **The 22,000-plan progression mask was re-encoded exactly once, on the captain's authority,
+  770 → 758.** Routing moved all 22 competitive / 4-day / 12-week / 5K matrix intakes
+  (10–110 km, both recent-time variants) onto the generic curve, removing 14 offenders
+  (50–110 km) and adding two, named in a new `POST_BASELINE_NAMED_OFFENDERS` constant and
+  asserted by name: `5k / competitive / 4 days / 40 km/week / 12 weeks / no recent time` and
+  `… / recent 10K` — the generic path's #103-class shape (week 8 long run 17 → 11 km, peak 47 km
+  under a 49 km week 7), pre-existing and captain-scoped out under issue #103. Any other addition
+  is still a regression. `AGENTS.md`'s mask guardrail records the re-encode, and a new guardrail
+  there states the admission rule.
+- Full root gate green: `npm run typecheck && npm run lint && npm test` — 53 suites, 931 tests. The new band suite was also run against `main`'s engine and fails there with exactly the three breaches above. `workers/` untouched.
+
 ## 2026-09-16 — Settings' "Delete account" now confirms and deletes on web (issue #96)
 
 Issue #96. `src/app/(tabs)/settings.tsx` routed its confirmation through `Alert.alert`, which

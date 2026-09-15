@@ -165,6 +165,14 @@ function limitedPreparationDisclosure(durationWeeks: number, raceDistance: RaceD
  * recovery weeks (4 and 8) by reading these dips directly. */
 const FIVE_K_WEEKLY_LOAD = [34, 35, 38, 23, 41, 45, 48, 30, 45, 48, 40, 28] as const;
 const FIVE_K_LONG_RUNS = [10, 11, 12, 8, 13, 14, 15, 10, 14, 15, 12] as const;
+/**
+ * The recovery cadence the two curves above (and the tempo/interval tables) were authored for:
+ * their dips sit at weeks 4 and 8, every fourth week. `buildTemplatePlan` routes an intake onto
+ * `buildCanonicalFiveKWeek` only when the runner's own `deloadEveryWeeks` recovers on exactly
+ * those weeks (or is 50+, whose ruled 4/8/12 reads the same dips); any other cadence would flag a
+ * week the curve does not dip on and dip on a week it does not flag — audit §1.3.
+ */
+const FIVE_K_AUTHORED_DIP_CADENCE = 4;
 
 /**
  * The same 12-week shape — same 34 km baseline, same 48 km peak, same 40/28 taper tail — with the
@@ -1126,6 +1134,8 @@ function buildCanonicalFiveKWeek(args: {
   // Week 12 is also the race week; for 50+ it is flagged as a deload on top of that, not instead.
   // This fully replaces the modulo cadence for 50+ on this path — weeks 3/6/9 (what a 3-week
   // cadence would otherwise produce) are deliberately NOT deload here, only 4/8/12 are.
+  // Under 50, `buildTemplatePlan` admits only `FIVE_K_AUTHORED_DIP_CADENCE` to this builder, so
+  // the modulo below can only ever flag the authored dips at 4 and 8 (audit §1.3, 2026-09-16).
   const isDeload = intake.age >= 50
     ? [4, 8, 12].includes(weekNumber)
     : !isRaceWeek && phase !== 'taper' && weekNumber % deloadCadence === 0;
@@ -1679,11 +1689,23 @@ export function buildTemplatePlan(params: TemplatePlanParams): Plan {
   const injuryReductionPct = injuryVolumeReductionPct(params.intake.injuries);
   const redFlagReductionPct = redFlagVolumeReductionPct(params.intake.injuries);
 
+  // The coach-authored golden plan is one artefact: `FIVE_K_WEEKLY_LOAD`, `FIVE_K_LONG_RUNS` and
+  // the tempo/interval tables were written together for a runner who recovers on weeks 4 and 8.
+  // It therefore serves only a runner whose own recovery cadence lands there — the 4-week cadence,
+  // or the 50+ ruling's explicit 4/8/12. Core-purpose audit §1.3: until 2026-09-16 the advanced
+  // runner's 3-week cadence reached this path too, and `buildCanonicalFiveKWeek` flagged weeks
+  // 3/6/9 `isDeload` while still reading the curve's *loading* volume at those positions (quality
+  // stripped, easy runs absorbing it, the "rest" week up 14–51% on the week before), and read the
+  // authored dips at 4/8 as unflagged loading weeks that then became the growth base. The curve
+  // has no volume, long run or session authored for a week-3/6/9 recovery, and inventing one is
+  // not ours to do, so that runner is served by `buildGenericWeek` like every other intake off
+  // this path — band-sized rest weeks off the de-dipped 5K curve.
   const useGoldenFiveKShape =
     isRacePlan &&
     raceDistance === '5k' &&
     durationWeeks === 12 &&
-    normalizedRunCount(params.intake.daysPerWeek) === 4;
+    normalizedRunCount(params.intake.daysPerWeek) === 4 &&
+    (params.intake.age >= 50 || deloadCadence === FIVE_K_AUTHORED_DIP_CADENCE);
   let lastLoadingWeekKm = 0;
   let lastLoadingLongRunKm = 0;
   let previousLongestKm = 0;
