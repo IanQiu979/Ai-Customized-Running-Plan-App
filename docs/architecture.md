@@ -23,7 +23,8 @@ kept in clearly separate sections below; nothing in a "planned" section is built
 ```
 src/
   app/
-    _layout.tsx          # root layout — loads the three font families; ThemeProvider is fed
+    _layout.tsx          # root layout — loads the three font families (a failed load boots on
+                          #                system fonts, issue #21); ThemeProvider is fed
                           #                constants/navigation-theme.ts's tokened Theme, and
                           #                gates the whole Stack behind Stack.Protected on
                           #                authClient.useSession() (no anonymous browsing)
