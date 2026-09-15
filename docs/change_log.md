@@ -46,6 +46,7 @@ never affected.
 - **Deliberately not built: a custom in-app confirmation sheet.** The browser modal is the
   platform-idiomatic equivalent of the OS alert; a designed sheet is separate design work.
 - Root gate clean: 52 suites, 899 tests (after rebasing onto #116). `workers/` untouched, so its gate does not apply.
+
 ## 2026-09-16 — Issue #25 (Home placeholder copy) was already fixed; the regression is now pinned
 
 Issue #25, from the 2026-07-11 frontend audit, reported Home saying "Intake, generation, and plan
