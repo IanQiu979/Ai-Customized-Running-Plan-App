@@ -80,7 +80,7 @@ subagents a chain actually pulls from; "Full roster (70)" below is the exhaustiv
 | **Implementation — fixes/upkeep** | `implementer` `debugger` `refactorer` `framework-upgrader` `mobile-perf-optimizer` |
 | **Testing** | `test-writer` `mocks-testdata` `seed-data` `e2e-browser-tester` `load-tester` `coverage-analyst` `llm-eval` |
 | **Review / security** | `code-reviewer` `security-auditor` `accessibility-reviewer` `privacy-compliance` `scope-guard` `tech-debt-tracker` `dependency-auditor` |
-| **Docs** | `doc-writer` `diagram-generator` |
+| **Docs** | `doc-writer` `diagram-generator` — `doc-writer` is the name this file uses throughout; the agent actually registered on this machine is `docs-updater` (`~/.claude/agents/docs-updater.md`), so dispatch that when `doc-writer` is "not found" |
 | **QA / final verification** | `verifier` (the mandatory gate, every tier) — plus `profiler`, `e2e-browser-tester`, or `load-tester` as situational adders for HIGH-tier user flows |
 
 ### 4. Escalation rule

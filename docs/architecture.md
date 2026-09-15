@@ -69,8 +69,10 @@ src/
       settings.tsx           # Settings tab (new 2026-08-05) — tier + quota (GET
                               #  /api/quota-status, src/lib/quotaDisplay.ts), sign-out (moved off
                               #  Home), a Free-tier "Upgrade" entry point to /paywall, and Delete
-                              #  Account (native confirm -> deleteAccount() -> authClient.signOut()).
-                              #  Quota refreshes cache-first on every focus.
+                              #  Account (confirmDestructive() — the OS alert on native, the
+                              #  browser's own confirm on web, since 2026-09-16 / issue #96 ->
+                              #  deleteAccount() -> authClient.signOut()). Quota refreshes
+                              #  cache-first on every focus.
       glossary.tsx           # compact accessible disclosure rows, collapsed by default; terms and
                               #  expanded definitions are sourced from notation.ts, nothing hardcoded
       my-plans.tsx           # My Plans — the permanent Example Plan is always present; generated
@@ -171,6 +173,12 @@ src/
                                #  unit-tested directly (2026-08-07, `Network request failed` fix)
     postSignupRedirect.ts    # one-shot module-level flag so a fresh signup lands on Intake — see
                               #  "Sign-up → Intake redirect" below
+    confirmDestructive.ts    # one confirmation step for a destructive action on every platform
+                              #  (new 2026-09-16, issue #96): the OS Alert.alert on native, the
+                              #  browser's window.confirm on web — react-native-web's Alert.alert
+                              #  is an empty method. Only an explicit confirm calls onConfirm; a
+                              #  web runtime with no confirm throws. Platform/Alert/confirm are
+                              #  read through an injectable runtime so both branches are tested
     planTypes.ts              # canonical — shared Plan/Week/Workout/Tier vocabulary
     loadRules.ts               # canonical — deterministic safety arithmetic
     notation.ts                 # canonical — run-type/structure-string notation, the code
@@ -220,7 +228,8 @@ src/
                               # planLibrary/ (registry, engine — 65 tests, new 2026-09-09),
                               # paceDerivation, quotaDisplay (6 tests, new 2026-08-05),
                               # goalRealismDisclosure, planRequest, fieldInput (new 2026-08-15),
-                              # buildMotion, weekStrip, planProgress (new 2026-09-14)
+                              # buildMotion, weekStrip, planProgress (new 2026-09-14),
+                              # confirmDestructive (11 tests, new 2026-09-16)
                               # — the two engine contracts included
 ```
 
@@ -434,6 +443,16 @@ src/lib/
                             #                fetch wrappers for the app's `/api/*` routes
   apiErrors.ts              # exists today (2026-08-07) — pure `ApiError`/`NetworkError`/
                              #                `describeError()`, re-exported from `apiClient.ts`
+  confirmDestructive.ts    # exists today (2026-09-16, issue #96) — `confirmDestructive(prompt,
+                            #          onConfirm)`: the OS `Alert.alert` on native (cancel +
+                            #          destructive button), the browser's `window.confirm` on web,
+                            #          because react-native-web's `Alert.alert` is an empty method
+                            #          and Settings' Delete account did nothing there. Only an
+                            #          explicit confirm calls `onConfirm`; no `confirm` on web
+                            #          throws. `Platform.OS`/`Alert.alert`/`globalThis.confirm`
+                            #          come through an injectable `runtime`
+                            #          (`defaultConfirmRuntime()`) so both branches are
+                            #          unit-tested; screens never pass it.
   planTypes.ts             # exists today — shared Plan/Week/Workout/Tier types, one source of
                             #                truth for the app and the Worker
   loadRules.ts              # exists today — deterministic safety arithmetic
@@ -691,7 +710,7 @@ it `getSession()` ignores the header and every route 403s a user who just signed
 | `POST /api/generate-plan` | session | `{ goalType: "race"\|"duration", raceDistance?, raceDate?, durationWeeks?, notes?, idempotencyKey }` | `{ plan, planId, isFallback, quotaConsumed }`, or `402` over-quota / `403` anon / `409` intake-required | Enforces tier + quota server-side, branches by tier, validates, persists. `raceDistance` is validated whenever it is present, on either goal type — a `duration` request legitimately carries one for a runner with a target distance and no date. A duplicate `idempotencyKey` returns the existing plan instead of generating twice. Free gets the template plan (since 2026-08-04). Pro/Elite call the personalization prompt (bound since 2026-08-10) but, with no `ANTHROPIC_API_KEY` configured anywhere yet, still fall back to the same template today (`isFallback: true`, quota-exempt) — see "Current — `generate-plan`" above. `quotaConsumed` tells the client whether this fallback counted against the tier limit, so `FallbackNotice` can pick `counted` vs `exempt`. |
 | `GET /api/quota-status` | session | — | `{ tier, used, limit, periodEnd }` | Drives Home's and Settings' "N of M plans used" line (`src/lib/quotaDisplay.ts`'s `formatQuotaLine()`, consumed by both since 2026-08-05). `used` counts **non-fallback** plans in the current purchase-anchored period, server-side, never a client counter. `periodEnd` is `null` for Free (lifetime allowance) and also `null` while the temporary `ALL_USERS_UNLIMITED_ACCESS` override is on (see below) — the UI must not render a countdown for either. |
 | `POST /api/purchase-tier` | session | `{ tier: "pro"\|"elite", source: "dummy" }` | `{ tier, periodStart: string \| null, periodEnd: string \| null }` | v1 dummy flow, called from `src/app/paywall.tsx` (new 2026-08-05) with honest "test upgrade, no payment required" copy. v2 swaps `source` to `"revenuecat"` and verifies the receipt — same route, same table write. `source: "revenuecat"` is refused in v1 rather than trusted. |
-| `POST /api/delete-account` | session | — | `{ deleted: true }` | Really deletes; no soft-delete flag, because the app's own copy promises erasure. The only route that deletes a plan. Called from Settings' Delete Account flow (new 2026-08-05), followed client-side by `authClient.signOut()` to invalidate the local session store. |
+| `POST /api/delete-account` | session | — | `{ deleted: true }` | Really deletes; no soft-delete flag, because the app's own copy promises erasure. The only route that deletes a plan. Called from Settings' Delete Account flow (new 2026-08-05) after a confirmation on every platform (`src/lib/confirmDestructive.ts`, 2026-09-16 — before that, react-native-web's empty `Alert.alert` meant the web row never reached this route; issue #96), followed client-side by `authClient.signOut()` to invalidate the local session store. |
 | `GET /api/intake` | session | — | `{ intake }` or `{ intake: null }` | Was a direct client read under Supabase. |
 | `PUT /api/intake` | session | `IntakeResponses` | `{ saved: true }` | Was a direct client upsert under Supabase. |
 | `GET /api/plans` | session | — | `{ plans: [summary] }` | Drives My Plans and Home's persisted-plan stage. My Plans keeps the permanent static example outside this response, links its most-recent stat to `max(createdAt)`, and has no empty-library state. Home uses only whether the list is non-empty to reveal its post-first-plan Notes/subscription panels. Summaries only — full documents would be megabytes for a heavy user. |

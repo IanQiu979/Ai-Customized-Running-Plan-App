@@ -5,6 +5,47 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-09-16 — Settings' "Delete account" now confirms and deletes on web (issue #96)
+
+Issue #96. `src/app/(tabs)/settings.tsx` routed its confirmation through `Alert.alert`, which
+react-native-web implements as literally an empty method (`class Alert { static alert() {} }`).
+On web the row therefore produced no dialog, no deletion and no error — the tap was swallowed.
+Verified real before fixing: the screen had no `Platform.OS === 'web'` branch at all. Native was
+never affected.
+
+- **New `src/lib/confirmDestructive.ts`, one confirmation step on every platform.** Native keeps
+  the OS `Alert.alert` exactly as before — same title, same message, a `cancel` button and a
+  `destructive` "Delete" button. Web asks the browser's own modal (`window.confirm`) with the
+  title, the message and "Press OK to delete, or Cancel to keep everything as it is." — the
+  browser cannot relabel OK, so the text says what OK will do. On either platform only an explicit
+  confirm calls `onConfirm`; dismissing sends nothing. If a web runtime has no `confirm` function
+  the lib **throws** rather than silently doing nothing — fail closed, loudly, the opposite of the
+  bug it replaces — and Settings catches that throw into its `deleteError` line, since React does
+  not catch handler throws and a console-only error would be #96's silent tap again. `Platform.OS`, `Alert.alert` and `globalThis.confirm` are read through an
+  injectable `runtime` parameter (`defaultConfirmRuntime()`) so both branches are unit-tested
+  under the one jest-expo preset; screens never pass it. Settings' `confirmDeleteAccount` is now
+  a call to it; the rest of the delete flow (`deleteAccount()` → `authClient.signOut()` → the
+  `Stack.Protected` bounce to `(auth)`) is unchanged.
+- **Pinned by `src/lib/__tests__/confirmDestructive.test.ts`, 11 cases.** On ios/android: the
+  alert is presented with the two buttons, cancel never reaches `onConfirm`, only the destructive
+  button does, and the browser dialog is never touched. On web: the browser confirm is asked with
+  the title, message and what OK does, cancel never reaches `onConfirm`, confirm reaches it
+  exactly once, and a missing `confirm` throws. `defaultConfirmRuntime` reads the real
+  `Platform`/`Alert` and binds the global `confirm` (bound, not passed bare — browsers throw
+  "Illegal invocation" on an unbound `confirm`).
+- **Verified end to end on Expo web** (headless Chrome, `npm run web` on 8081 against a local
+  `wrangler dev` on 8787 with a throwaway `.dev.vars`): dismissing the dialog sent no request and
+  the D1 user row stayed; accepting sent `POST /api/delete-account` (200), then `sign-out`, the app
+  bounced to onboarding, and the user table was empty.
+- **Observation, pre-existing and not changed here: a cross-origin web page does not keep the
+  better-auth session cookie.** The local Worker was needed because `localhost:8081` → the deployed
+  `workers.dev` origin does not retain the session cookie in the browser — `workers/src/auth.ts`
+  deliberately sets no cross-domain cookie attributes (`SameSite` defaults to Lax), and
+  `apiClient.ts` on web relies on the browser cookie rather than the bearer token. Same-site
+  `localhost:8081` → `localhost:8787` works. Recorded under "Known debt" in `mvp-progress.md`.
+- **Deliberately not built: a custom in-app confirmation sheet.** The browser modal is the
+  platform-idiomatic equivalent of the OS alert; a designed sheet is separate design work.
+- Root gate clean: 52 suites, 896 tests. `workers/` untouched, so its gate does not apply.
 ## 2026-09-16 — Issue #25 (Home placeholder copy) was already fixed; the regression is now pinned
 
 Issue #25, from the 2026-07-11 frontend audit, reported Home saying "Intake, generation, and plan

@@ -195,8 +195,10 @@
   `[vars]` of `workers/wrangler.toml` (the committed `[env.production.vars]` value is `"false"`),
   so the captain's test pass runs with every account Elite and the quota gate bypassed. Set the
   top-level value to `"false"` before real users arrive. Recorded in "Latest — 2026-08-09".
-- **Test counts:** 870 root tests across 48 suites on `fm/v22-animations-lane3`, verified by running
-  the root gate there on 2026-09-14. Earlier figures, for the record: 785 root tests across 39 suites on `fm/v22-3day-peak-below-base`, verified by
+- **Test counts:** 896 root tests across 52 suites on `fm/v22-delete-account-web-noop-96`,
+  verified by running the root gate there on 2026-09-16. Earlier figures, for the record: 870
+  root tests across 48 suites on `fm/v22-animations-lane3`, verified by running
+  the root gate there on 2026-09-14; 785 root tests across 39 suites on `fm/v22-3day-peak-below-base`, verified by
   running `npm test` there on 2026-09-09 (778 across 38 suites on
   `fm/v22-distance-specific-plans`, 2026-09-07, after the rebase onto #88); separately, 832 root
   tests across 40 suites on `fm/v22-library-free-engine`, also verified by running `npm test` there
@@ -678,6 +680,17 @@ from 82. Issue #22 remains open.)
   captain — provisioned and verified in local dev 2026-08-05 (see that entry below).
 
 ### Code
+- [x] **Settings' "Delete account" confirms and deletes on web (2026-09-16, issue #96).** The
+      row went through `Alert.alert`, which react-native-web implements as an empty method, so on
+      web it produced no dialog, no deletion and no error. New `src/lib/confirmDestructive.ts`
+      keeps the OS alert on native (unchanged: cancel + destructive "Delete") and asks the
+      browser's own `window.confirm` on web; only an explicit confirm deletes, and a web runtime
+      with no `confirm` throws instead of silently doing nothing. Pinned by
+      `src/lib/__tests__/confirmDestructive.test.ts` (11 cases, both platforms via an injected
+      runtime). Verified end to end on Expo web against a local `wrangler dev`: dismiss sends no
+      request and the D1 row stays; accept sends `POST /api/delete-account` 200, signs out, and
+      bounces to onboarding. A custom in-app sheet was considered and not built. Root gate: 52
+      suites, 896 tests. Detail: `docs/change_log.md`, 2026-09-16.
 - [x] **A font-load failure no longer strands the app on the splash screen (2026-09-16, issue
       #21).** `_layout.tsx` now reads `useFonts`'s error element and settles its readiness gate on
       a failed load as well as a successful one, so the splash is hidden and the app renders on
@@ -1436,6 +1449,14 @@ intact underneath.
 
 ### Standing
 
+- 🟡 **A cross-origin web page does not keep the better-auth session cookie (observed
+  2026-09-16 while verifying issue #96, pre-existing, not changed).** Expo web on
+  `localhost:8081` talking to the deployed `workers.dev` origin does not retain the session cookie
+  in the browser: `workers/src/auth.ts` deliberately sets no cross-domain cookie attributes
+  (`SameSite` defaults to Lax), and `apiClient.ts` on web relies on the browser cookie rather than
+  the bearer token. Same-site `localhost:8081` → `localhost:8787` (`wrangler dev`) works, which is
+  why the delete-account verification ran against a local Worker. Whether a browser client should
+  ever reach the deployed Worker cross-origin is an open question, not a bug fixed here.
 - 🟡 **Three-day intermediate/advanced marathon plans plateau (confirmed 2026-09-07, unchanged by
   the rebase onto #88).** A 50 km/week, 16-week, 3-day intermediate marathon renders 32 km every
   loading week (26 km on deloads) and an 11 km long run in every week of the plan: the sourced
