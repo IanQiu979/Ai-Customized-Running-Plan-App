@@ -87,7 +87,7 @@ Recorded so a future session doesn't re-park these by mistake:
 
 | Looks Apple-gated | Actually |
 |---|---|
-| **#20** — stock Expo blue in `app.json` (`#208AEF` splash, `#E6F4FE` adaptive icon) | A two-value config edit. No Apple account involved. **Still open — do it now.** |
+| **#20** — stock Expo blue in `app.json` (`#208AEF` splash, `#E6F4FE` adaptive icon) | A two-value config edit. No Apple account involved. **Closed 2026-09-16** with #49 (same defect) — both values are the Blueprint field, pinned by `src/constants/__tests__/app-config-colors.test.ts`; see `docs/change_log.md`. |
 | **#17** — motion, incl. haptics | `expo-haptics` runs in Expo Go. Only an on-device *EAS dev-client build* would need Apple credentials, and the reveal/reduced-motion work doesn't. **Still open.** |
 | **#15** — dummy paywall | It's a dummy. Real IAP (StoreKit/RevenueCat) would need the membership, but real IAP is explicitly deferred to v2. **Still open.** |
 | **#35** — app name | Was Ian's decision, not Apple's. **Closed 2026-07-12** — the app is Pace Blueprint. |
@@ -104,5 +104,5 @@ still open GitHub issues** — nothing in this section was deleted.
 | **#3** — the plan engine (`planTemplates.ts` + `paceDerivation.ts`) | **Unblocked but unbuilt.** Every coaching question that blocked it is now ruled on (#19, #29, #33, #34 all closed). Its two TDD suites are **quarantined** — excluded from `jest`, `tsc`, and `eslint` so `main` is green. **Un-quarantining them and getting them green is this issue's done-when.** The specs are correct and assert every current ruling; they fail only because the two modules don't exist. |
 | **#41** — main is red | **Fixed by the quarantine, not by building the engine** — which is the alternative #41's own text offered. `typecheck`, `lint`, and `test` (82/82) are all clean on `main` as of 2026-07-12. The real fix is #3. |
 | **#22** — `clampWeeklyVolume()` compares against the literal previous week | **Attempted, nothing produced.** A `worktree-issue22` branch was cut and left with zero commits. Still fully open. Conceptually the same fix as ruling R1c, which *did* land for `clampLongRun()` — the two functions now disagree about what "the previous week" means, so this is worth doing soon. |
-| **#20** — stock Expo blue | PR #40 edited `app.json` for the rename but **did not touch the colors**. `#208AEF` and `#E6F4FE` both survive. Still open. |
+| **#20** — stock Expo blue | PR #40 edited `app.json` for the rename but **did not touch the colors**. `#208AEF` and `#E6F4FE` both survive. Still open at the time; **closed 2026-09-16** — see the row above. |
 | **#33** — goal realism | The **ruling** landed (warn at 10%, cap the race-pace anchor at 15%), and the types + test contract are in the repo — but `assessGoalRealism()` itself is unimplemented, because `paceDerivation.ts` doesn't exist. That implementation is #3's job, not a reopening of #33. |

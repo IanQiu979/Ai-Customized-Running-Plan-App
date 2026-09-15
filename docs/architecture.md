@@ -149,9 +149,11 @@ src/
     navigation-theme.ts      # bridges theme.ts's tokens into expo-router's re-exported `Theme`
                              #  shape, so ThemeProvider never leaks the library's own stock
                              #  DefaultTheme/DarkTheme colors (fixes issue #27)
-    __tests__/                # navigation-theme, and theme.contrast (new 2026-09-03) — the latter
-                             #  recomputes every ratio in the design doc's tables from theme.ts's
-                             #  own hexes, so the contrast rule is enforced rather than documented
+    __tests__/                # navigation-theme, theme.contrast (new 2026-09-03), and
+                             #  app-config-colors (2026-09-16) — the middle one recomputes every
+                             #  ratio in the design doc's tables from theme.ts's own hexes, so the
+                             #  contrast rule is enforced rather than documented; the last pins
+                             #  app.json's splash/adaptive-icon hexes to Colors.dark.surface.base
   hooks/                    # use-theme (resolves to the dark scheme only, see below),
                              #  use-color-scheme, use-plan (one plan by id: real via
                              #  GET /api/plans/:id or the golden fixture)
@@ -850,7 +852,10 @@ scale *down* to fit, never up.
   recomputes every ratio from the hexes in `theme.ts` — both schemes, the accent, the session
   tones, the effort ramp — and asserts it against that token's floor (or, for `progress.disabled`,
   its ceiling). A last check counts the opaque tokens, so a new hex cannot be added without being
-  given a floor.
+  given a floor. The one surface the tokens cannot reach — `app.json`'s native chrome (the
+  `expo-splash-screen` background, both variants, and the Android `adaptiveIcon.backgroundColor`)
+  — is pinned to `Colors.dark.surface.base` the same way by
+  `src/constants/__tests__/app-config-colors.test.ts` (2026-09-16, issues #20/#49).
 - **Type** — the sheet's three families, loaded in `_layout.tsx` and named in `FontFamily`:
   **Barlow Condensed** 500/600/700/800 for display and every numeral; **IBM Plex Mono** 400/500/700
   for tracked uppercase labels, units and day numerals; **IBM Plex Sans** 400–700 for body. Scale
