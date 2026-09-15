@@ -1,6 +1,6 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActionRow, Group, Row } from '@/components/layout/GroupedRows';
@@ -8,6 +8,7 @@ import { ScreenHeader } from '@/components/layout/ScreenHeader';
 import { FontFamily, FontSize, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { API_BASE_URL, authClient, deleteAccount, describeError, getQuotaStatus } from '@/lib/apiClient';
+import { confirmDestructive } from '@/lib/confirmDestructive';
 import { formatQuotaLine } from '@/lib/quotaDisplay';
 import type { QuotaStatus } from '@/lib/planTypes';
 
@@ -15,9 +16,10 @@ import type { QuotaStatus } from '@/lib/planTypes';
  * Settings. On focus, fetches `getQuotaStatus()` and renders the runner's tier and quota line
  * (`formatQuotaLine`). Free tier gets a proactive "Upgrade" entry point to `/paywall` (no quota
  * param — that route is reserved for the 402 redirect out of Home). Sign-out (moved here from
- * Home) and Delete Account (native confirm, then `deleteAccount()`) round it out — on
- * delete-account success, an explicit `authClient.signOut()` invalidates the local session store
- * so `src/app/_layout.tsx`'s `Stack.Protected` guard bounces to `(auth)`.
+ * Home) and Delete Account (a real confirmation on every platform via `confirmDestructive`, then
+ * `deleteAccount()`) round it out — on delete-account success, an explicit `authClient.signOut()`
+ * invalidates the local session store so `src/app/_layout.tsx`'s `Stack.Protected` guard bounces
+ * to `(auth)`.
  *
  * **Zero accent, no exception** (`docs/design/instrument-visual-system.md` §1). This screen is flat
  * grouped rows and hairlines. The "Upgrade" row is deliberately not a signal-marked button: the offer
@@ -60,15 +62,24 @@ export default function SettingsScreen() {
     }, [])
   );
 
+  // Not `Alert.alert` directly: react-native-web implements that as an empty method, which made
+  // this row do nothing at all on web (issue #96). `confirmDestructive` keeps the OS alert on
+  // native and asks the browser's own dialog on web; either way only an explicit confirm deletes.
   function confirmDeleteAccount() {
-    Alert.alert(
-      'Delete account',
-      'This permanently deletes your account, intake, and plans. This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: handleDeleteAccount },
-      ]
-    );
+    try {
+      confirmDestructive(
+        {
+          title: 'Delete account',
+          message: 'This permanently deletes your account, intake, and plans. This cannot be undone.',
+          confirmLabel: 'Delete',
+        },
+        handleDeleteAccount
+      );
+    } catch (confirmError) {
+      // A runtime with no dialog at all (never a real browser) fails closed inside the lib; React
+      // does not catch handler throws, so surface it here rather than repeat #96's silent tap.
+      setDeleteError(describeError(confirmError, 'Could not open the confirmation.', API_BASE_URL));
+    }
   }
 
   // `onPress={() => authClient.signOut()}` handed React Native a promise nobody awaited, so an
