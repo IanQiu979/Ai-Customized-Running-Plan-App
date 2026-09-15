@@ -26,6 +26,27 @@ user — i.e. a tester — saw the splash screen indefinitely with no error and 
   render branch). Three cases — fonts loaded, fonts still loading (gate holds, splash stays), and
   fonts failed. The failure case was run red against the pre-fix layout before the change landed.
 
+## 2026-09-16 — Native splash and adaptive-icon chrome painted with the Blueprint field (issues #20, #49)
+
+`app.json` still carried the create-expo-app template colours — `#208AEF` on the
+`expo-splash-screen` background and `#E6F4FE` on `android.adaptiveIcon.backgroundColor` — through
+every rebrand since Instrument. Because `src/app/_layout.tsx` holds the splash
+(`preventAutoHideAsync`) until three font families load, that blue was the app's single longest
+first impression on every cold start, followed by a hard cut to the near-black field.
+
+- **Both values are now `#0B0E12`, the Blueprint field (`Colors.dark.surface.base`).** The splash
+  gets an explicit `dark.backgroundColor` too, pinned to the *same* token rather than the light
+  palette: `use-theme.ts` renders the dark scheme only, so a light-keyed splash on a light device
+  would flash white and then drop to near-black — the more jarring of the two problems. If the
+  light scheme is ever re-enabled, the base variant is the line to revisit.
+- **`app.json` cannot reference the tokens** — it is strict JSON, and `theme.ts` imports
+  `react-native`, so an `app.config.ts` could not import it at config-evaluation time either. So
+  the literals are pinned by a test instead of a comment:
+  `src/constants/__tests__/app-config-colors.test.ts` reads `app.json`, asserts each colour equals
+  the token, and asserts the two template hexes are absent. Verified to fail against the old file.
+- Colours only. The icon and splash artwork are the M6 release issue and remain stock.
+- Root gate clean: 50 suites, 883 tests. `workers/` untouched.
+
 ## 2026-09-16 — Issue #24 closed: the Elite per-workout "why" is rendered and now proven
 
 GitHub issue #24 (2026-07-11 frontend audit: "`WorkoutRow` never renders `Workout.why`, so Elite's
