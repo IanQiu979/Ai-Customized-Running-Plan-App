@@ -96,8 +96,9 @@ export default function RootLayout() {
 
   if (!ready) {
     // Keep the native splash screen up — nothing below can render its type-driven UI correctly
-    // until the fonts finish loading (or definitively fail, see `fontsSettled`), and routing a signed-in user into `(auth)` (or vice versa)
-    // for one frame while the session is still resolving would be a visible flash, not a state.
+    // until the fonts finish loading (or definitively fail, see `fontsSettled`), and routing a
+    // signed-in user into `(auth)` (or vice versa) for one frame while the session is still
+    // resolving would be a visible flash, not a state.
     //
     // That reasoning holds for the *first* resolution only, which is why the gate is latched
     // (`sessionSettled`) rather than read straight off `sessionPending`. Returning `null` here
