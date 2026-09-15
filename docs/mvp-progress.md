@@ -678,6 +678,13 @@ from 82. Issue #22 remains open.)
   captain — provisioned and verified in local dev 2026-08-05 (see that entry below).
 
 ### Code
+- [x] **GitHub issue #24 closed (2026-09-16) — stale as filed; the Elite per-workout `why` is
+      rendered and now proven.** `WorkoutRow` went with PR #111; the plan detail's day screen
+      already renders `Workout.why` as its WHY section. No source change — the gap was that no
+      fixture populated `Workout.why` (the example plan is Pro, and stays so), so the branch could
+      never fail a test. New `src/app/plan/__tests__/day-why.test.tsx` (the fourth rendered-screen
+      exception) derives an Elite week from `examplePlan` and pins the branch both ways. Root gate:
+      49 suites, 879 tests. Detail: `docs/change_log.md`, 2026-09-16.
 - [x] **Home and navigation layout audit batch (2026-09-12).** Home puts Create plan first, carries
       tier + server quota in its header, and reveals Notes/subscription panels only after
       `GET /api/plans` confirms a persisted generated plan. My Plans treats the permanent Example

@@ -5,6 +5,34 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-09-16 — Issue #24 closed: the Elite per-workout "why" is rendered and now proven
+
+GitHub issue #24 (2026-07-11 frontend audit: "`WorkoutRow` never renders `Workout.why`, so Elite's
+per-workout coaching vanishes") was diagnosed today and is stale as filed. No source file changed;
+the fix is the missing test.
+
+- **Where the why renders now.** `WorkoutRow` and `WeekAccordion` were deleted by PR #111
+  (2026-09-14, V22-06); `composeWorkoutLabel` survives in `src/components/plan/format.ts` with its
+  unit test but no screen calls it. Their replacement, the plan detail's day screen
+  (`src/app/plan/[id]/week/[week]/day/[day].tsx`), already renders `Workout.why` as its WHY
+  section — `{day.why ? <Section label="WHY" body={day.why} /> : null}` — so the Elite per-workout
+  why does reach the runner. The week screen's `SessionRow` accessibility label omits it on
+  purpose: the row does not show it visually either; it is a link to the day screen, where the why
+  is plain `Text` and VoiceOver reads it as part of the page.
+- **What was genuinely missing was coverage — the root cause the issue named.** No fixture
+  anywhere populated `Workout.why` (the permanent example plan is Pro and correctly carries no
+  per-workout why; only Elite gets one), so the render branch could never fail a test.
+- **New `src/app/plan/__tests__/day-why.test.tsx`** — the fourth deliberate rendered-screen
+  exception on `CLAUDE.md`'s stated grounds (one conditional render branch, no logic layer beneath
+  it). It derives an Elite Week 1 from `examplePlan` by giving each of its four run days its own
+  `why`, mocks `expo-router` and `@/hooks/use-plan`, and pins five things: an Elite workout's why
+  renders under WHY; every run day's why renders on its own screen; a workout without a why (the
+  Pro example) renders no WHY section at all; a rest day gets `REST_WHY` and never the week's why;
+  a workout screen never shows the week's why. Removing the branch from the screen fails the first
+  two tests.
+- The example plan stays Pro and carries no per-workout why; that is deliberate, not a gap.
+- Root gate clean: 49 suites, 879 tests. `workers/` untouched, so its gate does not apply.
+
 ## 2026-09-16 — Expo SDK 57 packages brought to their expected patch versions
 
 `npx expo-doctor` reported 14 Expo packages behind their expected SDK 57 patch on 2026-09-12
