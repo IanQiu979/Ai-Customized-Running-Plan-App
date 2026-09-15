@@ -195,7 +195,7 @@
   `[vars]` of `workers/wrangler.toml` (the committed `[env.production.vars]` value is `"false"`),
   so the captain's test pass runs with every account Elite and the quota gate bypassed. Set the
   top-level value to `"false"` before real users arrive. Recorded in "Latest — 2026-08-09".
-- **Test counts:** 896 root tests across 52 suites on `fm/v22-delete-account-web-noop-96`,
+- **Test counts:** 899 root tests across 52 suites on `fm/v22-delete-account-web-noop-96` (after rebasing onto #116),
   verified by running the root gate there on 2026-09-16. Earlier figures, for the record: 870
   root tests across 48 suites on `fm/v22-animations-lane3`, verified by running
   the root gate there on 2026-09-14; 785 root tests across 39 suites on `fm/v22-3day-peak-below-base`, verified by
@@ -689,8 +689,8 @@ from 82. Issue #22 remains open.)
       `src/lib/__tests__/confirmDestructive.test.ts` (11 cases, both platforms via an injected
       runtime). Verified end to end on Expo web against a local `wrangler dev`: dismiss sends no
       request and the D1 row stays; accept sends `POST /api/delete-account` 200, signs out, and
-      bounces to onboarding. A custom in-app sheet was considered and not built. Root gate: 52
-      suites, 896 tests. Detail: `docs/change_log.md`, 2026-09-16.
+      bounces to onboarding. A custom in-app sheet was considered and not built. Root gate (post-rebase onto #116): 52
+      suites, 899 tests. Detail: `docs/change_log.md`, 2026-09-16.
 - [x] **A font-load failure no longer strands the app on the splash screen (2026-09-16, issue
       #21).** `_layout.tsx` now reads `useFonts`'s error element and settles its readiness gate on
       a failed load as well as a successful one, so the splash is hidden and the app renders on

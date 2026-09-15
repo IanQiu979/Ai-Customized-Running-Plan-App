@@ -45,7 +45,7 @@ never affected.
   `localhost:8081` → `localhost:8787` works. Recorded under "Known debt" in `mvp-progress.md`.
 - **Deliberately not built: a custom in-app confirmation sheet.** The browser modal is the
   platform-idiomatic equivalent of the OS alert; a designed sheet is separate design work.
-- Root gate clean: 52 suites, 896 tests. `workers/` untouched, so its gate does not apply.
+- Root gate clean: 52 suites, 899 tests (after rebasing onto #116). `workers/` untouched, so its gate does not apply.
 ## 2026-09-16 — Issue #25 (Home placeholder copy) was already fixed; the regression is now pinned
 
 Issue #25, from the 2026-07-11 frontend audit, reported Home saying "Intake, generation, and plan
