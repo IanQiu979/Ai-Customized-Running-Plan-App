@@ -5,6 +5,24 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-09-16 — Expo SDK 57 packages brought to their expected patch versions
+
+`npx expo-doctor` reported 14 Expo packages behind their expected SDK 57 patch on 2026-09-12
+(`expo`, `expo-router`, `expo-linking`, `expo-secure-store`, `expo-splash-screen`, `expo-symbols`,
+`expo-system-ui`, `expo-web-browser`, `expo-network`, `expo-constants`, `expo-device`, `expo-font`,
+`expo-image`, `@expo/ui`). `npx expo install --fix` was run twice — bumping `expo` itself raises the
+expected range for the rest — until `expo-doctor` is 21/21 clean. `expo` now carries a tilde range
+(`~57.0.23`) rather than the caret it had since the 2026-09-05 upgrade; `package.json` is the
+source of truth for every current version. `jest-expo` was already at its latest SDK 57 patch.
+Every bumped package's SDK 57 changelog was checked: additive-only, nothing this app uses.
+
+- **`app.json`: `expo-image` re-registered in `plugins`, by the tool.** `expo install --fix`
+  auto-registers the config plugin of any package that ships one; not a hand edit.
+- `workers/` untouched, so its gate does not apply. Root gate clean: 48 suites, 874 tests.
+- Resumed from an earlier interrupted session whose WIP commit was based on a stale `main`; that
+  commit was reset and the fix re-run cleanly on top of current `main` rather than hand-resolving
+  the rebase conflict.
+
 ## 2026-09-14 — "The plan builds itself": the V22 build animations, the Blueprint theme, and the heartbeat/graph motif retired
 
 Implements the six captain-approved Claude Design pages (`V22-01` … `V22-06`, approved
