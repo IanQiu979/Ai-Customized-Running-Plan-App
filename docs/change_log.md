@@ -50,7 +50,7 @@ first impression on every cold start, followed by a hard cut to the near-black f
   field equals the token. Verified to fail against the old file.
 - Colours only. The adaptive icon's foreground and monochrome layers, the iOS icon and the splash
   artwork are the M6 release issue and remain stock.
-- Root gate clean: 50 suites, 883 tests. `workers/` untouched.
+- Root gate clean: 51 suites, 885 tests (on the rebased head, which includes PR #114's suite). `workers/` untouched.
 
 ## 2026-09-16 — Issue #24 closed: the Elite per-workout "why" is rendered and now proven
 
