@@ -647,6 +647,11 @@ from 82. Issue #22 remains open.)
       gitignored and untracked; no secret is committed; `ANTHROPIC_API_KEY` is server-side only and
       read in exactly one file, `workers/src/lib/model.ts`
 - [x] `gh` 2.96.0 installed; `wrangler` 4.118 available via `npx`
+- [x] **Expo SDK 57 patch bumps — done 2026-09-16.** `npx expo install --fix` brought the 14
+      Expo packages `expo-doctor` flagged on 2026-09-12 to their expected SDK 57 patches
+      (`expo ~57.0.23`, `expo-router ~57.0.21`, …); `expo-doctor` 21/21, root gate clean
+      (48 suites, 874 tests). `package.json` is the source of truth for versions. Detail:
+      `docs/change_log.md`, 2026-09-16.
 - [x] **Expo SDK 54 → 57 upgrade — done 2026-09-05.** Client-only (`workers/` untouched), one major
       version at a time (54→55→56→57) per this repo's upgrade etiquette. Now on `expo ^57.0.20`,
       `react-native 0.86.3`, `react 19.2.3`, `expo-router ~57.0.19`, `react-native-reanimated
