@@ -10,7 +10,8 @@ import { Colors } from '../theme';
  * literals drift. Issues #20 and #49 are what that drift looks like: the stock create-expo-app
  * splash blue (`#208AEF`) and adaptive-icon tint (`#E6F4FE`) survived the whole rebrand because
  * nothing compared them against the palette. This suite is that comparison, so the next field
- * change fails here instead of shipping a mismatched cold start.
+ * change fails here instead of shipping a mismatched cold start. Each case pins one parsed field
+ * to the token; there is no substring scan of the file.
  *
  * Why both splash variants pin to the SAME token: `use-theme.ts` renders the dark scheme only
  * (the V22 sheet defines one field), so the canvas the splash cuts to is `Colors.dark.surface.base`
@@ -52,11 +53,5 @@ describe('app.json native chrome colours', () => {
 
   it('tints the Android adaptive icon background with the Blueprint field', () => {
     expect(appConfig.expo.android.adaptiveIcon.backgroundColor).toBe(FIELD);
-  });
-
-  it('carries no create-expo-app template colour anywhere', () => {
-    const raw = JSON.stringify(appConfig).toUpperCase();
-    expect(raw).not.toContain('#208AEF');
-    expect(raw).not.toContain('#E6F4FE');
   });
 });

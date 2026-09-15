@@ -1607,10 +1607,12 @@ intact underneath.
   wordmark, splash artwork, and store listing copy are all still placeholders; needed at M6, not
   before. The stock Expo *colours* around that art are gone as of 2026-09-16 (issues #20/#49):
   `app.json`'s splash `backgroundColor` (both variants) and the Android
-  `adaptiveIcon.backgroundColor` are the Blueprint field `#0B0E12`, and
-  `src/constants/__tests__/app-config-colors.test.ts` pins them to `Colors.dark.surface.base`, so a
-  future palette change fails the suite rather than silently missing the one file the theme cannot
-  reach. Artwork only remains.
+  `adaptiveIcon.backgroundColor` are the Blueprint field `#0B0E12` — the latter effective only
+  because the template-blue `adaptiveIcon.backgroundImage` was dropped (prebuild prefers the image
+  over the colour) — and `src/constants/__tests__/app-config-colors.test.ts` pins each field to
+  `Colors.dark.surface.base`, so a future palette change fails the suite rather than silently
+  missing the one file the theme cannot reach. The foreground/monochrome icon layers, iOS icon
+  and splash artwork remain stock until M6.
 - 🟡 **Payments are dummy-only.** Real IAP (RevenueCat/StoreKit) is required before public App Store
   release; deferred to v2 per `planning/02-product-requirements.md`.
 - 🟠 **Google OAuth client secret should be rotated before shipping (found 2026-08-05).** The
