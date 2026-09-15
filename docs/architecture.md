@@ -850,7 +850,10 @@ scale *down* to fit, never up.
   recomputes every ratio from the hexes in `theme.ts` — both schemes, the accent, the session
   tones, the effort ramp — and asserts it against that token's floor (or, for `progress.disabled`,
   its ceiling). A last check counts the opaque tokens, so a new hex cannot be added without being
-  given a floor.
+  given a floor. The one surface the tokens cannot reach — `app.json`'s native chrome (the
+  `expo-splash-screen` background, both variants, and the Android `adaptiveIcon.backgroundColor`)
+  — is pinned to `Colors.dark.surface.base` the same way by
+  `src/constants/__tests__/app-config-colors.test.ts` (2026-09-16, issues #20/#49).
 - **Type** — the sheet's three families, loaded in `_layout.tsx` and named in `FontFamily`:
   **Barlow Condensed** 500/600/700/800 for display and every numeral; **IBM Plex Mono** 400/500/700
   for tracked uppercase labels, units and day numerals; **IBM Plex Sans** 400–700 for body. Scale

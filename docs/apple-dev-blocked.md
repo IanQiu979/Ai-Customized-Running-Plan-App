@@ -87,7 +87,7 @@ Recorded so a future session doesn't re-park these by mistake:
 
 | Looks Apple-gated | Actually |
 |---|---|
-| **#20** — stock Expo blue in `app.json` (`#208AEF` splash, `#E6F4FE` adaptive icon) | A two-value config edit. No Apple account involved. **Still open — do it now.** |
+| **#20** — stock Expo blue in `app.json` (`#208AEF` splash, `#E6F4FE` adaptive icon) | A two-value config edit. No Apple account involved. **Closed 2026-09-16** with #49 (same defect) — both values are the Blueprint field, pinned by `src/constants/__tests__/app-config-colors.test.ts`; see `docs/change_log.md`. |
 | **#17** — motion, incl. haptics | `expo-haptics` runs in Expo Go. Only an on-device *EAS dev-client build* would need Apple credentials, and the reveal/reduced-motion work doesn't. **Still open.** |
 | **#15** — dummy paywall | It's a dummy. Real IAP (StoreKit/RevenueCat) would need the membership, but real IAP is explicitly deferred to v2. **Still open.** |
 | **#35** — app name | Was Ian's decision, not Apple's. **Closed 2026-07-12** — the app is Pace Blueprint. |
