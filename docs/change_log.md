@@ -11,8 +11,9 @@ GitHub issue #24 (2026-07-11 frontend audit: "`WorkoutRow` never renders `Workou
 per-workout coaching vanishes") was diagnosed today and is stale as filed. No source file changed;
 the fix is the missing test.
 
-- **Where the why renders now.** `WorkoutRow`, `WeekAccordion` and `composeWorkoutLabel` were
-  deleted by PR #111 (2026-09-14, V22-06). Their replacement, the plan detail's day screen
+- **Where the why renders now.** `WorkoutRow` and `WeekAccordion` were deleted by PR #111
+  (2026-09-14, V22-06); `composeWorkoutLabel` survives in `src/components/plan/format.ts` with its
+  unit test but no screen calls it. Their replacement, the plan detail's day screen
   (`src/app/plan/[id]/week/[week]/day/[day].tsx`), already renders `Workout.why` as its WHY
   section — `{day.why ? <Section label="WHY" body={day.why} /> : null}` — so the Elite per-workout
   why does reach the runner. The week screen's `SessionRow` accessibility label omits it on
