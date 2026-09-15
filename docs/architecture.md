@@ -149,9 +149,11 @@ src/
     navigation-theme.ts      # bridges theme.ts's tokens into expo-router's re-exported `Theme`
                              #  shape, so ThemeProvider never leaks the library's own stock
                              #  DefaultTheme/DarkTheme colors (fixes issue #27)
-    __tests__/                # navigation-theme, and theme.contrast (new 2026-09-03) — the latter
-                             #  recomputes every ratio in the design doc's tables from theme.ts's
-                             #  own hexes, so the contrast rule is enforced rather than documented
+    __tests__/                # navigation-theme, theme.contrast (new 2026-09-03), and
+                             #  app-config-colors (2026-09-16) — the middle one recomputes every
+                             #  ratio in the design doc's tables from theme.ts's own hexes, so the
+                             #  contrast rule is enforced rather than documented; the last pins
+                             #  app.json's splash/adaptive-icon hexes to Colors.dark.surface.base
   hooks/                    # use-theme (resolves to the dark scheme only, see below),
                              #  use-color-scheme, use-plan (one plan by id: real via
                              #  GET /api/plans/:id or the golden fixture)
