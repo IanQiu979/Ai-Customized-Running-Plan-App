@@ -5,6 +5,27 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-09-16 — A font-load failure boots the app instead of stranding it on the splash screen
+
+Issue #21, from the 2026-07-11 codebase audit. `src/app/_layout.tsx` read only the first element
+of `useFonts`'s `[loaded, error]` pair. `expo-font`'s hook never resolves `loaded` after
+`loadAsync` rejects — it sets `error` and stops — so any one of the eleven Google-font assets
+failing (an interrupted first-launch download, a corrupt cache, a failed web fetch) left `ready`
+false forever: the layout returned `null`, `SplashScreen.hideAsync()` never ran, and a first-time
+user — i.e. a tester — saw the splash screen indefinitely with no error and no retry.
+
+- **The gate now settles on either outcome.** `fontsSettled = fontsLoaded || fontError !== null`
+  feeds `ready` in place of `fontsLoaded`; the session half of the gate (`sessionGate.ts`) is
+  untouched. On failure the app renders on the system faces — each `fontFamily` the theme names
+  falls back at the renderer, wrong-looking but legible — and the splash is hidden exactly as on
+  success. **Deliberately no user-visible signal**: there is nothing a runner could do with an
+  error dialog, and a working app in the wrong typeface beats a stranded one. A `__DEV__`-only
+  `console.warn` carries the error for the developer.
+- **Pinned by `src/app/__tests__/root-layout-font-gate.test.tsx`**, the fifth rendered-screen
+  suite (`CLAUDE.md` → Testing, same grounds as the other four: the behaviour is the layout's own
+  render branch). Three cases — fonts loaded, fonts still loading (gate holds, splash stays), and
+  fonts failed. The failure case was run red against the pre-fix layout before the change landed.
+
 ## 2026-09-16 — Issue #24 closed: the Elite per-workout "why" is rendered and now proven
 
 GitHub issue #24 (2026-07-11 frontend audit: "`WorkoutRow` never renders `Workout.why`, so Elite's

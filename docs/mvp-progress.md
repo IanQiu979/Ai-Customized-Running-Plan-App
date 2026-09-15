@@ -678,6 +678,12 @@ from 82. Issue #22 remains open.)
   captain — provisioned and verified in local dev 2026-08-05 (see that entry below).
 
 ### Code
+- [x] **A font-load failure no longer strands the app on the splash screen (2026-09-16, issue
+      #21).** `_layout.tsx` now reads `useFonts`'s error element and settles its readiness gate on
+      a failed load as well as a successful one, so the splash is hidden and the app renders on
+      system fonts instead of returning `null` forever. No user-visible signal by design; a
+      `__DEV__` warning carries the error. Pinned by `src/app/__tests__/root-layout-font-gate.test.tsx`.
+      Change log 2026-09-16.
 - [x] **GitHub issue #24 closed (2026-09-16) — stale as filed; the Elite per-workout `why` is
       rendered and now proven.** `WorkoutRow` went with PR #111; the plan detail's day screen
       already renders `Workout.why` as its WHY section. No source change — the gap was that no

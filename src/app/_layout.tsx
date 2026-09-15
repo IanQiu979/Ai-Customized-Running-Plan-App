@@ -37,7 +37,7 @@ export default function RootLayout() {
   // The eleven faces `FontFamily` (`src/constants/theme.ts`) names, and only those — the keys
   // here ARE the `fontFamily` strings the rest of the app writes, so the two lists cannot drift
   // without a missing font silently falling back to the system face.
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     BarlowCondensed_500Medium,
     BarlowCondensed_600SemiBold,
     BarlowCondensed_700Bold,
@@ -65,7 +65,20 @@ export default function RootLayout() {
     setSessionSettled((settled) => hasSessionSettled(settled, sessionPending));
   }, [sessionPending]);
 
-  const ready = fontsLoaded && sessionSettled;
+  // `useFonts` reports a failed load through its second element and leaves `fontsLoaded` false
+  // for good (`expo-font`'s `useRuntimeFonts` never resolves `loaded` after `loadAsync` rejects),
+  // so the gate must settle on either. A failure boots the app on the system faces — every
+  // `fontFamily` the theme names falls back at the renderer, wrong-looking but legible — rather
+  // than holding the splash forever with no error and no retry (issue #21). Nothing is shown to
+  // the runner: there is no action they could take on it. The warning is for the developer.
+  const fontsSettled = fontsLoaded || fontError !== null;
+  useEffect(() => {
+    if (fontError && __DEV__) {
+      console.warn('Font assets failed to load; rendering with system fonts.', fontError);
+    }
+  }, [fontError]);
+
+  const ready = fontsSettled && sessionSettled;
 
   useEffect(() => {
     if (ready) {
@@ -83,7 +96,7 @@ export default function RootLayout() {
 
   if (!ready) {
     // Keep the native splash screen up — nothing below can render its type-driven UI correctly
-    // until the fonts finish loading, and routing a signed-in user into `(auth)` (or vice versa)
+    // until the fonts finish loading (or definitively fail, see `fontsSettled`), and routing a signed-in user into `(auth)` (or vice versa)
     // for one frame while the session is still resolving would be a visible flash, not a state.
     //
     // That reasoning holds for the *first* resolution only, which is why the gate is latched

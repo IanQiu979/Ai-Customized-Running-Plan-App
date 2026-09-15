@@ -154,15 +154,17 @@ clean `typecheck && lint && test`. Never force-push without explicit user approv
 ## Testing
 
 jest-expo is installed. New logic added to `src/lib/` gets a test alongside it (see
-`src/lib/__tests__/supabase.test.ts`). Screens are not unit-tested for now. Four rendered-screen
+`src/lib/__tests__/supabase.test.ts`). Screens are not unit-tested for now. Five rendered-screen
 suites are deliberate exceptions, each because the bug or behaviour under test lives in the
 screen's own render branches with no logic layer underneath to test instead: the two in
 `src/app/(auth)/__tests__/` (2026-09-04) — `onboarding.test.tsx` (the CTA gate and its bounded
 ceiling) and `auth-back-link.test.tsx` (the four pre-auth links' navigation action) —
 `src/app/(tabs)/__tests__/tab-cache-first.test.tsx` (2026-09-12, the cache-first-on-refocus
-regression proof cited in `docs/change_log.md`'s same-dated entry), and
+regression proof cited in `docs/change_log.md`'s same-dated entry),
 `src/app/plan/__tests__/day-why.test.tsx` (2026-09-16, the Elite per-workout `why` render proof,
-issue #24). Each file's header states the reason; add a fifth only on the same grounds.
+issue #24), and `src/app/__tests__/root-layout-font-gate.test.tsx` (2026-09-16, the root layout's
+splash gate settling on a font-load *failure* as well as a success — issue #21). Each file's
+header states the reason; add a sixth only on the same grounds.
 
 ## Keep these docs updated — this is a standing rule, not a suggestion
 
