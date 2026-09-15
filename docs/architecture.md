@@ -487,7 +487,9 @@ src/lib/
                             #          existing easy-run ceiling to carry the rendered pre-peak
                             #          high-water mark; `clampLongRun`'s safety ceilings remain
                             #          authoritative. The byte-pinned golden fixture remains its
-                            #          own path.
+                            #          own path, admitted only for a 12-week / 4-day / 5K race
+                            #          intake on the 4-week recovery cadence or the 50+ 4/8/12
+                            #          (2026-09-16); any other cadence is served generically.
   planLibrary/            # exists (2026-09-09) — the Free tier's entire engine: the 40-plan
                             #          deterministic library, a port of
                             #          `planning/research/plan-blueprint-examples.md`'s "V1
@@ -672,7 +674,10 @@ continues into later peak-deload and taper weeks. The separate pre-clamp startin
 floored against the quality sessions the layout actually schedules (`retainedQuality`), so a three-
 or four-day week is never floored on the Q2 interval it drops. The coach-authored golden
 5K path uses the flat per-level share table, the flat absolute table, and the raw fractional spike
-ceiling. Generic easy runs are
+ceiling. That path is admitted only for a 12-week / 4-day / 5K race intake whose recovery cadence
+lands on the curve's authored dips at weeks 4 and 8 — the 4-week cadence, or the 50+ ruling's
+4/8/12; every other intake, including the under-50 advanced runner's 3-week cadence, is built by
+the generic path (captain's `golden-cadence3-route` ruling, 2026-09-16, audit §1.3). Generic easy runs are
 capped at the final clamped LR distance. Quality/tempo sessions are not: the safety cap may put LR
 below one of them rather than rewriting the authored stimulus. `reconcileVolumeToTarget()` trims
 whole kilometres without dropping scheduled training runs; an extremely small target can therefore

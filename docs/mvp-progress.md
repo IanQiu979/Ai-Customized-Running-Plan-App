@@ -97,9 +97,9 @@
   place, the pre-clamp `longRunStartFloor` now reads `retainedQuality` too, so a three- or four-day
   week is no longer floored on the Q2 interval it never schedules (348 of 22,000 swept plans move,
   each by a 1 km long-run drop). Both halves of GitHub issue #99 have landed. The sweep's residual
-  770 broad peak-below-pre-peak-loading and 470 literal peak-below-base offenders are pre-existing,
-  unchanged by either fix, and stay tracked by GitHub issue #103 — the captain scoped this pair to
-  a zero-new-regression gate, not a curve redesign. **Rest weeks shorten the long run first
+  peak-below-pre-peak-loading and peak-below-base offenders are pre-existing, unchanged by either
+  fix, and stay tracked by GitHub issue #103 — the captain scoped this pair to a zero-new-regression
+  gate, not a curve redesign (current counts: "Known debt" below). **Rest weeks shorten the long run first
   (2026-09-12):** the skeleton's recovery weeks now size Day 7 at `loadRules.ts`'s
   `deloadLongRun` (§ 9's 60–70% of the preceding long run — the band the Free library already
   used) instead of leaving it on the loading curve while the easy runs absorbed the whole cut; the
@@ -127,6 +127,13 @@
   unreachable, with the 5% Riegel margin banked for then), and any declared injury maps to H1 until
   § 15's six-field injury intake exists (so H2–H4 are implemented and tested but unreachable).
   **Free now requires a target race distance**; a race date stays optional on every tier.
+- **The golden 5K path admits only the cadence it was authored for (2026-09-16, audit §1.3
+  closed).** `buildTemplatePlan` routes a 12-week / 4-day / 5K race intake onto the coach-authored
+  curve only on the 4-week recovery cadence or the 50+ ruling's 4/8/12; the under-50 advanced
+  runner's 3-week cadence is served by `buildGenericWeek`, cadence intact, so its rest weeks are
+  now 15–25% cuts instead of loading weeks flagged as rest (they had gone up 14–51%). Paid-tier
+  skeleton only; Free and the example-plan fixture are untouched. Captain's `golden-cadence3-route`
+  ruling — see "Decided (2026-09-16)"; pinned by `planTemplates.goldenDeload.test.ts`.
 - **Intake is asked once and a race target is optional.** Home reads the target off the saved
   intake and asks only for a plan length when there is no race date. A no-race plan never ends on
   a deload; a past race date is refused on both screens (race day and a blank date remain valid);
@@ -680,6 +687,16 @@ from 82. Issue #22 remains open.)
   captain — provisioned and verified in local dev 2026-08-05 (see that entry below).
 
 ### Code
+- [x] **Audit §1.3 closed — the golden 5K path serves only the cadence it was authored for
+      (2026-09-16, captain ruling `golden-cadence3-route`).** `FIVE_K_WEEKLY_LOAD` dips at weeks
+      4 and 8, so `buildTemplatePlan` now admits a 12-week / 4-day / 5K race intake to
+      `buildCanonicalFiveKWeek` only on the 4-week cadence or the 50+ 4/8/12; the under-50
+      `competitive` runner goes to `buildGenericWeek`, keeping 3/6/9 (before: those flagged weeks
+      were up 14–51%; after: cuts of 20/19/20% for the 60 km/week witness, peak 72 → 69 km). The
+      50+ race week 12 stays flagged and is excluded from the band property. New
+      `planTemplates.goldenDeload.test.ts` sweeps all eight golden-shape profiles; the progression
+      mask was re-encoded once on the captain's authority, 770 → 758, with the two admitted
+      offenders named. Detail: `docs/change_log.md`, 2026-09-16.
 - [x] **Settings' "Delete account" confirms and deletes on web (2026-09-16, issue #96).** The
       row went through `Alert.alert`, which react-native-web implements as an empty method, so on
       web it produced no dialog, no deletion and no error. New `src/lib/confirmDestructive.ts`
@@ -1319,6 +1336,21 @@ guidelines scout (`/Users/Guestyyyyyyyy/firstmate/data/v22-apple-kids-guidelines
 | `fifty-plus-golden-deload-weeks` | **Weeks 4, 8, and 12** are deload weeks for 50+ runners on the golden 12-week 5K path — not the generic every-3-weeks modulo (which would land on 3/6/9). This is a golden-path-only override; the generic path's every-3-weeks-for-50+ cadence is unchanged. Week 12 (the race week) is flagged `isDeload: true` in addition to its existing race-day structure. Implementation: `buildCanonicalFiveKWeek()` in `planTemplates.ts`. |
 | `age-floor` (App Store declared minimum age) | **13**, unified with the backend intake validator. The two were briefly treated as separate (the backend floor had been raised to 13 in an earlier, unrelated commit — `8acc27c` — while a prior ruling had separately declined touching it), but the captain resolved that tension mid-task: both the backend validator (`workers/src/routes.ts:210`, already `age < 13`) and the App Store Connect age-rating questionnaire answer are 13. There is no in-repo App Store Connect config to edit — `eas init` has never been run (`docs/apple-dev-blocked.md`) — so the declared floor is recorded here as the value to use once submission is set up; the questionnaire itself remains a captain's-account action at submission time. |
 
+## Decided (2026-09-16) — golden 5K path admission, `v22-core-purpose-audit-r1` §1.3
+
+Closes the audit finding the 2026-09-06 §1.2/§1.4 task deliberately left open: on the golden
+12-week / 4-day / 5K path, an under-50 advanced runner's flagged deload weeks (3/6/9, the pro
+cadence) were loading weeks — `isDeload` came from the cadence, the volume from
+`FIVE_K_WEEKLY_LOAD`'s array position, whose authored dips sit at weeks 4 and 8 only. Full
+account: `docs/change_log.md`'s 2026-09-16 entry; coaching record:
+`docs/reference/coaching/load-rules.md` § Deload trigger.
+
+| Item | Decision |
+|---|---|
+| `golden-cadence3-route` — what to do with a recovery cadence the coach-authored curve was not written for | **Option A: the golden plan serves only a runner whose recovery cadence lands on its authored dips.** `FIVE_K_WEEKLY_LOAD`, `FIVE_K_LONG_RUNS` and the tempo/interval tables are one artefact for a runner who recovers on weeks 4 and 8, so `buildTemplatePlan` admits a 12-week / 4-day / 5K race intake to `buildCanonicalFiveKWeek` only on the 4-week cadence or the 50+ ruling's 4/8/12 (`FIVE_K_AUTHORED_DIP_CADENCE = 4`, one extra clause on `useGoldenFiveKShape`). The under-50 advanced runner is served by `buildGenericWeek` like every other intake off the path, 3-week cadence intact and rest weeks inside the 15–25% band. Rejected: authoring a week-3/6/9 recovery for the curve (option C — it needs tempo/interval doses the coach never wrote) and reversing the 2026-08-03 pro cadence (option B). No coaching content added. |
+| Race week 12 for 50+, flagged `isDeload` by `fifty-plus-golden-deload-weeks` (2026-08-06) but carrying the 10 km race day | **Stays flagged; excluded from the reduction-band property rather than un-flagged.** Its volume includes race day, so it cannot satisfy a band; the UI keeps calling it a recovery week. |
+| The 22,000-plan progression mask (`planTemplates.progression.test.ts`) | **Re-encoded exactly once, 770 → 758, on the captain's authority.** The reroute moved all 22 competitive / 4-day / 12-week / 5K matrix intakes onto the generic curve, removing 14 offenders and admitting two by name (`POST_BASELINE_NAMED_OFFENDERS`: competitive / 4 days / 40 km / 12 weeks, both recent-time variants — the generic path's #103-class shape). Any other addition is still a regression. |
+
 ## Decided (2026-09-10) — the Free library engine's six coaching questions, all answered
 
 The six decisions `planning/research/plan-blueprint-examples.md` does not make, raised 2026-09-09
@@ -1393,7 +1425,8 @@ cap, by level".
 Closes the two core-purpose-audit findings that were pure rule-enforcement bugs, not coaching
 content (`/Users/Guestyyyyyyyy/firstmate/data/v22-core-purpose-audit-r1/report.md`). The audit's
 other findings (§1.1, §1.3, §1.5–§1.9 — per-distance training content, deload session shape) are
-**not** touched by this work; they stay open, captain-content-blocked.
+**not** touched by this work; they stay open, captain-content-blocked. *§1.3 was closed on
+2026-09-16 — see "Decided (2026-09-16)" above.*
 
 | Item | Decision |
 |---|---|
@@ -1475,10 +1508,12 @@ intact underneath.
   mask gate passes, so no plan entered the offender set. Nobody has confirmed the GitHub issue is
   closed.
 - 🟡 **The pre-existing peak-below-base offenders are still there — GitHub issue #103.** After both
-  tasks the 22,000-plan sweep still reports **770** broad "peak below pre-peak loading" and **470**
-  literal "peak below base" plans (pre-Task-1: 954 broad, 470 literal). They predate both fixes and
-  were explicitly out of scope per the captain's 2026-09-09 decision, which scoped this pair to a
-  zero-new-regression gate rather than a curve/phase redesign. Closing them is a curve and phase
+  tasks the 22,000-plan sweep reported **770** broad "peak below pre-peak loading" and **470**
+  literal "peak below base" plans (pre-Task-1: 954 broad, 470 literal); since the 2026-09-16
+  golden-path reroute the broad set is **758** — 14 golden offenders left it and two generic ones
+  entered by name, on the captain's authority (see "Decided (2026-09-16)"). They predate every fix
+  and were explicitly out of scope per the captain's 2026-09-09 decision, which scoped that pair to
+  a zero-new-regression gate rather than a curve/phase redesign. Closing them is a curve and phase
   question, so it waits on Ian.
 - 🟡 **The client's and the Worker's `better-auth` versions must match, and only the lockfile
   holds them together (2026-09-05).** They are two separate npm projects sharing one wire format

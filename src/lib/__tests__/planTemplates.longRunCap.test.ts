@@ -143,23 +143,34 @@ describe('golden 5K path — long-run weekly-share cap holds at any baseline (sc
  * (`planTemplates.genericLongRun.test.ts`) across every level, age band and volume the path can
  * be reached with, so the coach-authored plan is verified against the safety rules rather than
  * silently exempt from them. A breach here is a coaching question for Ian, not a licence to clamp.
+ *
+ * One of the eight golden-shape intakes is no longer *built* by the golden path. Under the
+ * captain's `golden-cadence3-route` ruling (2026-09-16, audit §1.3) the under-50 advanced runner's
+ * 3-week recovery cadence is served by `buildGenericWeek`, because the coach-authored curve dips
+ * only at weeks 4 and 8 and flagging 3/6/9 on it produced "rest" weeks that went up. That profile
+ * stays in this sweep — same intake, same four checks — so the reroute is proven against the same
+ * caps, judged by the generic path's own conventions where the two differ (`servedBy`).
  */
 interface GoldenProfile {
   name: string;
   experience: ExperienceAnswer;
   age: number;
   weeklyKm: number;
+  /** Which builder `buildTemplatePlan` routes this intake to; see `useGoldenFiveKShape`. */
+  servedBy: 'golden' | 'generic';
 }
 
 const GOLDEN_PROFILES: GoldenProfile[] = [
-  { name: 'beginner — brand new, 12 km/wk, 30 y/o', experience: 'new', age: 30, weeklyKm: 12 },
-  { name: 'beginner — brand new, 20 km/wk, 16 y/o (youth, RPE not HR)', experience: 'new', age: 16, weeklyKm: 20 },
-  { name: 'beginner — some experience, 30 km/wk, 55 y/o (3-week deload cadence)', experience: 'some', age: 55, weeklyKm: 30 },
-  { name: 'intermediate — regular, 35 km/wk, 30 y/o', experience: 'regular', age: 30, weeklyKm: 35 },
-  { name: 'intermediate — experienced, 27 km/wk, 16 y/o', experience: 'experienced', age: 16, weeklyKm: 27 },
-  { name: 'intermediate — experienced, 45 km/wk, 55 y/o', experience: 'experienced', age: 55, weeklyKm: 45 },
-  { name: 'advanced — competitive, 60 km/wk, 30 y/o', experience: 'competitive', age: 30, weeklyKm: 60 },
-  { name: 'advanced — competitive, 80 km/wk, 55 y/o', experience: 'competitive', age: 55, weeklyKm: 80 },
+  { name: 'beginner — brand new, 12 km/wk, 30 y/o', experience: 'new', age: 30, weeklyKm: 12, servedBy: 'golden' },
+  { name: 'beginner — brand new, 20 km/wk, 16 y/o (youth, RPE not HR)', experience: 'new', age: 16, weeklyKm: 20, servedBy: 'golden' },
+  { name: 'beginner — some experience, 30 km/wk, 55 y/o (3-week deload cadence)', experience: 'some', age: 55, weeklyKm: 30, servedBy: 'golden' },
+  { name: 'intermediate — regular, 35 km/wk, 30 y/o', experience: 'regular', age: 30, weeklyKm: 35, servedBy: 'golden' },
+  { name: 'intermediate — experienced, 27 km/wk, 16 y/o', experience: 'experienced', age: 16, weeklyKm: 27, servedBy: 'golden' },
+  { name: 'intermediate — experienced, 45 km/wk, 55 y/o', experience: 'experienced', age: 55, weeklyKm: 45, servedBy: 'golden' },
+  // Under 50 and advanced: the 3-week cadence, routed off the golden curve since 2026-09-16.
+  { name: 'advanced — competitive, 60 km/wk, 30 y/o (generic path since 2026-09-16)', experience: 'competitive', age: 30, weeklyKm: 60, servedBy: 'generic' },
+  // 50+ and advanced: the 4/8/12 ruling keeps this runner on the coach-authored curve.
+  { name: 'advanced — competitive, 80 km/wk, 55 y/o', experience: 'competitive', age: 55, weeklyKm: 80, servedBy: 'golden' },
 ];
 
 function buildGoldenPlanFor(profile: GoldenProfile): Plan {
@@ -240,7 +251,12 @@ describe('golden 5K path — the coach-authored plan is verified against the cap
         const longRun = findLongRun(week);
         if (!longRun) continue;
         const km = longRun.distanceKm ?? 0;
-        if (previousLongestKm > 0 && km > previousLongestKm * LONG_RUN_SPIKE_MULTIPLE) {
+        // The coach-authored path keeps the raw fractional ceiling; the generic path reads it in
+        // whole kilometres (`roundSpikeCeilingUp`), exactly as `planTemplates.genericLongRun.test.ts`
+        // asserts it. Judge each profile by the builder that actually served it.
+        const rawCeiling = previousLongestKm * LONG_RUN_SPIKE_MULTIPLE;
+        const ceiling = profile.servedBy === 'generic' ? Math.ceil(rawCeiling) : rawCeiling;
+        if (previousLongestKm > 0 && km > ceiling) {
           breaches.push(`week ${week.weekNumber}: ${km} km after a previous longest of ${previousLongestKm} km`);
         }
         previousLongestKm = Math.max(previousLongestKm, km);
@@ -277,7 +293,9 @@ describe('golden 5K path — the coach-authored plan is verified against the cap
     'intermediate — regular, 35 km/wk, 30 y/o': { peakLongRunKm: 15, firstLongRunKm: 10, peakLoadingWeekKm: 48 },
     'intermediate — experienced, 27 km/wk, 16 y/o': { peakLongRunKm: 8, firstLongRunKm: 8, peakLoadingWeekKm: 30 },
     'intermediate — experienced, 45 km/wk, 55 y/o': { peakLongRunKm: 17, firstLongRunKm: 13, peakLoadingWeekKm: 54 },
-    'advanced — competitive, 60 km/wk, 30 y/o': { peakLongRunKm: 24, firstLongRunKm: 17, peakLoadingWeekKm: 72 },
+    // Generic path since 2026-09-16: 72 km / 24 km on the golden curve before, where the "peak"
+    // was a flagged-rest week 9 that had actually loaded (77 km). The generic curve's honest peak.
+    'advanced — competitive, 60 km/wk, 30 y/o (generic path since 2026-09-16)': { peakLongRunKm: 23, firstLongRunKm: 17, peakLoadingWeekKm: 69 },
     'advanced — competitive, 80 km/wk, 55 y/o': { peakLongRunKm: 34, firstLongRunKm: 23, peakLoadingWeekKm: 98 },
   };
 

@@ -333,6 +333,20 @@ land on 3, 6, 9 and drop off the plan by week 9). This aligns with the natural v
 week — as a deload for 50+ runners specifically, on top of its existing taper/race structure. The
 generic (non-golden) path is unaffected and still uses the every-3-weeks modulo above.
 
+**Golden path admission (captain ruling, `golden-cadence3-route`, 2026-09-16):** the coach-authored
+golden plan (`FIVE_K_WEEKLY_LOAD`, `FIVE_K_LONG_RUNS`, the tempo/interval tables) is one artefact
+written for a runner who recovers on weeks 4 and 8, so `buildTemplatePlan` admits a 12-week /
+4-day / 5K race intake to `buildCanonicalFiveKWeek` only when the runner's own cadence lands there
+— the 4-week cadence, or the 50+ exception's 4/8/12 above. Core-purpose audit §1.3 found why: the
+curve dips only at weeks 4 and 8, but an under-50 advanced runner's 3-week cadence flagged weeks
+3, 6 and 9 as deloads while reading the curve's *loading* volume at those positions — the flagged
+"rest" weeks went **up** 14–51% on the week before, and the real dips at 4 and 8 passed as
+unflagged loading weeks. That runner is now served by the generic path with the 3-week pro cadence
+(2026-08-03) intact and each rest week sized inside the 15–25% band below. No coaching content was
+added: nothing was authored for the curve at weeks 3/6/9, and inventing it was declined. The 50+
+runner's race week 12 stays flagged `isDeload` per the exception above; its volume includes race
+day, so it is excluded from the reduction-band property rather than un-flagged.
+
 **Reduction: 15–25% of volume** during a deload week — authoritative (**Ian's ruling, 2026-09-06,
 superseding the 35–45% figure below**).
 

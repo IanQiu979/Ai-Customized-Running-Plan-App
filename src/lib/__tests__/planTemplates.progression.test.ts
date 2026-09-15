@@ -43,10 +43,25 @@ const MATRIX_WEEKLY_KM = Array.from({ length: 11 }, (_, index) => 10 + index * 1
 const MATRIX_DURATIONS = [6, 8, 10, 12, 14, 16, 20, 24] as const;
 const MATRIX_RECENT_PERFORMANCES = [undefined, { distance: '10k', timeSec: 2700 }] as const;
 const TASK_ONE_MATRIX_SIZE = 22_000;
-const TASK_ONE_BASELINE_OFFENDER_COUNT = 770;
-// This is an exact membership baseline, not a model of the production rules: the 770 legacy
-// offenders are sparse across the matrix. Task 2 may remove any of them, but must not add one.
+const TASK_ONE_BASELINE_OFFENDER_COUNT = 758;
+// This is an exact membership baseline, not a model of the production rules: the legacy
+// offenders are sparse across the matrix. A change may remove any of them, but must not add one.
 // Matrix order is distance → experience → days/week → weekly km → duration → recent performance.
+//
+// Re-encoded exactly once, under the captain's `golden-cadence3-route` ruling (2026-09-16, audit
+// §1.3): routing the under-50 advanced runner's 3-week cadence off the golden 12-week/4-day 5K
+// path moved all 22 of its matrix intakes (5k / competitive / 4 days / 12 weeks, 10–110 km,
+// both recent-time variants) onto the generic curve. That removed the 14 golden offenders at
+// 50–110 km (whose flagged "rest" weeks had been the curve's loading weeks) and ADDED the two
+// named below, which the ruling accepted by name — 770 → 758. Any other addition is still a
+// regression; do not re-encode this mask to make one pass.
+const POST_BASELINE_NAMED_OFFENDERS = [
+  // The generic path's #103-class shape at this one baseline: week 8's long run dips 17 → 11 km
+  // and the peak phase tops out at 47 km against a 49 km week 7. Pre-existing on the generic
+  // path for the same reason issue #103 catalogues, captain-scoped out there too.
+  '5k / competitive / 4 days / 40 km/week / 12 weeks / no recent time',
+  '5k / competitive / 4 days / 40 km/week / 12 weeks / recent 10K',
+] as const;
 const TASK_ONE_PRE_PEAK_BASELINE_MASK =
   'AAD//////////////////////////wAADAAMAAAAAAAAAAAAAAAAAAAAAAAAAAwADAAAAAAAAAAAAAAAAAAAAAAAAAAMAAwAAAAA' +
     'AAAAAAAAAAAAAAAAAAAADAAMAAAAAAAAAAAAAAAAAAAAAAAAAP//////////////////////////AAAMAAwAAAAAAAAAAAAAAAAA' +
@@ -54,7 +69,7 @@ const TASK_ONE_PRE_PEAK_BASELINE_MASK =
     'AAAAAAAAAAAAAAAAAAAAAAAAAAwADADMAMwAwADAAMAAwADAAMAAAAAMAAwADAAMAAAAAAAAAAAAAAAAAAAADAAMAAwADAAAAAAA' +
     'AAAAAAAAAAAAAAwADAAMAAwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADAAMAMwAzADAAMAAwADAAMAAwAAA' +
     'AAwADAAMAAwAAAAAAAAAAAAAAAAAAAAMAAwADAAMAAAAAAAAAAAAAAAAAAAADAAMAAwADAAAAAAAAAAAAAAAAAAAAAAAAADAAAAA' +
-    'AAAAAAAAAAAAAAAAAAAAAAAAAADAAMAAwADAAMAAwADAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' +
+    'AAAAAAAAAAAAAAAAAAAAAAAAwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' +
     'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADAAAAAAAAAAAAAAAAAAAAAAAAAAMAAwAAAA' +
     'AAAAAAAAAAAAAAAAAAAAADAAMAAAAAAAAAAAAAAAAAAAAAAAAAAwADAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' +
     'AAAAAAAAAAAAMAAAAAAAAAAAAAAAAAAAAAAAAAAwADAAAAAAAAAAAAAAAAAAAAAAAAAAMAAwAAAAAAAAAAAAAAAAAAAAAAAAADAA' +
@@ -269,5 +284,15 @@ describe('generic peak-week capacity progression', () => {
       isOffender && !baselineFlags[index] ? [caseDescription] : [],
     );
     expect(newOffenderDescriptions).toEqual([]);
+
+    // The two 2026-09-16 additions are in the mask by name, not by accident: each must still be
+    // both flagged in the baseline and an offender today, so a future fix that clears one shows up
+    // here as a deliberate edit rather than a silent drift of the count.
+    for (const named of POST_BASELINE_NAMED_OFFENDERS) {
+      const index = results.findIndex(({ caseDescription }) => caseDescription === named);
+      expect(index).toBeGreaterThanOrEqual(0);
+      expect(baselineFlags[index]).toBe(true);
+      expect(results[index].isOffender).toBe(true);
+    }
   });
 });
