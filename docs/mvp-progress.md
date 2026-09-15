@@ -684,6 +684,12 @@ from 82. Issue #22 remains open.)
       system fonts instead of returning `null` forever. No user-visible signal by design; a
       `__DEV__` warning carries the error. Pinned by `src/app/__tests__/root-layout-font-gate.test.tsx`.
       Change log 2026-09-16.
+- [x] **GitHub issue #25 closed (2026-09-16) — stale as filed; Home's "later build phases"
+      placeholder and the demo link both left with PR #62.** The sample plan is My Plans' pinned
+      `PlanListRow`, already a `link`. No source change; `home.test.tsx` gains three cases pinning
+      that neither Home branch renders a placeholder capability claim and that every Home
+      `Pressable` carries a role. Root gate: 51 suites, 888 tests. Detail: `docs/change_log.md`,
+      2026-09-16.
 - [x] **GitHub issue #24 closed (2026-09-16) — stale as filed; the Elite per-workout `why` is
       rendered and now proven.** `WorkoutRow` went with PR #111; the plan detail's day screen
       already renders `Workout.why` as its WHY section. No source change — the gap was that no

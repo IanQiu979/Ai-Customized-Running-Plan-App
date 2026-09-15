@@ -264,3 +264,72 @@ describe('Home subscription disclosures', () => {
     expect(flatten(tree.root)).toContain('ON PRO & ELITE');
   });
 });
+
+/**
+ * Copy-vs-behaviour (issue #25). The frontend audit of 2026-07-11 caught Home telling a tester
+ * "Intake, generation, and plan view land in later build phases" directly above a working
+ * plan-view link. Both the sentence and that link left this screen when it was wired to the real
+ * backend (#62), so the fix is already in; these cases exist so the claim cannot come back — in
+ * either branch of the screen — and so every pressable Home renders keeps announcing a role.
+ */
+describe('Home copy matches what the app does (issue #25)', () => {
+  beforeEach(() => {
+    mockPush.mockClear();
+    mockGetIntake.mockReset();
+    mockGetQuotaStatus.mockReset().mockResolvedValue(freeQuota);
+    mockListPlans.mockReset().mockResolvedValue({ plans: [generatedPlan] });
+    mockGeneratePlan.mockReset();
+    mockFocusedEffect = undefined;
+    mockFocusCleanup = undefined;
+  });
+
+  afterEach(() => {
+    act(() => {
+      mountedTrees.splice(0).forEach((tree) => tree.unmount());
+    });
+  });
+
+  const placeholderClaims = [/later build phase/i, /build phases/i, /\(demo\)/i, /not yet available/i];
+
+  it('never claims a capability is missing before intake', async () => {
+    mockGetIntake.mockResolvedValue({ intake: null });
+
+    const tree = await renderScreen(<HomeScreen />);
+    const renderedText = flatten(tree.root);
+
+    expect(renderedText).toContain("Let's find your starting line.");
+    for (const claim of placeholderClaims) expect(renderedText).not.toMatch(claim);
+  });
+
+  it('never claims a capability is missing once intake and a plan exist', async () => {
+    mockGetIntake.mockResolvedValue({ intake });
+
+    const tree = await renderScreen(<HomeScreen />);
+    const renderedText = flatten(tree.root);
+
+    expect(renderedText).toContain('YOUR TARGET');
+    expect(renderedText).toContain('My Plans →');
+    for (const claim of placeholderClaims) expect(renderedText).not.toMatch(claim);
+  });
+
+  it('gives every pressable on Home a role a screen reader can announce', async () => {
+    mockGetIntake.mockResolvedValue({ intake });
+
+    const tree = await renderScreen(<HomeScreen />);
+    const pressables = tree.root.findAll(
+      (node) =>
+        typeof node.type === 'function' &&
+        node.type.name === 'Pressable' &&
+        typeof node.props.onPress === 'function'
+    );
+
+    // The one CTA, the Change link, the My Plans row, the tier row, and the two locked panels'
+    // unlock controls — none of them may be a bare, role-less Pressable.
+    expect(pressables.length).toBeGreaterThanOrEqual(4);
+    for (const pressable of pressables) {
+      expect(['button', 'link']).toContain(pressable.props.accessibilityRole);
+    }
+    expect(labels(tree, 'Go to My Plans')).toHaveLength(1);
+    expect(labels(tree, 'Go to My Plans')[0].props.accessibilityRole).toBe('link');
+  });
+});
