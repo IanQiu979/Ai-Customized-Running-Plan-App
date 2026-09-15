@@ -5,6 +5,21 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-09-16 — Issue #25 (Home placeholder copy) was already fixed; the regression is now pinned
+
+Issue #25, from the 2026-07-11 frontend audit, reported Home saying "Intake, generation, and plan
+view land in later build phases" directly above a working "View the sample 5K plan (demo)" link.
+Both the sentence and that link left `src/app/(tabs)/index.tsx` in `86d2d66` (#62) when Home was
+wired to the real backend; the sample plan is now My Plans' pinned `PlanListRow`, which already
+announces as a link (`my-plans.test.tsx`'s `rowsContaining` only matches `role === 'link'`). No
+screen change — a second edit to a sentence that no longer exists would have been invented work.
+
+- **`src/app/(tabs)/__tests__/home.test.tsx` gains three cases** under "Home copy matches what
+  the app does": neither the pre-intake nor the intake-plus-plan branch renders placeholder
+  capability claims ("later build phase", "(demo)", "not yet available"), and every `Pressable`
+  Home renders carries a `button`/`link` `accessibilityRole` — the issue's second ask, generalised
+  from one control to all of them. Both guards were run red against a mutated screen first.
+
 ## 2026-09-16 — A font-load failure boots the app instead of stranding it on the splash screen
 
 Issue #21, from the 2026-07-11 codebase audit. `src/app/_layout.tsx` read only the first element
