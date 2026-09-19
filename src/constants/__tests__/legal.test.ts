@@ -16,7 +16,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 
-import { PRIVACY_POLICY_URL } from '../legal';
+import { PRIVACY_POLICY_URL, PRIVACY_POLICY_VERSION } from '../legal';
 
 /**
  * The privacy policy is three files that must agree: `docs/privacy-policy.md` (the text),
@@ -112,8 +112,14 @@ describe('the privacy policy the app links to', () => {
     expect(published).not.toMatch(/TBC|TBD|DO NOT PUBLISH|\[DATA CONTROLLER|\[CONTACT EMAIL/);
   });
 
-  it('carries a Last updated date in ISO form', () => {
-    expect(published).toMatch(/\*\*Last updated: \d{4}-\d{2}-\d{2}\*\*/);
+  it('carries a Last updated date in ISO form, and that date is the recorded consent version', () => {
+    const lastUpdated = published.match(/\*\*Last updated: (\d{4}-\d{2}-\d{2})\*\*/g);
+    expect(lastUpdated).toHaveLength(1);
+    const date = /(\d{4}-\d{2}-\d{2})/.exec(lastUpdated![0])![1];
+    expect(new Date(date).toISOString().slice(0, 10)).toBe(date);
+    // Every guardian-consent row is stamped with `PRIVACY_POLICY_VERSION`; a policy revision the
+    // constant did not follow would record consent against text the guardian never saw.
+    expect(PRIVACY_POLICY_VERSION).toBe(date);
   });
 
   it('states the under-18 posture: 13 and over, 13–17 with guardian consent', () => {
