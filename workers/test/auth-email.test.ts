@@ -283,6 +283,35 @@ describe('auth log redaction', () => {
     expect(serialized).toContain('502');
   });
 
+  it('leaves bare OAuth error codes readable while still redacting real key=value tokens', () => {
+    const error = Object.assign(new Error('Code not found'), { code: 'state_mismatch' });
+    const sanitized = sanitizeAuthLogValue(error) as { message: string; code: string };
+    expect(sanitized.message).toBe('Code not found');
+    expect(sanitized.code).toBe('state_mismatch');
+
+    const redacted = sanitizeAuthLogValue('invalid_code with code=abc&state=xyz') as string;
+    expect(redacted).toBe('invalid_code with code=[redacted]&state=[redacted]');
+    expect(redacted).not.toContain('abc');
+    expect(redacted).not.toContain('xyz');
+  });
+
+  it('keeps a redacted stack trace on sanitized errors', () => {
+    const error = new Error('boom');
+    error.stack = [
+      'Error: boom',
+      '    at handler (https://worker.test/src/index.ts:10:5)',
+      `    at ${'x'.repeat(600)}`,
+      '    at reset (/api/auth/reset-password/stack-secret)',
+    ].join('\n');
+
+    const sanitized = sanitizeAuthLogValue(error) as { stack?: string };
+    expect(sanitized.stack).toContain('Error: boom');
+    expect(sanitized.stack).toContain('/api/auth/reset-password/[redacted]');
+    expect(sanitized.stack).not.toContain('https://');
+    expect(sanitized.stack).not.toContain('stack-secret');
+    expect(sanitized.stack!.length).toBeGreaterThan(500);
+  });
+
   it('does not log reset tokens or full URLs when mail delivery fails', async () => {
     const errorLog = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     try {

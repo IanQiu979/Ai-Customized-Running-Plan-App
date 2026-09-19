@@ -232,6 +232,7 @@ function sanitizeOAuthError(error: unknown): Record<string, unknown> {
     statusText: candidate.response?.statusText
       ? redactSensitiveText(candidate.response.statusText)
       : undefined,
+    stack: candidate.stack ? redactSensitiveTokens(candidate.stack).slice(0, STACK_LOG_LIMIT) : undefined,
   };
 }
 
@@ -253,12 +254,21 @@ export function sanitizeAuthLogValue(value: unknown, depth = 0): unknown {
   return redacted;
 }
 
-export function redactSensitiveText(value: string): string {
+const TEXT_LOG_LIMIT = 500;
+const STACK_LOG_LIMIT = 4000;
+
+function redactSensitiveTokens(value: string): string {
   return value
     .replace(/\/api\/auth\/reset-password\/[^/?\s"'<>]+/gi, '/api/auth/reset-password/[redacted]')
     .replace(/\b(?:https?|exp|paceblueprint):\/\/[^\s"'<>]+/gi, '[url redacted]')
-    .replace(/(client_secret|access_token|refresh_token|id_token|code|cookie|state)=?[^\s&,]*/gi, '$1=[redacted]')
-    .slice(0, 500);
+    .replace(
+      /\b(client_secret|access_token|refresh_token|id_token|token|code|cookie|state)=[^\s&,]*/gi,
+      '$1=[redacted]'
+    );
+}
+
+export function redactSensitiveText(value: string): string {
+  return redactSensitiveTokens(value).slice(0, TEXT_LOG_LIMIT);
 }
 
 export function redactAuthRequestPath(path: string): string {
