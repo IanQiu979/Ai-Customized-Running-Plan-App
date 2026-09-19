@@ -5,6 +5,46 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-09-19 — Issue #89 gains one privacy-policy source, a publication path, and an in-app link
+
+Pace Blueprint had account deletion and store-bound data flows but no public privacy policy for a
+runner or store listing to read. This change adds the complete surface without creating a second
+copy of the policy or exposing the rest of `docs/`.
+
+- **`docs/privacy-policy.md` is the source of truth.** It names **Ian Qiu**, a sole trader based in
+  **Thailand**, as the data controller and describes the app as built: the account/intake/plan
+  data it stores, the paid-tier Anthropic transfer, retention, rights, and deletion. Account-linked
+  intake answers and plans are treated conservatively as health/fitness data; the policy does not
+  claim the injury picker itself records GDPR Article 9 explicit consent. It states the real
+  overwrite boundary (one saved intake) and deletion boundary (whole account, not individual
+  plans). The deletion control it cites is already shipped: Settings → Danger zone → Delete
+  account was made reliable on web as well as native in PR #117.
+- **The age posture is explicit without claiming an unbuilt control.** Use is 13+; a runner aged
+  13–17 may use the app only with a parent or guardian's consent. This policy states that
+  condition, while the in-app flow that records guardian consent remains a separate, not-yet-
+  shipped task.
+- **Publication is narrow and happens after a qualifying push.** `.github/workflows/publish-legal-pages.yml`
+  runs on `main` only when the policy or workflow changes (plus manual dispatch), stages the
+  Markdown with Jekyll front matter at `privacy-policy/index.md`, and uses GitHub's official Jekyll
+  Pages action to upload an otherwise-empty artifact containing the rendered policy and a root
+  redirect—never the repository's internal documentation. Each third-party action is pinned to a
+  verified release commit, and the build/deploy jobs receive only their required permissions. Its
+  target path is
+  `https://ianqiu979.github.io/Ai-Customized-Running-Plan-App/privacy-policy/`. That URL is **not
+  claimed live in this entry**: a qualifying Pages workflow must succeed first.
+- **Settings links to the same path.** A new Legal → Privacy policy row opens the shared
+  `PRIVACY_POLICY_URL` in the same tab on web. Native uses Expo's in-app browser and falls back to
+  the platform URL handler. If every path fails, the screen shows a visible assertive live-region
+  error; the row carries link semantics and an accessibility hint.
+  `src/constants/__tests__/legal.test.ts` pins the controller identity,
+  13–17 guardian-consent wording, Markdown input, workflow output directory, and app URL together
+  so the three surfaces cannot quietly drift.
+- **Provider disclosures match the implemented boundaries.** GitHub Pages is named as the policy
+  host receiving ordinary web request metadata. Anthropic receives raw goal, injury-note and
+  per-plan-note text exactly as entered (name/email are not appended separately, but free text may
+  contain identifiers); flagged inputs/outputs may remain up to two years and related safety
+  scores up to seven years. Cloudflare Worker logs are described as retained up to seven days.
+
 ## 2026-09-19 — First EAS build: Android development client (issue #93, Android half)
 
 - **EAS project created** under the captain's `ianbeatingpros` account (`pace-blueprint`,

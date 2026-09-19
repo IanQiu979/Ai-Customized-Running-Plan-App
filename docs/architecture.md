@@ -68,8 +68,11 @@ src/
                              #  static empty strip
       settings.tsx           # Settings tab (new 2026-08-05) — tier + quota (GET
                               #  /api/quota-status, src/lib/quotaDisplay.ts), sign-out (moved off
-                              #  Home), a Free-tier "Upgrade" entry point to /paywall, and Delete
-                              #  Account (confirmDestructive() — the OS alert on native, the
+                              #  Home), a Free-tier "Upgrade" entry point to /paywall, a Legal ->
+                              #  Privacy policy row (issue #89; same-tab navigation on web,
+                              #  in-app browser -> OS link fallback on native, with a visible
+                              #  accessible error if opening fails), and Delete Account
+                              #  (confirmDestructive() — the OS alert on native, the
                               #  browser's own confirm on web, since 2026-09-16 / issue #96 ->
                               #  deleteAccount() -> authClient.signOut()). Quota refreshes
                               #  cache-first on every focus.
@@ -146,12 +149,14 @@ src/
                              # with the `-`/`:` printed, never typed. No screen uses a raw
                              # <TextInput keyboardType="..."> for a number
   constants/
+    legal.ts                # issue #89 — the one public privacy-policy URL used by Settings;
+                             #  points at the GitHub Pages path rendered from docs/privacy-policy.md
     theme.ts                # "Blueprint" token system (2026-09-14, the captain's V22 theme sheet)
                              #  — current, see below
     navigation-theme.ts      # bridges theme.ts's tokens into expo-router's re-exported `Theme`
                              #  shape, so ThemeProvider never leaks the library's own stock
                              #  DefaultTheme/DarkTheme colors (fixes issue #27)
-    __tests__/                # navigation-theme, theme.contrast (new 2026-09-03), and
+    __tests__/                # legal (issue #89), navigation-theme, theme.contrast (new 2026-09-03), and
                              #  app-config-colors (2026-09-16) — the middle one recomputes every
                              #  ratio in the design doc's tables from theme.ts's own hexes, so the
                              #  contrast rule is enforced rather than documented; the last pins
@@ -254,6 +259,30 @@ returns Elite with `limit: null`, reservation/settlement preserve the immutable 
 refuse or count a slot, and the client labels the state as unlimited. This is one reversible
 short-circuit over the entitlement system, not a replacement for it; set the variable to `"false"`
 before real users arrive.
+
+## Current — privacy policy and publication
+
+[`docs/privacy-policy.md`](privacy-policy.md) is the sole policy source. It identifies Ian Qiu, a
+sole trader based in Thailand, as data controller and documents the current observable contract,
+including the account-deletion control already shipped through PR #117. It states that users must
+be at least 13 and that ages 13–17 require a parent or guardian's consent. That statement is a
+condition of use today; the product flow that records guardian consent is separate and has not
+shipped. It treats account-linked intake answers and plans conservatively as health/fitness data
+without claiming that the injury picker records a GDPR Article 9 consent event; saving Intake
+overwrites the one stored response but does not rewrite existing plans. Its provider disclosures
+cover GitHub Pages request metadata, Cloudflare Worker logs (up to seven days), and Anthropic's
+ordinary and flagged-request retention, including trust-and-safety scores.
+
+Publication is intentionally isolated from the app and the internal documentation tree:
+`.github/workflows/publish-legal-pages.yml` runs after a qualifying push to `main` (or manual
+dispatch), stages the policy as `privacy-policy/index.md` with Jekyll front matter plus one root
+redirect, and uses GitHub's official Pages Jekyll build action to produce an otherwise-empty Pages
+artifact. It targets
+`https://ianqiu979.github.io/Ai-Customized-Running-Plan-App/privacy-policy/`. The URL is a configured
+target, **not a proven live endpoint until a qualifying Pages workflow succeeds**.
+`src/constants/legal.ts` holds the same URL for Settings → Legal → Privacy policy;
+`src/constants/__tests__/legal.test.ts` pins the controller identity and age posture and checks that
+the workflow's Markdown input/output path still agrees with the app constant.
 
 ## Current — the backend, in `workers/`
 
@@ -408,7 +437,9 @@ src/app/
   (tabs)/my-plans       # My Plans — permanent Example Plan plus GET /api/plans rows; no empty
                          # state, and MOST RECENT links to the newest generated plan
   (tabs)/settings       # exists today (2026-08-05) — tier + quota display, sign-out, delete
-                         # account, an "Upgrade" entry point to /paywall (decision 1, 2026-07-10)
+                         # account, an "Upgrade" entry point to /paywall (decision 1, 2026-07-10),
+                         # and issue #89's accessible Legal -> Privacy policy link (same tab on
+                         # web; in-app browser then OS-link fallback on native)
   intake/                # onboarding questionnaire (stack) — exists today, against GET/PUT
                          #  /api/intake
   plan/[id]              # plan overview (V22-06 A) — exists today; renders a real generated plan

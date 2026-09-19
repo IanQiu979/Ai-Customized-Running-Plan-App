@@ -1,7 +1,15 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import * as WebBrowser from 'expo-web-browser';
-import { ActivityIndicator, Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Linking,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActionRow, Group, Row } from '@/components/layout/GroupedRows';
@@ -39,6 +47,7 @@ export default function SettingsScreen() {
 
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [privacyPolicyError, setPrivacyPolicyError] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -100,14 +109,33 @@ export default function SettingsScreen() {
     }
   }
 
-  // An in-app browser sheet on native (`SFSafariViewController` / Custom Tabs) so the runner
-  // returns to Settings with a swipe; on web the same call opens a tab. If no browser can be
-  // presented (a bare runtime), fall through to the OS handler rather than do nothing (#96).
+  // Web stays in the current tab — popup blockers must not make a required legal link inert.
+  // Native prefers the in-app browser sheet (`SFSafariViewController` / Custom Tabs), then the
+  // OS URL handler. Every failure reaches visible copy instead of repeating #96's silent tap.
   async function openPrivacyPolicy() {
+    setPrivacyPolicyError(null);
+
+    if (Platform.OS === 'web') {
+      try {
+        window.location.assign(PRIVACY_POLICY_URL);
+      } catch {
+        setPrivacyPolicyError(
+          'Could not open the privacy policy. Check your connection and try again.'
+        );
+      }
+      return;
+    }
+
     try {
       await WebBrowser.openBrowserAsync(PRIVACY_POLICY_URL);
     } catch {
-      await Linking.openURL(PRIVACY_POLICY_URL).catch(() => {});
+      try {
+        await Linking.openURL(PRIVACY_POLICY_URL);
+      } catch {
+        setPrivacyPolicyError(
+          'Could not open the privacy policy. Check your connection and try again.'
+        );
+      }
     }
   }
 
@@ -163,9 +191,22 @@ export default function SettingsScreen() {
             <ActionRow
               label="Privacy policy"
               hint="What we collect, who sees it, and how to delete it"
+              accessibilityRole="link"
+              accessibilityHint="Opens the Pace Blueprint privacy policy"
               onPress={openPrivacyPolicy}
             />
           </Group>
+
+          {privacyPolicyError ? (
+            <Text
+              accessibilityRole="alert"
+              accessibilityLiveRegion="assertive"
+              selectable
+              style={[styles.error, { color: theme.status.error }]}
+            >
+              {privacyPolicyError}
+            </Text>
+          ) : null}
 
           <Group title="Danger zone">
             <ActionRow

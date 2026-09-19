@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Children, Fragment, isValidElement } from 'react';
+import type { AccessibilityRole } from 'react-native';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import {
@@ -87,6 +88,8 @@ export function ActionRow({
   tone = 'default',
   disabled = false,
   busy = false,
+  accessibilityRole = 'button',
+  accessibilityHint,
   onPress,
 }: {
   label: string;
@@ -94,6 +97,8 @@ export function ActionRow({
   tone?: 'default' | 'destructive';
   disabled?: boolean;
   busy?: boolean;
+  accessibilityRole?: AccessibilityRole;
+  accessibilityHint?: string;
   onPress: () => void;
 }) {
   const theme = useTheme();
@@ -101,7 +106,8 @@ export function ActionRow({
 
   return (
     <Pressable
-      accessibilityRole="button"
+      accessibilityRole={accessibilityRole}
+      accessibilityHint={accessibilityHint}
       accessibilityState={{ disabled: disabled || busy, busy }}
       disabled={disabled || busy}
       onPress={onPress}
