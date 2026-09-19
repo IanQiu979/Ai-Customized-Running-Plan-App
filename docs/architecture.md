@@ -68,8 +68,11 @@ src/
                              #  static empty strip
       settings.tsx           # Settings tab (new 2026-08-05) — tier + quota (GET
                               #  /api/quota-status, src/lib/quotaDisplay.ts), sign-out (moved off
-                              #  Home), a Free-tier "Upgrade" entry point to /paywall, and Delete
-                              #  Account (confirmDestructive() — the OS alert on native, the
+                              #  Home), a Free-tier "Upgrade" entry point to /paywall, a Legal ->
+                              #  Privacy policy row (issue #89; opens through
+                              #  src/lib/openPrivacyPolicy.ts, with a visible accessible error
+                              #  if opening fails), and Delete Account
+                              #  (confirmDestructive() — the OS alert on native, the
                               #  browser's own confirm on web, since 2026-09-16 / issue #96 ->
                               #  deleteAccount() -> authClient.signOut()). Quota refreshes
                               #  cache-first on every focus.
@@ -87,7 +90,10 @@ src/
                               # full-viewport build that holds, then PRESS TO CONTINUE reveals the
                               # questions; the questions never animate. Numeric answers use src/components/inputs/
                               # (segmented YYYY-MM-DD and H:MM:SS boxes, digit-filtered).
-                              # Against GET/PUT /api/intake; its
+                              # Against GET/PUT /api/intake. An age of 13–17 reveals a required
+                              # guardian-consent checkbox (issue #89, 2026-09-19) whose policy
+                              # link goes through lib/openPrivacyPolicy.ts; save sends
+                              # guardianConsent: true and the server refuses without it. Its
                               # exit-header action replaces to Home ("Done" once intake exists,
                               # "Skip for now" otherwise), and as of 2026-08-05 a successful save
                               # also router.replace('/(tabs)')s there instead of staying put
@@ -146,12 +152,14 @@ src/
                              # with the `-`/`:` printed, never typed. No screen uses a raw
                              # <TextInput keyboardType="..."> for a number
   constants/
+    legal.ts                # issue #89 — the one public privacy-policy URL used by Settings;
+                             #  points at the GitHub Pages path rendered from docs/privacy-policy.md
     theme.ts                # "Blueprint" token system (2026-09-14, the captain's V22 theme sheet)
                              #  — current, see below
     navigation-theme.ts      # bridges theme.ts's tokens into expo-router's re-exported `Theme`
                              #  shape, so ThemeProvider never leaks the library's own stock
                              #  DefaultTheme/DarkTheme colors (fixes issue #27)
-    __tests__/                # navigation-theme, theme.contrast (new 2026-09-03), and
+    __tests__/                # legal (issue #89), navigation-theme, theme.contrast (new 2026-09-03), and
                              #  app-config-colors (2026-09-16) — the middle one recomputes every
                              #  ratio in the design doc's tables from theme.ts's own hexes, so the
                              #  contrast rule is enforced rather than documented; the last pins
@@ -179,6 +187,11 @@ src/
                               #  is an empty method. Only an explicit confirm calls onConfirm; a
                               #  web runtime with no confirm throws. Platform/Alert/confirm are
                               #  read through an injectable runtime so both branches are tested
+    openPrivacyPolicy.ts     # the one way the app opens PRIVACY_POLICY_URL (issue #89): web
+                              #  navigates the current tab, native tries the in-app browser then
+                              #  the OS handler; every failure resolves to a message the screen
+                              #  shows instead of throwing. Shared by Settings' Legal row and the
+                              #  intake consent row; same injectable-runtime seam as confirmDestructive
     planTypes.ts              # canonical — shared Plan/Week/Workout/Tier vocabulary
     loadRules.ts               # canonical — deterministic safety arithmetic
     notation.ts                 # canonical — run-type/structure-string notation, the code
@@ -229,7 +242,8 @@ src/
                               # paceDerivation, quotaDisplay (6 tests, new 2026-08-05),
                               # goalRealismDisclosure, planRequest, fieldInput (new 2026-08-15),
                               # buildMotion, weekStrip, planProgress (new 2026-09-14),
-                              # confirmDestructive (11 tests, new 2026-09-16)
+                              # confirmDestructive (11 tests, new 2026-09-16),
+                              # openPrivacyPolicy (issue #89, 2026-09-19)
                               # — the two engine contracts included
 ```
 
@@ -255,6 +269,32 @@ refuse or count a slot, and the client labels the state as unlimited. This is on
 short-circuit over the entitlement system, not a replacement for it; set the variable to `"false"`
 before real users arrive.
 
+## Current — privacy policy and publication
+
+[`docs/privacy-policy.md`](privacy-policy.md) is the sole policy source. It identifies Ian Qiu, a
+sole trader based in Thailand, as data controller and documents the current observable contract,
+including the account-deletion control already shipped through PR #117. It states that users must
+be at least 13 and that ages 13–17 require a parent or guardian's consent. As of 2026-09-19 that
+consent is also recorded, not just stated: `PUT /api/intake` requires an explicit
+`guardianConsent: true` for a 13–17 runner and writes a `guardian_consent` event (timestamp +
+policy version) atomically with the intake row — see the schema and API table above. It treats
+account-linked intake answers and plans conservatively as health/fitness data
+without claiming that the injury picker records a GDPR Article 9 consent event; saving Intake
+overwrites the one stored response but does not rewrite existing plans. Its provider disclosures
+cover GitHub Pages request metadata, Cloudflare Worker logs (up to seven days), and Anthropic's
+ordinary and flagged-request retention, including trust-and-safety scores.
+
+Publication is intentionally isolated from the app and the internal documentation tree:
+`.github/workflows/publish-legal-pages.yml` runs after a qualifying push to `main` (or manual
+dispatch), stages the policy as `privacy-policy/index.md` with Jekyll front matter plus one root
+redirect, and uses GitHub's official Pages Jekyll build action to produce an otherwise-empty Pages
+artifact. It targets
+`https://ianqiu979.github.io/Ai-Customized-Running-Plan-App/privacy-policy/`. The URL is a configured
+target, **not a proven live endpoint until a qualifying Pages workflow succeeds**.
+`src/constants/legal.ts` holds the same URL for Settings → Legal → Privacy policy;
+`src/constants/__tests__/legal.test.ts` pins the controller identity and age posture and checks that
+the workflow's Markdown input/output path still agrees with the app constant.
+
 ## Current — the backend, in `workers/`
 
 ```
@@ -263,6 +303,8 @@ workers/                    # a SEPARATE npm project; Metro is told to skip it (
   migrations/
     0001_better_auth.sql    # user, session, account, verification
     0002_app_schema.sql     # profiles, intake_responses, subscriptions, plans
+    0003_intake_age_floor.sql / 0003_raise_intake_age_floor.sql   # the 13+ age floor
+    0004_guardian_consent.sql # guardian_consent — one row per 13–17 user, consent event
   src/
     index.ts                # authenticate once, then dispatch — the route table
     auth.ts                 # better-auth on D1, email/password + Bearer sessions
@@ -408,7 +450,9 @@ src/app/
   (tabs)/my-plans       # My Plans — permanent Example Plan plus GET /api/plans rows; no empty
                          # state, and MOST RECENT links to the newest generated plan
   (tabs)/settings       # exists today (2026-08-05) — tier + quota display, sign-out, delete
-                         # account, an "Upgrade" entry point to /paywall (decision 1, 2026-07-10)
+                         # account, an "Upgrade" entry point to /paywall (decision 1, 2026-07-10),
+                         # and issue #89's accessible Legal -> Privacy policy link (via
+                         # src/lib/openPrivacyPolicy.ts)
   intake/                # onboarding questionnaire (stack) — exists today, against GET/PUT
                          #  /api/intake
   plan/[id]              # plan overview (V22-06 A) — exists today; renders a real generated plan
@@ -730,7 +774,7 @@ it `getSession()` ignores the header and every route 403s a user who just signed
 | `POST /api/purchase-tier` | session | `{ tier: "pro"\|"elite", source: "dummy" }` | `{ tier, periodStart: string \| null, periodEnd: string \| null }` | v1 dummy flow, called from `src/app/paywall.tsx` (new 2026-08-05) with honest "test upgrade, no payment required" copy. v2 swaps `source` to `"revenuecat"` and verifies the receipt — same route, same table write. `source: "revenuecat"` is refused in v1 rather than trusted. |
 | `POST /api/delete-account` | session | — | `{ deleted: true }` | Really deletes; no soft-delete flag, because the app's own copy promises erasure. The only route that deletes a plan. Called from Settings' Delete Account flow (new 2026-08-05) after a confirmation on every platform (`src/lib/confirmDestructive.ts`, 2026-09-16 — before that, react-native-web's empty `Alert.alert` meant the web row never reached this route; issue #96), followed client-side by `authClient.signOut()` to invalidate the local session store. |
 | `GET /api/intake` | session | — | `{ intake }` or `{ intake: null }` | Was a direct client read under Supabase. |
-| `PUT /api/intake` | session | `IntakeResponses` | `{ saved: true }` | Was a direct client upsert under Supabase. |
+| `PUT /api/intake` | session | `IntakeResponses & { guardianConsent?: boolean }` | `{ saved: true }` or `400 invalid_request` | Was a direct client upsert under Supabase. Since 2026-09-19, an `age` of 13–17 requires `guardianConsent: true`; without it the request is refused before anything is persisted. With it, the intake row and a `guardian_consent` event (timestamp + policy version) are written atomically in the same D1 batch (`workers/src/lib/store.ts`'s `upsertIntake`). 18+ requests are unaffected. |
 | `GET /api/plans` | session | — | `{ plans: [summary] }` | Drives My Plans and Home's persisted-plan stage. My Plans keeps the permanent static example outside this response, links its most-recent stat to `max(createdAt)`, and has no empty-library state. Home uses only whether the list is non-empty to reveal its post-first-plan Notes/subscription panels. Summaries only — full documents would be megabytes for a heavy user. |
 | `GET /api/plans/:id` | session | — | `{ plan, planId, isFallback, quotaConsumed }` or `404` | Someone else's plan id is a `404`, not a `403`: it does not exist to you. |
 
@@ -789,6 +833,13 @@ plans             (id, user_id, tier_at_generation, engine template|hybrid|ai,
                    created_at, settled_at)
   -- UNIQUE (user_id, idempotency_key) — lets generate-plan detect a retried request and
   --                                     return the existing plan instead of generating twice.
+
+-- 0004 — guardian consent for a 13–17 runner
+guardian_consent  (user_id -> user.id PK, granted_at, policy_version)
+  -- One row per user (INSERT OR REPLACE) — the most recent consent event, not a history.
+  -- Written by `upsertIntake` in the same db.batch() as the intake_responses upsert, so an
+  -- intake row for a 13–17 user can never exist without a matching consent row. policy_version
+  -- is `src/constants/legal.ts`'s PRIVACY_POLICY_VERSION.
 ```
 
 Two intentional departures from the Postgres draft, both because the draft contradicted a rule

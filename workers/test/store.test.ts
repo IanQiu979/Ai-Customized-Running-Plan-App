@@ -11,7 +11,7 @@
 import { env } from 'cloudflare:test';
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import type { Plan } from '../../src/lib/planTypes';
+import type { InjuryFlag, Plan } from '../../src/lib/planTypes';
 import { FALLBACK_EXEMPTION_CAP } from '../../src/lib/tierLimits';
 import { D1PlanStore, RESERVATION_TTL_MS } from '../src/lib/store';
 
@@ -99,9 +99,16 @@ beforeEach(async () => {
   // these tests assert on exact row counts, and a test that silently inherits another's rows fails
   // in a way that looks like a quota bug.
   await env.DB.batch(
-    ['plans', 'intake_responses', 'subscriptions', 'profiles', 'session', 'account', 'user'].map(
-      (table) => env.DB.prepare(`DELETE FROM ${table}`)
-    )
+    [
+      'plans',
+      'intake_responses',
+      'guardian_consent',
+      'subscriptions',
+      'profiles',
+      'session',
+      'account',
+      'user',
+    ].map((table) => env.DB.prepare(`DELETE FROM ${table}`))
   );
   await seedUser();
 });
@@ -499,15 +506,71 @@ describe('intake', () => {
   });
 });
 
+const BASE_INTAKE = {
+  goal: 'g',
+  age: 15,
+  experience: 'regular' as const,
+  daysPerWeek: 4,
+  weeklyKm: 30,
+  injuries: ['none'] as InjuryFlag[],
+};
+
+describe('guardianConsent', () => {
+  it('records a consent event with its granted-at time and policy version, atomically with the intake', async () => {
+    const s = store();
+
+    await s.upsertIntake(USER, BASE_INTAKE, NOW, { grantedAt: NOW, policyVersion: '2026-09-19' });
+
+    const row = await env.DB.prepare(
+      'SELECT granted_at, policy_version FROM guardian_consent WHERE user_id = ?'
+    )
+      .bind(USER)
+      .first<{ granted_at: string; policy_version: string }>();
+    expect(row).toEqual({ granted_at: NOW, policy_version: '2026-09-19' });
+  });
+
+  it('replaces the prior consent row rather than accumulating a history', async () => {
+    const s = store();
+
+    await s.upsertIntake(USER, BASE_INTAKE, NOW, { grantedAt: NOW, policyVersion: '2026-09-19' });
+    await s.upsertIntake(USER, BASE_INTAKE, '2026-09-20T00:00:00.000Z', {
+      grantedAt: '2026-09-20T00:00:00.000Z',
+      policyVersion: '2026-10-01',
+    });
+
+    const rows = await env.DB.prepare('SELECT * FROM guardian_consent WHERE user_id = ?')
+      .bind(USER)
+      .all();
+    expect(rows.results).toHaveLength(1);
+    const row = await env.DB.prepare(
+      'SELECT granted_at, policy_version FROM guardian_consent WHERE user_id = ?'
+    )
+      .bind(USER)
+      .first<{ granted_at: string; policy_version: string }>();
+    expect(row).toEqual({ granted_at: '2026-09-20T00:00:00.000Z', policy_version: '2026-10-01' });
+  });
+
+  it('writes the intake and the consent row together in one call', async () => {
+    const s = store();
+
+    await s.upsertIntake(USER, BASE_INTAKE, NOW, { grantedAt: NOW, policyVersion: '2026-09-19' });
+
+    const consentRow = await env.DB.prepare('SELECT 1 FROM guardian_consent WHERE user_id = ?')
+      .bind(USER)
+      .first();
+    const intakeRow = await env.DB.prepare('SELECT 1 FROM intake_responses WHERE user_id = ?')
+      .bind(USER)
+      .first();
+    expect(consentRow).not.toBeNull();
+    expect(intakeRow).not.toBeNull();
+  });
+});
+
 describe('deleteAccount', () => {
-  it('erases the user, their plans, intake, subscription and sessions', async () => {
+  it('erases the user, their plans, intake, guardian consent, subscription and sessions', async () => {
     const s = store();
     await s.recordPurchase(USER, 'pro', 'dummy', NOW);
-    await s.upsertIntake(
-      USER,
-      { goal: 'g', age: 30, experience: 'regular', daysPerWeek: 4, weeklyKm: 30, injuries: ['none'] },
-      NOW
-    );
+    await s.upsertIntake(USER, BASE_INTAKE, NOW, { grantedAt: NOW, policyVersion: '2026-09-19' });
     await reserveAndSettle(s, 'to-be-deleted');
     await env.DB.prepare(
       `INSERT INTO session (id, expiresAt, token, createdAt, updatedAt, userId) VALUES (?, 0, ?, 0, 0, ?)`
@@ -520,6 +583,7 @@ describe('deleteAccount', () => {
     for (const [table, column] of [
       ['plans', 'user_id'],
       ['intake_responses', 'user_id'],
+      ['guardian_consent', 'user_id'],
       ['subscriptions', 'user_id'],
       ['session', 'userId'],
     ] as const) {

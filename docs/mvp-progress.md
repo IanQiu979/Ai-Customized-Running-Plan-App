@@ -75,6 +75,22 @@
   **not redeployed**, so those code fixes are not live until the captain runs `wrangler deploy
   --env production`. The `paceblueprint://` deep-link scheme matches `app.json` but has never been
   exercised by a real built app.
+- **Issue #89's privacy-policy surface is implemented, but its public URL is not yet proven live
+  (2026-09-19).** [`docs/privacy-policy.md`](privacy-policy.md) is the source of truth and names
+  Ian Qiu, a sole trader based in Thailand, as controller. Settings now has a **Legal → Privacy
+  policy** row that opens the pinned target URL,
+  `https://ianqiu979.github.io/Ai-Customized-Running-Plan-App/privacy-policy/`. The narrowly scoped
+  `publish-legal-pages.yml` workflow renders only that policy into an otherwise-empty GitHub Pages
+  artifact with GitHub's official Jekyll build action after a qualifying push to `main`; until a
+  Pages deployment succeeds, the URL must not be described as live. The policy can point to in-app
+  erasure because Delete account already shipped through PR #117. Its age posture is 13+ and, for ages 13–17,
+  parent/guardian consent; that consent is now recorded, not just stated (2026-09-19) — the intake
+  screen requires a checkbox for a 13–17 runner, and `PUT /api/intake` (`workers/src/routes.ts`'s
+  `handlePutIntake`) refuses the save without it and otherwise writes a consent event (timestamp +
+  `PRIVACY_POLICY_VERSION`) to the new `guardian_consent` table
+  (`workers/migrations/0004_guardian_consent.sql`) in the same D1 batch as the intake row.
+  It treats linked intake/plans as health/fitness data without claiming the injury picker records
+  explicit consent, and documents GitHub Pages metadata plus Cloudflare/Anthropic retention.
 - **Plan engine is fully wired, and every distance now gets its own training shape.** The pure
   template/pace engine (`src/lib/planTemplates.ts` + `src/lib/paceDerivation.ts`) is bound into
   `generate-plan` via `workers/src/deps.ts`; the plan view renders real generated plans. As of
@@ -691,6 +707,25 @@ from 82. Issue #22 remains open.)
   captain — provisioned and verified in local dev 2026-08-05 (see that entry below).
 
 ### Code
+- [x] **Issue #89's privacy policy, publication path and in-app link are implemented
+      (2026-09-19; publication still awaits a successful deployment).**
+      `docs/privacy-policy.md` is the policy's one source of truth; it identifies Ian Qiu, sole
+      trader in Thailand, as controller, documents
+      the already-shipped Settings → Danger zone → Delete account flow (PR #117), and states the
+      13–17 parent/guardian-consent posture. As of this same date the consent-recording flow has
+      also shipped (see the "Current state" bullet above): a required intake checkbox plus a
+      server-recorded consent event, so the policy's text and the code now agree. It treats linked
+      intake/plans as health/fitness data without claiming the injury picker itself records a
+      GDPR Article 9 consent event, and states the actual overwrite/deletion boundaries and provider
+      retention. `.github/workflows/publish-legal-pages.yml` runs only on `main` when the policy or
+      workflow changes (or by manual dispatch), uses GitHub's official Jekyll action to render only
+      the staged policy into an otherwise-empty Pages artifact, and targets
+      `https://ianqiu979.github.io/Ai-Customized-Running-Plan-App/privacy-policy/`. Settings gained
+      an accessible Legal link that navigates the same tab on web and uses an in-app browser with
+      an OS-link fallback on native; every failure renders visibly;
+      `legal.test.ts` pins the controller identity, age posture, workflow source/output path and app
+      URL together. The target URL is **not yet claimed live**: a successful Pages run is still
+      required.
 - [x] **Issue #106 closed — a declared injury cuts a Free plan once, not every week
       (2026-09-19).** `src/lib/planLibrary/engine.ts` applied the § 17 module reduction to every
       week's target while later targets build on the previous (already cut) loading week, so a
@@ -1105,7 +1140,9 @@ segment model would be a plan-engine change, not a screen one), or mark days as 
 mark fills to *elapsed* days; a real day-marking flow is Ian's call). The Instrument redesign and
 the pulse trace that preceded it are both landed-and-superseded history now, not open work.
 
-Nothing else is in flight. The one remaining critical-path item — `ANTHROPIC_API_KEY`, without which
+Issue #89's implementation is complete; its remaining publication gate is a successful
+`Publish legal pages` run after a qualifying push to `main`. Do not mark the target URL live before
+that run succeeds. Nothing else is in flight. The one remaining critical-path item — `ANTHROPIC_API_KEY`, without which
 paid-tier requests serve the quota-exempt template fallback — is a captain-only action, not work
 in progress; see "Current state" above and "Blocked" below. The 2026-07-11 coaching cycles 1 and 2 are
 recorded under "Done" → "Domain" above, not here.

@@ -179,6 +179,17 @@ Built-ins also available: `Explore`, `Plan`, `general-purpose`. Plugin agents ar
   pre-dispatch session check in `workers/src/index.ts`. See that store's header before touching it.
 - **No business rules in the client.** Tier, quota, and plan generation are Worker work —
   `jobs-queues-edge`, not `frontend-builder`.
+- **The privacy policy has one source and a publication gate.** `docs/privacy-policy.md` is the
+  source; `src/constants/legal.ts` is the in-app URL; `.github/workflows/publish-legal-pages.yml`
+  publishes only that policy after a qualifying push to `main`. Keep all three aligned, and never
+  call `https://ianqiu979.github.io/Ai-Customized-Running-Plan-App/privacy-policy/` live until the
+  Pages run succeeds. The policy's 13–17 guardian-consent condition is now enforced and recorded
+  in `workers/` (schema: `workers/migrations/0004_guardian_consent.sql`; route: `handlePutIntake`
+  in `workers/src/routes.ts`) — keep that flow's behavior and the policy's Age section in sync;
+  the consent checkbox's exact copy still needs the captain's/legal's certification before ship.
+  Treat the account-linked intake and plans conservatively as health/fitness data, and document
+  provider retention from current official sources rather than inferring consent or deletion
+  behavior.
 - **`ANTHROPIC_API_KEY` never leaves the server.** Any agent touching env goes through
   `env-config-manager`. Two committed-file traps, not one: `EXPO_PUBLIC_*` is plain text in the app
   bundle, and `workers/wrangler.toml` is committed — secrets go in `workers/.dev.vars` (gitignored)

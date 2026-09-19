@@ -8,6 +8,7 @@ import { ScreenHeader } from '@/components/layout/ScreenHeader';
 import { FontFamily, FontSize, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { API_BASE_URL, authClient, deleteAccount, describeError, getQuotaStatus } from '@/lib/apiClient';
+import { openPrivacyPolicy } from '@/lib/openPrivacyPolicy';
 import { confirmDestructive } from '@/lib/confirmDestructive';
 import { formatQuotaLine } from '@/lib/quotaDisplay';
 import type { QuotaStatus } from '@/lib/planTypes';
@@ -19,7 +20,8 @@ import type { QuotaStatus } from '@/lib/planTypes';
  * Home) and Delete Account (a real confirmation on every platform via `confirmDestructive`, then
  * `deleteAccount()`) round it out — on delete-account success, an explicit `authClient.signOut()`
  * invalidates the local session store so `src/app/_layout.tsx`'s `Stack.Protected` guard bounces
- * to `(auth)`.
+ * to `(auth)`. A "Legal" group links the published privacy policy (`PRIVACY_POLICY_URL`, issue
+ * #89) — the in-app link the store guidelines require alongside the listing's URL.
  *
  * **Zero accent, no exception** (`docs/design/instrument-visual-system.md` §1). This screen is flat
  * grouped rows and hairlines. The "Upgrade" row is deliberately not a signal-marked button: the offer
@@ -36,6 +38,7 @@ export default function SettingsScreen() {
 
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [privacyPolicyError, setPrivacyPolicyError] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -97,6 +100,14 @@ export default function SettingsScreen() {
     }
   }
 
+  // The open chain (same-tab on web, in-app browser then OS handler on native) lives in
+  // `src/lib/openPrivacyPolicy.ts`, shared with the intake screen's consent row; every failure
+  // reaches visible copy instead of repeating #96's silent tap.
+  async function handleOpenPrivacyPolicy() {
+    setPrivacyPolicyError(null);
+    setPrivacyPolicyError(await openPrivacyPolicy());
+  }
+
   async function handleDeleteAccount() {
     setDeleteError(null);
     setDeleting(true);
@@ -144,6 +155,27 @@ export default function SettingsScreen() {
           <Group title="Session">
             <ActionRow label="Sign out" onPress={handleSignOut} />
           </Group>
+
+          <Group title="Legal">
+            <ActionRow
+              label="Privacy policy"
+              hint="What we collect, who sees it, and how to delete it"
+              accessibilityRole="link"
+              accessibilityHint="Opens the Pace Blueprint privacy policy"
+              onPress={handleOpenPrivacyPolicy}
+            />
+          </Group>
+
+          {privacyPolicyError ? (
+            <Text
+              accessibilityRole="alert"
+              accessibilityLiveRegion="assertive"
+              selectable
+              style={[styles.error, { color: theme.status.error }]}
+            >
+              {privacyPolicyError}
+            </Text>
+          ) : null}
 
           <Group title="Danger zone">
             <ActionRow

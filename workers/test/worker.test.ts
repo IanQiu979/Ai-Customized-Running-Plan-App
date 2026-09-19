@@ -43,9 +43,16 @@ async function signUp(email: string): Promise<string> {
 
 beforeEach(async () => {
   await env.DB.batch(
-    ['plans', 'intake_responses', 'subscriptions', 'profiles', 'session', 'account', 'user'].map(
-      (table) => env.DB.prepare(`DELETE FROM ${table}`)
-    )
+    [
+      'plans',
+      'intake_responses',
+      'guardian_consent',
+      'subscriptions',
+      'profiles',
+      'session',
+      'account',
+      'user',
+    ].map((table) => env.DB.prepare(`DELETE FROM ${table}`))
   );
 });
 
@@ -309,6 +316,9 @@ describe('the intake age floor', () => {
     daysPerWeek: 4,
     weeklyKm: 30,
     injuries: ['none'],
+    // Age 13 falls in the 13–17 guardian-consent band (captain's ruling, 2026-09-19); consent is
+    // orthogonal to the age-floor behavior this test is pinning, so it is asserted unconditionally.
+    guardianConsent: true,
   });
 
   it('rejects age 12 and accepts age 13', async () => {
@@ -412,5 +422,95 @@ describe('PUT /api/intake', () => {
 
     expect(response.status).toBe(400);
     expect(await response.json()).toMatchObject({ code: 'invalid_request' });
+  });
+});
+
+describe('guardian consent (13–17 intake) — captain ruling 2026-09-19', () => {
+  /** A full, otherwise-valid IntakeResponses body at the given age. */
+  function intakeBody(age: number, extra: Record<string, unknown> = {}) {
+    return {
+      goal: 'Run a faster 5K',
+      age,
+      experience: 'new',
+      daysPerWeek: 3,
+      weeklyKm: 15,
+      injuries: ['none'],
+      ...extra,
+    };
+  }
+
+  async function putIntake(token: string, body: unknown) {
+    return SELF.fetch('https://example.test/api/intake', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+      body: JSON.stringify(body),
+    });
+  }
+
+  async function consentRow(userId: string) {
+    return env.DB.prepare(
+      'SELECT granted_at, policy_version FROM guardian_consent WHERE user_id = ?'
+    )
+      .bind(userId)
+      .first<{ granted_at: string; policy_version: string }>();
+  }
+
+  it('rejects a 13–17 intake with no guardianConsent, and persists nothing', async () => {
+    const token = await signUp('minor-no-consent@example.test');
+
+    const response = await putIntake(token, intakeBody(15));
+
+    const body = await response.json();
+    expect(response.status).toBe(400);
+    expect(body).toMatchObject({ code: 'invalid_request' });
+
+    const intakeCount = await env.DB.prepare(
+      'SELECT COUNT(*) AS n FROM intake_responses ir JOIN user u ON u.id = ir.user_id WHERE u.email = ?'
+    )
+      .bind('minor-no-consent@example.test')
+      .first<{ n: number }>();
+    expect(intakeCount?.n).toBe(0);
+  });
+
+  it('rejects a 13–17 intake with guardianConsent: false, and persists nothing', async () => {
+    const token = await signUp('minor-false-consent@example.test');
+
+    const response = await putIntake(token, intakeBody(16, { guardianConsent: false }));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ code: 'invalid_request' });
+  });
+
+  it('accepts a 13–17 intake with guardianConsent: true and records a consent row', async () => {
+    const token = await signUp('minor-consented@example.test');
+
+    const response = await putIntake(token, intakeBody(14, { guardianConsent: true }));
+
+    const body = await response.text();
+    expect(response.status, body).toBe(200);
+    expect(JSON.parse(body)).toEqual({ saved: true });
+
+    const user = await env.DB.prepare('SELECT id FROM user WHERE email = ?')
+      .bind('minor-consented@example.test')
+      .first<{ id: string }>();
+    const row = await consentRow(user!.id);
+    expect(row?.policy_version).toBe('2026-09-19');
+    expect(row?.granted_at).toBeTruthy();
+  });
+
+  it('accepts an 18+ intake with no guardianConsent field and writes no consent row', async () => {
+    const token = await signUp('adult-no-consent-field@example.test');
+
+    const response = await putIntake(token, intakeBody(34));
+
+    const body = await response.text();
+    expect(response.status, body).toBe(200);
+    expect(JSON.parse(body)).toEqual({ saved: true });
+
+    const user = await env.DB.prepare('SELECT id FROM user WHERE email = ?')
+      .bind('adult-no-consent-field@example.test')
+      .first<{ id: string }>();
+    const row = await consentRow(user!.id);
+    expect(row).toBeNull();
   });
 });

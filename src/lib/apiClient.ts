@@ -330,7 +330,15 @@ export function getIntake(): Promise<{ intake: IntakeResponses | null }> {
   return apiFetch('/api/intake');
 }
 
-export function putIntake(intake: IntakeResponses): Promise<{ saved: true }> {
+/**
+ * `guardianConsent` is not part of `IntakeResponses` (the stored intake row) — it is a one-time
+ * consent assertion the server requires only for a 13–17 runner (`workers/src/routes.ts`'s
+ * `handlePutIntake`, captain's ruling 2026-09-19). Widening the accepted type here, rather than on
+ * `IntakeResponses` itself, keeps that interface a pure description of the stored row.
+ */
+export function putIntake(
+  intake: IntakeResponses & { guardianConsent?: boolean }
+): Promise<{ saved: true }> {
   return apiFetch('/api/intake', { method: 'PUT', body: JSON.stringify(intake) });
 }
 

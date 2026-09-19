@@ -5,6 +5,82 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-09-19 — Guardian consent for 13–17 intake is now required and recorded
+
+The privacy policy has stated since its first draft that a 13–17 runner may use the app only with
+a parent or guardian's consent, but nothing enforced or recorded that condition. This closes that
+gap per the captain's 2026-09-19 ruling that the legal basis for processing a minor's data is
+explicit consent (GDPR Art. 9(2)(a), Thai PDPA s.26).
+
+- **Intake requires an explicit checkbox for ages 13–17.** `src/app/intake.tsx` shows a
+  `GuardianConsentRow` only when the entered age is 13–17: "I am 13–17, and a parent or guardian
+  has read the privacy policy and agrees to it on my behalf," linking to
+  `PRIVACY_POLICY_URL`. It is never persisted or preloaded from `getIntake()` — it starts unchecked
+  every time and must be re-affirmed on every save while the runner is a minor. This exact copy has
+  **not yet been certified by the captain or legal counsel.**
+- **The server refuses a 13–17 save without it, and records the event when it's given.**
+  `workers/src/routes.ts`'s `handlePutIntake` rejects a `PUT /api/intake` for an age 13–17 body
+  unless `guardianConsent: true` is present, before anything is persisted. When given,
+  `D1PlanStore.upsertIntake` (`workers/src/lib/store.ts`) writes the consent row (`user_id`,
+  `granted_at`, `policy_version`) in the **same `db.batch()`** as the intake upsert, so the two can
+  never diverge — an intake row can't exist without its consent record or vice versa.
+  `deleteAccount` cascades the new table too.
+- **New table: `guardian_consent`.** `workers/migrations/0004_guardian_consent.sql` — one row per
+  user (`INSERT OR REPLACE`, most-recent-consent-only, not a history), `policy_version` stamped
+  from the new `PRIVACY_POLICY_VERSION` constant in `src/constants/legal.ts` (currently
+  `'2026-09-19'`, tied to the policy's own "Last updated" date).
+- **`docs/privacy-policy.md`'s Age section and its top-of-file "Under-18 posture" note are
+  corrected** — both previously said the consent-recording flow was a separate, not-yet-built task;
+  they now describe the shipped checkbox-plus-server-record flow and name it as the stated legal
+  basis for processing a minor's data.
+- **Review round (same day).** The policy opener moved out of Settings into
+  `src/lib/openPrivacyPolicy.ts`, shared by the Legal row and the intake consent row (same
+  injectable-runtime seam as `confirmDestructive`; `src/lib/__tests__/openPrivacyPolicy.test.ts`
+  drives every branch). `legal.test.ts` now parses `publish-legal-pages.yml` with the `yaml`
+  package (new devDependency, pinned to the lockfile's version) instead of regexing it, and pins
+  `PRIVACY_POLICY_VERSION` to the policy's single "Last updated" date. `workers/tsconfig.json`
+  includes `src/constants/legal.ts` so the Worker stamps the same version constant.
+
+## 2026-09-19 — Issue #89 gains one privacy-policy source, a publication path, and an in-app link
+
+Pace Blueprint had account deletion and store-bound data flows but no public privacy policy for a
+runner or store listing to read. This change adds the complete surface without creating a second
+copy of the policy or exposing the rest of `docs/`.
+
+- **`docs/privacy-policy.md` is the source of truth.** It names **Ian Qiu**, a sole trader based in
+  **Thailand**, as the data controller and describes the app as built: the account/intake/plan
+  data it stores, the paid-tier Anthropic transfer, retention, rights, and deletion. Account-linked
+  intake answers and plans are treated conservatively as health/fitness data; the policy does not
+  claim the injury picker itself records GDPR Article 9 explicit consent. It states the real
+  overwrite boundary (one saved intake) and deletion boundary (whole account, not individual
+  plans). The deletion control it cites is already shipped: Settings → Danger zone → Delete
+  account was made reliable on web as well as native in PR #117.
+- **The age posture is explicit without claiming an unbuilt control.** Use is 13+; a runner aged
+  13–17 may use the app only with a parent or guardian's consent. This policy states that
+  condition, while the in-app flow that records guardian consent remains a separate, not-yet-
+  shipped task.
+- **Publication is narrow and happens after a qualifying push.** `.github/workflows/publish-legal-pages.yml`
+  runs on `main` only when the policy or workflow changes (plus manual dispatch), stages the
+  Markdown with Jekyll front matter at `privacy-policy/index.md`, and uses GitHub's official Jekyll
+  Pages action to upload an otherwise-empty artifact containing the rendered policy and a root
+  redirect—never the repository's internal documentation. Each third-party action is pinned to a
+  verified release commit, and the build/deploy jobs receive only their required permissions. Its
+  target path is
+  `https://ianqiu979.github.io/Ai-Customized-Running-Plan-App/privacy-policy/`. That URL is **not
+  claimed live in this entry**: a qualifying Pages workflow must succeed first.
+- **Settings links to the same path.** A new Legal → Privacy policy row opens the shared
+  `PRIVACY_POLICY_URL` in the same tab on web. Native uses Expo's in-app browser and falls back to
+  the platform URL handler. If every path fails, the screen shows a visible assertive live-region
+  error; the row carries link semantics and an accessibility hint.
+  `src/constants/__tests__/legal.test.ts` pins the controller identity,
+  13–17 guardian-consent wording, Markdown input, workflow output directory, and app URL together
+  so the three surfaces cannot quietly drift.
+- **Provider disclosures match the implemented boundaries.** GitHub Pages is named as the policy
+  host receiving ordinary web request metadata. Anthropic receives raw goal, injury-note and
+  per-plan-note text exactly as entered (name/email are not appended separately, but free text may
+  contain identifiers); flagged inputs/outputs may remain up to two years and related safety
+  scores up to seven years. Cloudflare Worker logs are described as retained up to seven days.
+
 ## 2026-09-19 — First EAS build: Android development client (issue #93, Android half)
 
 - **EAS project created** under the captain's `ianbeatingpros` account (`pace-blueprint`,

@@ -1,0 +1,74 @@
+# Publishes docs/privacy-policy.md to GitHub Pages at
+#   https://ianqiu979.github.io/Ai-Customized-Running-Plan-App/privacy-policy/
+# — the public URL `src/constants/legal.ts` links to and the store listings cite (issue #89).
+#
+# This is NOT CI. The repo deliberately has none (`no-mistakes` is the gate); this workflow only
+# runs on `main`, only when the policy or this file changes, and publishes nothing else — the
+# Pages site is built from a staging directory holding the rendered policy alone, so pointing
+# Pages at `/docs` (which would publish every internal doc) is never needed. The same approach
+# the V2.3 sibling settled on (Pages, `build_type: workflow`).
+#
+# The official Pages Jekyll action renders the staged Markdown; no runner-level converter is
+# assumed. GitHub Pages itself must already be configured with `build_type: workflow`.
+name: Publish legal pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - docs/privacy-policy.md
+      - .github/workflows/publish-legal-pages.yml
+  workflow_dispatch:
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Stage the policy as an otherwise-empty Jekyll source
+        run: |
+          set -euo pipefail
+          mkdir -p legal-site/privacy-policy
+          {
+            printf '%s\n' '---' 'title: Pace Blueprint — Privacy Policy' 'lang: en' '---' ''
+            sed 's/\r$//' docs/privacy-policy.md
+          } > legal-site/privacy-policy/index.md
+          # A root page so the site never 404s at its base; it only points at the policy.
+          cat > legal-site/index.html <<'HTML'
+          <!doctype html>
+          <html lang="en"><head><meta charset="utf-8"><title>Pace Blueprint</title>
+          <meta http-equiv="refresh" content="0; url=privacy-policy/"></head>
+          <body><p><a href="privacy-policy/">Pace Blueprint — Privacy Policy</a></p></body></html>
+          HTML
+          test -s legal-site/privacy-policy/index.md
+
+      - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
+
+      - uses: actions/jekyll-build-pages@44a6e6beabd48582f863aeeb6cb2151cc1716697 # v1.0.13
+        with:
+          source: ./legal-site
+          destination: ./legal-site-output
+
+      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.1
+        with:
+          path: ./legal-site-output
+
+  deploy:
+    needs: build
+    permissions:
+      pages: write
+      id-token: write
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5

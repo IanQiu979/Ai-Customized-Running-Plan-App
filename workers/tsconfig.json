@@ -21,6 +21,7 @@
     "test/**/*.ts",
     "../src/lib/planTypes.ts",
     "../src/lib/tierLimits.ts",
-    "../src/lib/quotaPeriod.ts"
+    "../src/lib/quotaPeriod.ts",
+    "../src/constants/legal.ts"
   ]
 }
