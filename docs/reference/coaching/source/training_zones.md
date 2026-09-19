@@ -399,6 +399,8 @@ Track for 7 days, calculate average. This is the baseline.
 **Every 3-4 weeks, reduce volume 35-45%.**
 
 > 📌 **RULING (Ian, 2026-07-10):** Previously "reduce volume 20-30%." Deload = **35-45% volume reduction** everywhere — see `load_rules.md` Rule 1 for the reconciliation of the four conflicting numbers the library used to carry.
+>
+> ↩️ **Superseded 2026-09-06 by Ian's ruling:** down weeks are **15–25%** lower, not 35–45% — see `docs/reference/coaching/load-rules.md` § Deload trigger; the code's `DELOAD_REDUCTION_MIN`/`DELOAD_REDUCTION_MAX` (0.15/0.25) in `src/lib/loadRules.ts` are authoritative, and the annotation above is kept as history.
 
 | Setting | Intensity |
 |---------|-----------|

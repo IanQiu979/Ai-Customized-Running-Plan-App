@@ -307,7 +307,14 @@ export function buildPlanPersonalizationRequest(input: PersonalizeInput): Anthro
     `Runner's stated goal: ${input.intake.goal}`,
     `Experience: ${input.intake.experience}`,
     `Plan goal type: ${input.skeleton.goalType}`,
-    ...(input.skeleton.raceDistance ? [`Race distance: ${input.skeleton.raceDistance}`] : []),
+    // `raceDate`, not `raceDistance`, is what says a race is booked (issue #76): a base block
+    // toward a distance carries the distance too, and the model must not write it up as a race.
+    ...(input.skeleton.raceDistance ? [`Target distance: ${input.skeleton.raceDistance}`] : []),
+    ...(input.skeleton.raceDate
+      ? [`Race date: ${input.skeleton.raceDate}`]
+      : input.skeleton.raceDistance
+        ? ['No race is booked — this is an open-ended base block toward that distance, not a race build.']
+        : []),
     `Duration: ${input.skeleton.durationWeeks} week(s)`,
     ...(under18
       ? ['This plan belongs to a runner under 18 — keep the tone age-appropriate and never assume adult training history.']

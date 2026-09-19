@@ -287,6 +287,27 @@ describe('createTemplateSkeletonBuilder — no race named anywhere', () => {
     expect(result.plan.weeks).toHaveLength(12);
   });
 
+  it('keeps a paid runner\'s named distance on a dateless plan, titled as a base block', async () => {
+    // Issue #76 (captain's ruling, 2026-09-19): a distance with no date is not a race, but it is
+    // not nothing either — the periodization is shaped to it, so the plan records it and says so,
+    // exactly as the Free library does. `raceDate` stays the only "a race is booked" signal.
+    const result = await createTemplateSkeletonBuilder().build({
+      tier: 'pro',
+      goalType: 'duration',
+      durationWeeks: 12,
+      raceDistance: '10k',
+      intake: { ...INTAKE, raceDistance: '10k' },
+      now: '2026-08-01T00:00:00.000Z',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.plan.raceDistance).toBe('10k');
+    expect(result.plan.raceDate).toBeUndefined();
+    expect(result.plan.title).toBe('12-Week 10K Base Plan');
+    expect(result.plan.weeks.map((week) => week.phase)).not.toContain('taper');
+  });
+
   it('leaves the race fields off the plan instead of defaulting them to 5K', async () => {
     const result = await createTemplateSkeletonBuilder().build({
       tier: 'pro',

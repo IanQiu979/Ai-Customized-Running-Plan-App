@@ -331,16 +331,21 @@ Built-ins also available: `Explore`, `Plan`, `general-purpose`. Plugin agents ar
   even where an approved page prints MON…SUN.
 - **The progression suite's 22,000-plan baseline mask is a gate, not a fixture — never regenerate
   it.** `src/lib/__tests__/planTemplates.progression.test.ts` encodes the exact *membership* of the
-  known peak-below-pre-peak-loading offender set as a base64 mask, so a change may remove offenders
-  but never add one. Re-encoding the mask to make a failure go away silently destroys the only
-  guard that a plan-shape change did not regress a different profile; read the failing case list
-  instead. The residual offenders it pins are pre-existing and captain-scoped out (issue #103), not
-  a bug to fix in passing — see `docs/change_log.md`'s 2026-09-09 entries for the two-part fix and
-  why the long-run floor correction had to land *after* the peak-capacity one. It has been
-  re-encoded exactly once, on the captain's own `golden-cadence3-route` ruling (2026-09-16,
-  770 → 758): the two intakes that ruling admitted are listed by name in the file's
-  `POST_BASELINE_NAMED_OFFENDERS` and asserted, so an addition is only ever a captain decision
-  written down, never a count that drifted.
+  known offender set as a base64 mask, so a change may remove offenders but never add one.
+  Re-encoding the mask to make a failure go away silently destroys the only guard that a
+  plan-shape change did not regress a different profile; read the failing case list instead. The
+  invariant it encodes is the captain's #103 ruling (2026-09-19): **the peak phase's highest
+  loading week is never below the base phase's** — a peak under a mid-build loading spike is
+  tolerated only when the plan carries `buildSpikeDisclosure`, emitted only when that spike is the
+  plan's highest loading week (a base high above it makes the plan an offender, not a tolerated
+  shape, and it says nothing), which the same suite asserts for every swept plan (32 such plans,
+  pinned as a ceiling). The 348 residual offenders it pins fall
+  in two named families (`REMAINING_OFFENDER_FAMILIES`: beginner three-day 5K plans; the golden
+  12-week/4-day 5K path at ≥50 km/week) whose remedies are coaching or safety numbers awaiting
+  the captain (`docs/mvp-progress.md` → Blocked) — not a bug to fix in passing. History: encoded
+  the stricter peak-below-any-pre-peak-week comparison until 2026-09-19 (770 → 758 on the
+  2026-09-16 `golden-cadence3-route` ruling, 458 → 348 under the base-high rule with the taper
+  alignment and held long-run curves) — `docs/change_log.md` 2026-09-09, 2026-09-16, 2026-09-19.
 - **The coach-authored golden 5K path serves only a runner whose recovery cadence lands on its
   authored dips.** `FIVE_K_WEEKLY_LOAD` dips at weeks 4 and 8, so `buildTemplatePlan` admits a
   12-week / 4-day / 5K race intake to `buildCanonicalFiveKWeek` only on the 4-week cadence or the

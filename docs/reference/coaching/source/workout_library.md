@@ -699,6 +699,8 @@ A deload week is a **planned reduction in training stress** (volume, intensity, 
 **Standard Protocol:** Every 3-4 weeks, reduce volume by 35-45%.
 
 > 📌 **RULING (Ian, 2026-07-10):** Previously "20-30%," which contradicted this file's own worked examples below (beginner ~40%, intermediate ~45%, advanced 35-40% reductions). Ian ruled the worked examples reflect his actual practice: deload = **35-45% volume reduction**, now consistent across the library (see `load_rules.md` Rule 1 for the full reconciliation). The worked examples below are unchanged — they are the basis of the ruling.
+>
+> ↩️ **Superseded 2026-09-06 by Ian's ruling:** down weeks are **15–25%** lower, not 35–45% — see `docs/reference/coaching/load-rules.md` § Deload trigger; the code's `DELOAD_REDUCTION_MIN`/`DELOAD_REDUCTION_MAX` (0.15/0.25) in `src/lib/loadRules.ts` are authoritative, and the annotation above is kept as history.
 
 ---
 

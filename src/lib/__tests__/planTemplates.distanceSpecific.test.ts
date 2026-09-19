@@ -582,14 +582,15 @@ describe('distance-aware ceilings and the curves that feed them', () => {
     const raceWeek = plan.weeks[plan.weeks.length - 1];
 
     // The six requested days cannot all receive a real run from this race-week budget (the peak
-    // training week is 15 km, so 5 km is all the room above a 10 km race day). The two survivors
-    // belong in the two latest slots the three-run layout leaves before Sunday; Monday stays
-    // genuine rest instead of receiving the first surviving run by array order.
+    // training week is 16 km — 15 before the 2026-09-19 taper alignment — so 6 km is all the room
+    // above a 10 km race day). The survivors belong in the latest slots the six-run layout leaves
+    // before Sunday; Monday stays genuine rest instead of receiving the first surviving run by
+    // array order.
     expect(
       raceWeek.days.map((day) =>
         day.kind === 'rest' ? 'rest' : `${day.label}:${day.distanceKm ?? 0}`,
       ),
-    ).toEqual(['rest', 'rest', 'rest', 'ER:3', 'rest', 'SR:2', 'Race Day:10']);
+    ).toEqual(['rest', 'rest', 'ER:2', 'rest', 'ER:2', 'SR:2', 'Race Day:10']);
   });
 
   it.each([2, 3])(

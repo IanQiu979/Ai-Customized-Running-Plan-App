@@ -486,7 +486,17 @@ src/lib/
                             #          candidate also includes the algebraic capacity needed for the
                             #          existing easy-run ceiling to carry the rendered pre-peak
                             #          high-water mark; `clampLongRun`'s safety ceilings remain
-                            #          authoritative. The byte-pinned golden fixture remains its
+                            #          authoritative. Since 2026-09-19 (issue #103) the curve's
+                            #          loading block is sampled across the plan's non-taper weeks
+                            #          and its taper entries across the allocator's taper weeks
+                            #          (`sampleCurve`), and the generic path reads each long-run
+                            #          curve with its recovery dips held at the running maximum
+                            #          (`holdRecoveryDips`) — rest weeks size their own long run.
+                            #          A peak that sits below a build-phase loading spike is
+                            #          disclosed in one sentence. A distance named with no race
+                            #          date yields an "N-Week 10K Base Plan" that keeps
+                            #          `raceDistance` (issue #76); `raceDate` alone means a race.
+                            #          The byte-pinned golden fixture remains its
                             #          own path, admitted only for a 12-week / 4-day / 5K race
                             #          intake on the 4-week recovery cadence or the 50+ 4/8/12
                             #          (2026-09-16); any other cadence is served generically.
@@ -672,9 +682,12 @@ already-rendered pre-peak high-water mark and the scheduled quality/easy slots. 
 only a capacity floor: `clampLongRun()` retains final authority, and the resulting rendered state
 continues into later peak-deload and taper weeks. The separate pre-clamp starting candidate is
 floored against the quality sessions the layout actually schedules (`retainedQuality`), so a three-
-or four-day week is never floored on the Q2 interval it drops. The coach-authored golden
-5K path uses the flat per-level share table, the flat absolute table, and the raw fractional spike
-ceiling. That path is admitted only for a 12-week / 4-day / 5K race intake whose recovery cadence
+or four-day week is never floored on the Q2 interval it drops. The generic path also reads
+every long-run curve with its authored recovery dips held at the running maximum and keeps the
+curve's taper entries on the allocator's taper weeks (2026-09-19, issue #103) — see `sampleCurve`
+and `holdRecoveryDips` in `planTemplates.ts`. The coach-authored golden
+5K path uses the flat per-level share table, the flat absolute table, the raw fractional spike
+ceiling, and the un-held `FIVE_K_LONG_RUNS` with whole-curve interpolation. That path is admitted only for a 12-week / 4-day / 5K race intake whose recovery cadence
 lands on the curve's authored dips at weeks 4 and 8 — the 4-week cadence, or the 50+ ruling's
 4/8/12; every other intake, including the under-50 advanced runner's 3-week cadence, is built by
 the generic path (captain's `golden-cadence3-route` ruling, 2026-09-16, audit §1.3). Generic easy runs are

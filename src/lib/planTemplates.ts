@@ -111,6 +111,39 @@ const UNDER_18_DISCLAIMER =
   'training load and has the right to pause or stop the plan at any time. This plan does not ' +
   "account for individual medical history, injuries, or a coach's in-person supervision.";
 
+/**
+ * Issue #103, captain's ruling 2026-09-19: the product invariant is that the peak phase's highest
+ * loading week is never below the **base** phase's; a peak that sits below a mid-**build** loading
+ * spike is tolerated, but only if the plan says so in the standing one-sentence flag style. Returns
+ * the spike week when that is the case, otherwise `undefined`. Loading weeks only — a rest week is
+ * not a high of anything. The sentence names the spike as the plan's highest-distance week, so it
+ * is emitted only when that is true: a plan whose base high is above the build spike is a residual
+ * offender of the invariant itself (escalated to the captain), not a tolerated shape, and says
+ * nothing here rather than something false.
+ */
+function peakBelowBuildSpike(weeks: readonly Week[]): Week | undefined {
+  const loading = weeks.filter((week) => !week.isDeload);
+  const loadingMaxKm = (phase: Phase) =>
+    Math.max(-Infinity, ...loading.filter((week) => week.phase === phase).map((w) => w.volumeKm));
+  const peakMaxKm = loadingMaxKm('peak');
+  if (!Number.isFinite(peakMaxKm)) return undefined;
+  const spike = loading
+    .filter((week) => week.phase === 'build')
+    .reduce<Week | undefined>(
+      (best, week) => (best === undefined || week.volumeKm > best.volumeKm ? week : best),
+      undefined,
+    );
+  if (spike === undefined || spike.volumeKm <= peakMaxKm) return undefined;
+  return spike.volumeKm >= loadingMaxKm('base') ? spike : undefined;
+}
+
+function buildSpikeDisclosure(spike: Week, isRacePlan: boolean): string {
+  return (
+    `Your highest-distance week is week ${spike.weekNumber}, in the build phase; the peak weeks ` +
+    `carry a little less distance and more ${isRacePlan ? 'race-specific' : 'quality'} intensity.`
+  );
+}
+
 /** Source §20's required disclosure for the limited-preparation fixed point created by applying
  * the captain's 35% marathon long-run cap to a non-beginner three-day race plan. */
 const THREE_DAY_MARATHON_DISCLAIMER =
@@ -260,6 +293,38 @@ const MARATHON_LONG_RUNS = [
 ] as const;
 
 /**
+ * The generic path's read of a long-run curve: the loading block with its authored recovery dips
+ * held at the running maximum, the taper tail untouched (issue #103, captain's ruling 2026-09-19).
+ *
+ * The four `*_LONG_RUNS` arrays above still carry their authored recovery dips (indices 3, 7, 11,
+ * … — every fourth entry), and the comment on the distance curves notes that "the dips only ever
+ * shape loading weeks" once rest weeks took their long run from `deloadLongRun`. Shaping a loading
+ * week with a recovery dip is the defect, not a feature: `interpolateCanonical` lands a dip on
+ * whichever loading week a plan's length maps it to, the long run drops there, and because no
+ * easy run may outgrow the long run (`easyRunCapKm`) the whole week drops with it — the same
+ * throttling the weekly-load curves were already cured of (`FIVE_K_WEEKLY_LOAD_GENERIC`, and the
+ * three distance curves that "carry no recovery dips of their own"). This is that cure applied to
+ * the long run, derived rather than transcribed so it cannot drift from the source: each dip
+ * becomes a hold at the longest run authored before it (the "HOLD" week type of the curve
+ * architecture), so every value is still one of the coach's own, the block is non-decreasing,
+ * and the taper tail is byte-identical. `FIVE_K_LONG_RUNS` itself is untouched — the golden
+ * 12-week/4-day path reads its dips deliberately and is pinned to them.
+ */
+function holdRecoveryDips(values: readonly number[], taperEntries: number): readonly number[] {
+  const loading = values.slice(0, values.length - taperEntries);
+  let runningMax = -Infinity;
+  const held = loading.map((value) => {
+    runningMax = Math.max(runningMax, value);
+    return runningMax;
+  });
+  return [...held, ...values.slice(loading.length)];
+}
+const FIVE_K_LONG_RUNS_GENERIC = holdRecoveryDips(FIVE_K_LONG_RUNS, 1);
+const TEN_K_LONG_RUNS_GENERIC = holdRecoveryDips(TEN_K_LONG_RUNS, 1);
+const HALF_LONG_RUNS_GENERIC = holdRecoveryDips(HALF_LONG_RUNS, 1);
+const MARATHON_LONG_RUNS_GENERIC = holdRecoveryDips(MARATHON_LONG_RUNS, 2);
+
+/**
  * Picks the canonical shape for a distance. Absent distance (no target named at all) keeps the
  * shape that is closest to what existed before this file — the 5K curve.
  *
@@ -275,18 +340,20 @@ function curvesForDistance(
   weeklyLoad: readonly number[];
   longRuns: readonly number[];
 } {
+  // Only the golden 12-week/4-day 5K path reads a long-run curve with its recovery dips in place;
+  // every generic plan reads the held (`holdRecoveryDips`) curve — see that function.
   switch (raceDistance) {
     case '10k':
-      return { weeklyLoad: TEN_K_WEEKLY_LOAD, longRuns: TEN_K_LONG_RUNS };
+      return { weeklyLoad: TEN_K_WEEKLY_LOAD, longRuns: TEN_K_LONG_RUNS_GENERIC };
     case 'half':
-      return { weeklyLoad: HALF_WEEKLY_LOAD, longRuns: HALF_LONG_RUNS };
+      return { weeklyLoad: HALF_WEEKLY_LOAD, longRuns: HALF_LONG_RUNS_GENERIC };
     case 'marathon':
-      return { weeklyLoad: MARATHON_WEEKLY_LOAD, longRuns: MARATHON_LONG_RUNS };
+      return { weeklyLoad: MARATHON_WEEKLY_LOAD, longRuns: MARATHON_LONG_RUNS_GENERIC };
     case '5k':
     case undefined:
       return {
         weeklyLoad: goldenFiveKShape ? FIVE_K_WEEKLY_LOAD : FIVE_K_WEEKLY_LOAD_GENERIC,
-        longRuns: FIVE_K_LONG_RUNS,
+        longRuns: goldenFiveKShape ? FIVE_K_LONG_RUNS : FIVE_K_LONG_RUNS_GENERIC,
       };
   }
 }
@@ -775,19 +842,24 @@ const TAPER_ENTRIES: ReadonlyMap<readonly number[], number> = new Map<readonly n
   [FIVE_K_WEEKLY_LOAD, 2],
   // Same two weeks — the generic curve keeps the taper tail unchanged.
   [FIVE_K_WEEKLY_LOAD_GENERIC, 2],
-  // The same two weeks, minus race week, which has no long run of its own.
+  // The same two weeks, minus race week, which has no long run of its own. The held generic
+  // read of each long-run curve keeps its taper tail byte-identical, so it registers the same count.
   [FIVE_K_LONG_RUNS, 1],
+  [FIVE_K_LONG_RUNS_GENERIC, 1],
   // 10K: weeks 13 (taper) and 14 (race).
   [TEN_K_WEEKLY_LOAD, 2],
   [TEN_K_LONG_RUNS, 1],
+  [TEN_K_LONG_RUNS_GENERIC, 1],
   // Half: weeks 15 (taper) and 16 (race).
   [HALF_WEEKLY_LOAD, 2],
   [HALF_LONG_RUNS, 1],
+  [HALF_LONG_RUNS_GENERIC, 1],
   // Marathon: weeks 22/23 (two-week disciplined taper, `plan-blueprint-examples.md` § "Resolved
   // for the V1 library") and 24 (race).
   [MARATHON_WEEKLY_LOAD, 3],
   // Both taper weeks still carry a (reduced) long run — only race week has none — so 2, not 3.
   [MARATHON_LONG_RUNS, 2],
+  [MARATHON_LONG_RUNS_GENERIC, 2],
 ]);
 
 /**
@@ -814,8 +886,10 @@ function endingOnPeak(values: readonly number[]): readonly number[] {
  * `TEN_K_LONG_RUNS`' twelve pre-taper entries with the last one — its 4-week recovery dip, which
  * for this one curve lands on the final loading week where 5K, half and marathon all place their
  * peak — replaced by the curve's own peak, 17 km. Nothing else moves: same length, same twelve
- * sample positions for `interpolateCanonical`, same dips on weeks 4 and 8 so they still line up
- * with the deload cadence, and the same values everywhere else.
+ * sample positions for `interpolateCanonical`, and the same values everywhere else. Since
+ * 2026-09-19 it is derived from the held generic read (`holdRecoveryDips`), whose final loading
+ * entry is already that peak, so the substitution is now an identity kept for the invariant it
+ * documents rather than a correction it still has to make.
  *
  * It exists because dropping the race taper is not enough on its own for this curve: a no-race
  * plan that finishes on a dip winds down for a start line that does not exist, the defect
@@ -824,7 +898,7 @@ function endingOnPeak(values: readonly number[]): readonly number[] {
  * No number is invented: 17 km is this curve's own captain-approved peak. The race read of
  * `TEN_K_LONG_RUNS` is untouched and still tapers 12 → 11 km.
  */
-const TEN_K_LONG_RUNS_NO_RACE = endingOnPeak(TEN_K_LONG_RUNS);
+const TEN_K_LONG_RUNS_NO_RACE = endingOnPeak(TEN_K_LONG_RUNS_GENERIC);
 
 /**
  * No-race substitutes for canonical curves whose pre-taper tail is not their peak. Only the 10K
@@ -834,11 +908,43 @@ const TEN_K_LONG_RUNS_NO_RACE = endingOnPeak(TEN_K_LONG_RUNS);
 const NO_RACE_CURVES: ReadonlyMap<readonly number[], readonly number[]> = new Map<
   readonly number[],
   readonly number[]
->([[TEN_K_LONG_RUNS, TEN_K_LONG_RUNS_NO_RACE]]);
+>([[TEN_K_LONG_RUNS_GENERIC, TEN_K_LONG_RUNS_NO_RACE]]);
 
 function taperAwareCurve(values: readonly number[], includeTaper: boolean): readonly number[] {
   if (includeTaper) return values;
   return NO_RACE_CURVES.get(values) ?? preTaperCurve(values);
+}
+
+/**
+ * Samples a canonical curve for one week of a plan, keeping the curve's authored taper on the
+ * plan's taper weeks (issue #103, captain's ruling 2026-09-19).
+ *
+ * The phase allocator (`allocatePhaseCounts`) decides how many of a plan's weeks are taper from
+ * the distance's phase weights; the curve carries its own taper as a fixed number of trailing
+ * entries (`TAPER_ENTRIES`). Interpolating the whole curve across the whole plan let the two
+ * disagree whenever the plan's length differed from the curve's: a 14-week half plan gets one
+ * taper week from the allocator, but the 16-entry curve's two-entry taper spans 1.75 of its
+ * weeks, so the last *peak* week was sampled 85% of the way down the taper slope — and rendered
+ * below the base phase's high. With the taper weeks known, the loading block of the curve is
+ * interpolated across the loading weeks and the taper entries across the taper weeks, so a peak
+ * week is always sampled from the loading block. No curve value changes; only which week reads
+ * which point. When `taperWeeks` is not supplied (the coach-authored golden 5K path, which is 12
+ * weeks on a 12-entry curve and byte-pinned) the whole-curve interpolation is unchanged.
+ */
+function sampleCurve(
+  values: readonly number[],
+  weekIndex: number,
+  totalWeeks: number,
+  includeTaper: boolean,
+  taperWeeks: number | undefined,
+): number {
+  if (!includeTaper) return interpolateCanonical(taperAwareCurve(values, false), weekIndex, totalWeeks);
+  if (taperWeeks === undefined) return interpolateCanonical(values, weekIndex, totalWeeks);
+  const loading = preTaperCurve(values);
+  const tail = values.slice(loading.length);
+  const loadingWeeks = totalWeeks - taperWeeks;
+  if (weekIndex < loadingWeeks) return interpolateCanonical(loading, weekIndex, loadingWeeks);
+  return interpolateCanonical(tail, weekIndex - loadingWeeks, taperWeeks);
 }
 
 function targetVolumeKm(
@@ -848,11 +954,14 @@ function targetVolumeKm(
   includeTaper: boolean,
   raceDistance: RaceDistance | undefined,
   goldenFiveKShape = false,
+  taperWeeks?: number,
 ): number {
-  const canonical = interpolateCanonical(
-    taperAwareCurve(curvesForDistance(raceDistance, goldenFiveKShape).weeklyLoad, includeTaper),
+  const canonical = sampleCurve(
+    curvesForDistance(raceDistance, goldenFiveKShape).weeklyLoad,
     weekIndex,
     durationWeeks,
+    includeTaper,
+    taperWeeks,
   );
   return Math.max(1, Math.round(canonical * (startingWeeklyKm / 35)));
 }
@@ -949,15 +1058,21 @@ function targetLongRunKm(
   includeTaper: boolean,
   raceDistance: RaceDistance | undefined,
   goldenFiveKShape = false,
+  taperWeeks?: number,
 ): number {
   // A race plan's final week is race day, so it has no scheduled long run; a no-race plan trains
   // through to the end and does.
   const scheduledLongRunWeeks = Math.max(1, includeTaper ? durationWeeks - 1 : durationWeeks);
   const longRunWeekIndex = Math.min(weekIndex, scheduledLongRunWeeks - 1);
-  const canonical = interpolateCanonical(
-    taperAwareCurve(curvesForDistance(raceDistance, goldenFiveKShape).longRuns, includeTaper),
+  // Race week is the last taper week and schedules no long run, so the long-run curve's taper
+  // entries (which already exclude race week — see `TAPER_ENTRIES`) map onto one fewer week.
+  const longRunTaperWeeks = taperWeeks === undefined ? undefined : Math.max(0, taperWeeks - 1);
+  const canonical = sampleCurve(
+    curvesForDistance(raceDistance, goldenFiveKShape).longRuns,
     longRunWeekIndex,
     scheduledLongRunWeeks,
+    includeTaper,
+    longRunTaperWeeks,
   );
   return Math.max(1, Math.min(maxSingleRunKm, Math.round(canonical * (startingWeeklyKm / 35))));
 }
@@ -1341,6 +1456,9 @@ function buildGenericWeek(args: {
   peakTrainingWeekKm: number;
   injuryReductionPct: number;
   redFlagReductionPct: number;
+  /** How many of the plan's weeks the allocator made taper — `sampleCurve` keeps the curve's
+   * authored taper on exactly those weeks. `0` for a no-race plan (no taper phase exists). */
+  taperWeeks: number;
 }): Week {
   const {
     weekNumber,
@@ -1349,6 +1467,7 @@ function buildGenericWeek(args: {
     raceDistance,
     isRacePlan,
     readiness,
+    taperWeeks,
     intake,
     density,
     easyPace,
@@ -1399,6 +1518,8 @@ function buildGenericWeek(args: {
     durationWeeks,
     isRacePlan,
     raceDistance,
+    false,
+    taperWeeks,
   );
   const desiredVolumeKm = applyInjuryVolumeAdjustment(
     isDeload
@@ -1536,6 +1657,8 @@ function buildGenericWeek(args: {
           singleRunCeilingKm,
           isRacePlan,
           raceDistance,
+          false,
+          taperWeeks,
         ),
       );
   const longRunVolumeBudget = Math.max(
@@ -1684,6 +1807,7 @@ export function buildTemplatePlan(params: TemplatePlanParams): Plan {
   const readiness: ReadinessPath =
     isRacePlan && raceDistance ? deriveReadinessPath(params.intake, raceDistance) : 'prepared';
   const phases = phasesForPlan(durationWeeks, raceDistance, isRacePlan, readiness);
+  const taperWeeks = phases.filter((phase) => phase === 'taper').length;
   const maxSingleRunKm = MAX_SINGLE_RUN_KM[level];
   const deloadCadence = deloadEveryWeeks(level, params.intake.age);
   const injuryReductionPct = injuryVolumeReductionPct(params.intake.injuries);
@@ -1752,6 +1876,7 @@ export function buildTemplatePlan(params: TemplatePlanParams): Plan {
           peakTrainingWeekKm,
           injuryReductionPct,
           redFlagReductionPct,
+          taperWeeks,
         });
     const weekLongRunKm = week.days
       .filter((day): day is Workout => day.kind === 'run')
@@ -1776,8 +1901,11 @@ export function buildTemplatePlan(params: TemplatePlanParams): Plan {
         })
       : undefined;
 
+  const buildSpike = peakBelowBuildSpike(weeks);
+
   const disclaimers = [
     GENERAL_DISCLAIMER,
+    ...(buildSpike ? [buildSpikeDisclosure(buildSpike, isRacePlan)] : []),
     ...(isRacePlan &&
     raceDistance === 'marathon' &&
     normalizedRunCount(params.intake.daysPerWeek) === 3 &&
@@ -1798,12 +1926,21 @@ export function buildTemplatePlan(params: TemplatePlanParams): Plan {
   ];
 
   return {
+    // Three titles, keyed on what the runner actually told us (issue #76, captain's ruling
+    // 2026-09-19, mirroring the Free library's `buildLibraryPlan`): a race with a date is a
+    // "<distance> Plan"; a distance named with no date is a "<distance> Base Plan" — the
+    // periodization is shaped to that distance (`generalPhaseWeights`), so the plan says so and
+    // keeps `raceDistance` for every later reader; no distance at all is a "Running Plan".
+    // `raceDate` is the only field that means "a race is booked": nothing downstream may read
+    // `raceDistance`'s presence as that.
     title:
       isRacePlan && raceDistance
         ? `${durationWeeks}-Week ${distanceLabel(raceDistance)} Plan`
-        : `${durationWeeks}-Week Running Plan`,
+        : raceDistance
+          ? `${durationWeeks}-Week ${distanceLabel(raceDistance)} Base Plan`
+          : `${durationWeeks}-Week Running Plan`,
     goalType: params.goalType,
-    ...(isRacePlan && raceDistance ? { raceDistance } : {}),
+    ...(raceDistance ? { raceDistance } : {}),
     ...(isRacePlan && params.raceDate ? { raceDate: params.raceDate } : {}),
     durationWeeks,
     tierAtGeneration: params.tierAtGeneration,

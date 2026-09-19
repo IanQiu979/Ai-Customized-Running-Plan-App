@@ -231,16 +231,50 @@ describe('a target distance with no race date', () => {
     expect(phases).not.toContain('taper');
   });
 
-  it('does not put the distance on the plan as though a race were booked', () => {
+  it('keeps the distance on the plan as a base block, never as a booked race', () => {
+    // Issue #76 (captain's ruling, 2026-09-19): the periodization is shaped to the distance, so
+    // the plan records it and is titled as a Base Plan — mirroring `buildLibraryPlan`. A race is
+    // booked only when `raceDate` is set; that is the field every reader must test.
     const plan = buildTemplatePlan({
       intake: withDistance,
       goalType: 'duration',
       durationWeeks: 12,
-      tierAtGeneration: 'free',
-      density: 'free',
+      tierAtGeneration: 'pro',
+      density: 'paid',
     });
-    expect(plan.raceDistance).toBeUndefined();
-    expect(plan.title).toBe('12-Week Running Plan');
+    expect(plan.raceDistance).toBe('marathon');
+    expect(plan.raceDate).toBeUndefined();
+    expect(plan.title).toBe('12-Week Marathon Base Plan');
+    // Race-only fields stay off: no readiness verdict, no goal realism, no taper, no race day.
+    expect(plan.readinessPath).toBeUndefined();
+    expect(plan.goalRealism).toBeUndefined();
+    expect(phasesOf(plan)).not.toContain('taper');
+    expect(
+      plan.weeks
+        .flatMap((week) => week.days.filter(isWorkout))
+        .some((workout) => workout.label === 'Race Day' || workout.label === 'RP'),
+    ).toBe(false);
+  });
+
+  it('titles a base block by its distance for every distance, and a race by its race', () => {
+    const cases = [
+      ['5k', '8-Week 5K Base Plan'],
+      ['10k', '8-Week 10K Base Plan'],
+      ['half', '8-Week Half Marathon Base Plan'],
+      ['marathon', '8-Week Marathon Base Plan'],
+    ] as const;
+    for (const [raceDistance, title] of cases) {
+      const plan = buildTemplatePlan({
+        intake: { ...NO_RACE_INTAKE, raceDistance },
+        goalType: 'duration',
+        durationWeeks: 8,
+        tierAtGeneration: 'pro',
+        density: 'paid',
+      });
+      expect(plan.title).toBe(title);
+      expect(plan.raceDistance).toBe(raceDistance);
+      expect(plan.raceDate).toBeUndefined();
+    }
   });
 
   it('ends a no-race 10K block on its peak long run, not on a recovery dip', () => {
@@ -304,5 +338,105 @@ describe('race plans are untouched by the no-race path', () => {
         .filter(isWorkout)
         .some((workout) => workout.label === 'Race Day'),
     ).toBe(true);
+  });
+});
+
+describe('the build-spike disclosure names the highest week, and a race only when one is booked', () => {
+  // Issue #103's tolerance flag fires only when a build-phase loading spike is the plan's highest
+  // loading week and the peak sits below it. Its race clause is gated on `isRacePlan`, never on
+  // `raceDistance` presence: a dateless Base Plan carries a distance too, and `raceDate` is the
+  // only signal that a race is booked (#76).
+  // 5K / regular / 4 days / 40 km / 12 weeks: as a race plan, build week 7 is the highest loading
+  // week (51 km, above the 48 km peak and the 42 km base high), so it discloses.
+  const spikeIntake: IntakeResponses = {
+    goal: 'Run a 5K',
+    age: 34,
+    experience: 'regular',
+    daysPerWeek: 4,
+    weeklyKm: 40,
+    injuries: ['none'],
+    raceDistance: '5k',
+  };
+  // 5K / new / 3 days / 30 km / 8 weeks: a Family A residual offender whose base high is above its
+  // build spike, so it must not claim a highest week.
+  const baseHighIntake: IntakeResponses = {
+    goal: 'Run a 5K',
+    age: 35,
+    experience: 'new',
+    daysPerWeek: 3,
+    weeklyKm: 30,
+    injuries: ['none'],
+    raceDistance: '5k',
+  };
+  const disclosureOf = (plan: Plan) =>
+    plan.disclaimers.find((line) => line.startsWith('Your highest-distance week is week '));
+  const loadingMax = (plan: Plan, phase: Phase) =>
+    Math.max(
+      ...plan.weeks.filter((w) => !w.isDeload && w.phase === phase).map((w) => w.volumeKm),
+    );
+
+  it('keeps the approved race-specific ending on a race plan whose build spike is its highest week', () => {
+    const plan = buildTemplatePlan({
+      intake: spikeIntake,
+      goalType: 'race',
+      durationWeeks: 12,
+      raceDistance: '5k',
+      raceDate: '2026-12-25',
+      tierAtGeneration: 'pro',
+      density: 'paid',
+    });
+    expect(plan.raceDate).toBe('2026-12-25');
+    const spikeKm = loadingMax(plan, 'build');
+    expect(spikeKm).toBeGreaterThan(loadingMax(plan, 'peak'));
+    expect(spikeKm).toBeGreaterThanOrEqual(loadingMax(plan, 'base'));
+    const spikeWeek = plan.weeks.find((w) => !w.isDeload && w.volumeKm === spikeKm)!;
+    expect(disclosureOf(plan)).toBe(
+      `Your highest-distance week is week ${spikeWeek.weekNumber}, in the build phase; the peak ` +
+        'weeks carry a little less distance and more race-specific intensity.',
+    );
+  });
+
+  it('says nothing when the base phase, not the build spike, holds the highest week', () => {
+    // 25, 22, 17, 14*, 14, 11, 11, 18 km: the build high (week 5, 14 km) is above the 11 km peak
+    // but below the 25 km base high, so "your highest-distance week is week 5" would be false —
+    // the plan carries no build-spike line at all.
+    const plan = buildTemplatePlan({
+      intake: baseHighIntake,
+      goalType: 'race',
+      durationWeeks: 8,
+      raceDistance: '5k',
+      raceDate: '2026-12-25',
+      tierAtGeneration: 'pro',
+      density: 'paid',
+    });
+    expect(loadingMax(plan, 'build')).toBeGreaterThan(loadingMax(plan, 'peak'));
+    expect(loadingMax(plan, 'base')).toBeGreaterThan(loadingMax(plan, 'build'));
+    expect(disclosureOf(plan)).toBeUndefined();
+    expect(plan.disclaimers.some((line) => line.includes('highest-distance week'))).toBe(false);
+  });
+
+  it('never frames a dateless Base Plan as a race build', () => {
+    // The same runner with no race booked. A no-race block never tapers and never ends on a
+    // deload, so on the current curves its peak is its own highest week and there is no spike to
+    // disclose; either way, nothing in its disclaimers may describe it as a race. Were a Base
+    // Plan ever to disclose, the sentence ends "more quality intensity", the same shape minus the
+    // race clause.
+    for (const durationWeeks of [8, 12, 16] as const) {
+      const plan = buildTemplatePlan({
+        intake: spikeIntake,
+        goalType: 'duration',
+        durationWeeks,
+        tierAtGeneration: 'pro',
+        density: 'paid',
+      });
+      expect(plan.raceDate).toBeUndefined();
+      expect(plan.title).toBe(`${durationWeeks}-Week 5K Base Plan`);
+      expect(loadingMax(plan, 'peak')).toBeGreaterThanOrEqual(loadingMax(plan, 'build'));
+      const disclosure = disclosureOf(plan);
+      if (disclosure !== undefined) {
+        expect(disclosure).toMatch(/and more quality intensity\.$/);
+      }
+      expect(plan.disclaimers.some((line) => /\brace/i.test(line))).toBe(false);
+    }
   });
 });

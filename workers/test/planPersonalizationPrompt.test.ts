@@ -59,6 +59,8 @@ const SKELETON = makePlan({
   ],
 });
 
+const INPUT_BASE = { skeleton: SKELETON, tier: 'pro' as const, intake: INTAKE };
+
 function toolUseResponse(input: unknown) {
   return { content: [{ type: 'tool_use', name: PLAN_PERSONALIZATION_TOOL_NAME, input }] };
 }
@@ -89,6 +91,28 @@ describe('buildPlanPersonalizationRequest', () => {
 
     expect(proSchema.required).not.toContain('workouts');
     expect(eliteSchema.required).toContain('workouts');
+  });
+
+  it('tells the model a dateless distance is a base block, and a dated one is a race', () => {
+    // Issue #76: `raceDate`, not `raceDistance`, means a race is booked. The prompt is a reader of
+    // the skeleton like any other, so it must not present a base block's distance as a race.
+    const text = (skeleton: typeof SKELETON) =>
+      JSON.stringify(buildPlanPersonalizationRequest({ ...INPUT_BASE, skeleton }));
+    const baseBlock = text(makePlan({ ...SKELETON, goalType: 'duration', raceDistance: '10k' }));
+    expect(baseBlock).toContain('Target distance: 10k');
+    expect(baseBlock).toContain('No race is booked');
+    expect(baseBlock).not.toContain('Race date:');
+
+    const race = text(
+      makePlan({ ...SKELETON, goalType: 'race', raceDistance: '10k', raceDate: '2026-12-05' }),
+    );
+    expect(race).toContain('Target distance: 10k');
+    expect(race).toContain('Race date: 2026-12-05');
+    expect(race).not.toContain('No race is booked');
+
+    const noDistance = text(makePlan({ ...SKELETON, goalType: 'duration' }));
+    expect(noDistance).not.toContain('Target distance');
+    expect(noDistance).not.toContain('No race is booked');
   });
 
   it('never sends a numeric field (pace, hrZone, rpe) — only the compact day summary', () => {
