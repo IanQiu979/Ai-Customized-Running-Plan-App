@@ -84,7 +84,11 @@
   artifact with GitHub's official Jekyll build action after a qualifying push to `main`; until a
   Pages deployment succeeds, the URL must not be described as live. The policy can point to in-app
   erasure because Delete account already shipped through PR #117. Its age posture is 13+ and, for ages 13–17,
-  parent/guardian consent; the flow that records that consent is separate work and is not shipped.
+  parent/guardian consent; that consent is now recorded, not just stated (2026-09-19) — the intake
+  screen requires a checkbox for a 13–17 runner, and `PUT /api/intake` (`workers/src/routes.ts`'s
+  `handlePutIntake`) refuses the save without it and otherwise writes a consent event (timestamp +
+  `PRIVACY_POLICY_VERSION`) to the new `guardian_consent` table
+  (`workers/migrations/0004_guardian_consent.sql`) in the same D1 batch as the intake row.
   It treats linked intake/plans as health/fitness data without claiming the injury picker records
   explicit consent, and documents GitHub Pages metadata plus Cloudflare/Anthropic retention.
 - **Plan engine is fully wired, and every distance now gets its own training shape.** The pure
@@ -708,9 +712,11 @@ from 82. Issue #22 remains open.)
       `docs/privacy-policy.md` is the policy's one source of truth; it identifies Ian Qiu, sole
       trader in Thailand, as controller, documents
       the already-shipped Settings → Danger zone → Delete account flow (PR #117), and states the
-      13–17 parent/guardian-consent posture without pretending the separate consent-recording flow
-      exists. It treats linked intake/plans as health/fitness data without describing an unbuilt
-      explicit-consent event, and states the actual overwrite/deletion boundaries and provider
+      13–17 parent/guardian-consent posture. As of this same date the consent-recording flow has
+      also shipped (see the "Current state" bullet above): a required intake checkbox plus a
+      server-recorded consent event, so the policy's text and the code now agree. It treats linked
+      intake/plans as health/fitness data without claiming the injury picker itself records a
+      GDPR Article 9 consent event, and states the actual overwrite/deletion boundaries and provider
       retention. `.github/workflows/publish-legal-pages.yml` runs only on `main` when the policy or
       workflow changes (or by manual dispatch), uses GitHub's official Jekyll action to render only
       the staged policy into an otherwise-empty Pages artifact, and targets

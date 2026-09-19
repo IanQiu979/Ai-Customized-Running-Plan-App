@@ -15,9 +15,10 @@
   reviews this policy and the store privacy-label answers before public store submission.
 
   Under-18 posture (captain, 2026-09-19): 13–17 may use the app WITH a parent's or guardian's
-  consent. This policy states that posture; the in-app consent flow that records it is a
-  separate task and is not yet built. Until it ships, the consent is a condition of use rather
-  than a recorded event.
+  consent. This policy states that posture; the in-app consent flow that records it has now
+  shipped — a required checkbox at intake plus a server-recorded consent event (timestamp +
+  policy version), written atomically with the intake row (`workers/migrations/
+  0004_guardian_consent.sql`, `workers/src/routes.ts`'s `handlePutIntake`).
 -->
 
 # Pace Blueprint — Privacy Policy
@@ -214,11 +215,14 @@ age under 13; we do not knowingly hold an account for anyone younger, and if we 
 do, we delete it.
 
 If you are **13 to 17**, you may use the app **only with the consent of a parent or guardian**,
-who agrees to this policy on your behalf. If you are a parent or guardian and believe your child
-is using the app without your consent, contact us at the address below and we will delete the
-account. The current app does not separately record or verify guardian consent; building that
-recording flow remains a separate task. Plans for runners under 18 are also built differently:
-they never prescribe heart-rate zones, using effort levels instead.
+who agrees to this policy on your behalf. Before an account with an age in that range can save its
+intake answers, the app requires an explicit checkbox affirming that a parent or guardian has read
+this policy and agrees to it on the runner's behalf, and we record that consent — the time it was
+given and which version of this policy it covered — as a server-side event. This recorded consent
+is our stated legal basis for processing a minor's data under GDPR Article 9(2)(a) and Thai PDPA
+section 26. If you are a parent or guardian and believe your child is using the app without your
+consent, contact us at the address below and we will delete the account. Plans for runners under
+18 are also built differently: they never prescribe heart-rate zones, using effort levels instead.
 
 ---
 

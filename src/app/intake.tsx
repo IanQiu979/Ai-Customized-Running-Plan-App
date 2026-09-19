@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -32,6 +33,7 @@ import {
 import { useTheme } from '@/hooks/use-theme';
 import { PrimaryAction } from '@/components/ui/ActionButton';
 import { API_BASE_URL, describeError, getIntake, putIntake } from '@/lib/apiClient';
+import { PRIVACY_POLICY_URL } from '@/constants/legal';
 import {
   clockFieldError,
   clockPartsToSeconds,
@@ -50,7 +52,7 @@ import { CUE_DELAY, SURVEY_TIMELINE } from '@/lib/buildMotion';
 import { getGoalRealismIntakeCopy } from '@/lib/goalRealismDisclosure';
 import { assessGoalRealism } from '@/lib/paceDerivation';
 import { intakeRaceDateError } from '@/lib/planRequest';
-import type { ExperienceAnswer, InjuryFlag, IntakeResponses, RaceDistance } from '@/lib/planTypes';
+import type { ExperienceAnswer, InjuryFlag, RaceDistance } from '@/lib/planTypes';
 
 const EXPERIENCE_OPTIONS: { value: ExperienceAnswer; label: string }[] = [
   { value: 'new', label: 'New to running' },
@@ -159,6 +161,15 @@ export default function IntakeScreen() {
   const [injuries, setInjuries] = useState<InjuryFlag[]>(['none']);
   const [injuryNotes, setInjuryNotes] = useState('');
 
+  // Captain's ruling (2026-09-19): 13–17 requires a parent/guardian's affirmed consent, recorded
+  // server-side. This is a one-time-per-save affirmation, never persisted or reloaded from
+  // `getIntake()` — it always starts unchecked and must be re-affirmed on every save while the
+  // runner is a minor.
+  const [guardianConsent, setGuardianConsent] = useState(false);
+  const ageNumForMinorCheck = Number(age);
+  const isMinor =
+    Number.isInteger(ageNumForMinorCheck) && ageNumForMinorCheck >= 13 && ageNumForMinorCheck <= 17;
+
   // Inline, as-you-type feedback for the three structured date/time fields — derived from the
   // current parts on every render rather than held in their own state, so there's nothing to keep
   // in sync. Each stays quiet until the runner has typed enough for a box to be judged.
@@ -242,6 +253,10 @@ export default function IntakeScreen() {
       setError('Age must be a whole number between 13 and 100.');
       return;
     }
+    if (isMinor && !guardianConsent) {
+      setError('A parent or guardian must confirm consent before saving.');
+      return;
+    }
     if (!experience) {
       setError('Select your experience level.');
       return;
@@ -299,7 +314,7 @@ export default function IntakeScreen() {
       goalTimeSec = parsed;
     }
 
-    const payload: IntakeResponses = {
+    const payload = {
       goal: goal.trim(),
       age: ageNum,
       experience,
@@ -313,6 +328,7 @@ export default function IntakeScreen() {
         : {}),
       injuries,
       ...(injuryNotes.trim() ? { injuryNotes: injuryNotes.trim() } : {}),
+      ...(isMinor ? { guardianConsent: true } : {}),
     };
 
     setSubmitting(true);
@@ -377,6 +393,14 @@ export default function IntakeScreen() {
               placeholder="e.g. 34"
             />
           </Field>
+
+          {isMinor ? (
+            <GuardianConsentRow
+              checked={guardianConsent}
+              onToggle={() => setGuardianConsent((current) => !current)}
+              theme={theme}
+            />
+          ) : null}
 
           <Field label="Experience" theme={theme}>
             <View style={styles.optionColumn}>
@@ -594,6 +618,63 @@ function OptionRow({
   );
 }
 
+/**
+ * Required consent affirmation for a 13–17 runner (captain's ruling, 2026-09-19: GDPR Art. 9(2)(a),
+ * Thai PDPA s.26). Not persisted — `guardianConsent` always starts `false` and must be re-affirmed
+ * every save; the server independently rejects a minor's intake without it. Copy needs the
+ * captain's / legal certification before ship.
+ */
+function GuardianConsentRow({
+  checked,
+  onToggle,
+  theme,
+}: {
+  checked: boolean;
+  onToggle: () => void;
+  theme: ReturnType<typeof useTheme>;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked }}
+      accessibilityLabel="Parent or guardian consent"
+      onPress={onToggle}
+      style={({ pressed }) => [
+        styles.consentRow,
+        {
+          borderColor: checked ? theme.text.primary : theme.hairline,
+          backgroundColor: theme.surface.raised,
+        },
+        pressed && styles.pressed,
+      ]}
+    >
+      <View
+        style={[
+          styles.consentBox,
+          {
+            borderColor: checked ? theme.text.primary : theme.hairline,
+            backgroundColor: checked ? theme.text.primary : 'transparent',
+          },
+        ]}
+      >
+        {checked ? (
+          <Text style={[styles.consentBoxMark, { color: theme.surface.base }]}>✓</Text>
+        ) : null}
+      </View>
+      <Text style={[styles.consentText, { color: theme.text.primary }]}>
+        I am 13–17, and a parent or guardian has read{' '}
+        <Text
+          style={[styles.consentLink, { color: theme.text.primary }]}
+          onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}
+        >
+          the privacy policy
+        </Text>{' '}
+        and agrees to it on my behalf.
+      </Text>
+    </Pressable>
+  );
+}
+
 function Chip({
   label,
   selected,
@@ -710,5 +791,35 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: PressedOpacity,
+  },
+  consentRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.two,
+    borderWidth: Stroke.mark,
+    borderRadius: Radius.control,
+    padding: Spacing.three,
+  },
+  consentBox: {
+    width: Spacing.four,
+    height: Spacing.four,
+    borderWidth: Stroke.mark,
+    borderRadius: Radius.control,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: Spacing.half,
+  },
+  consentBoxMark: {
+    fontFamily: FontFamily.body.medium,
+    fontSize: FontSize.xs,
+  },
+  consentText: {
+    flex: 1,
+    fontFamily: FontFamily.body.regular,
+    fontSize: FontSize.sm,
+  },
+  consentLink: {
+    fontFamily: FontFamily.body.semiBold,
+    textDecorationLine: 'underline',
   },
 });

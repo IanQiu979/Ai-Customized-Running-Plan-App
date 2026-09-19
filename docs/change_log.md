@@ -5,6 +5,35 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-09-19 — Guardian consent for 13–17 intake is now required and recorded
+
+The privacy policy has stated since its first draft that a 13–17 runner may use the app only with
+a parent or guardian's consent, but nothing enforced or recorded that condition. This closes that
+gap per the captain's 2026-09-19 ruling that the legal basis for processing a minor's data is
+explicit consent (GDPR Art. 9(2)(a), Thai PDPA s.26).
+
+- **Intake requires an explicit checkbox for ages 13–17.** `src/app/intake.tsx` shows a
+  `GuardianConsentRow` only when the entered age is 13–17: "I am 13–17, and a parent or guardian
+  has read the privacy policy and agrees to it on my behalf," linking to
+  `PRIVACY_POLICY_URL`. It is never persisted or preloaded from `getIntake()` — it starts unchecked
+  every time and must be re-affirmed on every save while the runner is a minor. This exact copy has
+  **not yet been certified by the captain or legal counsel.**
+- **The server refuses a 13–17 save without it, and records the event when it's given.**
+  `workers/src/routes.ts`'s `handlePutIntake` rejects a `PUT /api/intake` for an age 13–17 body
+  unless `guardianConsent: true` is present, before anything is persisted. When given,
+  `D1PlanStore.upsertIntake` (`workers/src/lib/store.ts`) writes the consent row (`user_id`,
+  `granted_at`, `policy_version`) in the **same `db.batch()`** as the intake upsert, so the two can
+  never diverge — an intake row can't exist without its consent record or vice versa.
+  `deleteAccount` cascades the new table too.
+- **New table: `guardian_consent`.** `workers/migrations/0004_guardian_consent.sql` — one row per
+  user (`INSERT OR REPLACE`, most-recent-consent-only, not a history), `policy_version` stamped
+  from the new `PRIVACY_POLICY_VERSION` constant in `src/constants/legal.ts` (currently
+  `'2026-09-19'`, tied to the policy's own "Last updated" date).
+- **`docs/privacy-policy.md`'s Age section and its top-of-file "Under-18 posture" note are
+  corrected** — both previously said the consent-recording flow was a separate, not-yet-built task;
+  they now describe the shipped checkbox-plus-server-record flow and name it as the stated legal
+  basis for processing a minor's data.
+
 ## 2026-09-19 — Issue #89 gains one privacy-policy source, a publication path, and an in-app link
 
 Pace Blueprint had account deletion and store-bound data flows but no public privacy policy for a

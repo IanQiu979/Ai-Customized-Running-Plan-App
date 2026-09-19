@@ -16,6 +16,7 @@
 
 import type { GeneratePlanRequest, IntakeResponses, Tier } from '../../src/lib/planTypes';
 import type { Deps } from './deps';
+import { PRIVACY_POLICY_VERSION } from '../../src/constants/legal';
 import { fail, ok, readJson } from './http';
 import { generatePlan } from './lib/generate-plan-flow';
 import { isPurchasableTier, TIER_PLAN_LIMITS } from '../../src/lib/tierLimits';
@@ -173,15 +174,31 @@ export async function handleGetIntake(userId: string, deps: Deps): Promise<Respo
 }
 
 /**
+ * The wire shape of a PUT /api/intake body: the stored intake row plus the one-time consent
+ * assertion for a 13–17 runner. `guardianConsent` deliberately does NOT live on `IntakeResponses`
+ * (`src/lib/planTypes.ts`) — that interface is the stored intake row, shared verbatim between the
+ * app and the workers, and a one-time consent action is not part of it.
+ */
+type IntakePutBody = IntakeResponses & { guardianConsent?: boolean };
+
+/**
  * Save the intake answers.
  *
  * Validation here is deliberately shallow — required fields, ranges, closed sets — because the
  * table's own CHECK constraints are the real gate (`0002_app_schema.sql`). Two layers is right:
  * this one produces a readable message, the table one cannot be bypassed by a future caller that
  * forgets to use this route.
+ *
+ * A 13–17 runner additionally requires an explicit `guardianConsent: true` on the request
+ * (captain's ruling, 2026-09-19 — GDPR Art. 9(2)(a) / Thai PDPA s.26 both require explicit
+ * consent for this age band). Missing or false consent is refused before anything is persisted —
+ * neither the intake nor a consent row. On success, the consent event is written in the SAME
+ * `db.batch()` transaction as the intake upsert (`upsertIntake`'s `guardianConsent` param) so the
+ * intake row can never persist without its consent record, or vice versa. 18+ runners are
+ * unaffected: no consent handling, no consent row.
  */
 export async function handlePutIntake(request: Request, userId: string, deps: Deps): Promise<Response> {
-  const body = await readJson<IntakeResponses>(request);
+  const body = await readJson<IntakePutBody>(request);
   if (!body) {
     return fail(400, 'invalid_request', 'Request body must be valid JSON.');
   }
@@ -191,7 +208,19 @@ export async function handlePutIntake(request: Request, userId: string, deps: De
     return fail(400, 'invalid_request', problem);
   }
 
-  await deps.store.upsertIntake(userId, body, new Date().toISOString());
+  const requiresGuardianConsent = body.age >= 13 && body.age <= 17;
+  if (requiresGuardianConsent && body.guardianConsent !== true) {
+    return fail(400, 'invalid_request', 'Guardian consent is required for runners aged 13 to 17.');
+  }
+
+  const now = new Date().toISOString();
+  await deps.store.upsertIntake(
+    userId,
+    body,
+    now,
+    requiresGuardianConsent ? { grantedAt: now, policyVersion: PRIVACY_POLICY_VERSION } : undefined
+  );
+
   return ok({ saved: true });
 }
 

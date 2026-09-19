@@ -569,9 +569,22 @@ export class D1PlanStore implements PlanStore {
     return raw ? toIntakeResponses(raw) : null;
   }
 
-  /** Upsert the caller's intake answers. One row per user; the intake screen overwrites it. */
-  async upsertIntake(userId: string, intake: IntakeResponses, now: string): Promise<void> {
-    await this.db
+  /**
+   * Upsert the caller's intake answers. One row per user; the intake screen overwrites it.
+   *
+   * `guardianConsent`, when given, batches a `guardian_consent` upsert into the SAME `db.batch()`
+   * transaction as the intake write — a 13–17 intake row and its consent record must commit
+   * together or not at all, since the consent row is the audit evidence that the intake was even
+   * allowed to be saved. Two separate `.run()` calls would leave a window (isolate eviction, a
+   * throw between them) where the intake persists with no consent record on file.
+   */
+  async upsertIntake(
+    userId: string,
+    intake: IntakeResponses,
+    now: string,
+    guardianConsent?: { grantedAt: string; policyVersion: string }
+  ): Promise<void> {
+    const intakeStatement = this.db
       .prepare(
         `INSERT INTO intake_responses (
            user_id, goal, age, experience, days_per_week, weekly_km, race_distance, race_date,
@@ -608,8 +621,21 @@ export class D1PlanStore implements PlanStore {
         JSON.stringify(intake.injuries ?? []),
         intake.injuryNotes ?? null,
         now
+      );
+
+    if (!guardianConsent) {
+      await intakeStatement.run();
+      return;
+    }
+
+    const consentStatement = this.db
+      .prepare(
+        `INSERT OR REPLACE INTO guardian_consent (user_id, granted_at, policy_version)
+         VALUES (?, ?, ?)`
       )
-      .run();
+      .bind(userId, guardianConsent.grantedAt, guardianConsent.policyVersion);
+
+    await this.db.batch([intakeStatement, consentStatement]);
   }
 
   /**
@@ -630,6 +656,7 @@ export class D1PlanStore implements PlanStore {
     await this.db.batch([
       this.db.prepare('DELETE FROM plans WHERE user_id = ?').bind(userId),
       this.db.prepare('DELETE FROM intake_responses WHERE user_id = ?').bind(userId),
+      this.db.prepare('DELETE FROM guardian_consent WHERE user_id = ?').bind(userId),
       this.db.prepare('DELETE FROM subscriptions WHERE user_id = ?').bind(userId),
       this.db.prepare('DELETE FROM profiles WHERE user_id = ?').bind(userId),
       this.db.prepare('DELETE FROM session WHERE userId = ?').bind(userId),
