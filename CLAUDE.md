@@ -119,9 +119,11 @@ clean `typecheck && lint && test`. Never force-push without explicit user approv
 - AI output validation is structural, not strict-content: validate shape, retry once, then fall
   back to a template. Over-tight content validation is a known Echo V1 mistake — detail in
   [`docs/reference/plan-generation.md`](docs/reference/plan-generation.md).
-- Shared types (`Plan`, `Week`, `Workout`, `Tier`) live in `src/lib/planTypes.ts`, and shared
-  constants/logic in `src/lib/tierLimits.ts` and `src/lib/quotaPeriod.ts`. All three are imported by
-  both the app and `workers/`, so they must stay pure — no React, no Node, no Cloudflare globals.
+- Shared types (`Plan`, `Week`, `Workout`, `Tier`) live in `src/lib/planTypes.ts`, shared
+  constants/logic in `src/lib/tierLimits.ts` and `src/lib/quotaPeriod.ts`, and the policy URL and
+  version in `src/constants/legal.ts`. All four are imported by both the app and `workers/` (and
+  listed in `workers/tsconfig.json`'s `include`), so they must stay pure — no React, no Node, no
+  Cloudflare globals.
 
 ## Coaching domain — read before touching plan generation
 
@@ -154,7 +156,7 @@ clean `typecheck && lint && test`. Never force-push without explicit user approv
 ## Testing
 
 jest-expo is installed. New logic added to `src/lib/` gets a test alongside it (see
-`src/lib/__tests__/supabase.test.ts`). Screens are not unit-tested for now. Five rendered-screen
+`src/lib/__tests__/supabase.test.ts`). Screens are not unit-tested for now. Seven rendered-screen
 suites are deliberate exceptions, each because the bug or behaviour under test lives in the
 screen's own render branches with no logic layer underneath to test instead: the two in
 `src/app/(auth)/__tests__/` (2026-09-04) — `onboarding.test.tsx` (the CTA gate and its bounded
@@ -162,9 +164,12 @@ ceiling) and `auth-back-link.test.tsx` (the four pre-auth links' navigation acti
 `src/app/(tabs)/__tests__/tab-cache-first.test.tsx` (2026-09-12, the cache-first-on-refocus
 regression proof cited in `docs/change_log.md`'s same-dated entry),
 `src/app/plan/__tests__/day-why.test.tsx` (2026-09-16, the Elite per-workout `why` render proof,
-issue #24), and `src/app/__tests__/root-layout-font-gate.test.tsx` (2026-09-16, the root layout's
-splash gate settling on a font-load *failure* as well as a success — issue #21). Each file's
-header states the reason; add a sixth only on the same grounds.
+issue #24), `src/app/__tests__/root-layout-font-gate.test.tsx` (2026-09-16, the root layout's
+splash gate settling on a font-load *failure* as well as a success — issue #21),
+`src/app/__tests__/intake-guardian-consent.test.tsx` (2026-09-19, the 13–17 consent checkbox's
+render branch and save-time gate, issue #89) and `src/app/(tabs)/__tests__/settings-privacy.test.tsx`
+(2026-09-19, the Settings privacy-policy link's role and its visible failure copy, issue #89). Each
+file's header states the reason; add an eighth only on the same grounds.
 
 ## Keep these docs updated — this is a standing rule, not a suggestion
 

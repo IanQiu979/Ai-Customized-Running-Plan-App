@@ -1,7 +1,20 @@
+/**
+ * @jest-environment node
+ * @jest-environment-options {"customExportConditions": ["node"]}
+ */
 import { execFileSync } from 'node:child_process';
-import { cpSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import {
+  cpSync,
+  existsSync,
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { parse as parseYaml } from 'yaml';
 
 import { PRIVACY_POLICY_URL } from '../legal';
 
@@ -14,37 +27,79 @@ import { PRIVACY_POLICY_URL } from '../legal';
  * shipped with `[DATA CONTROLLER — TBC]` behind a DO-NOT-PUBLISH guard for two months; this
  * repo's version has no guard, so the pin is a test instead.
  *
+ * The workflow is read as what it is — a machine-consumed document: parsed into its jobs and
+ * steps, the staging step's script actually executed, and the `source → destination → path`
+ * chain between the Pages actions asserted on the parsed values. Nothing here matches the YAML's
+ * text, so a reformat cannot fail it and a commented-out step cannot pass it.
+ *
  * Deliberately NOT pinned: the policy's description of the data flows. That is prose reviewed
  * against `workers/` by a human, and a substring assertion on it would be a test of wording.
  */
 
 const ROOT = join(__dirname, '..', '..', '..');
+const REPO_PAGES_BASE = '/Ai-Customized-Running-Plan-App/';
+
 const policy = readFileSync(join(ROOT, 'docs', 'privacy-policy.md'), 'utf8');
-const workflow = readFileSync(
-  join(ROOT, '.github', 'workflows', 'publish-legal-pages.yml'),
-  'utf8'
-);
 
 /** The body a reader sees — the HTML comment header is maintainer notes, not policy. */
 const published = policy.replace(/<!--[\s\S]*?-->/g, '');
 
-function workflowRunBlock(stepName: string): string {
-  const lines = workflow.split('\n');
-  const nameIndex = lines.findIndex((line) => line.trim() === `- name: ${stepName}`);
-  if (nameIndex === -1) throw new Error(`Missing workflow step: ${stepName}`);
+interface WorkflowStep {
+  name?: string;
+  uses?: string;
+  run?: string;
+  with?: Record<string, unknown>;
+}
 
-  const runIndex = lines.findIndex(
-    (line, index) => index > nameIndex && line.trim() === 'run: |'
-  );
-  if (runIndex === -1) throw new Error(`Missing run block for workflow step: ${stepName}`);
+interface Workflow {
+  on: { push?: { branches?: string[]; paths?: string[] } };
+  jobs: Record<string, { needs?: string; steps: WorkflowStep[] }>;
+}
 
-  const body: string[] = [];
-  for (let index = runIndex + 1; index < lines.length; index += 1) {
-    const line = lines[index];
-    if (line.startsWith('      - ')) break;
-    body.push(line.startsWith('          ') ? line.slice(10) : line);
+const workflow = parseYaml(
+  readFileSync(join(ROOT, '.github', 'workflows', 'publish-legal-pages.yml'), 'utf8')
+) as Workflow;
+
+const buildSteps = workflow.jobs.build.steps;
+
+/** The step that runs an action, identified by the action's name — its `@ref` is checked separately. */
+function actionStep(action: string): WorkflowStep {
+  const matches = buildSteps.filter((step) => step.uses?.startsWith(`${action}@`));
+  if (matches.length !== 1) {
+    throw new Error(`Expected exactly one build step using ${action}, found ${matches.length}`);
   }
-  return body.join('\n');
+  return matches[0];
+}
+
+/** The commit a `uses:` is pinned to — a full SHA, never a movable tag. */
+function pinnedRef(step: WorkflowStep): string {
+  const ref = step.uses?.split('@')[1] ?? '';
+  expect(ref).toMatch(/^[0-9a-f]{40}$/);
+  return ref;
+}
+
+function stagingScript(): string {
+  const stagingSteps = buildSteps.filter((step) => typeof step.run === 'string');
+  if (stagingSteps.length !== 1) {
+    throw new Error(`Expected exactly one scripted build step, found ${stagingSteps.length}`);
+  }
+  return stagingSteps[0].run as string;
+}
+
+/** Runs the workflow's own staging script against a scratch checkout holding only the policy. */
+function stagePolicy(scratch: string): void {
+  mkdirSync(join(scratch, 'docs'));
+  cpSync(join(ROOT, 'docs', 'privacy-policy.md'), join(scratch, 'docs', 'privacy-policy.md'));
+  execFileSync('bash', ['-c', stagingScript()], { cwd: scratch });
+}
+
+function withScratch(body: (scratch: string) => void): void {
+  const scratch = mkdtempSync(join(tmpdir(), 'pace-legal-pages-'));
+  try {
+    body(scratch);
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
 }
 
 describe('the privacy policy the app links to', () => {
@@ -67,15 +122,18 @@ describe('the privacy policy the app links to', () => {
     expect(published).toMatch(/consent of a parent or guardian/);
   });
 
-  it('stages only the policy as a renderable Jekyll source', () => {
-    const scratch = mkdtempSync(join(tmpdir(), 'pace-legal-pages-'));
-    try {
-      mkdirSync(join(scratch, 'docs'));
-      cpSync(join(ROOT, 'docs', 'privacy-policy.md'), join(scratch, 'docs', 'privacy-policy.md'));
+  it('publishes from main only, and only when the policy or the workflow itself changes', () => {
+    expect(workflow.on.push?.branches).toEqual(['main']);
+    expect(workflow.on.push?.paths).toEqual([
+      'docs/privacy-policy.md',
+      '.github/workflows/publish-legal-pages.yml',
+    ]);
+    expect(workflow.jobs.deploy.needs).toBe('build');
+  });
 
-      execFileSync('bash', ['-c', workflowRunBlock('Stage the policy as an otherwise-empty Jekyll source')], {
-        cwd: scratch,
-      });
+  it('stages only the policy as a renderable Jekyll source', () => {
+    withScratch((scratch) => {
+      stagePolicy(scratch);
 
       expect(readdirSync(join(scratch, 'legal-site')).sort()).toEqual([
         'index.html',
@@ -95,30 +153,56 @@ describe('the privacy policy the app links to', () => {
       const rootPage = readFileSync(join(scratch, 'legal-site', 'index.html'), 'utf8');
       expect(rootPage).toContain('url=privacy-policy/');
       expect(rootPage).toContain('href="privacy-policy/"');
-    } finally {
-      rmSync(scratch, { recursive: true, force: true });
+    });
+  });
+
+  it('renders the staged directory with the SHA-pinned Pages Jekyll action and uploads only its output', () => {
+    const jekyll = actionStep('actions/jekyll-build-pages');
+    const upload = actionStep('actions/upload-pages-artifact');
+    pinnedRef(jekyll);
+    pinnedRef(upload);
+    pinnedRef(actionStep('actions/checkout'));
+    pinnedRef(actionStep('actions/configure-pages'));
+
+    // The chain: the script stages into a directory, Jekyll renders that directory into another,
+    // and only the rendered one is uploaded — so `/docs` (every internal doc) is never published.
+    const source = jekyll.with?.source;
+    const destination = jekyll.with?.destination;
+    expect(typeof source).toBe('string');
+    expect(typeof destination).toBe('string');
+    expect(upload.with?.path).toBe(destination);
+    expect(destination).not.toBe(source);
+    for (const dir of [source, destination]) {
+      expect(dir).not.toMatch(/^\.?\/?docs(\/|$)/);
     }
+
+    withScratch((scratch) => {
+      stagePolicy(scratch);
+      expect(existsSync(join(scratch, source as string))).toBe(true);
+      expect(existsSync(join(scratch, destination as string))).toBe(false);
+    });
+
+    expect(buildSteps.indexOf(jekyll)).toBeGreaterThan(
+      buildSteps.findIndex((step) => typeof step.run === 'string')
+    );
+    expect(buildSteps.indexOf(upload)).toBeGreaterThan(buildSteps.indexOf(jekyll));
+    expect(buildSteps.some((step) => /pandoc/.test(step.run ?? ''))).toBe(false);
   });
 
-  it('builds the staged source with the pinned Pages Jekyll action and uploads only its output', () => {
-    expect(workflow).toContain(
-      'actions/jekyll-build-pages@44a6e6beabd48582f863aeeb6cb2151cc1716697'
-    );
-    expect(workflow).toContain('source: ./legal-site');
-    expect(workflow).toContain('destination: ./legal-site-output');
-    expect(workflow).toContain(
-      'actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa'
-    );
-    expect(workflow).toMatch(/actions\/upload-pages-artifact@[\s\S]*?path: \.\/legal-site-output/);
-    expect(workflow).not.toMatch(/path:\s+\.?\/?docs(?:\/|\s|$)/);
-    expect(workflow).not.toContain('pandoc');
-  });
-
-  it('links the app to the exact repository Pages path', () => {
+  it('links the app to the page the staged source renders at', () => {
     const url = new URL(PRIVACY_POLICY_URL);
     expect(url.protocol).toBe('https:');
     expect(url.hostname).toBe('ianqiu979.github.io');
-    expect(url.pathname).toBe('/Ai-Customized-Running-Plan-App/privacy-policy/');
-    expect(workflow).toContain('legal-site/privacy-policy/index.md');
+    expect(url.pathname.startsWith(REPO_PAGES_BASE)).toBe(true);
+
+    // Jekyll serves `<source>/<page>/index.md` at `<base>/<page>/`, so the app's URL must resolve
+    // to a file the staging script actually produces.
+    const pagePath = url.pathname.slice(REPO_PAGES_BASE.length);
+    expect(pagePath.endsWith('/')).toBe(true);
+    const source = actionStep('actions/jekyll-build-pages').with?.source as string;
+    withScratch((scratch) => {
+      stagePolicy(scratch);
+      expect(existsSync(join(scratch, source, pagePath, 'index.md'))).toBe(true);
+    });
   });
 });

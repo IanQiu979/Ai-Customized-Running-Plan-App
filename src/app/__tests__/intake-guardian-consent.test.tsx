@@ -16,6 +16,11 @@ jest.mock('expo-router', () => ({
 }));
 
 const mockPutIntake = jest.fn().mockResolvedValue({ saved: true });
+const mockOpenPrivacyPolicy = jest.fn().mockResolvedValue(null);
+
+jest.mock('@/lib/openPrivacyPolicy', () => ({
+  openPrivacyPolicy: () => mockOpenPrivacyPolicy(),
+}));
 
 // An existing saved intake, so `hadIntakeOnLoad` is true and the screen renders the form
 // directly rather than the first-time survey intro (which otherwise replaces the whole screen
@@ -120,6 +125,7 @@ async function renderLoaded(): Promise<ReactTestRenderer> {
 describe('IntakeScreen guardian consent (captain\'s 2026-09-19 ruling)', () => {
   beforeEach(() => {
     mockPutIntake.mockClear();
+    mockOpenPrivacyPolicy.mockReset().mockResolvedValue(null);
   });
 
   it('does not render a consent checkbox for an adult age', async () => {
@@ -169,5 +175,36 @@ describe('IntakeScreen guardian consent (captain\'s 2026-09-19 ruling)', () => {
 
     expect(mockPutIntake).toHaveBeenCalledTimes(1);
     expect(mockPutIntake.mock.calls[0][0]).toMatchObject({ guardianConsent: true });
+  });
+
+  it('opens the policy from the consent row and shows the failure instead of swallowing it', async () => {
+    const tree = await renderLoaded();
+    await setAge(tree, '15');
+
+    const link = findNode(
+      tree.toJSON(),
+      (props) => props.accessibilityRole === 'link' && typeof props.onPress === 'function'
+    );
+    expect(link).toBeDefined();
+
+    await act(async () => {
+      await (link?.props.onPress as () => Promise<void>)();
+    });
+    expect(mockOpenPrivacyPolicy).toHaveBeenCalledTimes(1);
+    expect(textNodes(tree).join(' ')).not.toContain('Could not open the privacy policy');
+
+    const failure = 'Could not open the privacy policy. Check your connection and try again.';
+    mockOpenPrivacyPolicy.mockResolvedValue(failure);
+    const linkAgain = findNode(
+      tree.toJSON(),
+      (props) => props.accessibilityRole === 'link' && typeof props.onPress === 'function'
+    );
+    await act(async () => {
+      await (linkAgain?.props.onPress as () => Promise<void>)();
+    });
+
+    const alert = findNode(tree.toJSON(), (props) => props.accessibilityRole === 'alert');
+    expect(alert?.props.accessibilityLiveRegion).toBe('assertive');
+    expect(textNodes(tree).join(' ')).toContain(failure);
   });
 });

@@ -1,23 +1,14 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import * as WebBrowser from 'expo-web-browser';
-import {
-  ActivityIndicator,
-  Linking,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActionRow, Group, Row } from '@/components/layout/GroupedRows';
 import { ScreenHeader } from '@/components/layout/ScreenHeader';
-import { PRIVACY_POLICY_URL } from '@/constants/legal';
 import { FontFamily, FontSize, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { API_BASE_URL, authClient, deleteAccount, describeError, getQuotaStatus } from '@/lib/apiClient';
+import { openPrivacyPolicy } from '@/lib/openPrivacyPolicy';
 import { confirmDestructive } from '@/lib/confirmDestructive';
 import { formatQuotaLine } from '@/lib/quotaDisplay';
 import type { QuotaStatus } from '@/lib/planTypes';
@@ -109,34 +100,12 @@ export default function SettingsScreen() {
     }
   }
 
-  // Web stays in the current tab — popup blockers must not make a required legal link inert.
-  // Native prefers the in-app browser sheet (`SFSafariViewController` / Custom Tabs), then the
-  // OS URL handler. Every failure reaches visible copy instead of repeating #96's silent tap.
-  async function openPrivacyPolicy() {
+  // The open chain (same-tab on web, in-app browser then OS handler on native) lives in
+  // `src/lib/openPrivacyPolicy.ts`, shared with the intake screen's consent row; every failure
+  // reaches visible copy instead of repeating #96's silent tap.
+  async function handleOpenPrivacyPolicy() {
     setPrivacyPolicyError(null);
-
-    if (Platform.OS === 'web') {
-      try {
-        window.location.assign(PRIVACY_POLICY_URL);
-      } catch {
-        setPrivacyPolicyError(
-          'Could not open the privacy policy. Check your connection and try again.'
-        );
-      }
-      return;
-    }
-
-    try {
-      await WebBrowser.openBrowserAsync(PRIVACY_POLICY_URL);
-    } catch {
-      try {
-        await Linking.openURL(PRIVACY_POLICY_URL);
-      } catch {
-        setPrivacyPolicyError(
-          'Could not open the privacy policy. Check your connection and try again.'
-        );
-      }
-    }
+    setPrivacyPolicyError(await openPrivacyPolicy());
   }
 
   async function handleDeleteAccount() {
@@ -193,7 +162,7 @@ export default function SettingsScreen() {
               hint="What we collect, who sees it, and how to delete it"
               accessibilityRole="link"
               accessibilityHint="Opens the Pace Blueprint privacy policy"
-              onPress={openPrivacyPolicy}
+              onPress={handleOpenPrivacyPolicy}
             />
           </Group>
 

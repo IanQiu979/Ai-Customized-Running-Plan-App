@@ -3,7 +3,6 @@ import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -33,7 +32,6 @@ import {
 import { useTheme } from '@/hooks/use-theme';
 import { PrimaryAction } from '@/components/ui/ActionButton';
 import { API_BASE_URL, describeError, getIntake, putIntake } from '@/lib/apiClient';
-import { PRIVACY_POLICY_URL } from '@/constants/legal';
 import {
   clockFieldError,
   clockPartsToSeconds,
@@ -51,6 +49,7 @@ import {
 import { CUE_DELAY, SURVEY_TIMELINE } from '@/lib/buildMotion';
 import { getGoalRealismIntakeCopy } from '@/lib/goalRealismDisclosure';
 import { assessGoalRealism } from '@/lib/paceDerivation';
+import { openPrivacyPolicy } from '@/lib/openPrivacyPolicy';
 import { intakeRaceDateError } from '@/lib/planRequest';
 import type { ExperienceAnswer, InjuryFlag, RaceDistance } from '@/lib/planTypes';
 
@@ -633,45 +632,65 @@ function GuardianConsentRow({
   onToggle: () => void;
   theme: ReturnType<typeof useTheme>;
 }) {
+  const [policyError, setPolicyError] = useState<string | null>(null);
+
+  async function handleOpenPolicy() {
+    setPolicyError(null);
+    setPolicyError(await openPrivacyPolicy());
+  }
+
   return (
-    <Pressable
-      accessibilityRole="checkbox"
-      accessibilityState={{ checked }}
-      accessibilityLabel="Parent or guardian consent"
-      onPress={onToggle}
-      style={({ pressed }) => [
-        styles.consentRow,
-        {
-          borderColor: checked ? theme.text.primary : theme.hairline,
-          backgroundColor: theme.surface.raised,
-        },
-        pressed && styles.pressed,
-      ]}
-    >
-      <View
-        style={[
-          styles.consentBox,
+    <View style={styles.consentGroup}>
+      <Pressable
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked }}
+        accessibilityLabel="Parent or guardian consent"
+        onPress={onToggle}
+        style={({ pressed }) => [
+          styles.consentRow,
           {
             borderColor: checked ? theme.text.primary : theme.hairline,
-            backgroundColor: checked ? theme.text.primary : 'transparent',
+            backgroundColor: theme.surface.raised,
           },
+          pressed && styles.pressed,
         ]}
       >
-        {checked ? (
-          <Text style={[styles.consentBoxMark, { color: theme.surface.base }]}>✓</Text>
-        ) : null}
-      </View>
-      <Text style={[styles.consentText, { color: theme.text.primary }]}>
-        I am 13–17, and a parent or guardian has read{' '}
-        <Text
-          style={[styles.consentLink, { color: theme.text.primary }]}
-          onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}
+        <View
+          style={[
+            styles.consentBox,
+            {
+              borderColor: checked ? theme.text.primary : theme.hairline,
+              backgroundColor: checked ? theme.text.primary : 'transparent',
+            },
+          ]}
         >
-          the privacy policy
-        </Text>{' '}
-        and agrees to it on my behalf.
-      </Text>
-    </Pressable>
+          {checked ? (
+            <Text style={[styles.consentBoxMark, { color: theme.surface.base }]}>✓</Text>
+          ) : null}
+        </View>
+        <Text style={[styles.consentText, { color: theme.text.primary }]}>
+          I am 13–17, and a parent or guardian has read{' '}
+          <Text
+            accessibilityRole="link"
+            accessibilityHint="Opens the Pace Blueprint privacy policy"
+            style={[styles.consentLink, { color: theme.text.primary }]}
+            onPress={handleOpenPolicy}
+          >
+            the privacy policy
+          </Text>{' '}
+          and agrees to it on my behalf.
+        </Text>
+      </Pressable>
+      {policyError ? (
+        <Text
+          accessibilityRole="alert"
+          accessibilityLiveRegion="assertive"
+          style={[styles.fieldError, { color: theme.status.error }]}
+        >
+          {policyError}
+        </Text>
+      ) : null}
+    </View>
   );
 }
 
@@ -791,6 +810,9 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: PressedOpacity,
+  },
+  consentGroup: {
+    gap: Spacing.one,
   },
   consentRow: {
     flexDirection: 'row',
