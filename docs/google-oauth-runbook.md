@@ -60,7 +60,8 @@ On a physical phone:
 
 1. Start Expo with `.env` pointing `EXPO_PUBLIC_API_BASE_URL` at
    `https://pace-blueprint-production.i78979848.workers.dev` (never `localhost`).
-2. Open the app in Expo Go, tap **Continue with Google**, and use the captain's Google account.
+2. Open the app in Expo Go or in the Android development-client build (`docs/build.md`), tap
+   **Continue with Google**, and use the captain's Google account.
 3. If Google says the app is unavailable to this user, fix **Audience → Test users** or publish the
    consent screen. If the app reports that the server credential may be out of date, reset
    `GOOGLE_CLIENT_SECRET` as above and redeploy.
