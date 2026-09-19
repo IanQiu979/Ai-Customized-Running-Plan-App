@@ -294,8 +294,13 @@ describe('golden 5K path — the coach-authored plan is verified against the cap
     'intermediate — experienced, 27 km/wk, 16 y/o': { peakLongRunKm: 8, firstLongRunKm: 8, peakLoadingWeekKm: 30 },
     'intermediate — experienced, 45 km/wk, 55 y/o': { peakLongRunKm: 17, firstLongRunKm: 13, peakLoadingWeekKm: 54 },
     // Generic path since 2026-09-16: 72 km / 24 km on the golden curve before, where the "peak"
-    // was a flagged-rest week 9 that had actually loaded (77 km). The generic curve's honest peak.
-    'advanced — competitive, 60 km/wk, 30 y/o (generic path since 2026-09-16)': { peakLongRunKm: 23, firstLongRunKm: 17, peakLoadingWeekKm: 69 },
+    // was a flagged-rest week 9 that had actually loaded (77 km). The generic curve's honest peak —
+    // 69 km / 23 km until 2026-09-19, when the generic path stopped reading `FIVE_K_LONG_RUNS`'
+    // week-4/8 recovery dips as loading-week long runs (`holdRecoveryDips`); this runner's 3-week
+    // cadence never rested on those weeks, so the dips had been throttling loading weeks 4 and 8
+    // and, through the growth base, every week after them. 82 km is the curve's own 137% of 60,
+    // inside every cap the suite above enforces.
+    'advanced — competitive, 60 km/wk, 30 y/o (generic path since 2026-09-16)': { peakLongRunKm: 26, firstLongRunKm: 17, peakLoadingWeekKm: 82 },
     'advanced — competitive, 80 km/wk, 55 y/o': { peakLongRunKm: 34, firstLongRunKm: 23, peakLoadingWeekKm: 98 },
   };
 

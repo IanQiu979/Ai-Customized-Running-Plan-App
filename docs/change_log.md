@@ -5,6 +5,80 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-09-19 — Three plan-engine rulings: dateless distance plans, the #103 peak invariant, the 35–45% source annotations
+
+Captain's rulings of 2026-09-19 (firstmate task `v22-plan-engine-captain-calls-r1`), GitHub
+issues #76, #103 and #101. All three were re-verified against `main` before anything changed.
+
+- **#76 — a paid plan with a race distance but no race date keeps `raceDistance`, titled as a
+  Base Plan.** `buildTemplatePlan` (`src/lib/planTemplates.ts`) used to write `raceDistance`
+  onto the returned `Plan` only when `isRacePlan` was true, so a runner who named a half but
+  booked no race got `"N-Week Running Plan"` with the distance gone — invisible and unrecoverable,
+  even though `generalPhaseWeights` had shaped the block to it. It now mirrors the Free library's
+  `buildLibraryPlan`: three titles keyed on what the runner said — `"N-Week 10K Plan"` (race with
+  a date), `"N-Week 10K Base Plan"` (distance, no date), `"N-Week Running Plan"` (no distance) —
+  and `raceDistance` is set whenever it is known. **`raceDate` is the only field that means a race
+  is booked.** Reader audit: the plan view already keyed its race line on `plan.raceDate`; the
+  race-only engine outputs (`readinessPath`, `goalRealism`, taper phase, race week, the RP
+  session) stay gated on the race goal type, which the Worker's `validateRequest` only accepts
+  with a `raceDate`; the one reader that presented the distance as a race — the Pro/Elite
+  personalization prompt's context line — now says `Target distance:` plus either `Race date:` or
+  an explicit "no race is booked — an open-ended base block" line, so the model cannot write a
+  base block up as a race build. Pinned in `planTemplates.noRace.test.ts`,
+  `planTemplates.general.test.ts`, `workers/test/planEngine.test.ts` and
+  `workers/test/planPersonalizationPrompt.test.ts`.
+- **#103 — the product invariant is "the peak phase's highest loading week is never below the
+  base phase's highest loading week"; a peak under a mid-build loading spike is tolerated if
+  disclosed.** Two engine defects put peak weeks under the base high, and both are mechanics,
+  not coaching numbers:
+  1. *Taper alignment* (`sampleCurve`). The phase allocator sets a plan's taper-week count from the
+     distance's phase weights, while each curve carries its taper as a fixed number of trailing
+     entries; interpolating the whole curve across the whole plan let the two disagree whenever
+     the plan's length differed from the curve's — every 14-week half plan gave the allocator one
+     taper week but the 16-entry curve's two-entry taper 1.75 of them, so the last *peak* week was
+     sampled 85% of the way down the taper slope and rendered 1 km under the base high (108 of the
+     sweep's offenders). The loading block of the curve is now interpolated across the plan's
+     non-taper weeks and the taper entries across its taper weeks; no curve value changes.
+  2. *Held long-run curves* (`holdRecoveryDips`). The four `*_LONG_RUNS` arrays keep their
+     authored recovery dips at every fourth entry, but since 2026-09-12 a rest week takes its long
+     run from `deloadLongRun`, so a dip only ever landed on a *loading* week — where it pulled
+     the long run down and, because no easy run may outgrow the long run, the whole week with it,
+     and through the growth base every week after. That is the same throttling the weekly-load
+     curves were already cured of (`FIVE_K_WEEKLY_LOAD_GENERIC` and the three dip-free distance
+     curves). The generic path now reads each long-run curve with its loading block held at the
+     running maximum (the curve architecture's HOLD week — every value still the coach's own, the
+     taper tail byte-identical). `FIVE_K_LONG_RUNS` itself and the golden 12-week/4-day path are
+     untouched and still byte-pinned.
+  Measured on the standing 22,000-plan sweep, before → after: **peak-below-base 458 → 348, the
+  old peak-below-any-pre-peak-loading-week metric 758 → 352**, no plan entering either set,
+  2,692 plans with a higher peak and 364 with a lower one (1 km re-sampling shifts), 4,548 with
+  more total volume and 2,552 with less. `planTemplates.progression.test.ts` now encodes the
+  base-high invariant as its exact-membership mask (348), asserts that every remaining offender
+  belongs to one of two named families (below), and asserts the tolerance half of the ruling: every
+  plan whose peak sits below a build-phase loading spike carries the new one-sentence flag
+  (`buildSpikeDisclosure`: "Your highest-distance week is week N, in the build phase; the peak
+  weeks carry a little less distance and more race-specific intensity."), nothing else does, and
+  there are 48 such plans, pinned as a ceiling. Two witness pins moved with the re-sampling and are
+  annotated in place (20-week 3-day 5K: 21/21 → 24/24 with a 19 km base high; the advanced 60 km
+  12-week generic 5K: 69 km/23 km → 82 km/26 km, the curve's own 137%). **Not zero — the 348 that
+  remain are two families whose only remedies change a coaching or safety number, so they go back
+  to the captain (`docs/mvp-progress.md` → Blocked):** (a) beginner three-day 5K plans, 320 —
+  with one 8 km-nominal tempo (≈23% of the week) the beginner three-run share ceiling (1.1/3) and
+  the easy-run-≤-long-run rule cap the week at ~86% of target, so the growth base decays to the
+  tempo's 3 km floor and the peak renders ~11 km against a week-1 base high; (b) the golden
+  12-week/4-day 5K path at 50–110 km/week, 28 — scaled past ~50 km its two-easy-run base/build
+  weeks and one-easy-run peak weeks pin to the same flat share cap at different totals. Also
+  surfaced, not fixed: 150 sweep plans whose peak *phase* is a single week that is also a rest
+  week (first-timer weighting at 10 weeks, for instance), so they have no loading peak at all.
+- **#101 — the three coaching source ports now carry a one-line supersession note under each
+  35–45% ruling annotation** (`docs/reference/coaching/source/load_rules.md` × 2,
+  `training_zones.md`, `workout_library.md`): superseded 2026-09-06, down weeks are 15–25%, see
+  `load-rules.md` § Deload trigger, `DELOAD_REDUCTION_MIN`/`_MAX` (0.15/0.25) in
+  `src/lib/loadRules.ts` are authoritative, annotation kept as history. The wording is the
+  captain's to approve in the PR. `ECHO_Training_Plans_McMillan.md` line ~1305 still says
+  "reduce volume 35-45%" inside a plan example and was not in the issue's scope — flagged, not
+  edited.
+
 ## 2026-09-19 — A declared injury cuts a Free plan once, not every week (issue #106)
 
 Reported by the captain on 2026-09-13 while sweeping rest weeks on `fm/v22-deload-rest-week-bug`,

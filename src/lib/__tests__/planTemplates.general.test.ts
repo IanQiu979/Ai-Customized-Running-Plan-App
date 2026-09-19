@@ -199,9 +199,12 @@ describe('buildTemplatePlan — parametric inputs', () => {
   );
 
   it('does not leak race fields or race sessions into a duration plan', () => {
+    // `build` names a 5K distance on every intake, so this is a distance-with-no-date block: it
+    // keeps the distance and is titled as a base block (issue #76), but nothing race-only leaks —
+    // `raceDate` is the one field that means a race is booked.
     const plan = build({ goalType: 'duration', durationWeeks: 8 });
-    expect(plan.title).toBe('8-Week Running Plan');
-    expect(plan.raceDistance).toBeUndefined();
+    expect(plan.title).toBe('8-Week 5K Base Plan');
+    expect(plan.raceDistance).toBe('5k');
     expect(plan.raceDate).toBeUndefined();
     expect(plan.goalRealism).toBeUndefined();
     expect(

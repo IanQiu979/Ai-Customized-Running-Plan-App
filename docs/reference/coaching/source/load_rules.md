@@ -44,12 +44,16 @@ The planning system must calculate proposed weekly km. If proposed total exceeds
 The increase cap applies to increases only — deload-week decreases are exempt from it. Deload weeks reduce volume by 35-45% (see Deload Trigger below).
 
 > 📌 **RULING (Ian, 2026-07-10):** **Deload = 35-45% volume reduction. Authoritative everywhere.** This clause previously read "Volume can decrease by any amount during deload weeks... even 50% reduction is fine." The library carried four different deload numbers: 20-30% (Deload Trigger below, `training_zones.md` Deload Frequency, and `workout_library.md` Part 3's Standard Protocol), "any amount... even 50%" (this clause), "50% volume" (`ECHO_Training_Plans_McMillan.md` General Principles), and ~35-45% (`workout_library.md` Part 3's worked examples: ~40% beginner, ~45% intermediate, 35-40% advanced). Ian ruled the worked examples reflect his actual practice; 35-45% now governs in all files.
+>
+> ↩️ **Superseded 2026-09-06 by Ian's ruling:** down weeks are **15–25%** lower, not 35–45% — see `docs/reference/coaching/load-rules.md` § Deload trigger; the code's `DELOAD_REDUCTION_MIN`/`DELOAD_REDUCTION_MAX` (0.15/0.25) in `src/lib/loadRules.ts` are authoritative, and the annotation above is kept as history.
 
 ### Deload Trigger
 
 Every 3-4 weeks, reduce volume 35-45%.
 
 > 📌 **RULING (Ian, 2026-07-10):** Previously "reduce volume 20-30%." Reconciled to the authoritative 35-45% — see the ruling under "Exception — Recovery Weeks" above for the full history.
+>
+> ↩️ **Superseded 2026-09-06 by Ian's ruling:** down weeks are **15–25%** lower, not 35–45% — see `docs/reference/coaching/load-rules.md` § Deload trigger; the code's `DELOAD_REDUCTION_MIN`/`DELOAD_REDUCTION_MAX` (0.15/0.25) in `src/lib/loadRules.ts` are authoritative, and the annotation above is kept as history.
 
 | Level | Frequency |
 |-------|-----------|

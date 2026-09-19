@@ -231,16 +231,50 @@ describe('a target distance with no race date', () => {
     expect(phases).not.toContain('taper');
   });
 
-  it('does not put the distance on the plan as though a race were booked', () => {
+  it('keeps the distance on the plan as a base block, never as a booked race', () => {
+    // Issue #76 (captain's ruling, 2026-09-19): the periodization is shaped to the distance, so
+    // the plan records it and is titled as a Base Plan — mirroring `buildLibraryPlan`. A race is
+    // booked only when `raceDate` is set; that is the field every reader must test.
     const plan = buildTemplatePlan({
       intake: withDistance,
       goalType: 'duration',
       durationWeeks: 12,
-      tierAtGeneration: 'free',
-      density: 'free',
+      tierAtGeneration: 'pro',
+      density: 'paid',
     });
-    expect(plan.raceDistance).toBeUndefined();
-    expect(plan.title).toBe('12-Week Running Plan');
+    expect(plan.raceDistance).toBe('marathon');
+    expect(plan.raceDate).toBeUndefined();
+    expect(plan.title).toBe('12-Week Marathon Base Plan');
+    // Race-only fields stay off: no readiness verdict, no goal realism, no taper, no race day.
+    expect(plan.readinessPath).toBeUndefined();
+    expect(plan.goalRealism).toBeUndefined();
+    expect(phasesOf(plan)).not.toContain('taper');
+    expect(
+      plan.weeks
+        .flatMap((week) => week.days.filter(isWorkout))
+        .some((workout) => workout.label === 'Race Day' || workout.label === 'RP'),
+    ).toBe(false);
+  });
+
+  it('titles a base block by its distance for every distance, and a race by its race', () => {
+    const cases = [
+      ['5k', '8-Week 5K Base Plan'],
+      ['10k', '8-Week 10K Base Plan'],
+      ['half', '8-Week Half Marathon Base Plan'],
+      ['marathon', '8-Week Marathon Base Plan'],
+    ] as const;
+    for (const [raceDistance, title] of cases) {
+      const plan = buildTemplatePlan({
+        intake: { ...NO_RACE_INTAKE, raceDistance },
+        goalType: 'duration',
+        durationWeeks: 8,
+        tierAtGeneration: 'pro',
+        density: 'paid',
+      });
+      expect(plan.title).toBe(title);
+      expect(plan.raceDistance).toBe(raceDistance);
+      expect(plan.raceDate).toBeUndefined();
+    }
   });
 
   it('ends a no-race 10K block on its peak long run, not on a recovery dip', () => {

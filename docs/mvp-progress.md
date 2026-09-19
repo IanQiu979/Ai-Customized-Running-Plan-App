@@ -97,9 +97,13 @@
   place, the pre-clamp `longRunStartFloor` now reads `retainedQuality` too, so a three- or four-day
   week is no longer floored on the Q2 interval it never schedules (348 of 22,000 swept plans move,
   each by a 1 km long-run drop). Both halves of GitHub issue #99 have landed. The sweep's residual
-  peak-below-pre-peak-loading and peak-below-base offenders are pre-existing, unchanged by either
-  fix, and stay tracked by GitHub issue #103 — the captain scoped this pair to a zero-new-regression
-  gate, not a curve redesign (current counts: "Known debt" below). **Rest weeks shorten the long run first
+  peak-below-base offenders were ruled on 2026-09-19 (issue #103): the invariant is peak high ≥
+  **base** high, a peak under a mid-build spike is tolerated when the plan discloses it, and two
+  engine fixes (taper-aligned curve sampling, held long-run curves) took the sweep from 458 to 348
+  such plans with none entering — the 348 are two named families that need a captain decision
+  ("Blocked" below; counts in "Known debt"). A paid plan with a distance but no date now keeps
+  `raceDistance` and is titled a Base Plan (issue #76), and the three source ports carry the 15–25%
+  supersession note (issue #101) — `docs/change_log.md` 2026-09-19. **Rest weeks shorten the long run first
   (2026-09-12):** the skeleton's recovery weeks now size Day 7 at `loadRules.ts`'s
   `deloadLongRun` (§ 9's 60–70% of the preceding long run — the band the Free library already
   used) instead of leaving it on the loading curve while the easy runs absorbed the whole cut; the
@@ -1222,7 +1226,9 @@ to "Decided" below.
 | **Decided 2026-08-07: deploy the Worker.** How a phone reaches the backend — LAN against `wrangler dev` was the alternative and was declined; on-device testing waits on `wrangler deploy` (the row above) rather than a same-Wi-Fi workaround | all on-device testing; caused the 2026-08-07 `Network request failed` report | **Ian — ruled.** A loopback base URL is unreachable from a phone by construction, tunnel or not (see `.env.example`); once deployed, `EXPO_PUBLIC_API_BASE_URL` becomes the Worker's `https://` URL. The app now reports the unreachable case clearly instead of crashing, but cannot fix it |
 | `wrangler deploy --env production` for the 2026-08-10 (later) `INVALID_ORIGIN`/`INVALID_CALLBACK_URL` fix | email sign-up and Google sign-in against the deployed Worker | **Ian.** The fix (`workers/src/auth.ts`, `workers/wrangler.toml`) is merged and tested but not live until redeployed — see the "Last updated" entry above |
 | Google OAuth consent screen publishing status (Testing vs. production) — does it block real users, not just listed test accounts | Google sign-in for anyone other than a listed test user | **Ian**, in Google Cloud Console → OAuth consent screen. Not checkable or changeable by an agent |
-| Marathon's separate absolute single-run calibration for intermediate/advanced remains open. Since 2026-09-07 `maxSingleRunKm()` returns `Infinity` only for a `prepared` marathoner whose easy pace makes the 180-minute cap enforceable; everyone else (no recent time, advanced, first-timer) keeps the flat ≤25 / ≤35 km table, so the open question is now what number should replace the table for the prepared, pace-known case. The weekly-share number is settled at 35% and is not part of this blocker | the final marathon-specific absolute kilometre ceiling, and whether the unchanged 180-minute duration cap should remain the ultimate duration bound | **Ian.** `report-source.md` says the exact absolute policy is coaching judgment and notes McMillan sometimes permits up to four hours; this work settles the share at 35%, leaving only the absolute calibration and any future time-cap change open. The current 180-minute cap and 10% spike guard remain active. Separately, the fixed-position long-run-curve dips still do not realign with `deloadEveryWeeks` when resampled onto noncanonical durations; 35% controls magnitude but does not solve that structure. Valid deloads use the last loading week's denominator, so their displayed own-week ratio is not required to be ≤35%. |
+| **Beginner three-day 5K plans collapse to the tempo floor (issue #103 residual, 320 sweep plans).** With one quality session at the 5K tempo's 8 km nominal (≈23% of the week), the beginner three-run share ceiling (`LONG_RUN_SHARE_MARGIN.beginner` 1.1 → 36.7%) and the no-easy-run-outgrows-the-long-run rule cap a week at ~86% of its target, so the growth base decays week on week to the tempo's 3 km floor: a 30 km/week beginner's 8-week 5K plan renders 25, 22, 17, 14*, 14, 11, **11**, 18. Options: raise the beginner share margin to ≥1.157 (1.2 gives 40% at 3 runs, 30% at 4 — a safety-ceiling loosening #103's own acceptance criteria reserve to the captain); give the generic 5K tempo the 10 km nominal the other distances use (a coaching dose); or accept and disclose | every beginner 3-day 5K plan on the paid skeleton | **Ian.** Both remedies change a number the code is not allowed to pick |
+| **The golden 12-week/4-day 5K path at 50–110 km/week renders its peak under its base (issue #103 residual, 28 sweep plans).** Authored at 35 km/week; scaled past ~50 km its two-easy-run base/build weeks and its one-easy-run, two-quality peak weeks both pin to the flat intermediate share cap, at 54 km and 48 km. Options: route declared volumes above the point where the caps bind off the golden path onto the generic curve (the same class of decision as `golden-cadence3-route`), or accept | intermediate 4-day 12-week 5K runners declaring ≥50 km/week | **Ian.** Who gets the coach's plan is his call |
+| Marathon's separate absolute single-run calibration for intermediate/advanced remains open. Since 2026-09-07 `maxSingleRunKm()` returns `Infinity` only for a `prepared` marathoner whose easy pace makes the 180-minute cap enforceable; everyone else (no recent time, advanced, first-timer) keeps the flat ≤25 / ≤35 km table, so the open question is now what number should replace the table for the prepared, pace-known case. The weekly-share number is settled at 35% and is not part of this blocker | the final marathon-specific absolute kilometre ceiling, and whether the unchanged 180-minute duration cap should remain the ultimate duration bound | **Ian.** `report-source.md` says the exact absolute policy is coaching judgment and notes McMillan sometimes permits up to four hours; this work settles the share at 35%, leaving only the absolute calibration and any future time-cap change open. The current 180-minute cap and 10% spike guard remain active. The fixed-position long-run-curve dips that used to land on loading weeks when resampled onto noncanonical durations are gone since 2026-09-19 — the generic path reads the curves with their loading block held at the running maximum (`holdRecoveryDips`), and rest weeks size their own long run from `deloadLongRun`. Valid deloads use the last loading week's denominator, so their displayed own-week ratio is not required to be ≤35%. |
 
 None of the above blocks local work: everything in `workers/` runs offline against `wrangler dev`'s
 Miniflare emulation with no account. The list is the exact Cloudflare counterpart of what the audit
@@ -1347,6 +1353,17 @@ guidelines scout (`/Users/Guestyyyyyyyy/firstmate/data/v22-apple-kids-guidelines
 | `plantar-arch-injury-flag` | **Already shipped** in the 2026-08-03 batch above — confirmed still wired through `planTypes.ts`, `workers/src/routes.ts` validation, `src/app/intake.tsx`'s picker, and `loadRules.ts`'s reduction table. No further change needed. |
 | `fifty-plus-golden-deload-weeks` | **Weeks 4, 8, and 12** are deload weeks for 50+ runners on the golden 12-week 5K path — not the generic every-3-weeks modulo (which would land on 3/6/9). This is a golden-path-only override; the generic path's every-3-weeks-for-50+ cadence is unchanged. Week 12 (the race week) is flagged `isDeload: true` in addition to its existing race-day structure. Implementation: `buildCanonicalFiveKWeek()` in `planTemplates.ts`. |
 | `age-floor` (App Store declared minimum age) | **13**, unified with the backend intake validator. The two were briefly treated as separate (the backend floor had been raised to 13 in an earlier, unrelated commit — `8acc27c` — while a prior ruling had separately declined touching it), but the captain resolved that tension mid-task: both the backend validator (`workers/src/routes.ts:210`, already `age < 13`) and the App Store Connect age-rating questionnaire answer are 13. There is no in-repo App Store Connect config to edit — `eas init` has never been run (`docs/apple-dev-blocked.md`) — so the declared floor is recorded here as the value to use once submission is set up; the questionnaire itself remains a captain's-account action at submission time. |
+
+## Decided (2026-09-19) — three plan-engine rulings, `v22-plan-engine-captain-calls-r1`
+
+Issues #76, #103 and #101, each re-verified against `main` before the change. Full account:
+`docs/change_log.md`'s 2026-09-19 entry.
+
+| Item | Decision |
+|---|---|
+| #76 — a paid plan with a race distance but no race date | **Keeps `raceDistance`, titled `"N-Week 10K Base Plan"`, mirroring the Free library.** `raceDate` is the only "a race is booked" signal; every reader audited, and the personalization prompt now says so explicitly. |
+| #103 — which phase comparison is the product invariant | **The peak phase's highest loading week is never below the base phase's.** A peak under a mid-build loading spike is tolerated when disclosed with the standing one-sentence flag (`buildSpikeDisclosure`). Two mechanics fixes — taper-aligned curve sampling and held long-run curves — took the 22,000-plan sweep from 458 to 348 base-high offenders (old pre-peak metric 758 → 352), none entering; the mask in `planTemplates.progression.test.ts` now encodes the base-high invariant (348) and the tolerance property (48 disclosed spikes, pinned as a ceiling). The 348 remaining are two families whose remedies are coaching/safety numbers — back to the captain, "Blocked" above. |
+| #101 — the 35–45% ruling annotations in the source ports | **One-line supersession note under each of the four annotations across the three files**, pointing at `load-rules.md` § Deload trigger and the `DELOAD_REDUCTION_MIN`/`_MAX` constants. Wording is the captain's to approve in the PR. |
 
 ## Decided (2026-09-16) — golden 5K path admission, `v22-core-purpose-audit-r1` §1.3
 
@@ -1524,14 +1541,16 @@ intact underneath.
   lands on the easy runs (total in band, shape wrong). Found by extending the rest-week sweep to
   `H1` for #106; whether the pin is a cap or a value is a coaching reading, so it waits on Ian.
   The recovery suite sweeps that flag for the total band only until then.
-- 🟡 **The pre-existing peak-below-base offenders are still there — GitHub issue #103.** After both
-  tasks the 22,000-plan sweep reported **770** broad "peak below pre-peak loading" and **470**
-  literal "peak below base" plans (pre-Task-1: 954 broad, 470 literal); since the 2026-09-16
-  golden-path reroute the broad set is **758** — 14 golden offenders left it and two generic ones
-  entered by name, on the captain's authority (see "Decided (2026-09-16)"). They predate every fix
-  and were explicitly out of scope per the captain's 2026-09-09 decision, which scoped that pair to
-  a zero-new-regression gate rather than a curve/phase redesign. Closing them is a curve and phase
-  question, so it waits on Ian.
+- 🟡 **348 peak-below-base plans remain in the 22,000-plan sweep — GitHub issue #103, two
+  named families awaiting the captain.** History of the counts: 954 broad / 470 literal before
+  #99's Task 1, 770 / 470 after it, 758 broad after the 2026-09-16 golden reroute; the 2026-09-19
+  ruling made peak-high ≥ **base**-high the invariant (458 such plans on `main` that morning) and
+  the two mechanics fixes took it to **348** (the old broad metric to 352) with no plan entering
+  either set. Every one of the 348 is a beginner three-day 5K plan (320) or the golden
+  12-week/4-day 5K path at 50–110 km/week (28) — see "Blocked" for the options; the progression
+  suite asserts that membership by family, so a new offender outside them fails by name. Also
+  surfaced there: 150 sweep plans whose peak *phase* is a single week that is also a rest week, so
+  they have no loading peak at all — not counted by either metric, not yet ruled on.
 - 🟡 **The client's and the Worker's `better-auth` versions must match, and only the lockfile
   holds them together (2026-09-05).** They are two separate npm projects sharing one wire format
   (cookie envelope, `/sign-in/social` state, session payload). During the
