@@ -27,7 +27,9 @@ src/
                           #                system fonts, issue #21); ThemeProvider is fed
                           #                constants/navigation-theme.ts's tokened Theme, and
                           #                gates the whole Stack behind Stack.Protected on
-                          #                authClient.useSession() (no anonymous browsing)
+                          #                authClient.useSession() (no anonymous browsing) —
+                          #                except reset-password and verify-email, registered
+                          #                outside both guards (issue #94, see below)
     (auth)/
       _layout.tsx          # stack layout for the signed-out route group
       index.tsx             # redirect anchor -> onboarding (2026-08-08; was sign-up). Note this is
@@ -44,10 +46,20 @@ src/
       sign-in.tsx            # email/password sign-in + a "Continue with Google" button; Google
                               #   provider live in production since 2026-08-09. Minimal since
                               #   2026-09-14 (spec §V22-06: the auth pages carry nothing) — wordmark,
-                              #   heading, fields, and a "Back to the start" link to onboarding
+                              #   heading, fields, and a "Back to the start" link to onboarding.
+                              #   Since 2026-09-20 (issue #94): a "Forgot your password?" link, and
+                              #   on EMAIL_NOT_VERIFIED an explicit "Resend the link" (through
+                              #   apiClient's resendVerificationEmail — never a callbackURL on
+                              #   sign-in itself, see workers/src/auth.ts's sendOnSignIn note)
       sign-up.tsx            # email/password sign-up + the same Google button, same treatment and
-                              #   the same link back
-                            #   both auth screens scroll (KeyboardAvoidingView + ScrollView) as of
+                              #   the same link back. Passes callbackURL: createVerifyEmailURL();
+                              #   when the Worker withholds the session (token: null — verification
+                              #   required) it shows "Check your inbox" instead of navigating
+      forgot-password.tsx    # issue #94 (2026-09-20) — reads GET /api/email-status on mount and,
+                              #   when the Worker cannot send mail, says so in place of the form;
+                              #   otherwise requestPasswordReset with the app's /reset-password
+                              #   callback, then a generic "if an account exists" confirmation
+                            #   all auth screens scroll (KeyboardAvoidingView + ScrollView) as of
                             #   2026-08-08 — centred content used to be unreachable under a keyboard
     (tabs)/
       _layout.tsx          # icon-only tab bar — Home, Glossary, My Plans, Settings. Every icon
@@ -113,8 +125,19 @@ src/
     paywall.tsx              # dummy paywall (new 2026-08-05) — a Stack route, reached from
                               #  Settings or from Home's generate-plan 402 over_quota catch;
                               #  calls POST /api/purchase-tier, honest "test upgrade" copy
+    reset-password.tsx       # issue #94 (2026-09-20) — where the mailed reset link lands, at the
+                              #  ROOT and outside both Stack.Protected groups (a deep link opens in
+                              #  either session state). ?token= → new password + confirm →
+                              #  resetPassword → "Password updated"; ?error= or nothing → "Link
+                              #  expired". The token is read from the URL, posted once, never logged
+    verify-email.tsx         # issue #94 — where the mailed verification link lands, same placement
+                              #  and reason. Bare arrival = "Email verified" (refetches the session);
+                              #  ?error= = "Link expired" with a resend when signed in
   components/
-    auth/                   # AuthField — the labelled text input both auth screens use
+    auth/                   # AuthField — the labelled text input every auth screen uses;
+                             #  VerifyEmailBanner (issue #94) — Home's "verify your email" card,
+                             #  self-contained: reads the session and GET /api/email-status and
+                             #  renders only for an unverified account on a mail-capable Worker
     build/                  # the build animations (new 2026-09-14) — "the plan builds itself".
                              # WeekStrip (the animated strip every build is made of), CountUp (the
                              # ticking Number), FadeIn, DesignCanvas (the 393×852 page canvas,
@@ -173,7 +196,17 @@ src/
                               #  (`authClient` — sign-up/sign-in/sign-out/useSession, session
                               #  persisted via expo-secure-store) plus typed fetch wrappers for
                               #  every other `/api/*` route; re-exports apiErrors.ts's error
-                              #  vocabulary so screens keep one import site
+                              #  vocabulary so screens keep one import site. Since 2026-09-20:
+                              #  getEmailStatus(), resendVerificationEmail(email) (the one caller
+                              #  of send-verification-email) and useSessionUser(), the typed door
+                              #  onto user.email / user.emailVerified — the expoClient cast types
+                              #  useSession().data as `never`
+    authEmail.ts             # pure (new 2026-09-20, issue #94) — the client half of password
+                              #  recovery and email verification: the two callback URLs via
+                              #  expo-linking, each landing screen's entry state from its
+                              #  ?token= / ?error= params, the password-match check, the
+                              #  banner/pending-sign-up predicates, and the flow's shared copy
+                              #  constants. 28 unit tests
     apiErrors.ts              # pure error vocabulary for every `/api/*` call: `ApiError` (server
                                #  answered and refused) vs `NetworkError` (nothing answered),
                                #  `describeError()` for the user-facing message. Split out so it
@@ -243,7 +276,8 @@ src/
                               # goalRealismDisclosure, planRequest, fieldInput (new 2026-08-15),
                               # buildMotion, weekStrip, planProgress (new 2026-09-14),
                               # confirmDestructive (11 tests, new 2026-09-16),
-                              # openPrivacyPolicy (issue #89, 2026-09-19)
+                              # openPrivacyPolicy (issue #89, 2026-09-19),
+                              # authEmail (28 tests) and apiClient.emailStatus (issue #94, 2026-09-20)
                               # — the two engine contracts included
 ```
 
@@ -306,10 +340,17 @@ workers/                    # a SEPARATE npm project; Metro is told to skip it (
     0003_intake_age_floor.sql / 0003_raise_intake_age_floor.sql   # the 13+ age floor
     0004_guardian_consent.sql # guardian_consent — one row per 13–17 user, consent event
   src/
-    index.ts                # authenticate once, then dispatch — the route table
-    auth.ts                 # better-auth on D1, email/password + Bearer sessions
+    index.ts                # authenticate once, then dispatch — the route table (plus the one
+                            # public app route, GET /api/email-status)
+    auth.ts                 # better-auth on D1, email/password + Bearer sessions; since 2026-09-20
+                            # also password reset + email verification (issue #94) and a
+                            # reset-token-redacting error logger
+    auth-email.ts           # resolveAuthMailRuntime(env) → { sendMail, mailConfigured,
+                            # verificationRequired }, and the two mail templates
     routes.ts               # handlers, each taking an already-verified userId
-    deps.ts                 # the only file that reads a secret; binds every seam
+    deps.ts                 # binds every plan-engine seam and reads ANTHROPIC_API_KEY
+    lib/mail.ts             # provider-agnostic sendMail — ResendAdapter (RESEND_API_KEY +
+                            # MAIL_FROM) or ConsoleAdapter (logs one redacted line, sends nothing)
     lib/store.ts            # every D1 statement — authorization lives here
     lib/generate-plan-flow.ts  # the eleven pipeline steps, pure, deps injected
     lib/planEngine.ts       # skeleton + personalizer seams (bound 2026-08-04 and 2026-08-10);
@@ -324,13 +365,40 @@ Full operational detail — how to run it, what the captain must do himself, why
 it is — lives in [`workers/README.md`](../workers/README.md).
 
 **Working today**, verified against `wrangler dev` and by the test suite: email/password auth with
-Bearer sessions, the quota ledger (reserve → settle/release, atomic gate, idempotency replay,
-fallback exemption), `quota-status`, `purchase-tier`, `delete-account`, intake read/write, and plan
-reads. **`generate-plan` now returns a real plan**, as of the 2026-08-04 skeleton binding — Free
+Bearer sessions, password reset and email verification (below), the quota ledger (reserve →
+settle/release, atomic gate, idempotency replay, fallback exemption), `quota-status`,
+`purchase-tier`, `delete-account`, intake read/write, and plan reads. **`generate-plan` now returns a real plan**, as of the 2026-08-04 skeleton binding — Free
 and, as a template fallback, Pro/Elite. **As of 2026-08-10 the Pro/Elite personalization prompt is
 bound too** (`workers/src/lib/planPersonalizationPrompt.ts`) — see "generate-plan" below. The one
 remaining gap is `ANTHROPIC_API_KEY`, unset everywhere, so Pro/Elite generation still serves the
 template plan as a quota-exempt fallback until the captain provisions it.
+
+**Transactional mail — password reset and email verification (2026-09-20, issue #94).**
+`workers/src/lib/mail.ts` is a provider-agnostic `sendMail({ to, subject, text, html })` with two
+adapters: `ResendAdapter` (Resend's HTTP API, chosen when `RESEND_API_KEY` **and** `MAIL_FROM` are
+both set and non-blank; a failed send throws with the HTTP status only, never a provider body) and
+`ConsoleAdapter` (chosen otherwise; logs one `mail_skipped_unconfigured` line with the subject and
+nothing else — never the recipient, link or token — and sends nothing).
+`workers/src/auth-email.ts`'s `resolveAuthMailRuntime(env)` picks the adapter per request and
+returns `{ sendMail, mailConfigured, verificationRequired }`, where
+`verificationRequired = mailConfigured && MAIL_VERIFICATION_REQUIRED === 'true'`; the flag is a
+committed, non-secret var set to `"false"` in both `[vars]` and `[env.production.vars]`. Both
+secrets go through `.dev.vars` / `wrangler secret put … --env production`, never `wrangler.toml`.
+`createAuth` wires that runtime into better-auth: `emailAndPassword.sendResetPassword`,
+`revokeSessionsOnPasswordReset: true`, `requireEmailVerification: verificationRequired`;
+`emailVerification.sendOnSignUp: mailConfigured`, `sendOnSignIn: false` (deliberate — the app
+cannot pass `callbackURL` on `sign-in/email` because on web the client's redirect plugin would
+navigate to it, so an auto-sent link would carry the default `/` callback, the Worker root; the
+sign-in screen resends explicitly instead); `advanced.backgroundTasks` runs the sends through
+`ctx.waitUntil`. Every mailed link is the Worker's own URL — it spends the token server-side and
+`302`s to the `callbackURL` the app supplied (`?token=` appended for a reset; bare or `?error=` for
+a verify). Both the better-auth error logger and `index.ts`'s unhandled-error path redact
+`reset-password/<token>` paths, URLs and secret/token/code/state-keyed values. So: with no
+provider configured (every deployment today), sign-up still creates a session immediately, no mail
+is sent, and the app's forgot-password screen says so — see `GET /api/email-status` in the API
+table and the captain's runbook, [`email-setup.md`](email-setup.md). `workers/vitest.config.ts`
+blanks both secrets so no test can send mail; `workers/test/auth-email.test.ts` drives both round
+trips against real D1.
 
 `src/lib/supabase.ts` and `supabase/functions/.env.example` are **legacy**. Nothing imports the
 Supabase client any more and no Supabase project is used. Both are kept rather than deleted so the
@@ -365,7 +433,10 @@ server, `describeError()` to turn either into a message screens can show), re-ex
 `TypeError` used to fall through that check into a generic, misleading fallback message — see
 `docs/change_log.md`'s 2026-08-07 entry for the full story. `src/app/(auth)/sign-in.tsx` and
 `sign-up.tsx` are the two screens built against it —
-email/password, plus a "Continue with Google" button. Native Google auth is driven by
+email/password, plus a "Continue with Google" button — joined on 2026-09-20 by
+`(auth)/forgot-password.tsx` and the root-level `reset-password.tsx` / `verify-email.tsx`
+(issue #94), whose decisions live in the pure `src/lib/authEmail.ts`; `apiClient.ts` gained
+`getEmailStatus()`, `resendVerificationEmail()` and `useSessionUser()` for them. Native Google auth is driven by
 `signInWithGoogle()` in `apiClient.ts`: it asks better-auth for an authorization URL without an
 automatic redirect, opens `@better-auth/expo`'s browser proxy (so the browser receives the signed
 OAuth state cookie), observes the deep-link result, turns callback errors into user copy, stores the
@@ -378,7 +449,11 @@ real human Google login; the exact proof and console contract are in
 [`google-oauth-runbook.md`](google-oauth-runbook.md). Worker callback errors use a redacting logger
 so token/state failures are visible without secrets. The root layout (`src/app/_layout.tsx`) reads `authClient.useSession()` and gates the entire route tree
 on it with Expo Router's `Stack.Protected` — there is no anonymous browsing at all, matching every
-`/api/*` route already 403ing anonymously.
+`/api/*` route already 403ing anonymously. The two exceptions, since 2026-09-20, are
+`reset-password` and `verify-email`: they are registered outside both `Stack.Protected` groups
+because the mailed link that opens them can arrive in either session state, and nothing on them is
+session-sensitive — the URL token is the only credential and the Worker is the only thing that can
+spend it.
 
 **Sign-up → Intake redirect (2026-08-04).** A fresh signup must land on Intake, not on `(auth)` or
 nowhere. `sign-up.tsx` unmounts as soon as `_layout.tsx`'s `Stack.Protected` swaps the signed-in
@@ -442,9 +517,20 @@ test`).
 src/app/
   (auth)/sign-in, sign-up  # exists today — email/password; Google provider live in production
                            # since 2026-08-09. Gated in by root Stack.Protected when there is no
-                           # session.
+                           # session. Sign-in links to forgot-password and offers a verification
+                           # resend on EMAIL_NOT_VERIFIED; sign-up shows "Check your inbox" when
+                           # the Worker withholds the session (issue #94, 2026-09-20)
+  (auth)/forgot-password   # exists today (2026-09-20) — email → requestPasswordReset, or the honest
+                           # "can't send email" message when GET /api/email-status says so
+  reset-password           # exists today (2026-09-20) — the reset link's landing; ROOT level,
+                           # outside both Stack.Protected groups, renders in either session state
+  verify-email             # exists today (2026-09-20) — the verification link's landing; same
+                           # placement. Both are reached only by deep link (paceblueprint://…,
+                           # exp://…/--/…, or the web origin), never by in-app navigation
   (tabs)/index          # Home / Create plan — tier + quota and the primary action lead the screen;
-                         # Notes/subscription disclosures wait for a persisted generated plan
+                         # Notes/subscription disclosures wait for a persisted generated plan.
+                         # Carries VerifyEmailBanner under the header (issue #94), which renders
+                         # only for an unverified account on a mail-capable Worker
   (tabs)/glossary       # compact, collapsed-by-default abbreviation disclosures; not in the
                          # original blueprint's tab list; added for Ian's 2026-07-11 notation ruling
   (tabs)/my-plans       # My Plans — permanent Example Plan plus GET /api/plans rows; no empty
@@ -487,6 +573,24 @@ src/lib/
                             #                fetch wrappers for the app's `/api/*` routes
   apiErrors.ts              # exists today (2026-08-07) — pure `ApiError`/`NetworkError`/
                              #                `describeError()`, re-exported from `apiClient.ts`
+  authEmail.ts             # exists today (2026-09-20, issue #94) — the client half of password
+                            #          recovery and email verification, pure so every decision is
+                            #          tested without a render: `createResetPasswordURL()` /
+                            #          `createVerifyEmailURL()` (the app's `callbackURL`s, built
+                            #          through `expo-linking` so one code path yields
+                            #          `paceblueprint://…` in a built app, `exp://…/--/…` in Expo
+                            #          Go and the page origin on web — all in the Worker's
+                            #          `trustedOrigins`); `resolveResetPasswordEntry()` (`?token=`
+                            #          → form, `?error=` or nothing → invalid) and
+                            #          `resolveVerifyEmailEntry()`; `newPasswordProblem()` (match
+                            #          only — the 8-character minimum stays server-side);
+                            #          `isEmailNotVerifiedError()`, `isVerificationPendingSignUp()`
+                            #          (better-auth answers `token: null` when verification is
+                            #          required), `shouldShowVerifyEmailBanner()`; and the flow's
+                            #          shared copy strings as exported constants (the
+                            #          not-configured, invalid-link, mismatch and lifetime
+                            #          messages — the screens' own titles and labels stay in their
+                            #          JSX; `docs/mvp-progress.md` → Blocked lists them all).
   confirmDestructive.ts    # exists today (2026-09-16, issue #96) — `confirmDestructive(prompt,
                             #          onConfirm)`: the OS `Alert.alert` on native (cancel +
                             #          destructive button), the browser's `window.confirm` on web,
@@ -767,8 +871,9 @@ it `getSession()` ignores the header and every route 403s a user who just signed
 
 | Method / Route | Auth | Body | Returns | Notes |
 |---|---|---|---|---|
-| `ANY /api/auth/*` | — | better-auth's own | better-auth's own | Sign-up, sign-in, sign-out, session, OAuth callbacks. Email/password and Google both work in production (Google since 2026-08-09 — see `docs/change_log.md`). |
+| `ANY /api/auth/*` | — | better-auth's own | better-auth's own | Sign-up, sign-in, sign-out, session, OAuth callbacks. Email/password and Google both work in production (Google since 2026-08-09 — see `docs/change_log.md`). Since 2026-09-20 (issue #94) also `request-password-reset`, `reset-password`, `send-verification-email` and the two mailed-link endpoints (`GET reset-password/:token`, `GET verify-email`) that spend the token and `302` to the app's `callbackURL`; a reset revokes every session; an unknown address gets the same `200` as a known one; an untrusted `callbackURL` is `403`. Sign-in answers `EMAIL_NOT_VERIFIED` only when `verificationRequired` is true (below). |
 | `GET /health` | none | — | `{ ok: true }` | Liveness. Touches no database. |
+| `GET /api/email-status` | none | — | `{ mailConfigured: boolean, verificationRequired: boolean }` | The only unauthenticated app route besides `/health` (issue #94, 2026-09-20). Booleans only — never which provider or credential is set — with `cache-control: no-store`. `mailConfigured` is true when `RESEND_API_KEY` and `MAIL_FROM` are both bound; `verificationRequired` is `mailConfigured && MAIL_VERIFICATION_REQUIRED === "true"`. Read by `(auth)/forgot-password` (form vs. honest "can't send email" message) and Home's `VerifyEmailBanner` (shown only when true and the account is unverified). |
 | `POST /api/generate-plan` | session | `{ goalType: "race"\|"duration", raceDistance?, raceDate?, durationWeeks?, notes?, idempotencyKey }` | `{ plan, planId, isFallback, quotaConsumed }`, or `402` over-quota / `403` anon / `409` intake-required | Enforces tier + quota server-side, branches by tier, validates, persists. `raceDistance` is validated whenever it is present, on either goal type — a `duration` request legitimately carries one for a runner with a target distance and no date. A duplicate `idempotencyKey` returns the existing plan instead of generating twice. Free gets the template plan (since 2026-08-04). Pro/Elite call the personalization prompt (bound since 2026-08-10) but, with no `ANTHROPIC_API_KEY` configured anywhere yet, still fall back to the same template today (`isFallback: true`, quota-exempt) — see "Current — `generate-plan`" above. `quotaConsumed` tells the client whether this fallback counted against the tier limit, so `FallbackNotice` can pick `counted` vs `exempt`. |
 | `GET /api/quota-status` | session | — | `{ tier, used, limit, periodEnd }` | Drives Home's and Settings' "N of M plans used" line (`src/lib/quotaDisplay.ts`'s `formatQuotaLine()`, consumed by both since 2026-08-05). `used` counts **non-fallback** plans in the current purchase-anchored period, server-side, never a client counter. `periodEnd` is `null` for Free (lifetime allowance) and also `null` while the temporary `ALL_USERS_UNLIMITED_ACCESS` override is on (see below) — the UI must not render a countdown for either. |
 | `POST /api/purchase-tier` | session | `{ tier: "pro"\|"elite", source: "dummy" }` | `{ tier, periodStart: string \| null, periodEnd: string \| null }` | v1 dummy flow, called from `src/app/paywall.tsx` (new 2026-08-05) with honest "test upgrade, no payment required" copy. v2 swaps `source` to `"revenuecat"` and verifies the receipt — same route, same table write. `source: "revenuecat"` is refused in v1 rather than trusted. |

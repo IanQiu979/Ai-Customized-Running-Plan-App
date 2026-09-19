@@ -137,6 +137,16 @@ export default function RootLayout() {
           <Stack.Protected guard={!session}>
             <Stack.Screen name="(auth)" />
           </Stack.Protected>
+          {/*
+            Deliberately outside both guards. These two are where the password-reset and
+            email-verification links land (`paceblueprint://reset-password?token=…` and
+            `…/verify-email`, issue #94), and a link can open in either session state — see each
+            screen's header. Guarding them would bounce the runner and drop the token on the
+            floor. Nothing on them is sensitive to a session: the token in the URL is the only
+            credential, and the Worker is the only thing that can spend it.
+          */}
+          <Stack.Screen name="reset-password" />
+          <Stack.Screen name="verify-email" />
         </Stack>
       </ThemeProvider>
     </SafeAreaProvider>

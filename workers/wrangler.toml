@@ -54,6 +54,10 @@ CORS_ALLOWED_ORIGINS = "http://localhost:8081,http://localhost:19006,http://loca
 # purchase records remain intact underneath it.
 ALL_USERS_UNLIMITED_ACCESS = "true"
 
+# Email verification remains opt-in until both server-only mail bindings are configured. Resend's
+# API key and sender address belong in `.dev.vars` / Cloudflare secrets, never this committed file.
+MAIL_VERIFICATION_REQUIRED = "false"
+
 [env.production.vars]
 # THE DEPLOYED ORIGIN, EXACTLY. This is not cosmetic: better-auth derives the OAuth `redirect_uri`
 # it hands Google from this value, so it must match, character for character, both the Worker's
@@ -84,6 +88,9 @@ CORS_ALLOWED_ORIGINS = "https://pace-blueprint-production.i78979848.workers.dev,
 # Deliberately temporary; DO NOT flip to "true" until the captain explicitly re-enables it for a
 # production test window, then flip back to "false" immediately after.
 ALL_USERS_UNLIMITED_ACCESS = "false"
+# Named environments do not inherit `[vars]`; keep this explicit so an unconfigured production
+# deployment never starts requiring verification before it can deliver verification email.
+MAIL_VERIFICATION_REQUIRED = "false"
 
 # Required — see the header: a named environment does not inherit top-level bindings.
 [[env.production.d1_databases]]

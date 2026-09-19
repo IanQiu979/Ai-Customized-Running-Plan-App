@@ -236,6 +236,25 @@ export const authClient = baseAuthClient as typeof baseAuthClient & {
 
 export const { signIn, signUp, signOut, useSession } = authClient;
 
+/**
+ * The fields of better-auth's `user` the app reads. Named here because the `expoAuthPlugin` cast
+ * above (see its comment) erases `createAuthClient`'s session inference — `useSession().data`
+ * comes out as `never` and `getSession()` as `any` — so screens cannot read `session.user.email`
+ * off the hook directly. `useSessionUser` is the one typed door; `_layout.tsx` only ever needs
+ * the truthiness of `data`, which the erased type still gives it.
+ */
+export interface SessionUser {
+  id: string;
+  email: string;
+  emailVerified: boolean;
+  name: string;
+}
+
+export function useSessionUser(): SessionUser | null {
+  const { data } = authClient.useSession();
+  return (data as unknown as { user?: SessionUser } | null)?.user ?? null;
+}
+
 export async function signInWithGoogle(options?: {
   onBeforeSessionNotify?: () => void;
 }): Promise<GoogleAuthOutcome> {
@@ -306,6 +325,38 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 // ---------------------------------------------------------------------------------------------
 // Typed wrappers — one per `workers/src/index.ts` route, outside `/api/auth/*`.
 // ---------------------------------------------------------------------------------------------
+
+export interface EmailStatus {
+  mailConfigured: boolean;
+  verificationRequired: boolean;
+}
+
+/** Public capability read. Never reuse a stale answer after server mail config changes. */
+export function getEmailStatus(): Promise<EmailStatus> {
+  return apiFetch('/api/email-status', { cache: 'no-store' });
+}
+
+export type ResendOutcome = { ok: true } | { ok: false; message: string };
+
+/**
+ * Asks the Worker for a fresh verification link. The one place the app calls
+ * `send-verification-email`, so the callback — the app's own `/verify-email` route, built by
+ * `createVerifyEmailURL` — is set once and identically for the Home banner, the unverified
+ * sign-in path and the expired-link landing. Takes the address explicitly because the sign-in
+ * screen has no session to read it from. Unlike `sign-in/email`, this endpoint's response carries
+ * no `redirect`, so the web client's redirect plugin leaves the page alone.
+ */
+export async function resendVerificationEmail(email: string): Promise<ResendOutcome> {
+  const { createVerifyEmailURL } = await import('./authEmail');
+  const { error } = await authClient.sendVerificationEmail({
+    email,
+    callbackURL: createVerifyEmailURL(),
+  });
+  if (error) {
+    return { ok: false, message: error.message ?? 'Could not send the link. Try again.' };
+  }
+  return { ok: true };
+}
 
 export function getQuotaStatus(): Promise<QuotaStatus> {
   return apiFetch<QuotaStatus>('/api/quota-status');

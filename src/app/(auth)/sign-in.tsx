@@ -19,7 +19,14 @@ import {
 } from '@/components/ui/ActionButton';
 import { FontFamily, FontSize, MaxContentWidth, Spacing, Tracking } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { API_BASE_URL, authClient, describeError, signInWithGoogle } from '@/lib/apiClient';
+import {
+  API_BASE_URL,
+  authClient,
+  describeError,
+  resendVerificationEmail,
+  signInWithGoogle,
+} from '@/lib/apiClient';
+import { isEmailNotVerifiedError } from '@/lib/authEmail';
 
 /**
  * Sign-in. Minimal by design (spec §V22-06: the create-account and sign-in pages get "nothing" —
@@ -47,6 +54,10 @@ export default function SignInScreen() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // The address the Worker refused with `EMAIL_NOT_VERIFIED`, so a resend can target it even
+  // after the field is edited. `null` until that happens; cleared by the next attempt.
+  const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
+  const [resendSent, setResendSent] = useState(false);
 
   // Every `authClient` call needs its own try/catch, not just an `error` check: better-auth's
   // `{ data, error }` contract only covers responses it received. A request that never reached the
@@ -56,14 +67,39 @@ export default function SignInScreen() {
   // so the button spins forever and sign-in is unreachable. See `apiErrors.ts`.
   async function handleSignIn() {
     setError(null);
+    setUnverifiedEmail(null);
+    setResendSent(false);
     setSubmitting(true);
     try {
+      // No `callbackURL` here, on purpose: on web the client's redirect plugin would navigate to
+      // it after a successful sign-in. The unverified case is handled below with an explicit
+      // resend instead — `workers/src/auth.ts` (`sendOnSignIn: false`) has the full reasoning.
       const { error: signInError } = await authClient.signIn.email({ email, password });
-      if (signInError) {
+      if (isEmailNotVerifiedError(signInError)) {
+        // A real account with the right password, refused only because the address is
+        // unverified (issue #94). Say exactly that; the generic message would read as a typo.
+        setUnverifiedEmail(email);
+        setError('Verify your email before signing in. Check your inbox for the link.');
+      } else if (signInError) {
         setError(signInError.message ?? 'Sign-in failed. Check your email and password.');
       }
     } catch (signInError) {
       setError(describeError(signInError, 'Sign-in failed. Try again.', API_BASE_URL));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleResend() {
+    if (!unverifiedEmail) return;
+    setError(null);
+    setSubmitting(true);
+    try {
+      const outcome = await resendVerificationEmail(unverifiedEmail);
+      if (outcome.ok) setResendSent(true);
+      else setError(outcome.message);
+    } catch (resendError) {
+      setError(describeError(resendError, 'Could not send the link. Try again.', API_BASE_URL));
     } finally {
       setSubmitting(false);
     }
@@ -149,6 +185,11 @@ export default function SignInScreen() {
               />
 
               {error && <Text style={[styles.error, { color: theme.status.error }]}>{error}</Text>}
+              {resendSent && unverifiedEmail && (
+                <Text style={[styles.error, { color: theme.text.secondary }]}>
+                  Sent. Check {unverifiedEmail} for the link.
+                </Text>
+              )}
 
               <PrimaryAction
                 label="Sign in"
@@ -158,6 +199,18 @@ export default function SignInScreen() {
               />
 
               <View style={styles.links}>
+                {/* Only after the Worker has said `EMAIL_NOT_VERIFIED`: the resend is the remedy
+                    for that one refusal, not a standing control. */}
+                {unverifiedEmail && !resendSent && (
+                  <LinkAction onPress={handleResend}>
+                    Didn&apos;t get it?{' '}
+                    <Text style={{ color: theme.text.primary }}>Resend the link</Text>
+                  </LinkAction>
+                )}
+                <LinkAction onPress={() => router.navigate('/(auth)/forgot-password')}>
+                  Forgot your password?{' '}
+                  <Text style={{ color: theme.text.primary }}>Reset it</Text>
+                </LinkAction>
                 <LinkAction onPress={() => router.navigate('/(auth)/sign-up')}>
                   No account? <Text style={{ color: theme.text.primary }}>Sign up</Text>
                 </LinkAction>

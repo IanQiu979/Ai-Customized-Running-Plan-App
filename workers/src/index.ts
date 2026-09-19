@@ -1,15 +1,18 @@
 /**
  * The Worker entry point: authenticate once, then dispatch.
  *
- * There is no routing framework here on purpose. Nine routes and one auth mount do not justify a
+ * There is no routing framework here on purpose. Ten routes and one auth mount do not justify a
  * dependency, and a hand-written switch keeps the one property that matters most visible on a
  * single screen — **every app route is behind the session check, structurally**, because the check
- * happens before dispatch rather than inside each handler where one could forget it.
+ * happens before dispatch rather than inside each handler where one could forget it. The two
+ * exceptions (`/health`, `/api/email-status`) touch no user data and sit above the gate on purpose.
  *
  * ROUTE TABLE (the Cloudflare translation of `docs/architecture.md`'s API contract):
  *
- *   ANY  /api/auth/*          better-auth: sign-up, sign-in, sign-out, session, OAuth callbacks
+ *   ANY  /api/auth/*          better-auth: sign-up, sign-in, sign-out, session, OAuth callbacks,
+ *                             password reset and email verification (issue #94)
  *   GET  /health              liveness, unauthenticated, no database access
+ *   GET  /api/email-status    unauthenticated mail capability booleans, no-store, no database access
  *   POST /api/generate-plan   the core call — 402 over quota, 403 anon
  *   GET  /api/quota-status    tier + quota/unlimited state
  *   POST /api/purchase-tier   v1 dummy purchase; real IAP lands on this same route later
@@ -22,7 +25,13 @@
  * immutable and undeletable, even though the temporary all-users override bypasses the count.
  */
 
-import { AUTH_BASE_PATH, createAuth } from './auth';
+import {
+  AUTH_BASE_PATH,
+  createAuth,
+  redactAuthRequestPath,
+  sanitizeAuthLogValue,
+} from './auth';
+import { resolveAuthMailRuntime, type AuthMailRuntime } from './auth-email';
 import {
   handleCorsPreflight,
   isCorsPreflight,
@@ -44,18 +53,24 @@ import {
 } from './routes';
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, context: ExecutionContext): Promise<Response> {
     if (isCorsPreflight(request)) return handleCorsPreflight(request, env);
 
     try {
       return withCors(
         request,
-        await dispatch(normalizeAllowedBrowserOrigin(request, env), env),
+        await dispatch(normalizeAllowedBrowserOrigin(request, env), env, {
+          waitUntil: (promise) => context.waitUntil(promise),
+        }),
         env
       );
     } catch (error) {
       const url = new URL(request.url);
-      console.error('unhandled error', { path: url.pathname, method: request.method, error });
+      console.error('unhandled error', {
+        path: redactAuthRequestPath(url.pathname),
+        method: request.method,
+        error: sanitizeAuthLogValue(error),
+      });
       return withCors(
         request,
         fail(500, 'internal_error', 'Something went wrong. Try again.'),
@@ -65,7 +80,11 @@ export default {
   },
 } satisfies ExportedHandler<Env>;
 
-async function dispatch(request: Request, env: Env): Promise<Response> {
+interface DispatchOptions {
+  waitUntil?: (promise: Promise<unknown>) => void;
+}
+
+async function dispatch(request: Request, env: Env, options: DispatchOptions = {}): Promise<Response> {
   const url = new URL(request.url);
   const path = url.pathname;
 
@@ -73,9 +92,17 @@ async function dispatch(request: Request, env: Env): Promise<Response> {
     return ok({ ok: true });
   }
 
+  const mail = resolveAuthMailRuntime(env);
+
+  // The only public app capability route. It exposes booleans only so the forgot-password UI can
+  // be honest without revealing which provider or credential is configured.
+  if (request.method === 'GET' && path === '/api/email-status') {
+    return emailStatus(mail);
+  }
+
   // better-auth owns everything under its base path, including its own method handling.
   if (path === AUTH_BASE_PATH || path.startsWith(`${AUTH_BASE_PATH}/`)) {
-    return createAuth(env).handler(request);
+    return createAuth(env, { mail, waitUntil: options.waitUntil }).handler(request);
   }
 
   if (!path.startsWith('/api/')) {
@@ -83,7 +110,9 @@ async function dispatch(request: Request, env: Env): Promise<Response> {
   }
 
   // --- the single authentication gate -------------------------------------------------------
-  const session = await createAuth(env).api.getSession({ headers: request.headers });
+  const session = await createAuth(env, { mail, waitUntil: options.waitUntil }).api.getSession({
+    headers: request.headers,
+  });
   if (!session?.user?.id) {
     return unauthenticated();
   }
@@ -116,6 +145,16 @@ async function dispatch(request: Request, env: Env): Promise<Response> {
   }
 
   return fail(404, 'not_found', 'No such route.');
+}
+
+function emailStatus(mail: AuthMailRuntime): Response {
+  const response = ok({
+    mailConfigured: mail.mailConfigured,
+    verificationRequired: mail.verificationRequired,
+  });
+  const headers = new Headers(response.headers);
+  headers.set('cache-control', 'no-store');
+  return new Response(response.body, { status: response.status, headers });
 }
 
 /** `/api/plans/:id` → the id. Anything deeper is not a route. */

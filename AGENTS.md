@@ -190,6 +190,18 @@ Built-ins also available: `Explore`, `Plan`, `general-purpose`. Plugin agents ar
   Treat the account-linked intake and plans conservatively as health/fitness data, and document
   provider retention from current official sources rather than inferring consent or deletion
   behavior.
+- **Auth mail is opt-in, and its links are the Worker's, not the app's.** Password reset and
+  email verification (issue #94) send through the provider-agnostic sender in
+  `workers/src/lib/mail.ts`; `RESEND_API_KEY` + `MAIL_FROM` (secrets, captain-only —
+  `docs/email-setup.md`) switch it on, and `MAIL_VERIFICATION_REQUIRED` gates sign-in only when
+  both exist. `GET /api/email-status` is the public capability read the app honours. The mailed
+  link is a Worker URL that spends the token and `302`s to the app's `callbackURL`
+  (`src/lib/authEmail.ts` builds it via `expo-linking`); `src/app/reset-password.tsx` and
+  `verify-email.tsx` sit **outside** both `Stack.Protected` groups so a cold deep link renders in
+  either session state. Two traps: never pass `callbackURL` on `signIn.email` (on web the client's
+  redirect plugin navigates to it after success — hence `sendOnSignIn: false` and the explicit
+  `resendVerificationEmail`), and `useSession().data` types as `never` because of the `expoClient`
+  cast, so read the user through `apiClient.ts`'s `useSessionUser`.
 - **`ANTHROPIC_API_KEY` never leaves the server.** Any agent touching env goes through
   `env-config-manager`. Two committed-file traps, not one: `EXPO_PUBLIC_*` is plain text in the app
   bundle, and `workers/wrangler.toml` is committed — secrets go in `workers/.dev.vars` (gitignored)

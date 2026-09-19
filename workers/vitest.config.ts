@@ -41,6 +41,11 @@ export default defineConfig({
           // Most existing quota tests assert the permanent entitlement rules. Individual tests
           // instantiate the store with the override enabled when exercising temporary test mode.
           ALL_USERS_UNLIMITED_ACCESS: 'false',
+          // Mail is always inert in tests, even when a developer has real values in `.dev.vars`.
+          // This prevents outbound delivery and keeps verification opt-in behavior deterministic.
+          RESEND_API_KEY: '',
+          MAIL_FROM: '',
+          MAIL_VERIFICATION_REQUIRED: 'false',
 
           /**
            * PINNED ON PURPOSE, and this is a correctness fix rather than tidiness. Wrangler loads

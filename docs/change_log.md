@@ -5,6 +5,109 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-09-20 — Password recovery and email verification, built on both sides and off by default (issue #94)
+
+Until now a runner who forgot their password had no way back into their account, and nothing
+ever checked that a sign-up address was real. This adds both flows end to end — Worker, mail,
+deep links, screens — while changing nothing for a deployment that has no mail provider, which is
+every deployment today. Runbook for switching it on: `docs/email-setup.md`.
+
+- **The Worker sends mail through a provider-agnostic seam, and sends nothing until configured.**
+  `workers/src/lib/mail.ts` defines `sendMail({ to, subject, text, html })` with two adapters:
+  `ResendAdapter` (Resend's HTTP API; on failure it throws with the HTTP status only — provider
+  bodies can echo the address and link, so they are never logged) and `ConsoleAdapter`, which logs
+  one `mail_skipped_unconfigured` line carrying the subject and nothing else. `workers/src/auth-email.ts`'s
+  `resolveAuthMailRuntime(env)` picks the adapter per request — Resend only when `RESEND_API_KEY`
+  **and** `MAIL_FROM` are both set and non-blank — and holds the two templates ("Verify your Pace
+  Blueprint email", "Reset your Pace Blueprint password"; the better-auth-supplied URL is the
+  contract, never reconstructed). `.dev.vars.example` documents both secrets; `wrangler.toml`
+  gains only the non-secret `MAIL_VERIFICATION_REQUIRED = "false"`, in **both** `[vars]` and
+  `[env.production.vars]`, because a named environment inherits nothing.
+- **Verification is opt-in, and required only when it can be satisfied.** In `workers/src/auth.ts`,
+  `emailVerification.sendOnSignUp` follows `mailConfigured`, and
+  `emailAndPassword.requireEmailVerification` follows
+  `verificationRequired = mailConfigured && MAIL_VERIFICATION_REQUIRED === 'true'` — so flipping
+  the flag on an unconfigured Worker changes nothing, and the two captain steps cannot be ordered
+  into a lockout. `sendResetPassword` and `revokeSessionsOnPasswordReset: true` are wired; a reset
+  signs every session out, this device's included. `advanced.backgroundTasks` hands the sends to
+  `ctx.waitUntil` (`fetch` now takes the `ExecutionContext`).
+- **`sendOnSignIn` is deliberately off.** better-auth builds the sign-in-time verification link
+  from the sign-in body's `callbackURL`, and the app cannot send one: on web the client's redirect
+  plugin treats a `callbackURL` on `sign-in/email` as a post-sign-in navigation target. The only
+  alternative is better-auth's default of `/` — the Worker root, a JSON 404 — so an auto-sent link
+  would strand the runner. Instead an unverified sign-in gets a plain `EMAIL_NOT_VERIFIED` and the
+  sign-in screen offers an explicit resend through `send-verification-email`, whose `callbackURL`
+  is the app's own `/verify-email` route. Pinned by the "unverified sign-in refused without
+  mailing; explicit resend carries the app's callback" test.
+- **One new public route: `GET /api/email-status`.** Answers `{ mailConfigured,
+  verificationRequired }` — booleans only, `cache-control: no-store`, no session required. It is
+  the only unauthenticated app route besides `/health`, and it exists so the app can be honest
+  about a capability it does not control rather than accept an email it can do nothing with.
+- **Worker logs redact reset tokens.** The better-auth error logger and the unhandled-error path
+  in `workers/src/index.ts` run through `redactSensitiveText` / `sanitizeAuthLogValue` /
+  `redactAuthRequestPath`, which blank `/api/auth/reset-password/<token>` paths, every
+  `https://` / `exp://` / `paceblueprint://` URL, and any secret-, token-, code- or state-keyed
+  value in a logged object. Error stack traces are kept (up to 4,000 chars) but pass through the
+  same token redaction, so a failure stays diagnosable without leaking the link it was handling
+  (`workers/test/auth-email.test.ts` pins both).
+- **The mailed link is the Worker's, and the app only says where to land afterwards.** A runner
+  opens `<BETTER_AUTH_URL>/api/auth/reset-password/<token>?callbackURL=…` (or
+  `/api/auth/verify-email?token=…&callbackURL=…`); the Worker spends the token and `302`s to the
+  callback — `?token=` appended for a reset, bare on a successful verify, `?error=` on a failed
+  one. `src/lib/authEmail.ts`'s `createResetPasswordURL` / `createVerifyEmailURL` build that
+  callback through `expo-linking`, so one code path yields `paceblueprint://…` in a built app,
+  `exp://<lan-ip>:8081/--/…` in Expo Go and `http://localhost:8081/…` on web, all already in
+  `trustedOrigins`. An untrusted redirect is refused `403` (tested).
+- **Two landing routes sit outside the session guard.** `src/app/reset-password.tsx` and
+  `src/app/verify-email.tsx` live at the root and are listed in `src/app/_layout.tsx` outside
+  **both** `Stack.Protected` groups: a cold deep link can open with or without a session (a reset
+  from another device; a verify after an optional-verification sign-up), and guarding them would
+  bounce the runner and drop the token. The token is read from the URL
+  (`resolveResetPasswordEntry`: `?token=` → form, `?error=` or nothing → "Link expired"), posted
+  once, and forgotten; a successful reset or verify notifies `$sessionSignal` so `Stack.Protected`
+  and Home's banner learn the new state now rather than on the next focus.
+- **Three new screens and a banner, all honest about capability.** `(auth)/forgot-password.tsx`
+  reads `/api/email-status` on mount and, when `mailConfigured` is false, shows *"Password reset
+  isn't available yet — this server can't send email. Ask whoever runs it to reset your
+  password."* in place of the form; otherwise email → `requestPasswordReset` → "Check your inbox"
+  with generic *"if an account exists"* copy, because the Worker answers `200` for unknown
+  addresses too (tested) and the screen must not reveal which. `reset-password.tsx`: new password +
+  confirm → `resetPassword` → "Password updated" → Sign in; the client checks only that the two
+  match (`newPasswordProblem`) — the 8-character minimum stays server-side, as on sign-up.
+  `verify-email.tsx`: "Email verified" or "Link expired" with a resend when signed in.
+  `src/components/auth/VerifyEmailBanner.tsx` sits under Home's header and renders only when
+  `mailConfigured && !user.emailVerified` (`shouldShowVerifyEmailBanner`; hidden while the
+  capability read is in flight) — calm `FallbackNotice` treatment, `SecondaryAction` resend, never
+  `status.error`.
+- **Sign-in and sign-up learn the two new states.** Sign-in gains "Forgot your password? Reset it"
+  and, on `EMAIL_NOT_VERIFIED` (`isEmailNotVerifiedError`), says so instead of the generic
+  credentials message and offers "Didn't get it? Resend the link". Sign-up passes
+  `callbackURL: createVerifyEmailURL()` (safe there — the sign-up response carries no `redirect`)
+  and, when better-auth answers `token: null` (`isVerificationPendingSignUp` — the account exists,
+  the session is withheld), shows "Check your inbox"; `markPostSignupRedirect` is still set so
+  their first sign-in after verifying lands on Intake.
+- **`apiClient.ts` gains three exports.** `getEmailStatus()`; `resendVerificationEmail(email)`,
+  the one caller of `send-verification-email` so the callback is set once for the banner, the
+  sign-in path and the expired-link landing; and `useSessionUser()`, a typed accessor for
+  `user.email` / `user.emailVerified` — needed because the existing `expoClient` cast erases the
+  session inference and `useSession().data` types as `never`.
+- **No test sends mail, and the round trips are real.** `workers/vitest.config.ts` blanks
+  `RESEND_API_KEY` / `MAIL_FROM` regardless of a developer's `.dev.vars`. `workers/test/auth-email.test.ts`
+  drives verify and reset end to end against D1; `mail.test.ts` covers both adapters;
+  `email-status.test.ts` the route. Client: `src/lib/__tests__/authEmail.test.ts` (28 tests),
+  `apiClient.emailStatus.test.ts`, and the Home render suite's mock extended for the banner.
+  Gates: root typecheck + lint (0 problems) + 999 tests across 60 suites; Workers 174 across 10.
+- **Not done, on purpose or by necessity.** No real mail has been sent — the Resend domain, DNS
+  and both secrets are captain-only, and the `MAIL_VERIFICATION_REQUIRED` flip is a product
+  decision (existing password accounts have `emailVerified = 0` and would be gated; Google accounts
+  are exempt). No deep link has been opened in a built app. Every user-facing string in the flow is
+  uncertified — `docs/mvp-progress.md` → Blocked lists them all. Universal Links / App Links are
+  not configured (no domain); the custom scheme works from any mail client via one browser hop.
+- **Spec updated.** `planning/03-engineering-requirements.md`'s Tech stack → Email row now
+  describes the Worker's provider-agnostic sender with the Resend adapter and the console/no-op
+  fallback, pointing to `docs/email-setup.md`; the original Supabase-mailer → SMTP plan is kept
+  as a dated superseded note (captain's decision, 2026-09-20).
+
 ## 2026-09-19 — Guardian consent for 13–17 intake is now required and recorded
 
 The privacy policy has stated since its first draft that a 13–17 runner may use the app only with

@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { VerifyEmailBanner } from '@/components/auth/VerifyEmailBanner';
 import { HeaderMark } from '@/components/build/HeaderMark';
 import { StaticWeekStrip } from '@/components/build/StaticWeekStrip';
 import { useBuildClock } from '@/components/build/useBuildClock';
@@ -297,6 +298,10 @@ export default function HomeScreen() {
             eyebrow={quota ? `${quota.tier} · ${formatQuotaLine(quota)}` : undefined}
             title="Today"
           />
+
+          {/* Renders nothing for a verified account or an unconfigured mail provider — it decides
+              for itself (`VerifyEmailBanner`), so Home carries no verification state. */}
+          <VerifyEmailBanner />
 
           {/*
             Outside the branches on purpose. A failed refresh keeps the last known intake, so the

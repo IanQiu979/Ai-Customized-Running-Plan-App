@@ -20,6 +20,7 @@ import {
 import { FontFamily, FontSize, MaxContentWidth, Spacing, Tracking } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { API_BASE_URL, authClient, describeError, signInWithGoogle } from '@/lib/apiClient';
+import { createVerifyEmailURL, isVerificationPendingSignUp } from '@/lib/authEmail';
 import { markPostSignupRedirect } from '@/lib/postSignupRedirect';
 
 /** Sign-up. Peer of `sign-in.tsx` — same wordmark, same page form, same single ink-filled
@@ -36,6 +37,10 @@ export default function SignUpScreen() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // Set when the Worker created the account but withheld the session because the deployment
+  // requires email verification first (issue #94). `Stack.Protected` will not move a runner
+  // without a session, so this screen has to tell them what happens next.
+  const [pendingVerificationFor, setPendingVerificationFor] = useState<string | null>(null);
 
   // See `sign-in.tsx` for why every `authClient` call needs a try/catch and not just an `error`
   // check — an unreachable backend rejects rather than resolving to `{ error }`.
@@ -45,9 +50,24 @@ export default function SignUpScreen() {
     try {
       // `minPasswordLength: 8` (workers/src/auth.ts) is enforced server-side; this is not
       // duplicated here so the server's message stays the one source of truth for the copy.
-      const { error: signUpError } = await authClient.signUp.email({ name, email, password });
+      // `callbackURL` is where the verification mail's link sends the runner once the Worker has
+      // consumed the token — the app's own `/verify-email` route. Safe on web, unlike sign-in: the
+      // sign-up response carries no `redirect`, so the client's redirect plugin ignores it.
+      const { data, error: signUpError } = await authClient.signUp.email({
+        name,
+        email,
+        password,
+        callbackURL: createVerifyEmailURL(),
+      });
       if (signUpError) {
         setError(signUpError.message ?? 'Sign-up failed. Try a different email or a longer password.');
+        return;
+      }
+      if (isVerificationPendingSignUp(data)) {
+        setPendingVerificationFor(email);
+        // Still marked: the flag survives until a session appears, which for this runner is
+        // their first sign-in after verifying — and a brand-new account still has no intake.
+        markPostSignupRedirect();
         return;
       }
       // A brand-new account has no intake yet, so send it straight there instead of leaving Home's
@@ -106,70 +126,87 @@ export default function SignUpScreen() {
               Pace Blueprint
             </Text>
 
-            <View style={styles.form}>
-              <View style={styles.formHeader}>
-                <Text style={[styles.title, { color: theme.text.primary }]}>Create account</Text>
-                <Text style={[styles.subtitle, { color: theme.text.secondary }]}>
-                  A short running intake comes next.
-                </Text>
+            {pendingVerificationFor ? (
+              <View style={styles.form}>
+                <View style={styles.formHeader}>
+                  <Text style={[styles.title, { color: theme.text.primary }]}>Check your inbox</Text>
+                  <Text style={[styles.subtitle, { color: theme.text.secondary }]}>
+                    We sent a verification link to {pendingVerificationFor}. Open it to finish
+                    creating your account, then sign in.
+                  </Text>
+                </View>
+                <View style={styles.links}>
+                  <LinkAction onPress={() => router.navigate('/(auth)/sign-in')}>
+                    Go to <Text style={{ color: theme.text.primary }}>Sign in</Text>
+                  </LinkAction>
+                </View>
               </View>
+            ) : (
+              <View style={styles.form}>
+                <View style={styles.formHeader}>
+                  <Text style={[styles.title, { color: theme.text.primary }]}>Create account</Text>
+                  <Text style={[styles.subtitle, { color: theme.text.secondary }]}>
+                    A short running intake comes next.
+                  </Text>
+                </View>
 
-              <AuthField
-                label="Name"
-                value={name}
-                onChangeText={setName}
-                placeholder="Your name"
-                autoCapitalize="words"
-                autoComplete="name"
-              />
-              <AuthField
-                label="Email"
-                value={email}
-                onChangeText={setEmail}
-                placeholder="you@example.com"
-                autoCapitalize="none"
-                autoComplete="email"
-                keyboardType="email-address"
-              />
-              <AuthField
-                label="Password"
-                value={password}
-                onChangeText={setPassword}
-                placeholder="At least 8 characters"
-                autoCapitalize="none"
-                autoComplete="password-new"
-                secureTextEntry
-              />
+                <AuthField
+                  label="Name"
+                  value={name}
+                  onChangeText={setName}
+                  placeholder="Your name"
+                  autoCapitalize="words"
+                  autoComplete="name"
+                />
+                <AuthField
+                  label="Email"
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder="you@example.com"
+                  autoCapitalize="none"
+                  autoComplete="email"
+                  keyboardType="email-address"
+                />
+                <AuthField
+                  label="Password"
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder="At least 8 characters"
+                  autoCapitalize="none"
+                  autoComplete="password-new"
+                  secureTextEntry
+                />
 
-              {error && <Text style={[styles.error, { color: theme.status.error }]}>{error}</Text>}
+                {error && <Text style={[styles.error, { color: theme.status.error }]}>{error}</Text>}
 
-              <PrimaryAction
-                label="Sign up"
-                disabled={disabled}
-                busy={submitting}
-                onPress={handleSignUp}
-              />
+                <PrimaryAction
+                  label="Sign up"
+                  disabled={disabled}
+                  busy={submitting}
+                  onPress={handleSignUp}
+                />
 
-              <ActionDivider />
+                <ActionDivider />
 
-              <SecondaryAction
-                label="Continue with Google"
-                disabled={submitting}
-                onPress={handleGoogleSignIn}
-              />
+                <SecondaryAction
+                  label="Continue with Google"
+                  disabled={submitting}
+                  onPress={handleGoogleSignIn}
+                />
 
-              <View style={styles.links}>
-                <LinkAction onPress={() => router.navigate('/(auth)/sign-in')}>
-                  Already have an account?{' '}
-                  <Text style={{ color: theme.text.primary }}>Sign in</Text>
-                </LinkAction>
-                {/* Quieter than the sign-in/sign-up swap above it: this is the escape hatch back
-                    to the only pre-auth screen, not the thing most people came here to do. */}
-                <LinkAction onPress={() => router.navigate('/(auth)/onboarding')}>
-                  Back to the start
-                </LinkAction>
+                <View style={styles.links}>
+                  <LinkAction onPress={() => router.navigate('/(auth)/sign-in')}>
+                    Already have an account?{' '}
+                    <Text style={{ color: theme.text.primary }}>Sign in</Text>
+                  </LinkAction>
+                  {/* Quieter than the sign-in/sign-up swap above it: this is the escape hatch back
+                      to the only pre-auth screen, not the thing most people came here to do. */}
+                  <LinkAction onPress={() => router.navigate('/(auth)/onboarding')}>
+                    Back to the start
+                  </LinkAction>
+                </View>
               </View>
-            </View>
+            )}
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>

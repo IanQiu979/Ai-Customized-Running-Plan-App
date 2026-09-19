@@ -74,6 +74,10 @@ different runner), so it will pass while the backend is broken.
   `.dev.vars` locally and `wrangler secret put` in production. `BETTER_AUTH_SECRET` included.
 - Google OAuth client id/secret live in `.dev.vars` / `wrangler secret put`, never in a committed
   file. Apple sign-in is parked entirely (`docs/apple-dev-blocked.md`).
+- `RESEND_API_KEY` and `MAIL_FROM` (transactional mail for password reset / email verification,
+  issue #94) follow the same rule — `.dev.vars` locally, `wrangler secret put … --env production`
+  live, captain-only. Both blank means mail is off and the app says so; the runbook is
+  [`docs/email-setup.md`](docs/email-setup.md).
 
 ## Git etiquette
 

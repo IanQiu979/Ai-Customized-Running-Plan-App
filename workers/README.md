@@ -70,6 +70,9 @@ Set the variable to `"false"` in both Wrangler environments before real users ar
 Working end to end, verified against `wrangler dev` and the Worker test suite:
 
 - email/password sign-up and sign-in, sessions, Bearer-token auth for the React Native client
+- password reset and email verification (issue #94) — the full token round trip against D1, with
+  mail going through the provider-agnostic sender in `src/lib/mail.ts`; inert (`ConsoleAdapter`)
+  until the captain configures Resend, see `docs/email-setup.md`
 - the quota ledger: reserve → settle/release, atomic gate, idempotency replay, fallback exemption
 - `quota-status`, `purchase-tier`, `delete-account`, intake read/write, plan reads
 - `generate-plan` — Free tier (and, as a template fallback, Pro/Elite) returns a real generated
@@ -99,6 +102,7 @@ Worker whose secrets you are certain you set.
 | Auth secret | `wrangler secret put BETTER_AUTH_SECRET --env production` | Generate with `openssl rand -base64 32`. Done |
 | Anthropic key | `wrangler secret put ANTHROPIC_API_KEY --env production` | Your account, your billing |
 | Google OAuth | `wrangler secret put GOOGLE_CLIENT_ID --env production` / `..._SECRET --env production` | Done 2026-08-09; the provider is registered in production. The token exchange and consent-screen publishing status remain unproven. Your Google Cloud project; see below |
+| Transactional mail | `wrangler secret put RESEND_API_KEY --env production` / `MAIL_FROM --env production` | Your domain, your Resend account. Off until both exist; **[`docs/email-setup.md`](../docs/email-setup.md)** is the runbook (DNS, the `MAIL_VERIFICATION_REQUIRED` flag, the `curl /api/email-status` check) |
 | Deploy | `wrangler deploy --env production` | Needs all of the above |
 
 This mirrors the Supabase path exactly: `wrangler login` is `supabase login`, and
