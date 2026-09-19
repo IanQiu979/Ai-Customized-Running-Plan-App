@@ -336,8 +336,10 @@ Built-ins also available: `Explore`, `Plan`, `general-purpose`. Plugin agents ar
   plan-shape change did not regress a different profile; read the failing case list instead. The
   invariant it encodes is the captain's #103 ruling (2026-09-19): **the peak phase's highest
   loading week is never below the base phase's** — a peak under a mid-build loading spike is
-  tolerated only when the plan carries `buildSpikeDisclosure`, which the same suite asserts for
-  every swept plan (48 such plans, pinned as a ceiling). The 348 residual offenders it pins fall
+  tolerated only when the plan carries `buildSpikeDisclosure`, emitted only when that spike is the
+  plan's highest loading week (a base high above it makes the plan an offender, not a tolerated
+  shape, and it says nothing), which the same suite asserts for every swept plan (32 such plans,
+  pinned as a ceiling). The 348 residual offenders it pins fall
   in two named families (`REMAINING_OFFENDER_FAMILIES`: beginner three-day 5K plans; the golden
   12-week/4-day 5K path at ≥50 km/week) whose remedies are coaching or safety numbers awaiting
   the captain (`docs/mvp-progress.md` → Blocked) — not a bug to fix in passing. History: encoded

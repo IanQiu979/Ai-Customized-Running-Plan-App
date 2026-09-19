@@ -116,13 +116,16 @@ const UNDER_18_DISCLAIMER =
  * loading week is never below the **base** phase's; a peak that sits below a mid-**build** loading
  * spike is tolerated, but only if the plan says so in the standing one-sentence flag style. Returns
  * the spike week when that is the case, otherwise `undefined`. Loading weeks only — a rest week is
- * not a high of anything.
+ * not a high of anything. The sentence names the spike as the plan's highest-distance week, so it
+ * is emitted only when that is true: a plan whose base high is above the build spike is a residual
+ * offender of the invariant itself (escalated to the captain), not a tolerated shape, and says
+ * nothing here rather than something false.
  */
 function peakBelowBuildSpike(weeks: readonly Week[]): Week | undefined {
   const loading = weeks.filter((week) => !week.isDeload);
-  const peakMaxKm = Math.max(
-    ...loading.filter((week) => week.phase === 'peak').map((week) => week.volumeKm),
-  );
+  const loadingMaxKm = (phase: Phase) =>
+    Math.max(-Infinity, ...loading.filter((week) => week.phase === phase).map((w) => w.volumeKm));
+  const peakMaxKm = loadingMaxKm('peak');
   if (!Number.isFinite(peakMaxKm)) return undefined;
   const spike = loading
     .filter((week) => week.phase === 'build')
@@ -130,7 +133,8 @@ function peakBelowBuildSpike(weeks: readonly Week[]): Week | undefined {
       (best, week) => (best === undefined || week.volumeKm > best.volumeKm ? week : best),
       undefined,
     );
-  return spike !== undefined && spike.volumeKm > peakMaxKm ? spike : undefined;
+  if (spike === undefined || spike.volumeKm <= peakMaxKm) return undefined;
+  return spike.volumeKm >= loadingMaxKm('base') ? spike : undefined;
 }
 
 function buildSpikeDisclosure(spike: Week, isRacePlan: boolean): string {

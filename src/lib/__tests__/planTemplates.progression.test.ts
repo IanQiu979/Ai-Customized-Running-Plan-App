@@ -87,10 +87,14 @@ const REMAINING_OFFENDER_FAMILIES: readonly ((caseDescription: string) => boolea
     ),
 ];
 /**
- * How many plans in the sweep render their peak below a build-phase loading spike — tolerated,
- * disclosed, and pinned as a ceiling so that growth in the tolerated class is a visible edit.
+ * How many plans in the sweep render their peak below a build-phase loading spike that is also the
+ * plan's highest loading week — tolerated, disclosed, and pinned as a ceiling so that growth in the
+ * tolerated class is a visible edit. 48 until the disclosure's trigger was tightened to that
+ * "highest loading week" condition the same day: the 16 plans that left the class have a base high
+ * above their build spike, so they are residual offenders of the invariant itself (`REMAINING_
+ * OFFENDER_FAMILIES`) and now say nothing rather than misname their highest week.
  */
-const TOLERATED_BUILD_SPIKE_COUNT = 48;
+const TOLERATED_BUILD_SPIKE_COUNT = 32;
 const BASE_HIGH_BASELINE_MASK =
   'AAD//////////////////////////wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' +
     'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP//////////////////////////AAAAAAAAAAAAAAAAAAAAAAAA' +
@@ -145,10 +149,12 @@ function isPeakBelowBaseHigh(plan: Plan): boolean {
 }
 
 function isPeakBelowBuildSpike(plan: Plan): boolean {
+  // Mirrors `peakBelowBuildSpike`: the build spike must be the plan's highest loading week — above
+  // the peak high and not below the base high — for the plan to be a tolerated, disclosed shape.
   const peakMaxKm = loadingMaxKm(plan, 'peak');
   const buildMaxKm = loadingMaxKm(plan, 'build');
   if (!Number.isFinite(peakMaxKm) || !Number.isFinite(buildMaxKm)) return false;
-  return peakMaxKm < buildMaxKm;
+  return peakMaxKm < buildMaxKm && buildMaxKm >= loadingMaxKm(plan, 'base');
 }
 
 function hasBuildSpikeDisclosure(plan: Plan): boolean {
