@@ -133,10 +133,10 @@ function peakBelowBuildSpike(weeks: readonly Week[]): Week | undefined {
   return spike !== undefined && spike.volumeKm > peakMaxKm ? spike : undefined;
 }
 
-function buildSpikeDisclosure(spike: Week): string {
+function buildSpikeDisclosure(spike: Week, isRacePlan: boolean): string {
   return (
     `Your highest-distance week is week ${spike.weekNumber}, in the build phase; the peak weeks ` +
-    'carry a little less distance and more race-specific intensity.'
+    `carry a little less distance and more ${isRacePlan ? 'race-specific' : 'quality'} intensity.`
   );
 }
 
@@ -1901,7 +1901,7 @@ export function buildTemplatePlan(params: TemplatePlanParams): Plan {
 
   const disclaimers = [
     GENERAL_DISCLAIMER,
-    ...(buildSpike ? [buildSpikeDisclosure(buildSpike)] : []),
+    ...(buildSpike ? [buildSpikeDisclosure(buildSpike, isRacePlan)] : []),
     ...(isRacePlan &&
     raceDistance === 'marathon' &&
     normalizedRunCount(params.intake.daysPerWeek) === 3 &&

@@ -340,3 +340,53 @@ describe('race plans are untouched by the no-race path', () => {
     ).toBe(true);
   });
 });
+
+describe('the build-spike disclosure names a race only when one is booked', () => {
+  // Issue #103's tolerance flag fires on any plan whose peak sits below a build-phase loading
+  // spike, race or not. Its race clause is gated on `isRacePlan`, never on `raceDistance`
+  // presence: a dateless Base Plan carries a distance too, and `raceDate` is the only signal that
+  // a race is booked (#76).
+  const spikeIntake: IntakeResponses = {
+    goal: 'Run a 5K',
+    age: 30,
+    experience: 'new',
+    daysPerWeek: 3,
+    weeklyKm: 30,
+    injuries: ['none'],
+    raceDistance: '5k',
+  };
+  const disclosureOf = (plan: Plan) =>
+    plan.disclaimers.find((line) => line.startsWith('Your highest-distance week is week '));
+
+  it('describes the peak of a dateless Base Plan without mentioning a race', () => {
+    const plan = buildTemplatePlan({
+      intake: spikeIntake,
+      goalType: 'duration',
+      durationWeeks: 8,
+      tierAtGeneration: 'pro',
+      density: 'paid',
+    });
+    expect(plan.raceDate).toBeUndefined();
+    expect(plan.title).toBe('8-Week 5K Base Plan');
+    const disclosure = disclosureOf(plan);
+    expect(disclosure).toBeDefined();
+    expect(disclosure).toMatch(/; the peak weeks carry a little less distance and more quality intensity\.$/);
+    expect(disclosure!.toLowerCase()).not.toContain('race');
+  });
+
+  it('keeps the approved race-specific ending on the equivalent race plan', () => {
+    const plan = buildTemplatePlan({
+      intake: spikeIntake,
+      goalType: 'race',
+      durationWeeks: 8,
+      raceDistance: '5k',
+      raceDate: '2026-11-14',
+      tierAtGeneration: 'pro',
+      density: 'paid',
+    });
+    expect(plan.raceDate).toBe('2026-11-14');
+    const disclosure = disclosureOf(plan);
+    expect(disclosure).toBeDefined();
+    expect(disclosure).toMatch(/; the peak weeks carry a little less distance and more race-specific intensity\.$/);
+  });
+});

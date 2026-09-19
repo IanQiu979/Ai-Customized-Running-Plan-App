@@ -57,7 +57,10 @@ issues #76, #103 and #101. All three were re-verified against `main` before anyt
   belongs to one of two named families (below), and asserts the tolerance half of the ruling: every
   plan whose peak sits below a build-phase loading spike carries the new one-sentence flag
   (`buildSpikeDisclosure`: "Your highest-distance week is week N, in the build phase; the peak
-  weeks carry a little less distance and more race-specific intensity."), nothing else does, and
+  weeks carry a little less distance and more race-specific intensity." — that ending on a race
+  plan only; a no-race duration plan or a dateless Base Plan gets the identical sentence ending
+  "more quality intensity", gated on `isRacePlan`, never on `raceDistance` presence, since a Base
+  Plan carries a distance and `raceDate` is the only booked-race signal), nothing else does, and
   there are 48 such plans, pinned as a ceiling. Two witness pins moved with the re-sampling and are
   annotated in place (20-week 3-day 5K: 21/21 → 24/24 with a 19 km base high; the advanced 60 km
   12-week generic 5K: 69 km/23 km → 82 km/26 km, the curve's own 137%). **Not zero — the 348 that
