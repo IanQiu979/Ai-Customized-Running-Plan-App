@@ -26,7 +26,7 @@
 | M3 — Plan engine (3 tiers produce valid plans) | **In progress.** The engine splits by tier as of 2026-09-09: Free is served entirely from the 40-plan deterministic library (`src/lib/planLibrary/`), paying tiers keep the template/pace engine as the AI skeleton. Both are wired into the Worker's `generate-plan` route and the client's generate-plan action; the plan view renders a real generated plan (via `GET /api/plans/:id`) alongside the permanent static golden fixture. Paid tiers still serve the quota-exempt template fallback — see "How it is now" |
 | M4 — Tiers & quotas (server-side, unbypassable) | **In progress.** The quota ledger, atomic gate, fallback exemption, `quota-status` and `purchase-tier` are built and tested server-side; Home now leads with the server-backed tier/quota line, Settings also displays it, and a dummy paywall lets a runner call `purchase-tier` |
 | M5 — My Plans (history) | **In progress.** My Plans keeps the permanent Example Plan, lists generated plans off `GET /api/plans`, and links MOST RECENT to the newest generated plan; there is no contradictory empty state |
-| M6 — Polish & TestFlight | **In progress.** The visual system is **Blueprint** (2026-09-14, `fm/v22-animations-lane3`): the captain's V22 theme sheet plus the six approved build animations, replacing Instrument (2026-09-03, on `main`) which replaced Trailhead. Every screen — signed-out and signed-in — has now been rendered on Expo **web** at 393×852 and compared against the approved Claude Design pages (the visual-match pass, 2026-09-14); no screen has ever been run on a real iOS or Android device or simulator. See "How it is now". No EAS build exists |
+| M6 — Polish & TestFlight | **In progress.** The visual system is **Blueprint** (2026-09-14, `fm/v22-animations-lane3`): the captain's V22 theme sheet plus the six approved build animations, replacing Instrument (2026-09-03, on `main`) which replaced Trailhead. Every screen — signed-out and signed-in — has now been rendered on Expo **web** at 393×852 and compared against the approved Claude Design pages (the visual-match pass, 2026-09-14); no screen has ever been run on a real iOS or Android device or simulator. See "How it is now". The first EAS build exists as of 2026-09-19 — an Android **development-client** .apk (build `9ca20e4e`, issue #93's Android half; recipe, artifact URL and the Google-sign-in keystore follow-up in `docs/build.md`); it has not yet been installed and exercised on a phone, and iOS/TestFlight still waits on the Apple Developer Program |
 
 ### How it is now
 
@@ -1699,8 +1699,12 @@ intact underneath.
   if `tabBarStyle` ever goes `position: 'absolute'`; whoever builds Home/My Plans' real scrolling
   content next should read this before reaching for the constant. Full reasoning in `theme.ts`'s
   docblock at the constant's definition.
-- 🟡 **EAS project not initialized** (`eas init` not run). No TestFlight pipeline exists yet — needed
-  at M6, not before.
+- 🟡 **EAS: Android done, iOS blocked.** The EAS project exists (`ianbeatingpros/pace-blueprint`,
+  `eas init` run 2026-09-19) and the first Android dev-client .apk is built — `docs/build.md`. No
+  TestFlight pipeline exists and cannot until the captain buys the Apple Developer Program
+  (`docs/apple-dev-blocked.md`). Google sign-in on the Android build still needs an Android OAuth
+  client keyed to the EAS-managed keystore's SHA-1, a captain-session `eas credentials` read —
+  `docs/build.md`'s follow-up section.
 - 🟡 **App art is still stock Expo — unblocked by the name decision, not yet done.** The icon,
   wordmark, splash artwork, and store listing copy are all still placeholders; needed at M6, not
   before. The stock Expo *colours* around that art are gone as of 2026-09-16 (issues #20/#49):
