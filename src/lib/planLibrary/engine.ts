@@ -758,10 +758,11 @@ export function buildLibraryPlan(params: LibraryPlanParams): LibraryPlanResult {
     }),
   );
 
-  // § 16 `H1`: "Week 1 at 90% of validated baseline."
+  // § 16 `H1`: "Week 1 at 90% of validated baseline" — read as the first *loading* week, see below.
   const baselineKm = Math.max(1, params.intake.weeklyKm);
   const deloadCadenceWeeks = resolveDeloadCadence(track, params.intake.age, baselineKm);
 
+  let firstLoadingWeekBuilt = false;
   let lastLoadingKm = 0;
   let peakLoadingKm = 0;
   let previousLongRunKm = 0;
@@ -787,9 +788,20 @@ export function buildLibraryPlan(params: LibraryPlanParams): LibraryPlanResult {
 
     // § 5: "level maximum weekly kilometres → injury adjustment → single-session and long-run caps".
     target = Math.min(target, MAX_WEEKLY_KM[level]);
-    if (injuryEffect.volumeReductionPct > 0) target *= 1 - injuryEffect.volumeReductionPct;
-    if (injuryState === 'H1' && index === 0) target *= H1_WEEK_1_BASELINE_SHARE;
+    // § 17: "Percentage reductions apply to the validated baseline once; they never stack", and every
+    // module's `H1` row is "First loading week −X%" — so the module cut lands on the first loading
+    // week only, together with § 16's own 90%. Later weeks ramp off that week's reduced volume
+    // through the state machine and `clampWeeklyVolume`; re-applying the cut here compounded it
+    // (0.85 × 0.85 × …) and collapsed an injured plan to ~30% of its healthy twin by week 12
+    // (issue #106). "First loading week" is not `index === 0`: `adaptCalendar`'s "Longer race date"
+    // prefix is drawn from the end of canonical weeks 1–4, so a `canonical + 1` duration opens on
+    // canonical week 4, a `RECOVERY` week, and a cut gated on week 1 would be spent on that rest
+    // week and never reach a loading week. A rest week is never cut; the first non-`RECOVERY` week is.
+    const isFirstLoadingWeek = !firstLoadingWeekBuilt && source.state !== 'RECOVERY';
+    if (injuryEffect.volumeReductionPct > 0 && isFirstLoadingWeek) target *= 1 - injuryEffect.volumeReductionPct;
+    if (injuryState === 'H1' && isFirstLoadingWeek) target *= H1_WEEK_1_BASELINE_SHARE;
     if (source.state !== 'RECOVERY') {
+      firstLoadingWeekBuilt = true;
       target = clampWeeklyVolume({
         lastLoadingWeekKm: lastLoadingKm,
         proposedKm: target,

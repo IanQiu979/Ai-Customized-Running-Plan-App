@@ -5,6 +5,61 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-09-19 — A declared injury cuts a Free plan once, not every week (issue #106)
+
+Reported by the captain on 2026-09-13 while sweeping rest weeks on `fm/v22-deload-rest-week-bug`,
+confirmed still real on current `main` today. In `src/lib/planLibrary/engine.ts`'s
+`buildLibraryPlan` week loop, the § 17 module reduction (`injuryEffect.volumeReductionPct`, −15%
+knee/shin, −20% ankle/hip/back/plantar) was multiplied into *every* week's target, while
+`LOAD-2` / `LOAD-3` / `HOLD` / `RECOVERY` targets are computed from `lastLoadingKm`, which already
+carried the previous week's cut. So a knee's 15% became 0.85 × 0.85 × …, and on a rest week it
+stacked on `deloadVolume`'s 20% (0.85 × 0.8 = 68%, below the band). The issue's own intake —
+`regular`, 3 days, 35 km, `['knee']`, 14-week 10K — ran 24.1, 26.4, 24.2, 16.4*, 26.6, 24.3, 22.3,
+15.2*, 20.5, 18.8, 15.7, 10.6*, 16.9, 15.2 km against a healthy 31.6 … 36.9* … 20.8: week 12 at
+29% of its healthy twin.
+
+- **The module cut now lands on the first loading week only, together with § 16's own 90%.**
+  Both factors are gated on one flag — the first week whose state is not `RECOVERY`.
+  `plan-blueprint-examples.md` § 17: "Percentage reductions apply to the validated baseline once;
+  they never stack", and every module's `H1` row reads "First loading week −X%" — the same reading
+  `planTemplates.ts`'s `applyInjuryVolumeAdjustment` has always applied on the paid skeleton. Later
+  weeks ramp off that week's reduced volume through the § 5 state machine and `clampWeeklyVolume`'s
+  +10% growth cap. "First loading week" is deliberately not `index === 0`: `adaptCalendar`'s
+  "Longer race date" prefix is drawn from the end of canonical weeks 1–4, so a `canonical + 1`
+  duration (13-week 5K, 15-week 10K, 17-week half, 25-week marathon) opens on a prepended rest
+  week — a week-1 gate (the first cut of this fix, caught in review) spent the cut on that rest
+  week and left every loading week at healthy volume. The rest week is now untouched and the cut
+  lands on week 2; the pre-existing re-anchor to the full baseline at the next `ENTRY` week on
+  longer-than-canonical plans is left as-is (a coaching-shape question for the captain). The
+  issue's intake (14 weeks, opens on `ENTRY`) is unaffected by the gate and now runs 24.1,
+  26.4, 28.5, 22.9*, 31.3, 33.8, 36.6, 29.3*, 39.6, 42.8, 41.7, 33.3*, 32.0, 19.8 km: week 1 is
+  unchanged (both week-1 cuts still apply there), rest weeks are 80% of the preceding loading
+  week, and week 12 is 90% of healthy. No coaching number was added or changed; the week-1
+  composition (§ 16's 90% × the module's −X%) is untouched and was not the issue.
+- **Regression harness.** New `src/lib/planLibrary/__tests__/engine.injury.test.ts` pins the
+  issue's intake by name and sweeps every § 17 module across the 40-plan register (5 tracks × 5
+  layouts × 5 volumes × 4 durations (`canonical − 4 / canonical / canonical + 1 / canonical + 4`)
+  × 2 goal types × 4 distances × 7 flags of injured weeks against their healthy twins): every
+  week of an injured plan must hold at least the once-applied share of its healthy twin, less one
+  bounded growth-cap step (`0.9 × B → B` for the healthy plan against `× 1.10` for the injured
+  one — derived from `WEEKLY_INCREASE_RECALC_AT` and `VOLUME_STATE_TARGETS.ENTRY`, not a magic
+  number) and a linear per-run rounding allowance that cannot be confused with the geometric bug.
+  Two named `canonical + 1` cases (15-week 10K and 17-week half, knee) pin the prepended-rest-week
+  shape from both sides: week 1 equals its healthy twin, week 2 is the once-applied share of its.
+  `engine.recovery.test.ts`'s 15–25% rest-week property now sweeps `H0` plus all seven `H1`
+  modules instead of `H0` only — the harness the captain's issue asked for. Both suites fail on
+  the unfixed line (mutation-checked) and pass on the fix.
+- **Not changed: the paid skeleton and the sweep baseline.** `buildTemplatePlan` was never
+  affected; the 22,000-plan progression mask passes untouched (758), and no golden fixture pins a
+  library plan with an injury, so no fixture changed. Worker suite (144) also green.
+- **Found, not fixed — issue #119.** Extending the rest-week sweep to `H1` exposed a second,
+  pre-existing defect on `lower_back` (INJ-6) only: "keep Day 7 at `LR-low`" is applied on rest
+  weeks too, so Day 7 never shortens there and the easy runs carry the whole cut (total still in
+  band; shape wrong — 2.7/2.7/4.5L after 3.9/3.9Q/4.5L). Whether the pin is a *cap* or a *value*
+  is a coaching reading, so it is the captain's; until ruled, the recovery suite sweeps
+  `lower_back` for the total band only (`TOTAL_BAND_ONLY`), and the other six modules pass all
+  three invariants.
+
 ## 2026-09-16 — The golden 5K path serves only the cadence it was authored for (audit §1.3, `golden-cadence3-route`)
 
 Core-purpose audit §1.3, found 2026-09-06 and deliberately left open by the §1.2/§1.4 task: on
