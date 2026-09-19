@@ -20,6 +20,9 @@ jest.mock('expo-web-browser', () => ({
 
 process.env.EXPO_PUBLIC_API_BASE_URL = 'https://api.example.test';
 
+// A `require`, not an import: the module throws at import time without the env var set above,
+// and a static import would be hoisted ahead of that assignment.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const { getEmailStatus } = require('../apiClient') as typeof import('../apiClient');
 
 describe('getEmailStatus', () => {

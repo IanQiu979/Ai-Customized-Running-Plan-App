@@ -121,7 +121,16 @@ export function createAuth(env: Env, options: CreateAuthOptions = {}) {
       sendVerificationEmail: ({ user, url }) =>
         sendVerificationMail(mail.sendMail, { to: user.email, url }),
       sendOnSignUp: mail.mailConfigured,
-      sendOnSignIn: mail.verificationRequired,
+      /**
+       * Deliberately off. better-auth builds the sign-in-time verification link from the sign-in
+       * body's `callbackURL`, and the app cannot send one: on web the client's redirect plugin
+       * treats a `callbackURL` on `sign-in/email` as a post-sign-in navigation target, so the
+       * only alternative is better-auth's default of `/` — the Worker root, which answers a JSON
+       * 404. An unverified sign-in therefore gets a plain `EMAIL_NOT_VERIFIED`, and the sign-in
+       * screen offers an explicit resend through `send-verification-email`, whose `callbackURL`
+       * is the app's own `/verify-email` route (`src/lib/authEmail.ts`).
+       */
+      sendOnSignIn: false,
     },
 
     socialProviders: buildSocialProviders(env),

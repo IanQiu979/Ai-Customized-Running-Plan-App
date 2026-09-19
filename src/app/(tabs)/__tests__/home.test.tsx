@@ -48,6 +48,12 @@ jest.mock('@/lib/apiClient', () => ({
   getIntake: (...args: unknown[]) => mockGetIntake(...args),
   getQuotaStatus: (...args: unknown[]) => mockGetQuotaStatus(...args),
   listPlans: (...args: unknown[]) => mockListPlans(...args),
+  // `VerifyEmailBanner` (issue #94) reads these and renders nothing for a verified runner or an
+  // unconfigured mail provider; both are held at "nothing to show" so the disclosures under test
+  // are the only variable.
+  getEmailStatus: async () => ({ mailConfigured: false, verificationRequired: false }),
+  resendVerificationEmail: async () => ({ ok: true }),
+  useSessionUser: () => null,
 }));
 
 const intake = {

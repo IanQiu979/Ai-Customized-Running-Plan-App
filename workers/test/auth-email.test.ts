@@ -83,6 +83,37 @@ describe('email verification', () => {
     expect((await signIn.json()) as { token?: string }).toHaveProperty('token');
   });
 
+  it('refuses an unverified sign-in without mailing anything, and resends on explicit request', async () => {
+    const { mail, messages } = captureMail({ required: true });
+    const auth = createAuth(withEnv(), { mail });
+    await signUp(auth, 'unverified@example.test', 'paceblueprint://verify-email');
+    messages.length = 0;
+
+    // `sendOnSignIn` is deliberately off (`auth.ts`): the app cannot supply a `callbackURL` on
+    // sign-in, so an auto-sent link would land on the Worker root. A plain refusal instead…
+    const signIn = await authRequest(auth, '/sign-in/email', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: 'unverified@example.test', password: PASSWORD }),
+    });
+    expect(signIn.status).toBe(403);
+    expect(((await signIn.json()) as { code: string }).code).toBe('EMAIL_NOT_VERIFIED');
+    expect(messages).toHaveLength(0);
+
+    // …and the sign-in screen's explicit resend, which does carry the app's own callback.
+    const resend = await authRequest(auth, '/send-verification-email', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        email: 'unverified@example.test',
+        callbackURL: 'paceblueprint://verify-email',
+      }),
+    });
+    expect(resend.status).toBe(200);
+    expect(messages).toHaveLength(1);
+    expect(messages[0].text).toContain('callbackURL=paceblueprint%3A%2F%2Fverify-email');
+  });
+
   it('still sends verification on sign-up when delivery exists but enforcement is off', async () => {
     const { mail, messages } = captureMail({ configured: true, required: false });
     const auth = createAuth(withEnv(), { mail });

@@ -21,7 +21,7 @@
 
 | Milestone | State |
 |---|---|
-| M1 — Foundation (account → empty Home) | **In progress.** Server (auth + schema + account routes) is deployed on Cloudflare (`workers/`, live `production` environment); client-side email/password works in production, and Google is registered in production since 2026-08-09 (registration only — see "How it is now" for the two unproven riders) |
+| M1 — Foundation (account → empty Home) | **In progress.** Server (auth + schema + account routes) is deployed on Cloudflare (`workers/`, live `production` environment); client-side email/password works in production, and Google is registered in production since 2026-08-09 (registration only — see "How it is now" for the two unproven riders). Password reset and email verification are built and tested end to end as of 2026-09-20 (issue #94) but **inert until the captain configures a mail provider** — `docs/email-setup.md`; see "How it is now" and "Blocked" |
 | M2 — Intake (questionnaire persists) | **In progress.** Intake is asked exactly once: Home reads the target back from the saved intake and asks only for a plan length, and only when there is no race date to derive one from (`src/lib/planRequest.ts`) |
 | M3 — Plan engine (3 tiers produce valid plans) | **In progress.** The engine splits by tier as of 2026-09-09: Free is served entirely from the 40-plan deterministic library (`src/lib/planLibrary/`), paying tiers keep the template/pace engine as the AI skeleton. Both are wired into the Worker's `generate-plan` route and the client's generate-plan action; the plan view renders a real generated plan (via `GET /api/plans/:id`) alongside the permanent static golden fixture. Paid tiers still serve the quota-exempt template fallback — see "How it is now" |
 | M4 — Tiers & quotas (server-side, unbypassable) | **In progress.** The quota ledger, atomic gate, fallback exemption, `quota-status` and `purchase-tier` are built and tested server-side; Home now leads with the server-backed tier/quota line, Settings also displays it, and a dummy paywall lets a runner call `purchase-tier` |
@@ -75,6 +75,33 @@
   **not redeployed**, so those code fixes are not live until the captain runs `wrangler deploy
   --env production`. The `paceblueprint://` deep-link scheme matches `app.json` but has never been
   exercised by a real built app.
+- **Password recovery and email verification are built, tested, and switched off (2026-09-20,
+  issue #94, `fm/v22-password-recovery-94`).** The Worker sends two transactional mails through a
+  provider-agnostic sender (`workers/src/lib/mail.ts`: a `ResendAdapter` over Resend's HTTP API
+  when `RESEND_API_KEY` **and** `MAIL_FROM` are both set, otherwise a `ConsoleAdapter` that logs
+  one redacted line and sends nothing). `workers/src/auth-email.ts` resolves that per request and
+  wires better-auth's `sendResetPassword` / `sendVerificationEmail`; sessions are revoked on a
+  reset, verification mail goes out on sign-up only when mail is configured, and sign-in is gated on
+  a verified address only when `MAIL_VERIFICATION_REQUIRED = "true"` **and** mail is configured
+  (`verificationRequired = mailConfigured && flag`; the flag is `"false"` in both `[vars]` and
+  `[env.production.vars]`). The app reads both booleans from the new public `GET /api/email-status`
+  — the only unauthenticated app route besides `/health` — and is honest about them:
+  `(auth)/forgot-password` shows *"Password reset isn't available yet — this server can't send
+  email"* in place of the form until the captain configures a provider; the Home banner
+  (`src/components/auth/VerifyEmailBanner.tsx`) renders only for an unverified account on a
+  mail-capable Worker. Every mailed link is the Worker's own URL: it spends the token server-side
+  and `302`s to the app's `callbackURL` (`src/lib/authEmail.ts` builds it through `expo-linking`,
+  so it is `paceblueprint://…` in a built app, `exp://…/--/…` in Expo Go, `http://localhost:8081/…`
+  on web — all three already in `trustedOrigins`). `src/app/reset-password.tsx` and
+  `verify-email.tsx` sit at the root, **outside both `Stack.Protected` groups**, so a cold deep
+  link renders in either session state. Sign-in gained "Forgot your password?" and, on
+  `EMAIL_NOT_VERIFIED`, an explicit resend; sign-up passes the verify callback and shows "Check
+  your inbox" when the Worker withholds the session. **Nothing has sent a real mail yet** — the
+  domain, DNS and both secrets are the captain's (`docs/email-setup.md`); no test sends mail
+  (`workers/vitest.config.ts` blanks both secrets); and the built-app deep link has never been
+  opened on a device, the same unproven class as the `APP_SCHEME` row. All of the flow's
+  user-facing copy awaits the captain's certification — "Blocked" lists every string. Full account:
+  `change_log.md`, 2026-09-20.
 - **Issue #89's privacy-policy surface is implemented, but its public URL is not yet proven live
   (2026-09-19).** [`docs/privacy-policy.md`](privacy-policy.md) is the source of truth and names
   Ian Qiu, a sole trader based in Thailand, as controller. Settings now has a **Legal → Privacy
@@ -222,8 +249,10 @@
   `[vars]` of `workers/wrangler.toml` (the committed `[env.production.vars]` value is `"false"`),
   so the captain's test pass runs with every account Elite and the quota gate bypassed. Set the
   top-level value to `"false"` before real users arrive. Recorded in "Latest — 2026-08-09".
-- **Test counts:** 899 root tests across 52 suites on `fm/v22-delete-account-web-noop-96` (after rebasing onto #116),
-  verified by running the root gate there on 2026-09-16. Earlier figures, for the record: 870
+- **Test counts:** 999 root tests across 60 suites and 174 `workers/` tests across 10 files on
+  `fm/v22-password-recovery-94`, verified by running both gates there on 2026-09-20. Earlier
+  figures, for the record: 899 root tests across 52 suites on `fm/v22-delete-account-web-noop-96` (after rebasing onto #116),
+  verified by running the root gate there on 2026-09-16; 870
   root tests across 48 suites on `fm/v22-animations-lane3`, verified by running
   the root gate there on 2026-09-14; 785 root tests across 39 suites on `fm/v22-3day-peak-below-base`, verified by
   running `npm test` there on 2026-09-09 (778 across 38 suites on
@@ -232,8 +261,8 @@
   on 2026-09-09 (778 across 38 on `fm/v22-distance-specific-plans` before the library landed); 511
   across 32 suites on
   `fm/v22-redesign-theme-onboarding` (2026-09-04); `main`'s figure is the 469 across 29 suites
-  recorded in the 2026-09-01 and 2026-09-03 entries below. 141 `workers/` tests across 7 files
-  (`npm --prefix workers test`, verified 2026-09-09). Typecheck clean on both sides and root lint clean (`workers/` has no lint script — its
+  recorded in the 2026-09-01 and 2026-09-03 entries below. `workers/` was 141 tests across 7 files
+  before #94's three new files (`npm --prefix workers test`, verified 2026-09-09). Typecheck clean on both sides and root lint clean (`workers/` has no lint script — its
   gate is typecheck + test). The dated entries below record each point in time's counts — this line
   is the current one.
 - **Verified by hand on an iOS 26.5 simulator**, scoped to the 2026-08-15 check: Home in both the
@@ -243,7 +272,49 @@
 
 ---
 
-**Last updated:** 2026-09-12 — the captain's Home and navigation audit batch is implemented,
+**Last updated:** 2026-09-20 — password recovery and email verification (issue #94) are built on
+both sides and off by default, on `fm/v22-password-recovery-94`.
+
+- **The Worker can mail, but only once the captain says so.** `workers/src/lib/mail.ts` is a
+  provider-agnostic `sendMail` with a `ResendAdapter` (used when `RESEND_API_KEY` and `MAIL_FROM`
+  are both set; logs an HTTP status on failure, never a provider body) and a `ConsoleAdapter`
+  (logs `mail_skipped_unconfigured` with the subject only — never the recipient, link or token).
+  `workers/src/auth-email.ts` picks one per request and hands better-auth its reset and
+  verification senders; `advanced.backgroundTasks` runs them through `ctx.waitUntil`.
+- **Verification is opt-in twice over.** `emailVerification.sendOnSignUp` follows
+  `mailConfigured`; `emailAndPassword.requireEmailVerification` follows
+  `verificationRequired = mailConfigured && MAIL_VERIFICATION_REQUIRED === 'true'`, and that flag
+  is `"false"` in both Wrangler environments. `sendOnSignIn` is deliberately off — the app cannot
+  pass `callbackURL` on `sign-in/email` (on web the client's redirect plugin would navigate to it
+  after success), so an auto-sent sign-in link would carry better-auth's default `/` callback, the
+  Worker root, a JSON 404. The sign-in screen resends explicitly through
+  `send-verification-email` with the app's own `/verify-email` callback instead.
+- **One new public route.** `GET /api/email-status` → `{ mailConfigured, verificationRequired }`,
+  booleans only, `cache-control: no-store`, no session — the forgot-password screen and the Home
+  banner read it so they never promise a mail the Worker cannot send.
+- **The client half is pure where it decides and thin where it renders.** `src/lib/authEmail.ts`
+  (28 tests) builds the callbacks through `expo-linking`, resolves each landing screen's entry
+  state from its `?token=` / `?error=` params, holds the password-match check (the 8-character
+  minimum stays server-side, as on sign-up) and every copy string. `src/lib/apiClient.ts` adds
+  `getEmailStatus()`, `resendVerificationEmail(email)` (the one caller of
+  `send-verification-email`) and `useSessionUser()` — a typed door onto `user.email` /
+  `user.emailVerified`, since the existing `expoClient` cast types `useSession().data` as `never`.
+  New screens: `(auth)/forgot-password.tsx`, and `reset-password.tsx` / `verify-email.tsx` at the
+  root, outside both `Stack.Protected` groups (`src/app/_layout.tsx`) because a deep link opens in
+  either session state and guarding them would drop the token. `src/components/auth/VerifyEmailBanner.tsx`
+  sits under Home's header, calm `FallbackNotice` treatment, `SecondaryAction` resend.
+- **Tests never send mail, and the round trips are real.** `workers/vitest.config.ts` blanks both
+  secrets regardless of `.dev.vars`. `workers/test/auth-email.test.ts` drives verify and reset end
+  to end against D1 — the `302` to `paceblueprint://reset-password?token=…`, session revocation on
+  reset, a generic `200` for an unknown address, an untrusted redirect refused `403`, log
+  redaction, and the unverified sign-in refused *without* mailing while the explicit resend carries
+  the app's callback. `mail.test.ts` covers both adapters, `email-status.test.ts` the route. Root
+  gate: typecheck, lint (0 problems), 999 tests across 60 suites; Workers gate: 174 across 10 files.
+- **What this does not prove.** No real mail has been sent (the domain, DNS and secrets are the
+  captain's — `docs/email-setup.md`), and the built-app deep link has never been opened on a
+  device. Every user-facing string in the flow is uncertified — see "Blocked".
+
+Previous entry: 2026-09-12 — the captain's Home and navigation audit batch is implemented,
 without new design assets and without touching the heartbeat/graph animations, onboarding or auth
 screens.
 
@@ -707,6 +778,22 @@ from 82. Issue #22 remains open.)
   captain — provisioned and verified in local dev 2026-08-05 (see that entry below).
 
 ### Code
+- [x] **Issue #94 — password recovery and email verification, built on both sides and off by
+      default (2026-09-20; sending real mail awaits the captain's provider setup).** Worker:
+      `workers/src/lib/mail.ts` (provider-agnostic `sendMail`, `ResendAdapter` / `ConsoleAdapter`),
+      `workers/src/auth-email.ts` (`resolveAuthMailRuntime` → `{ sendMail, mailConfigured,
+      verificationRequired }`, the two mail templates), better-auth in `workers/src/auth.ts` wired
+      for `sendResetPassword`, `revokeSessionsOnPasswordReset`, `requireEmailVerification`
+      (only when mail is configured *and* `MAIL_VERIFICATION_REQUIRED = "true"`), `sendOnSignUp`
+      (only when mail is configured) and `sendOnSignIn: false` (deliberate — see the "Last
+      updated" entry), a reset-token-redacting error logger, and the public
+      `GET /api/email-status`. Client: `src/lib/authEmail.ts` (pure, 28 tests), `getEmailStatus` /
+      `resendVerificationEmail` / `useSessionUser` in `apiClient.ts`, `(auth)/forgot-password.tsx`,
+      root `reset-password.tsx` and `verify-email.tsx` outside both `Stack.Protected` groups,
+      `components/auth/VerifyEmailBanner.tsx` on Home, and the sign-in / sign-up additions. Three
+      new Worker test files (`mail`, `email-status`, `auth-email` — real D1 round trips, no mail
+      ever sent). Runbook: `docs/email-setup.md`. Gates: 999 root / 174 Workers, green. Detail:
+      `docs/change_log.md`, 2026-09-20.
 - [x] **Issue #89's privacy policy, publication path and in-app link are implemented
       (2026-09-19; publication still awaits a successful deployment).**
       `docs/privacy-policy.md` is the policy's one source of truth; it identifies Ian Qiu, sole
@@ -1142,7 +1229,9 @@ the pulse trace that preceded it are both landed-and-superseded history now, not
 
 Issue #89's implementation is complete; its remaining publication gate is a successful
 `Publish legal pages` run after a qualifying push to `main`. Do not mark the target URL live before
-that run succeeds. Nothing else is in flight. The one remaining critical-path item — `ANTHROPIC_API_KEY`, without which
+that run succeeds. Issue #94 (password recovery + email verification) is likewise complete on
+`fm/v22-password-recovery-94` and awaiting its PR; what remains on it is captain-only (the mail
+provider, the verification flag, the copy certification — "Blocked"). Nothing else is in flight. The one remaining critical-path item — `ANTHROPIC_API_KEY`, without which
 paid-tier requests serve the quota-exempt template fallback — is a captain-only action, not work
 in progress; see "Current state" above and "Blocked" below. The 2026-07-11 coaching cycles 1 and 2 are
 recorded under "Done" → "Domain" above, not here.
@@ -1263,6 +1352,9 @@ to "Decided" below.
 | **Decided 2026-08-07: deploy the Worker.** How a phone reaches the backend — LAN against `wrangler dev` was the alternative and was declined; on-device testing waits on `wrangler deploy` (the row above) rather than a same-Wi-Fi workaround | all on-device testing; caused the 2026-08-07 `Network request failed` report | **Ian — ruled.** A loopback base URL is unreachable from a phone by construction, tunnel or not (see `.env.example`); once deployed, `EXPO_PUBLIC_API_BASE_URL` becomes the Worker's `https://` URL. The app now reports the unreachable case clearly instead of crashing, but cannot fix it |
 | `wrangler deploy --env production` for the 2026-08-10 (later) `INVALID_ORIGIN`/`INVALID_CALLBACK_URL` fix | email sign-up and Google sign-in against the deployed Worker | **Ian.** The fix (`workers/src/auth.ts`, `workers/wrangler.toml`) is merged and tested but not live until redeployed — see the "Last updated" entry above |
 | Google OAuth consent screen publishing status (Testing vs. production) — does it block real users, not just listed test accounts | Google sign-in for anyone other than a listed test user | **Ian**, in Google Cloud Console → OAuth consent screen. Not checkable or changeable by an agent |
+| **Mail provider for password reset and email verification (issue #94, 2026-09-20):** a Resend account and sending domain, its DNS records (DKIM, SPF/return-path, DMARC), and `wrangler secret put RESEND_API_KEY --env production` / `MAIL_FROM --env production`, then a redeploy — [`docs/email-setup.md`](email-setup.md) steps 1–5, `curl /api/email-status` is the proof | any real password-reset or verification mail. Until both secrets exist the Worker's `ConsoleAdapter` sends nothing, `GET /api/email-status` answers `mailConfigured: false`, forgot-password shows the honest "can't send email" message instead of a form, and the Home banner stays hidden | **Ian.** There is no Pace Blueprint domain yet, so this is also the domain decision; `MAIL_FROM` is the only place it appears in code. Nothing here can be done by an agent (`AGENTS.md` → never run `wrangler secret put`) |
+| **Flip `MAIL_VERIFICATION_REQUIRED` to `"true"` in `[env.production.vars]` (issue #94, `docs/email-setup.md` step 6)** — a product decision, not a config chore. On: sign-up creates the account but no session and the app says "Check your inbox"; an unverified sign-in is refused `EMAIL_NOT_VERIFIED` with a resend offered. **Every existing password account has `emailVerified = 0` and would be gated at its next sign-in**; Google accounts are exempt (Google reports the address verified). The Worker honours the flag only when mail is also configured, so the order of this row and the one above cannot lock anyone out | whether an unverified address can sign in at all. Off, the feature is reset-only plus an optional Home banner | **Ian.** Warn testers before flipping, or leave it off until launch |
+| **Copy certification for the whole auth-mail flow (issue #94).** None of these strings has been certified by the captain — flagged the same way as the 13–17 guardian-consent checkbox copy (2026-09-19). App copy, all in `src/lib/authEmail.ts` or the named screen's JSX: *authEmail.ts* — "Password reset isn't available yet — this server can't send email. Ask whoever runs it to reset your password." / "This reset link is invalid or has expired. Request a new one." / "This verification link is invalid or has expired." / "Passwords don't match." / "It expires in an hour."; *`(auth)/forgot-password`* — "Reset password", "Enter your email and we'll send a link.", "Send reset link", "Check your inbox", "If an account exists for {email}, a reset link is on its way. It expires in an hour.", "Back to Sign in"; *`reset-password`* — "New password", "Choose a new password for your account.", placeholders "At least 8 characters" / "Same again", "Set new password", "Password updated", "Sign in with your new password.", "Sign in", "Link expired", "Request a new link", "Back to Today"; *`verify-email`* — "Email verified", "You're all set.", "Sign in to continue.", "Continue", "Link expired", "Send a new link", "Sent. Check {email} for a new link.", "Sign in to request a new link", "Back to Today"; *`VerifyEmailBanner`* — "Verify your email", "We sent a link to {email}. Open it to confirm this address.", "Resend link", "Sent. Check {email} for the link."; *`sign-in`* — "Verify your email before signing in. Check your inbox for the link.", "Didn't get it? Resend the link", "Sent. Check {email} for the link.", "Forgot your password? Reset it"; *`sign-up`* — "Check your inbox", "We sent a verification link to {email}. Open it to finish creating your account, then sign in.", "Go to Sign in"; plus the generic failure fallbacks ("Could not send a reset link. Try again.", "Could not reset your password. Try again.", "Could not send the link. Try again."). Mail copy, in `workers/src/auth-email.ts`: subjects "Verify your Pace Blueprint email" / "Reset your Pace Blueprint password"; bodies "Verify email:" / "Reset password:" followed by the link, then "If you did not create this account, you can ignore this email." / "If you did not request this reset, you can ignore this email." | nothing functionally — the flow works with the copy as written. It blocks calling any of it final | **Ian.** Copy only; the code paths behind each string are tested and stay as they are |
 | **Beginner three-day 5K plans collapse to the tempo floor (issue #103 residual, 320 sweep plans).** With one quality session at the 5K tempo's 8 km nominal (≈23% of the week), the beginner three-run share ceiling (`LONG_RUN_SHARE_MARGIN.beginner` 1.1 → 36.7%) and the no-easy-run-outgrows-the-long-run rule cap a week at ~86% of its target, so the growth base decays week on week to the tempo's 3 km floor: a 30 km/week beginner's 8-week 5K plan renders 25, 22, 17, 14*, 14, 11, **11**, 18. Options: raise the beginner share margin to ≥1.157 (1.2 gives 40% at 3 runs, 30% at 4 — a safety-ceiling loosening #103's own acceptance criteria reserve to the captain); give the generic 5K tempo the 10 km nominal the other distances use (a coaching dose); or accept and disclose | every beginner 3-day 5K plan on the paid skeleton | **Ian.** Both remedies change a number the code is not allowed to pick |
 | **The golden 12-week/4-day 5K path at 50–110 km/week renders its peak under its base (issue #103 residual, 28 sweep plans).** Authored at 35 km/week; scaled past ~50 km its two-easy-run base/build weeks and its one-easy-run, two-quality peak weeks both pin to the flat intermediate share cap, at 54 km and 48 km. Options: route declared volumes above the point where the caps bind off the golden path onto the generic curve (the same class of decision as `golden-cadence3-route`), or accept | intermediate 4-day 12-week 5K runners declaring ≥50 km/week | **Ian.** Who gets the coach's plan is his call |
 | Marathon's separate absolute single-run calibration for intermediate/advanced remains open. Since 2026-09-07 `maxSingleRunKm()` returns `Infinity` only for a `prepared` marathoner whose easy pace makes the 180-minute cap enforceable; everyone else (no recent time, advanced, first-timer) keeps the flat ≤25 / ≤35 km table, so the open question is now what number should replace the table for the prepared, pace-known case. The weekly-share number is settled at 35% and is not part of this blocker | the final marathon-specific absolute kilometre ceiling, and whether the unchanged 180-minute duration cap should remain the ultimate duration bound | **Ian.** `report-source.md` says the exact absolute policy is coaching judgment and notes McMillan sometimes permits up to four hours; this work settles the share at 35%, leaving only the absolute calibration and any future time-cap change open. The current 180-minute cap and 10% spike guard remain active. The fixed-position long-run-curve dips that used to land on loading weeks when resampled onto noncanonical durations are gone since 2026-09-19 — the generic path reads the curves with their loading block held at the running maximum (`holdRecoveryDips`), and rest weeks size their own long run from `deloadLongRun`. Valid deloads use the last loading week's denominator, so their displayed own-week ratio is not required to be ≤35%. |
@@ -1708,6 +1800,15 @@ intact underneath.
   `BETTER_AUTH_URL`'s redirect URI is correctly registered with Google — what's still unverified is
   an actual interactive login carrying the deep link back into a running app; that needs a human
   clicking through Google's consent screen, which wasn't done here.
+- 🟠 **The password-reset and verify-email deep links have never been opened in a built app
+  (issue #94, 2026-09-20).** Same class as the row above, now with two more landing routes:
+  `paceblueprint://reset-password?token=…` and `paceblueprint://verify-email` are pinned as the
+  Worker's `302` targets in `workers/test/auth-email.test.ts`, and Expo Router maps them to
+  `src/app/reset-password.tsx` / `verify-email.tsx` (outside the session guard) — but no mail
+  client has ever handed one to a device, and no real mail has been sent at all (the provider is
+  captain-only, "Blocked"). Expo Go and web use `exp://` / `http://localhost:8081` callbacks
+  instead (`docs/email-setup.md` → "The deep links"); the first proof needs the Android dev-client
+  build, a configured provider, and a human tapping the link.
 - 🟠 **`GeneratePlanRequest` has no `goalTimeSec` field, so the per-generation goal cannot reach the
   engine at all (found 2026-07-12).** `docs/mvp-build-prompt.md:332` promises that race
   distance/date/goal-time *travel per-generation* — "intake's stored race is a default, not the
