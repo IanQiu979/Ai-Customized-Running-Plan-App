@@ -251,6 +251,14 @@ Built-ins also available: `Explore`, `Plan`, `general-purpose`. Plugin agents ar
   fall below the band (captain's 2026-09-12 audit, `docs/change_log.md`). Both property suites —
   `planTemplates.deload.test.ts` and `planLibrary/__tests__/engine.recovery.test.ts` — pin every
   rest week on both engines; if one fails, read which invariant before touching either engine.
+- **A declared injury's volume cut lands on week 1 only, in both engines.** § 17: "Percentage
+  reductions apply to the validated baseline once; they never stack." `planTemplates.ts`'s
+  `applyInjuryVolumeAdjustment` and `planLibrary/engine.ts`'s week loop both gate the module cut on
+  the first week; later weeks ramp off week 1's reduced volume through the growth cap. Re-applying
+  it per week compounds it against `lastLoadingKm` (0.85 × 0.85 × …) — issue #106, which collapsed
+  an injured Free plan to 29% of its healthy twin by week 12. `engine.injury.test.ts` sweeps every
+  module for exactly that, and `engine.recovery.test.ts` sweeps rest weeks for `H0` plus all seven
+  `H1` modules (`lower_back` for the total band only until the captain rules on #119).
 - **A race target is optional, and nothing may default one.** `buildTemplatePlan` carries
   `raceDistance?: RaceDistance` with no fallback; race week, the taper phase and the taper tail of
   the load curve are all gated on `isRacePlan`. Re-introducing a `?? '5k'` silently gives a

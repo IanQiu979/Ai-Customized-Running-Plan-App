@@ -787,7 +787,12 @@ export function buildLibraryPlan(params: LibraryPlanParams): LibraryPlanResult {
 
     // § 5: "level maximum weekly kilometres → injury adjustment → single-session and long-run caps".
     target = Math.min(target, MAX_WEEKLY_KM[level]);
-    if (injuryEffect.volumeReductionPct > 0) target *= 1 - injuryEffect.volumeReductionPct;
+    // § 17: "Percentage reductions apply to the validated baseline once; they never stack", and every
+    // module's `H1` row is "First loading week −X%" — so the module cut lands on week 1 only, like
+    // § 16's own 90% below it. Later weeks ramp off week 1's reduced volume through the state
+    // machine and `clampWeeklyVolume`; re-applying the cut here compounded it (0.85 × 0.85 × …) and
+    // collapsed an injured plan to ~30% of its healthy twin by week 12 (issue #106).
+    if (injuryEffect.volumeReductionPct > 0 && index === 0) target *= 1 - injuryEffect.volumeReductionPct;
     if (injuryState === 'H1' && index === 0) target *= H1_WEEK_1_BASELINE_SHARE;
     if (source.state !== 'RECOVERY') {
       target = clampWeeklyVolume({

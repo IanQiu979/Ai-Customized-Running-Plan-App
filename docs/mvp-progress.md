@@ -687,6 +687,16 @@ from 82. Issue #22 remains open.)
   captain — provisioned and verified in local dev 2026-08-05 (see that entry below).
 
 ### Code
+- [x] **Issue #106 closed — a declared injury cuts a Free plan once, not every week
+      (2026-09-19).** `src/lib/planLibrary/engine.ts` applied the § 17 module reduction to every
+      week's target while later targets build on the previous (already cut) loading week, so a
+      knee's 15% compounded to 29% of the healthy plan by week 12 and rest weeks fell to 68%. The
+      cut now lands on week 1 only (§ 17 "apply once", the paid skeleton's existing reading); rest
+      weeks are back inside the 15–25% band and week 12 sits at 90% of healthy. New
+      `engine.injury.test.ts` (issue intake + a 346,500-week sweep over all seven modules) and
+      `engine.recovery.test.ts` extended from `H0` to `H0` + all `H1` modules. Progression mask
+      untouched (758), no fixture changed. Surfaced #119 (`lower_back` Day-7 pin on rest weeks),
+      left for the captain. Detail: `docs/change_log.md`, 2026-09-19.
 - [x] **Audit §1.3 closed — the golden 5K path serves only the cadence it was authored for
       (2026-09-16, captain ruling `golden-cadence3-route`).** `FIVE_K_WEEKLY_LOAD` dips at weeks
       4 and 8, so `buildTemplatePlan` now admits a 12-week / 4-day / 5K race intake to
@@ -1507,6 +1517,11 @@ intact underneath.
   (peak weeks 17–19 at 23/24/24 km with 9/9/9 km long runs) is unchanged, and the exact-membership
   mask gate passes, so no plan entered the offender set. Nobody has confirmed the GitHub issue is
   closed.
+- 🟡 **`lower_back` (INJ-6) rest weeks never shorten Day 7 — GitHub issue #119 (2026-09-19).**
+  The "keep Day 7 at `LR-low`" pin is applied on `RECOVERY` weeks too, so the whole 15–25% cut
+  lands on the easy runs (total in band, shape wrong). Found by extending the rest-week sweep to
+  `H1` for #106; whether the pin is a cap or a value is a coaching reading, so it waits on Ian.
+  The recovery suite sweeps that flag for the total band only until then.
 - 🟡 **The pre-existing peak-below-base offenders are still there — GitHub issue #103.** After both
   tasks the 22,000-plan sweep reported **770** broad "peak below pre-peak loading" and **470**
   literal "peak below base" plans (pre-Task-1: 954 broad, 470 literal); since the 2026-09-16
