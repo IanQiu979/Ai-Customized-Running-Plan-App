@@ -1,0 +1,71 @@
+# Publishes docs/privacy-policy.md to GitHub Pages at
+#   https://ianqiu979.github.io/Ai-Customized-Running-Plan-App/privacy-policy/
+# — the public URL `src/constants/legal.ts` links to and the store listings cite (issue #89).
+#
+# This is NOT CI. The repo deliberately has none (`no-mistakes` is the gate); this workflow only
+# runs on `main`, only when the policy or this file changes, and publishes nothing else — the
+# Pages site is built from a staging directory holding the rendered policy alone, so pointing
+# Pages at `/docs` (which would publish every internal doc) is never needed. The same approach
+# the V2.3 sibling settled on (Pages, `build_type: workflow`).
+#
+# pandoc ships on GitHub's `ubuntu-latest` runner image, so the render needs no dependency.
+name: Publish legal pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - docs/privacy-policy.md
+      - .github/workflows/publish-legal-pages.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Render the policy into an otherwise-empty site
+        run: |
+          set -euo pipefail
+          mkdir -p site/privacy-policy
+          pandoc docs/privacy-policy.md \
+            --from gfm --to html5 --standalone \
+            --metadata pagetitle="Pace Blueprint — Privacy Policy" \
+            --metadata lang=en \
+            --output site/privacy-policy/index.html
+          # A root page so the site never 404s at its base; it only points at the policy.
+          cat > site/index.html <<'HTML'
+          <!doctype html>
+          <html lang="en"><head><meta charset="utf-8"><title>Pace Blueprint</title>
+          <meta http-equiv="refresh" content="0; url=privacy-policy/"></head>
+          <body><p><a href="privacy-policy/">Pace Blueprint — Privacy Policy</a></p></body></html>
+          HTML
+          test -s site/privacy-policy/index.html
+
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,10 +1,12 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
+import { ActivityIndicator, Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActionRow, Group, Row } from '@/components/layout/GroupedRows';
 import { ScreenHeader } from '@/components/layout/ScreenHeader';
+import { PRIVACY_POLICY_URL } from '@/constants/legal';
 import { FontFamily, FontSize, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { API_BASE_URL, authClient, deleteAccount, describeError, getQuotaStatus } from '@/lib/apiClient';
@@ -19,7 +21,8 @@ import type { QuotaStatus } from '@/lib/planTypes';
  * Home) and Delete Account (a real confirmation on every platform via `confirmDestructive`, then
  * `deleteAccount()`) round it out — on delete-account success, an explicit `authClient.signOut()`
  * invalidates the local session store so `src/app/_layout.tsx`'s `Stack.Protected` guard bounces
- * to `(auth)`.
+ * to `(auth)`. A "Legal" group links the published privacy policy (`PRIVACY_POLICY_URL`, issue
+ * #89) — the in-app link the store guidelines require alongside the listing's URL.
  *
  * **Zero accent, no exception** (`docs/design/instrument-visual-system.md` §1). This screen is flat
  * grouped rows and hairlines. The "Upgrade" row is deliberately not a signal-marked button: the offer
@@ -97,6 +100,17 @@ export default function SettingsScreen() {
     }
   }
 
+  // An in-app browser sheet on native (`SFSafariViewController` / Custom Tabs) so the runner
+  // returns to Settings with a swipe; on web the same call opens a tab. If no browser can be
+  // presented (a bare runtime), fall through to the OS handler rather than do nothing (#96).
+  async function openPrivacyPolicy() {
+    try {
+      await WebBrowser.openBrowserAsync(PRIVACY_POLICY_URL);
+    } catch {
+      await Linking.openURL(PRIVACY_POLICY_URL).catch(() => {});
+    }
+  }
+
   async function handleDeleteAccount() {
     setDeleteError(null);
     setDeleting(true);
@@ -143,6 +157,14 @@ export default function SettingsScreen() {
 
           <Group title="Session">
             <ActionRow label="Sign out" onPress={handleSignOut} />
+          </Group>
+
+          <Group title="Legal">
+            <ActionRow
+              label="Privacy policy"
+              hint="What we collect, who sees it, and how to delete it"
+              onPress={openPrivacyPolicy}
+            />
           </Group>
 
           <Group title="Danger zone">
