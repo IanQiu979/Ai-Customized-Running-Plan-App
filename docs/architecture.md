@@ -69,9 +69,9 @@ src/
       settings.tsx           # Settings tab (new 2026-08-05) — tier + quota (GET
                               #  /api/quota-status, src/lib/quotaDisplay.ts), sign-out (moved off
                               #  Home), a Free-tier "Upgrade" entry point to /paywall, a Legal ->
-                              #  Privacy policy row (issue #89; same-tab navigation on web,
-                              #  in-app browser -> OS link fallback on native, with a visible
-                              #  accessible error if opening fails), and Delete Account
+                              #  Privacy policy row (issue #89; opens through
+                              #  src/lib/openPrivacyPolicy.ts, with a visible accessible error
+                              #  if opening fails), and Delete Account
                               #  (confirmDestructive() — the OS alert on native, the
                               #  browser's own confirm on web, since 2026-09-16 / issue #96 ->
                               #  deleteAccount() -> authClient.signOut()). Quota refreshes
@@ -90,7 +90,10 @@ src/
                               # full-viewport build that holds, then PRESS TO CONTINUE reveals the
                               # questions; the questions never animate. Numeric answers use src/components/inputs/
                               # (segmented YYYY-MM-DD and H:MM:SS boxes, digit-filtered).
-                              # Against GET/PUT /api/intake; its
+                              # Against GET/PUT /api/intake. An age of 13–17 reveals a required
+                              # guardian-consent checkbox (issue #89, 2026-09-19) whose policy
+                              # link goes through lib/openPrivacyPolicy.ts; save sends
+                              # guardianConsent: true and the server refuses without it. Its
                               # exit-header action replaces to Home ("Done" once intake exists,
                               # "Skip for now" otherwise), and as of 2026-08-05 a successful save
                               # also router.replace('/(tabs)')s there instead of staying put
@@ -184,6 +187,11 @@ src/
                               #  is an empty method. Only an explicit confirm calls onConfirm; a
                               #  web runtime with no confirm throws. Platform/Alert/confirm are
                               #  read through an injectable runtime so both branches are tested
+    openPrivacyPolicy.ts     # the one way the app opens PRIVACY_POLICY_URL (issue #89): web
+                              #  navigates the current tab, native tries the in-app browser then
+                              #  the OS handler; every failure resolves to a message the screen
+                              #  shows instead of throwing. Shared by Settings' Legal row and the
+                              #  intake consent row; same injectable-runtime seam as confirmDestructive
     planTypes.ts              # canonical — shared Plan/Week/Workout/Tier vocabulary
     loadRules.ts               # canonical — deterministic safety arithmetic
     notation.ts                 # canonical — run-type/structure-string notation, the code
@@ -234,7 +242,8 @@ src/
                               # paceDerivation, quotaDisplay (6 tests, new 2026-08-05),
                               # goalRealismDisclosure, planRequest, fieldInput (new 2026-08-15),
                               # buildMotion, weekStrip, planProgress (new 2026-09-14),
-                              # confirmDestructive (11 tests, new 2026-09-16)
+                              # confirmDestructive (11 tests, new 2026-09-16),
+                              # openPrivacyPolicy (issue #89, 2026-09-19)
                               # — the two engine contracts included
 ```
 
@@ -442,8 +451,8 @@ src/app/
                          # state, and MOST RECENT links to the newest generated plan
   (tabs)/settings       # exists today (2026-08-05) — tier + quota display, sign-out, delete
                          # account, an "Upgrade" entry point to /paywall (decision 1, 2026-07-10),
-                         # and issue #89's accessible Legal -> Privacy policy link (same tab on
-                         # web; in-app browser then OS-link fallback on native)
+                         # and issue #89's accessible Legal -> Privacy policy link (via
+                         # src/lib/openPrivacyPolicy.ts)
   intake/                # onboarding questionnaire (stack) — exists today, against GET/PUT
                          #  /api/intake
   plan/[id]              # plan overview (V22-06 A) — exists today; renders a real generated plan

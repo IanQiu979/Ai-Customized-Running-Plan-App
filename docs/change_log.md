@@ -33,6 +33,13 @@ explicit consent (GDPR Art. 9(2)(a), Thai PDPA s.26).
   corrected** — both previously said the consent-recording flow was a separate, not-yet-built task;
   they now describe the shipped checkbox-plus-server-record flow and name it as the stated legal
   basis for processing a minor's data.
+- **Review round (same day).** The policy opener moved out of Settings into
+  `src/lib/openPrivacyPolicy.ts`, shared by the Legal row and the intake consent row (same
+  injectable-runtime seam as `confirmDestructive`; `src/lib/__tests__/openPrivacyPolicy.test.ts`
+  drives every branch). `legal.test.ts` now parses `publish-legal-pages.yml` with the `yaml`
+  package (new devDependency, pinned to the lockfile's version) instead of regexing it, and pins
+  `PRIVACY_POLICY_VERSION` to the policy's single "Last updated" date. `workers/tsconfig.json`
+  includes `src/constants/legal.ts` so the Worker stamps the same version constant.
 
 ## 2026-09-19 — Issue #89 gains one privacy-policy source, a publication path, and an in-app link
 

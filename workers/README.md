@@ -39,6 +39,9 @@ workers/
   migrations/
     0001_better_auth.sql # user, session, account, verification — better-auth's own tables
     0002_app_schema.sql  # profiles, intake_responses, subscriptions, plans + the quota ledger
+    0003_*.sql           # the 13+ intake age floor
+    0004_guardian_consent.sql # guardian_consent — one consent event per 13–17 user, written in the
+                         #  same batch as the intake row (issue #89; docs/architecture.md has the schema)
   src/
     index.ts             # entry: authenticate once, then dispatch. The route table lives here.
     auth.ts              # better-auth wired to D1
