@@ -103,6 +103,10 @@ every deployment today. Runbook for switching it on: `docs/email-setup.md`.
   are exempt). No deep link has been opened in a built app. Every user-facing string in the flow is
   uncertified — `docs/mvp-progress.md` → Blocked lists them all. Universal Links / App Links are
   not configured (no domain); the custom scheme works from any mail client via one browser hop.
+- **Spec updated.** `planning/03-engineering-requirements.md`'s Tech stack → Email row now
+  describes the Worker's provider-agnostic sender with the Resend adapter and the console/no-op
+  fallback, pointing to `docs/email-setup.md`; the original Supabase-mailer → SMTP plan is kept
+  as a dated superseded note (captain's decision, 2026-09-20).
 
 ## 2026-09-19 — Guardian consent for 13–17 intake is now required and recorded
 
