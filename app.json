@@ -2,6 +2,7 @@
   "expo": {
     "name": "Pace Blueprint",
     "slug": "pace-blueprint",
+    "owner": "ianbeatingpros",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -45,6 +46,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "d86c9827-401d-4866-890e-7fcd5deedc7e"
+      }
     }
   }
 }

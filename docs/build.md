@@ -1,0 +1,84 @@
+# EAS builds
+
+Issue #93 (Android half). iOS/TestFlight is out of scope — no Apple Developer Program yet.
+
+## Account & project
+
+- EAS account: `ianbeatingpros` (`i78979848@gmail.com`)
+- EAS project: `pace-blueprint`, id `d86c9827-401d-4866-890e-7fcd5deedc7e`
+- `app.json`'s `extra.eas.projectId` and top-level `owner` point at the above.
+
+## Profiles (`eas.json`)
+
+- `development` — `developmentClient: true`, `distribution: internal`, Android `buildType: apk`.
+  The .apk is a native shell with **no JS bundle inside it**: the phone loads the bundle from the
+  Metro server started by `npm start` on the developer's machine, and Metro inlines
+  `process.env.EXPO_PUBLIC_*` from **that machine's `.env`**, not from `eas.json`'s `env`. So the
+  Worker URL the dev-client build actually talks to is whatever `.env`'s
+  `EXPO_PUBLIC_API_BASE_URL` says on the computer running Metro. Keep it at the production Worker
+  (`https://pace-blueprint-production.i78979848.workers.dev`, `.env.example`'s default) when a
+  phone is on the other end — the `http://localhost:8787` `wrangler dev` value resolves to the
+  phone itself and every request fails with `Network request failed` (`AGENTS.md`'s loopback
+  guardrail).
+- `preview` — same shape as `development` but no dev client, for a closer-to-production internal
+  test build. The bundle is embedded at build time, so here `eas.json`'s
+  `env.EXPO_PUBLIC_API_BASE_URL` (the production Worker) is what the phone uses.
+- `production` — Android `buildType: app-bundle`, `autoIncrement: true`, for a future Play Store
+  submission. Same embedded-bundle rule as `preview`.
+
+All three profiles set the same production Worker URL in `eas.json`; it governs `preview` and
+`production` (embedded bundle) and is inert for `development` (Metro-served bundle, see above).
+There is no local/staging Worker profile yet — add one (a new `env.EXPO_PUBLIC_API_BASE_URL`) if
+`wrangler dev` needs to be targeted from a `preview`-style device build.
+
+## First Android development build
+
+Command: `npx eas-cli@latest build --profile development --platform android`
+
+| Field | Value |
+|---|---|
+| Build ID | `9ca20e4e-6dfe-4aad-bdff-1dfafa874eb5` |
+| Status | FINISHED |
+| Build page | https://expo.dev/accounts/ianbeatingpros/projects/pace-blueprint/builds/9ca20e4e-6dfe-4aad-bdff-1dfafa874eb5 |
+| Artifact (.apk) | https://expo.dev/artifacts/eas/ChU12AsfwEkGtRw7-6c4JUVMMzVvqyN_7iSx1NgOVNE.apk |
+| App version / build number | 1.0.0 / 1 |
+| SDK | 57.0.0 |
+| App identifier | `com.ian.paceblueprint` |
+| Fingerprint id/hash | `01a0b9b1-c918-7c53-8f48-b0f079e2b39a` / `0d61c7e2d14bc90e37342a855efa5d6fc49ebc2b` |
+| Git commit | `6d83e0f` (build: configure EAS Android development client) |
+
+Download the artifact URL directly on the Android phone (or `adb install` it) to get the app
+installed, then run `npm start` on the development machine and open the app to load the bundle
+(see the `development` profile note above for which `.env` the phone ends up using).
+Both sign-in paths are expected to work on the dev build — see the next section for what Google
+sign-in does and does not need.
+
+## Google sign-in on a phone
+
+No Android OAuth client and no keystore SHA-1 registration are needed. Google sign-in in this app
+is a server-side web OAuth round trip, not a native Google SDK: `src/lib/apiClient.ts`'s
+`openNativeGoogleAuth` opens `WebBrowser.openAuthSessionAsync` against the Worker's
+`/api/auth/expo-authorization-proxy`, Google redirects to the Worker's HTTPS callback using the
+existing **Web application** client (`GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`, Worker secrets),
+and `@better-auth/expo` deep-links back into the app on `paceblueprint://`, which
+`workers/src/auth.ts` already trusts via `APP_SCHEME`. `@react-native-google-signin` is not
+installed, so there is no native client config to fill in, and a keystore SHA-1 would only become
+relevant if native Google Sign-In is adopted later.
+
+What IS needed is that the Worker's redirect / trusted-origin configuration covers the dev
+build's return path: the Web client's authorized redirect URI is the Worker callback and the
+app's deep link is `paceblueprint://` (a dev-client build uses the real scheme, unlike Expo Go's
+`exp://`) — verify both against `docs/google-oauth-runbook.md`'s configuration contract before a
+device test. That is a config check, not a new OAuth client or an `eas credentials` lookup.
+
+The `fingerprint` field above is Expo's project fingerprint (used for build/update matching); it
+is not a signing-key fingerprint. EAS manages the Android keystore for this project (generated on
+the first `eas build --platform android`, accepted non-interactively); nothing in the sign-in flow
+depends on it.
+
+## Re-running a build
+
+`npx eas-cli@latest build --profile <development|preview|production> --platform android
+--non-interactive --no-wait`, then poll `npx eas-cli@latest build:list` or `build:view <id>
+--json` until `status` is `FINISHED`. EAS build minutes are on the free tier for this account —
+budget a queue wait, not payment.

@@ -5,6 +5,24 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-09-19 — First EAS build: Android development client (issue #93, Android half)
+
+- **EAS project created** under the captain's `ianbeatingpros` account (`pace-blueprint`,
+  id `d86c9827-401d-4866-890e-7fcd5deedc7e`); `app.json` gains `owner` and `extra.eas.projectId`.
+- **`eas.json` added** with `development` (dev client, internal, Android apk), `preview` and
+  `production` (app-bundle, `autoIncrement`) profiles mirroring V2.3's shape. Every profile sets
+  `EXPO_PUBLIC_API_BASE_URL` to the production Worker; that value is embedded for `preview` /
+  `production` and inert for the Metro-served `development` build, which reads the developer
+  machine's `.env` instead — `docs/build.md`.
+- **`expo-dev-client` added** as a dependency (HIGH-tier dependency add per `AGENTS.md`).
+- **Build `9ca20e4e-6dfe-4aad-bdff-1dfafa874eb5` FINISHED** — version 1.0.0 / build 1, SDK 57,
+  `com.ian.paceblueprint`, EAS-managed keystore accepted on this first build. Account, build page
+  and artifact .apk URL are recorded in `docs/build.md`. Google sign-in on the build needs no
+  Android OAuth client or keystore SHA-1 (the flow is the Worker's web-client OAuth proxy plus the
+  `paceblueprint://` deep link); the only prerequisite is the redirect / trusted-origin config
+  check in `docs/google-oauth-runbook.md`. iOS/TestFlight remains out of scope
+  (`docs/apple-dev-blocked.md`).
+
 ## 2026-09-19 — Three plan-engine rulings: dateless distance plans, the #103 peak invariant, the 35–45% source annotations
 
 Captain's rulings of 2026-09-19 (firstmate task `v22-plan-engine-captain-calls-r1`), GitHub

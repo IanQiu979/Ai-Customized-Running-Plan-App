@@ -145,6 +145,8 @@ src/
     supabase.ts                       # LEGACY, unused
     fixtures/examplePlan.ts            # golden fixture plan
 
+eas.json                     # EAS build profiles (development / preview / production) — see docs/build.md
+
 workers/                     # the Cloudflare backend — see workers/README.md
   wrangler.toml
   migrations/                 # 0001 better-auth's tables, 0002 the app's
@@ -160,7 +162,7 @@ workers/                     # the Cloudflare backend — see workers/README.md
 - **M3 — Plan engine**: free template plans + paid AI plans generate reliably; plan view renders. *Both seams are bound (skeleton 2026-08-04, personalizer 2026-08-10); `ANTHROPIC_API_KEY` is the remaining gap, so Pro/Elite still receive the quota-exempt template fallback.*
 - **M4 — Tiers & quotas**: dummy paywall, tier and quota enforcement server-side. *Done — server-side enforcement plus a Settings tab (tier/quota display) and dummy paywall client-side.*
 - **M5 — My Plans**: history tab, plan persistence, re-open past plans. *Done.*
-- **M6 — Polish & TestFlight**: empty states, errors, loading, app icon/splash, TestFlight build.
+- **M6 — Polish & TestFlight**: empty states, errors, loading, app icon/splash, TestFlight build. *First EAS build exists as of 2026-09-19 — an Android development-client .apk ([`docs/build.md`](docs/build.md)); TestFlight waits on the Apple Developer Program.*
 
 Full milestone "done" criteria are in `planning/02-product-requirements.md`.
 

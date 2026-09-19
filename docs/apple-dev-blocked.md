@@ -34,8 +34,9 @@ issue #35). So the icon/splash *artwork* is unblocked; only the Apple-side pipel
 
 **Why it's Apple-gated:** TestFlight and App Store submission both require the paid membership.
 `eas build` for iOS needs Apple credentials (an App Store Connect API key or an Apple ID with a
-team). `eas init` itself is Expo-side and free, but it exists here only to feed a pipeline that
-cannot run.
+team). `eas init` itself is Expo-side and free, and it **has now been run** (2026-09-19): the EAS
+project exists and the first Android development-client build is finished — `docs/build.md`. Only
+the iOS half of the pipeline is still gated here.
 
 **Not actually Apple-gated — do these now, without the membership:**
 - The **copy sweep** (empty states, Ruling 20 error states, offline copy) — pure app code.
