@@ -16,9 +16,12 @@ make a behavior-changing commit, add a bullet under today's date — create a ne
   machine's `.env` instead — `docs/build.md`.
 - **`expo-dev-client` added** as a dependency (HIGH-tier dependency add per `AGENTS.md`).
 - **Build `9ca20e4e-6dfe-4aad-bdff-1dfafa874eb5` FINISHED** — version 1.0.0 / build 1, SDK 57,
-  `com.ian.paceblueprint`, EAS-managed keystore accepted on this first build. Account, build page,
-  artifact .apk URL and the keystore-SHA-1 follow-up for Android Google sign-in are recorded in
-  `docs/build.md`. iOS/TestFlight remains out of scope (`docs/apple-dev-blocked.md`).
+  `com.ian.paceblueprint`, EAS-managed keystore accepted on this first build. Account, build page
+  and artifact .apk URL are recorded in `docs/build.md`. Google sign-in on the build needs no
+  Android OAuth client or keystore SHA-1 (the flow is the Worker's web-client OAuth proxy plus the
+  `paceblueprint://` deep link); the only prerequisite is the redirect / trusted-origin config
+  check in `docs/google-oauth-runbook.md`. iOS/TestFlight remains out of scope
+  (`docs/apple-dev-blocked.md`).
 
 ## 2026-09-19 — Three plan-engine rulings: dateless distance plans, the #103 peak invariant, the 35–45% source annotations
 
