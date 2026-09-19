@@ -23,6 +23,12 @@ import { expo } from '@better-auth/expo';
 import { betterAuth } from 'better-auth';
 import { bearer } from 'better-auth/plugins';
 
+import {
+  resolveAuthMailRuntime,
+  sendPasswordResetMail,
+  sendVerificationMail,
+  type AuthMailRuntime,
+} from './auth-email';
 import type { Env } from './env';
 
 /**
@@ -38,7 +44,12 @@ export const AUTH_BASE_PATH = '/api/auth';
  */
 export type Auth = ReturnType<typeof createAuth>;
 
-export function createAuth(env: Env) {
+export interface CreateAuthOptions {
+  mail?: AuthMailRuntime;
+  waitUntil?: (promise: Promise<unknown>) => void;
+}
+
+export function createAuth(env: Env, options: CreateAuthOptions = {}) {
   if (!env.BETTER_AUTH_SECRET) {
     // Loud, at the door. A missing signing secret must never degrade into unsigned sessions.
     throw new Error(
@@ -46,6 +57,8 @@ export function createAuth(env: Env) {
         'Production: wrangler secret put BETTER_AUTH_SECRET'
     );
   }
+
+  const mail = options.mail ?? resolveAuthMailRuntime(env);
 
   return betterAuth({
     database: env.DB,
@@ -97,16 +110,18 @@ export function createAuth(env: Env) {
 
     emailAndPassword: {
       enabled: true,
-      /**
-       * FALSE ON PURPOSE, and this is a decision with a date on it rather than a default left
-       * alone: turning it on requires an email sender, and this Worker has none — better-auth
-       * would mint a verification token and drop it on the floor, locking out every new account.
-       * `planning/03-engineering-requirements.md` "Tech stack" plans a real transactional sender
-       * (Resend/Postmark) before public launch; verification turns on in the same change that
-       * lands one, not before.
-       */
-      requireEmailVerification: false,
+      requireEmailVerification: mail.verificationRequired,
       minPasswordLength: 8,
+      sendResetPassword: ({ user, url }) =>
+        sendPasswordResetMail(mail.sendMail, { to: user.email, url }),
+      revokeSessionsOnPasswordReset: true,
+    },
+
+    emailVerification: {
+      sendVerificationEmail: ({ user, url }) =>
+        sendVerificationMail(mail.sendMail, { to: user.email, url }),
+      sendOnSignUp: mail.mailConfigured,
+      sendOnSignIn: mail.verificationRequired,
     },
 
     socialProviders: buildSocialProviders(env),
@@ -117,8 +132,14 @@ export function createAuth(env: Env) {
     logger: {
       level: 'error',
       log(level, message, ...args) {
-        if (level === 'error') console.error('better-auth error', { message, details: sanitizeAuthLog(args) });
-        else if (level === 'warn') console.warn('better-auth warning', { message });
+        if (level === 'error') {
+          console.error('better-auth error', {
+            message: redactSensitiveText(message),
+            details: sanitizeAuthLog(args),
+          });
+        } else if (level === 'warn') {
+          console.warn('better-auth warning', { message: redactSensitiveText(message) });
+        }
       },
     },
 
@@ -143,6 +164,7 @@ export function createAuth(env: Env) {
       // Secure cookies only over https, so `wrangler dev` on plain http still works. Cross-domain
       // cookie settings are deliberately absent — the client authenticates by Bearer token, above.
       useSecureCookies: env.BETTER_AUTH_URL.startsWith('https://'),
+      backgroundTasks: options.waitUntil ? { handler: options.waitUntil } : undefined,
     },
   });
 }
@@ -196,9 +218,11 @@ function sanitizeOAuthError(error: unknown): Record<string, unknown> {
   return {
     name: candidate.name,
     message: redactSensitiveText(candidate.message),
-    code: candidate.code,
+    code: candidate.code ? redactSensitiveText(candidate.code) : undefined,
     status: candidate.statusCode ?? candidate.status ?? candidate.response?.status,
-    statusText: candidate.response?.statusText,
+    statusText: candidate.response?.statusText
+      ? redactSensitiveText(candidate.response.statusText)
+      : undefined,
   };
 }
 
@@ -206,7 +230,7 @@ function sanitizeAuthLog(args: unknown[]): unknown[] {
   return args.map((arg) => sanitizeAuthLogValue(arg));
 }
 
-function sanitizeAuthLogValue(value: unknown, depth = 0): unknown {
+export function sanitizeAuthLogValue(value: unknown, depth = 0): unknown {
   if (value instanceof Error) return sanitizeOAuthError(value);
   if (typeof value === 'string') return redactSensitiveText(value);
   if (typeof value === 'number' || typeof value === 'boolean' || value === null) return value;
@@ -220,8 +244,17 @@ function sanitizeAuthLogValue(value: unknown, depth = 0): unknown {
   return redacted;
 }
 
-function redactSensitiveText(value: string): string {
+export function redactSensitiveText(value: string): string {
   return value
+    .replace(/\/api\/auth\/reset-password\/[^/?\s"'<>]+/gi, '/api/auth/reset-password/[redacted]')
+    .replace(/\b(?:https?|exp|paceblueprint):\/\/[^\s"'<>]+/gi, '[url redacted]')
     .replace(/(client_secret|access_token|refresh_token|id_token|code|cookie|state)=?[^\s&,]*/gi, '$1=[redacted]')
     .slice(0, 500);
+}
+
+export function redactAuthRequestPath(path: string): string {
+  return path.replace(
+    /(\/api\/auth\/reset-password\/)[^/]+/i,
+    '$1[redacted]'
+  );
 }

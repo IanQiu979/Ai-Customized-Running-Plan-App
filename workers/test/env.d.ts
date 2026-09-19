@@ -21,6 +21,9 @@ declare global {
       BETTER_AUTH_SECRET: string;
       BETTER_AUTH_URL: string;
       APP_SCHEME: string;
+      RESEND_API_KEY: string;
+      MAIL_FROM: string;
+      MAIL_VERIFICATION_REQUIRED: string;
       TEST_MIGRATIONS: D1Migration[];
     }
   }

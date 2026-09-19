@@ -307,6 +307,16 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 // Typed wrappers — one per `workers/src/index.ts` route, outside `/api/auth/*`.
 // ---------------------------------------------------------------------------------------------
 
+export interface EmailStatus {
+  mailConfigured: boolean;
+  verificationRequired: boolean;
+}
+
+/** Public capability read. Never reuse a stale answer after server mail config changes. */
+export function getEmailStatus(): Promise<EmailStatus> {
+  return apiFetch('/api/email-status', { cache: 'no-store' });
+}
+
 export function getQuotaStatus(): Promise<QuotaStatus> {
   return apiFetch<QuotaStatus>('/api/quota-status');
 }

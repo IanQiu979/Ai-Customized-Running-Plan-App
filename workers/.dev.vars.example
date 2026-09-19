@@ -46,3 +46,10 @@ ANTHROPIC_API_KEY=
 # not optional; without it the secret lands on a different Worker).
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
+
+# Transactional email (optional). Leave BOTH empty to use the safe console adapter: it logs only
+# redacted delivery metadata and never a verification/reset token. `MAIL_FROM` must be a sender on
+# a domain the captain has verified with the mail provider. Production values belong in Cloudflare
+# secrets for the named environment; never add an `EXPO_PUBLIC_` prefix or commit a real value.
+RESEND_API_KEY=
+MAIL_FROM=

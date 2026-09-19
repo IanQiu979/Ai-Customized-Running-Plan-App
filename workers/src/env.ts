@@ -26,8 +26,13 @@ export interface Env {
    * the quota gate. Remove or set to `"false"` before real users arrive.
    */
   ALL_USERS_UNLIMITED_ACCESS?: string;
+  /**
+   * `"true"` requires email verification for password accounts. Defaults off so deployments
+   * without a configured mail provider keep working.
+   */
+  MAIL_VERIFICATION_REQUIRED?: string;
 
-  // --- secrets, from `.dev.vars` / `wrangler secret put` ---------------------------------------
+  // --- server-only settings/secrets, from `.dev.vars` / `wrangler secret put` -----------------
 
   /** SECRET. better-auth's signing key for sessions and tokens. */
   BETTER_AUTH_SECRET: string;
@@ -43,4 +48,9 @@ export interface Env {
   /** SECRET (the secret half). Google OAuth. Both are absent until the captain provides them. */
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
+
+  /** SECRET. Resend HTTP API key. Mail delivery is disabled when this or `MAIL_FROM` is absent. */
+  RESEND_API_KEY?: string;
+  /** SERVER-ONLY. Verified sender address used for transactional email. */
+  MAIL_FROM?: string;
 }
