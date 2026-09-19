@@ -4,10 +4,17 @@
  *
  * `plan-blueprint-examples.md` § 17: "Percentage reductions apply to the validated baseline once;
  * they never stack", and every module's `H1` row reads "First loading week −15%/−20%". § 16 `H1`
- * adds "Week 1 at 90% of validated baseline". So week 1 carries both factors together —
- * `(1 − module%) × 0.9` of its healthy twin — and weeks after it ramp off week 1's own reduced
- * volume through the § 5 state machine and `loadRules.ts`'s growth cap, exactly as
+ * adds "Week 1 at 90% of validated baseline". So the first loading week carries both factors
+ * together — `(1 − module%) × 0.9` of its healthy twin — and weeks after it ramp off that week's
+ * own reduced volume through the § 5 state machine and `loadRules.ts`'s growth cap, exactly as
  * `planTemplates.ts`'s `applyInjuryVolumeAdjustment` already does on the paid skeleton.
+ *
+ * "First loading week" is not always week 1: `adaptCalendar`'s "Longer race date" branch prepends
+ * base-cycle weeks taken from the END of canonical weeks 1–4, so a `canonical + 1` duration
+ * (13-week 5K, 15-week 10K, 17-week half, 25-week marathon) opens on canonical week 4, a
+ * `RECOVERY` week. Gating the cut on `index === 0` spent it on that rest week and left every
+ * loading week at healthy volume; the `canonical + 1` cases below pin that the rest week is
+ * untouched and the cut lands on the first non-deload week instead.
  *
  * One legitimate extra step sits below that share and is not compounding: the healthy plan's
  * `ENTRY → LOAD-1` move is `0.9 × B → B` (+11.1%), while the injured plan, seeded lower, is held
@@ -152,6 +159,41 @@ describe('a declared injury reduces the plan once, not every week (issue #106)',
     expect(share(10)).toBeGreaterThanOrEqual(share(0) - 0.01);
   });
 
+  describe.each([
+    { raceDistance: '10k' as const, weeks: CANONICAL_WEEKS['10K'] + 1, flag: 'knee' as const },
+    { raceDistance: 'half' as const, weeks: CANONICAL_WEEKS.HM + 1, flag: 'knee' as const },
+  ])('$weeks-week $raceDistance, $flag — the plan opens on a prepended rest week', ({ raceDistance, weeks, flag }) => {
+    const params = { weeks, goalType: 'race' as const, raceDistance };
+    const healthy = build({ daysPerWeek: 3 }, params);
+    const injured = build({ daysPerWeek: 3, injuries: [flag] }, params);
+
+    it('week 1 is a rest week and is not cut', () => {
+      const healthyWeek1 = healthy.weeks[0]!;
+      const injuredWeek1 = injured.weeks[0]!;
+      expect(healthyWeek1.isDeload).toBe(true);
+      expect(injuredWeek1.isDeload).toBe(true);
+      expect(Math.abs(injuredWeek1.volumeKm - healthyWeek1.volumeKm)).toBeLessThanOrEqual(
+        roundingAllowanceKm(healthyWeek1, injuredWeek1),
+      );
+    });
+
+    it('the first loading week carries the once-applied cut', () => {
+      const index = healthy.weeks.findIndex((week) => !week.isDeload);
+      expect(index).toBe(1);
+      const healthyWeek = healthy.weeks[index]!;
+      const injuredWeek = injured.weeks[index]!;
+      expect(injuredWeek.isDeload).toBe(false);
+      const expected = onceAppliedShare(flag) * healthyWeek.volumeKm;
+      const allowance = roundingAllowanceKm(healthyWeek, injuredWeek);
+      expect(injuredWeek.volumeKm).toBeGreaterThanOrEqual(expected - allowance);
+      expect(injuredWeek.volumeKm).toBeLessThanOrEqual(expected + allowance);
+    });
+
+    it('no later week compounds the cut', () => {
+      expect(compoundingBreaches(healthy, injured, flag, `${weeks}w-${raceDistance}`)).toEqual([]);
+    });
+  });
+
   it.each(DISTANCES)('%s — every module, track, layout, volume and duration', (raceDistance) => {
     const canonical = CANONICAL_WEEKS[LIBRARY_DISTANCE[raceDistance] as LibraryDistance];
     const breaches: string[] = [];
@@ -159,7 +201,7 @@ describe('a declared injury reduces the plan once, not every week (issue #106)',
     for (const experience of EXPERIENCES) {
       for (const daysPerWeek of [3, 4, 5, 6, 7]) {
         for (const weeklyKm of [15, 25, 35, 50, 70]) {
-          for (const weeks of [canonical - 4, canonical, canonical + 4]) {
+          for (const weeks of [canonical - 4, canonical, canonical + 1, canonical + 4]) {
             for (const goalType of ['race', 'duration'] as const) {
               const healthy = build({ experience, daysPerWeek, weeklyKm }, { weeks, goalType, raceDistance });
               for (const flag of FLAGS) {

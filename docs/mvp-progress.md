@@ -691,9 +691,11 @@ from 82. Issue #22 remains open.)
       (2026-09-19).** `src/lib/planLibrary/engine.ts` applied the § 17 module reduction to every
       week's target while later targets build on the previous (already cut) loading week, so a
       knee's 15% compounded to 29% of the healthy plan by week 12 and rest weeks fell to 68%. The
-      cut now lands on week 1 only (§ 17 "apply once", the paid skeleton's existing reading); rest
-      weeks are back inside the 15–25% band and week 12 sits at 90% of healthy. New
-      `engine.injury.test.ts` (issue intake + a 346,500-week sweep over all seven modules) and
+      cut now lands on the first loading week only (§ 17 "apply once", the paid skeleton's
+      existing reading — the first non-`RECOVERY` week, so a `canonical + 1` plan's prepended rest
+      week is untouched and week 2 takes the cut); rest weeks are back inside the 15–25% band and
+      week 12 sits at 90% of healthy. New `engine.injury.test.ts` (issue intake, two named
+      `canonical + 1` cases, and a register-wide sweep over all seven modules) and
       `engine.recovery.test.ts` extended from `H0` to `H0` + all `H1` modules. Progression mask
       untouched (758), no fixture changed. Surfaced #119 (`lower_back` Day-7 pin on rest weeks),
       left for the captain. Detail: `docs/change_log.md`, 2026-09-19.

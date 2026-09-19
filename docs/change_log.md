@@ -18,23 +18,34 @@ stacked on `deloadVolume`'s 20% (0.85 × 0.8 = 68%, below the band). The issue's
 15.2*, 20.5, 18.8, 15.7, 10.6*, 16.9, 15.2 km against a healthy 31.6 … 36.9* … 20.8: week 12 at
 29% of its healthy twin.
 
-- **The module cut now lands on week 1 only, exactly like § 16's own 90%.** One condition added
-  on that line (`&& index === 0`). `plan-blueprint-examples.md` § 17: "Percentage reductions apply
-  to the validated baseline once; they never stack", and every module's `H1` row reads "First
-  loading week −X%" — the same reading `planTemplates.ts`'s `applyInjuryVolumeAdjustment` has
-  always applied on the paid skeleton. Later weeks ramp off week 1's reduced volume through the
-  § 5 state machine and `clampWeeklyVolume`'s +10% growth cap. The same intake now runs 24.1,
+- **The module cut now lands on the first loading week only, together with § 16's own 90%.**
+  Both factors are gated on one flag — the first week whose state is not `RECOVERY`.
+  `plan-blueprint-examples.md` § 17: "Percentage reductions apply to the validated baseline once;
+  they never stack", and every module's `H1` row reads "First loading week −X%" — the same reading
+  `planTemplates.ts`'s `applyInjuryVolumeAdjustment` has always applied on the paid skeleton. Later
+  weeks ramp off that week's reduced volume through the § 5 state machine and `clampWeeklyVolume`'s
+  +10% growth cap. "First loading week" is deliberately not `index === 0`: `adaptCalendar`'s
+  "Longer race date" prefix is drawn from the end of canonical weeks 1–4, so a `canonical + 1`
+  duration (13-week 5K, 15-week 10K, 17-week half, 25-week marathon) opens on a prepended rest
+  week — a week-1 gate (the first cut of this fix, caught in review) spent the cut on that rest
+  week and left every loading week at healthy volume. The rest week is now untouched and the cut
+  lands on week 2; the pre-existing re-anchor to the full baseline at the next `ENTRY` week on
+  longer-than-canonical plans is left as-is (a coaching-shape question for the captain). The
+  issue's intake (14 weeks, opens on `ENTRY`) is unaffected by the gate and now runs 24.1,
   26.4, 28.5, 22.9*, 31.3, 33.8, 36.6, 29.3*, 39.6, 42.8, 41.7, 33.3*, 32.0, 19.8 km: week 1 is
   unchanged (both week-1 cuts still apply there), rest weeks are 80% of the preceding loading
   week, and week 12 is 90% of healthy. No coaching number was added or changed; the week-1
   composition (§ 16's 90% × the module's −X%) is untouched and was not the issue.
 - **Regression harness.** New `src/lib/planLibrary/__tests__/engine.injury.test.ts` pins the
   issue's intake by name and sweeps every § 17 module across the 40-plan register (5 tracks × 5
-  layouts × 5 volumes × 3 durations × 2 goal types × 4 distances × 7 flags — 346,500 injured weeks against their healthy twins): every
+  layouts × 5 volumes × 4 durations (`canonical − 4 / canonical / canonical + 1 / canonical + 4`)
+  × 2 goal types × 4 distances × 7 flags of injured weeks against their healthy twins): every
   week of an injured plan must hold at least the once-applied share of its healthy twin, less one
   bounded growth-cap step (`0.9 × B → B` for the healthy plan against `× 1.10` for the injured
   one — derived from `WEEKLY_INCREASE_RECALC_AT` and `VOLUME_STATE_TARGETS.ENTRY`, not a magic
   number) and a linear per-run rounding allowance that cannot be confused with the geometric bug.
+  Two named `canonical + 1` cases (15-week 10K and 17-week half, knee) pin the prepended-rest-week
+  shape from both sides: week 1 equals its healthy twin, week 2 is the once-applied share of its.
   `engine.recovery.test.ts`'s 15–25% rest-week property now sweeps `H0` plus all seven `H1`
   modules instead of `H0` only — the harness the captain's issue asked for. Both suites fail on
   the unfixed line (mutation-checked) and pass on the fix.
