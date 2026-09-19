@@ -47,7 +47,9 @@ every deployment today. Runbook for switching it on: `docs/email-setup.md`.
   in `workers/src/index.ts` run through `redactSensitiveText` / `sanitizeAuthLogValue` /
   `redactAuthRequestPath`, which blank `/api/auth/reset-password/<token>` paths, every
   `https://` / `exp://` / `paceblueprint://` URL, and any secret-, token-, code- or state-keyed
-  value in a logged object.
+  value in a logged object. Error stack traces are kept (up to 4,000 chars) but pass through the
+  same token redaction, so a failure stays diagnosable without leaking the link it was handling
+  (`workers/test/auth-email.test.ts` pins both).
 - **The mailed link is the Worker's, and the app only says where to land afterwards.** A runner
   opens `<BETTER_AUTH_URL>/api/auth/reset-password/<token>?callbackURL=…` (or
   `/api/auth/verify-email?token=…&callbackURL=…`); the Worker spends the token and `302`s to the

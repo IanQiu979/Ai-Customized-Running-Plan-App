@@ -1,15 +1,18 @@
 /**
  * The Worker entry point: authenticate once, then dispatch.
  *
- * There is no routing framework here on purpose. Nine routes and one auth mount do not justify a
+ * There is no routing framework here on purpose. Ten routes and one auth mount do not justify a
  * dependency, and a hand-written switch keeps the one property that matters most visible on a
  * single screen — **every app route is behind the session check, structurally**, because the check
- * happens before dispatch rather than inside each handler where one could forget it.
+ * happens before dispatch rather than inside each handler where one could forget it. The two
+ * exceptions (`/health`, `/api/email-status`) touch no user data and sit above the gate on purpose.
  *
  * ROUTE TABLE (the Cloudflare translation of `docs/architecture.md`'s API contract):
  *
- *   ANY  /api/auth/*          better-auth: sign-up, sign-in, sign-out, session, OAuth callbacks
+ *   ANY  /api/auth/*          better-auth: sign-up, sign-in, sign-out, session, OAuth callbacks,
+ *                             password reset and email verification (issue #94)
  *   GET  /health              liveness, unauthenticated, no database access
+ *   GET  /api/email-status    unauthenticated mail capability booleans, no-store, no database access
  *   POST /api/generate-plan   the core call — 402 over quota, 403 anon
  *   GET  /api/quota-status    tier + quota/unlimited state
  *   POST /api/purchase-tier   v1 dummy purchase; real IAP lands on this same route later
