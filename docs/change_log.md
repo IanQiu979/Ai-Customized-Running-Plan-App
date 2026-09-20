@@ -20,9 +20,9 @@ uses V2.2's own Blueprint tokens, not V2.3's palette. Root gate clean: typecheck
   `docs/privacy-policy.md` through the `default` layout**, replacing the prior unthemed rendering. A
   new `docs/privacy-policy-theme/**` trigger path was added. The index page and the
   `privacy-policy/` output path are unchanged, so `PRIVACY_POLICY_URL`
-  (`src/constants/legal.ts`) still resolves to the same URL — nothing in "Current — privacy policy
-  and publication" (`architecture.md`) about the target path or trigger conditions changed, only
-  the rendering.
+  (`src/constants/legal.ts`) still resolves to the same URL — the target path in "Current —
+  privacy policy and publication" (`architecture.md`) is untouched; only the rendering and that one
+  trigger path changed.
 - **The policy's text is byte-identical** — `docs/privacy-policy.md` was not touched.
 - **Verified with an actual local Jekyll build** (`gem install jekyll`) against the workflow's own
   staging script, plus a rendered screenshot at a 390×844 mobile viewport confirming the dark
