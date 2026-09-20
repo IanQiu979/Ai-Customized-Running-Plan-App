@@ -333,7 +333,11 @@ function targetForState(args: {
     case 'LOAD-3':
       return previous * (args.track === 'NEW' ? LOAD_3_NEW_MULTIPLIER : (spec.target ?? 1.08));
     case 'HOLD':
-      return previous * bandMidpoint(spec.previousLoadingMultiplier ?? [0.95, 1]);
+      // Captain 2026-09-20: a `HOLD` week holds the load it follows — the band's top, so the peak
+      // phase is the plan's highest-volume block rather than 2.5% under its last `LOAD` week.
+      // `previous` is the rendered volume of that week, and `buildWeek` reconciles a week to its
+      // target exactly, so the two render identical.
+      return previous * (spec.target ?? bandMidpoint(spec.previousLoadingMultiplier ?? [0.95, 1]));
     case 'RECOVERY':
       // Captain 2026-09-06: 15–25% down, target 20%. `deloadVolume` is that same midpoint, and it
       // is the authoritative one — `loadRules.ts` owns the band, not this library.
@@ -383,23 +387,119 @@ function ladderLongRunKm(args: {
 // Week construction
 // ---------------------------------------------------------------------------
 
-function phaseForState(state: VolumeState, previous: Phase): Phase {
-  switch (state) {
-    case 'ENTRY':
-    case 'LOAD-1':
-      return 'base';
-    case 'LOAD-2':
-    case 'LOAD-3':
-      return 'build';
-    case 'HOLD':
-      return 'peak';
-    case 'TAPER-1':
-    case 'TAPER-2':
-    case 'RACE-WEEK':
-      return 'taper';
-    case 'RECOVERY':
-      return previous;
+function isTaperState(state: VolumeState): boolean {
+  return state === 'TAPER-1' || state === 'TAPER-2' || state === 'RACE-WEEK';
+}
+
+/**
+ * Phase labels follow the rendered volume (captain's ruling, 2026-09-20, coach sign-off pack).
+ *
+ * Until then a label was a function of the calendar state alone (`ENTRY`/`LOAD-1` base,
+ * `LOAD-2`/`LOAD-3` build, `HOLD` peak), which put the plan's single highest week — a `LOAD`
+ * week, by § 5's arithmetic — in the *build* phase beside a lower *peak*, reset to "base" on every
+ * `LOAD-1`, and on the half calendar read peak → recovery → build → peak. The same invariant #103
+ * settled for the paid engine applies here: the peak phase is the plan's highest-volume block, no
+ * build or base week outranks a peak week, and a race build never steps backwards.
+ *
+ * Taper states are the taper. The weeks before them are split by volume and structure:
+ *
+ * - **base** is the opening aerobic block: every week up to and including the first recovery week
+ *   that follows a loading week — § 11–14's "1–3 aerobic foundation, 4 step-back" for every
+ *   distance. A plan with no such rest week before its high is base until the peak.
+ * - **peak** starts at the first loading week that renders the plan's highest loading volume and
+ *   runs to the taper, rest weeks included — the source's own peak block for every distance
+ *   (5K weeks 9–10, "`HOLD` · peak specific"; marathon week 21, "final specific load", a single
+ *   week after a recovery), so a one-week peak is the calendar's shape, not a defect. A plan whose
+ *   high is already inside its base block never built above it — a runner pinned at the level's
+ *   weekly ceiling renders every loading week at that ceiling — so volume cannot place its peak;
+ *   the calendar's structure does instead: the final loading block before the taper (the weeks
+ *   from the rest week before the last loading week onward), which holds the plan high like
+ *   every other block. A plan with no loading block after its base — § 8 rule 3's completion
+ *   plan, rule 4's under-four-week plan — has no peak, and says so by having none.
+ * - **build** is whatever lies between.
+ *
+ * `adaptCalendar` can re-enter the calendar, and the walk restarts at each point the canonical
+ * week number falls. A race plan's "Longer race date" prefix is, in § 8's own words, "base
+ * cycles", and is labelled base whatever it renders; a "No target race date" plan longer than the
+ * base/build portion cycles that portion, and each cycle is labelled on its own so the plan says
+ * honestly that it re-enters (a cycle without a plan-high week has no peak).
+ */
+export function derivePhases(args: {
+  states: readonly VolumeState[];
+  canonicalWeeks: readonly number[];
+  volumesKm: readonly number[];
+}): Phase[] {
+  const { states, canonicalWeeks, volumesKm } = args;
+  const count = states.length;
+  const phases: Phase[] = new Array<Phase>(count).fill('base');
+  const isLoading = (index: number) => states[index] !== 'RECOVERY' && !isTaperState(states[index]!);
+  const planHighKm = Math.max(-Infinity, ...volumesKm.filter((_, index) => isLoading(index)));
+
+  const cycles: { start: number; end: number }[] = [];
+  let cycleStart = 0;
+  for (let index = 1; index <= count; index += 1) {
+    if (index === count || canonicalWeeks[index]! < canonicalWeeks[index - 1]!) {
+      cycles.push({ start: cycleStart, end: index });
+      cycleStart = index;
+    }
   }
+  const isRacePlan = states.some(isTaperState);
+
+  cycles.forEach(({ start, end }, cycleIndex) => {
+    // § 8 "Longer race date": the prefix is base cycles, whatever they render.
+    if (isRacePlan && cycleIndex < cycles.length - 1) return;
+
+    let preTaperEnd = end;
+    for (let i = start; i < end; i += 1) {
+      if (isTaperState(states[i]!)) {
+        preTaperEnd = i;
+        break;
+      }
+    }
+    for (let i = preTaperEnd; i < end; i += 1) phases[i] = 'taper';
+
+    let baseEnd = preTaperEnd; // exclusive
+    let sawLoading = false;
+    for (let i = start; i < preTaperEnd; i += 1) {
+      if (states[i] === 'RECOVERY' && sawLoading) {
+        baseEnd = i + 1;
+        break;
+      }
+      if (isLoading(i)) sawLoading = true;
+    }
+
+    let peakStart = preTaperEnd;
+    for (let i = start; i < preTaperEnd; i += 1) {
+      if (isLoading(i) && volumesKm[i] === planHighKm) {
+        peakStart = i;
+        break;
+      }
+    }
+    if (peakStart < baseEnd) {
+      // The high is already inside the base block: a flat plan. The peak is the final loading
+      // block — from the rest week before the plan's last loading week to the taper — when that
+      // block lies after the base and carries the plan high too.
+      let lastLoading = -1;
+      for (let i = baseEnd; i < preTaperEnd; i += 1) if (isLoading(i)) lastLoading = i;
+      let blockStart = baseEnd;
+      for (let i = lastLoading; i >= baseEnd; i -= 1) {
+        if (states[i] === 'RECOVERY') {
+          blockStart = i + 1;
+          break;
+        }
+      }
+      const blockHasHigh =
+        lastLoading >= baseEnd &&
+        volumesKm
+          .slice(blockStart, preTaperEnd)
+          .some((km, offset) => isLoading(blockStart + offset) && km === planHighKm);
+      peakStart = blockHasHigh ? blockStart : preTaperEnd;
+    }
+    for (let i = start; i < baseEnd; i += 1) phases[i] = 'base';
+    for (let i = baseEnd; i < peakStart; i += 1) phases[i] = 'build';
+    for (let i = peakStart; i < preTaperEnd; i += 1) phases[i] = 'peak';
+  });
+  return phases;
 }
 
 function doseText(spec: QualitySpec, track: ExperienceTrack): string | undefined {
@@ -519,7 +619,6 @@ function buildWeek(args: {
   injuryRemoved: ReadonlySet<WorkoutCode>;
   singleQualityOnly: boolean;
   injuryState: InjuryState;
-  phase: Phase;
 }): BuiltWeek {
   const layout = PLACEMENT_LAYOUTS[args.layoutDays];
   const { q1, q2 } = resolveQuality({
@@ -561,11 +660,12 @@ function buildWeek(args: {
       week: {
         weekNumber: args.weekNumber,
         totalWeeks: args.totalWeeks,
-        phase: args.phase,
+        // Phases are assigned after every week is built (`derivePhases`); race week is the taper.
+        phase: 'taper',
         isDeload: false,
         volumeKm,
         days: days as unknown as Week7<Day>,
-        },
+      },
       longRunKm: 0,
     };
   }
@@ -675,6 +775,31 @@ function buildWeek(args: {
   }
   built[6] = day7;
 
+  // § 5: "… → exact reconciliation of the seven days." Every session is rendered to 0.1 km, so
+  // the rounded days can drift from the week's target by up to ±0.05 km each. The drift goes on
+  // the largest easy/recovery slot — § 6: unused distance is distributed across `E/REC`, never
+  // into a quality dose — so a week renders its target exactly and a `HOLD` week renders the
+  // same total as the `LOAD` week it holds. Only when there is an easy slot with room for it.
+  const targetKm = round1(args.weeklyTargetKm);
+  const assembledKm = round1(
+    built.reduce((sum, day) => sum + (day.kind === 'run' ? (day.distanceKm ?? 0) : 0), 0),
+  );
+  const residualKm = round1(targetKm - assembledKm);
+  if (residualKm !== 0) {
+    const absorber = slots
+      .filter((slot) => slot.code === 'E' || slot.code === 'ST' || slot.code === 'REC' || slot.code === 'MLR')
+      .reduce<(typeof slots)[number] | undefined>(
+        (best, slot) => (best === undefined || slot.weight > best.weight ? slot : best),
+        undefined,
+      );
+    if (absorber !== undefined) {
+      const day = built[absorber.index]!;
+      if (day.kind === 'run' && day.distanceKm !== undefined && day.distanceKm + residualKm > 0) {
+        built[absorber.index] = { ...day, distanceKm: round1(day.distanceKm + residualKm) };
+      }
+    }
+  }
+
   const volumeKm = round1(
     built.reduce((sum, day) => sum + (day.kind === 'run' ? (day.distanceKm ?? 0) : 0), 0),
   );
@@ -683,7 +808,9 @@ function buildWeek(args: {
     week: {
       weekNumber: args.weekNumber,
       totalWeeks: args.totalWeeks,
-      phase: args.phase,
+      // A placeholder: phases follow the rendered volumes, so `buildLibraryPlan` assigns them once
+      // every week is built (`derivePhases`).
+      phase: 'base',
       isDeload: args.source.state === 'RECOVERY',
       volumeKm,
       days: built as unknown as Week7<Day>,
@@ -768,14 +895,11 @@ export function buildLibraryPlan(params: LibraryPlanParams): LibraryPlanResult {
   let previousLongRunKm = 0;
   let previousLongestKm = 0;
   let previousEasyRunKm = 0;
-  let previousPhase: Phase = 'base';
 
   const weeks: Week[] = [];
 
   calendarWeeks.forEach((canonicalWeek, index) => {
     const source = calendar[canonicalWeek - 1]!;
-    const phase = phaseForState(source.state, previousPhase);
-    previousPhase = phase;
 
     // --- weekly-volume state ---------------------------------------------------------------
     let target = targetForState({
@@ -811,15 +935,24 @@ export function buildLibraryPlan(params: LibraryPlanParams): LibraryPlanResult {
     }
 
     // --- long-run and hard-session clamps ---------------------------------------------------
-    const proposedLongRunKm = ladderLongRunKm({
-      distance,
-      track,
-      target: injuryEffect.longRunPinnedLow && source.longRun !== 'RACE' ? 'LR-low' : source.longRun,
-      ...(easyPaceSecPerKm !== undefined ? { easyPaceSecPerKm } : {}),
-      weeklyKm: target,
-      shareCap,
-      previousLongRunKm,
-    });
+    const ladderKm = (longRunTarget: LibraryWeek['longRun']) =>
+      ladderLongRunKm({
+        distance,
+        track,
+        target: longRunTarget,
+        ...(easyPaceSecPerKm !== undefined ? { easyPaceSecPerKm } : {}),
+        weeklyKm: target,
+        shareCap,
+        previousLongRunKm,
+      });
+    // § 18 rule 5 / INJ-6's "keep Day 7 at `LR-low`" is a cap on Day 7, not its value (captain's
+    // ruling on issue #119, 2026-09-20): the calendar's own target still applies beneath it, so a
+    // rest week's `LR-recovery` shortens Day 7 below `LR-low` and the cut is not left to the easy
+    // runs. Read as a value, the pin held every rest week's Day 7 at full `LR-low` length.
+    const proposedLongRunKm =
+      injuryEffect.longRunPinnedLow && source.longRun !== 'RACE'
+        ? Math.min(ladderKm(source.longRun), ladderKm('LR-low'))
+        : ladderKm(source.longRun);
     const clamped = clampLongRun({
       proposedKm: proposedLongRunKm,
       weeklyKm: target,
@@ -849,7 +982,6 @@ export function buildLibraryPlan(params: LibraryPlanParams): LibraryPlanResult {
       injuryRemoved: injuryEffect.removedCodes,
       singleQualityOnly: injuryEffect.singleQualityOnly,
       injuryState,
-      phase,
     });
 
     weeks.push(built.week);
@@ -867,15 +999,23 @@ export function buildLibraryPlan(params: LibraryPlanParams): LibraryPlanResult {
     if (easyDay?.distanceKm !== undefined) previousEasyRunKm = easyDay.distanceKm;
   });
 
+  // --- phase labels, from the rendered volumes ---------------------------------------------------
+  const phases = derivePhases({
+    states: calendarWeeks.map((canonicalWeek) => calendar[canonicalWeek - 1]!.state),
+    canonicalWeeks: calendarWeeks,
+    volumesKm: weeks.map((week) => week.volumeKm),
+  });
+  const labelledWeeks = weeks.map((week, index) => ({ ...week, phase: phases[index]! }));
+
   // --- § 16 H4: no running workouts, plan preserved as inactive future context ------------------
   const finalWeeks =
     injuryState === 'H4'
-      ? weeks.map((week) => ({
+      ? labelledWeeks.map((week) => ({
           ...week,
           volumeKm: 0,
           days: [REST, REST, REST, REST, REST, REST, REST] as unknown as Week7<Day>,
         }))
-      : weeks;
+      : labelledWeeks;
 
   // --- disclaimers and limited-preparation disclosure -------------------------------------------
   const limitedPreparation =

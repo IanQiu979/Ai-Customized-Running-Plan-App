@@ -173,11 +173,13 @@ describe('buildTemplatePlan — 5K golden fixture', () => {
     });
   });
 
-  it('derives week 12 (race week) volume from its sessions, landing near the fixture ~28 km', () => {
+  it('derives week 12 (race week) volume from its sessions: the fixture\'s 18 km of pre-race running plus the bare 5 km race', () => {
     // Sessions-derived, not asserted to the fixture cell — see the invariant loop below
-    // for the exact sessions-sum-to-volumeKm check that actually pins this number down.
-    expect(plan.weeks[11].volumeKm).toBeGreaterThanOrEqual(24);
-    expect(plan.weeks[11].volumeKm).toBeLessThanOrEqual(32);
+    // for the exact sessions-sum-to-volumeKm check that actually pins this number down. 28 km
+    // until the captain's 2026-09-20 ruling that race day reads as the bare race distance: the
+    // fixture's authored 3 km warm-up and 2 km cool-down live in the workout's `structure`, not
+    // in its `distanceKm`, so the week now sums to 18 + 5.
+    expect(plan.weeks[11].volumeKm).toBe(23);
   });
 
   it('mirrors weeklyLoad against each week volumeKm', () => {
@@ -349,7 +351,9 @@ describe('buildTemplatePlan — 5K golden fixture', () => {
   it("gives the race-day workout the exact structure 'WU 3 km · 5 km race · CD 2 km' (issue #34 ruling R6)", () => {
     const raceDay = plan.weeks[11].days[6] as Workout;
     expect(raceDay.structure).toBe('WU 3 km · 5 km race · CD 2 km');
-    expect(raceDay.distanceKm).toBe(10); // 3 (WU) + 5 (race) + 2 (CD)
+    // The bare race distance (captain, 2026-09-20): the warm-up and cool-down are in `structure`
+    // only. 10 km — 3 (WU) + 5 (race) + 2 (CD) — until then.
+    expect(raceDay.distanceKm).toBe(5);
   });
 
   it('never emits `why` on any week or workout, and never emits `coachIntro` (a template has none)', () => {

@@ -426,7 +426,13 @@ export const VOLUME_STATE_TARGETS: Record<VolumeState, VolumeStateTarget> = {
   },
   HOLD: {
     previousLoadingMultiplier: [0.95, 1.0],
-    note: '95–100% of the preceding loading week',
+    // Captain 2026-09-20 (coach sign-off pack, `docs/change_log.md`): the peak phase must be the
+    // plan's highest-volume block. `HOLD` is the calendar's peak-specific state, and at the band's
+    // midpoint it rendered 2.5% *below* the `LOAD` week it follows on every plan, so the "peak"
+    // always sat under a "build" week. The band's top is the one value inside the source's own
+    // 95–100% that lets a `HOLD` week carry the load it holds; no number outside the band is used.
+    target: 1.0,
+    note: '95–100% of the preceding loading week; the engine holds at 100% (captain 2026-09-20)',
   },
   RECOVERY: {
     previousLoadingMultiplier: [0.75, 0.85],

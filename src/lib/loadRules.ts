@@ -142,9 +142,18 @@ export const LONG_RUN_SHARE_CAP: Record<ExperienceLevel, number> = {
  * to the smallest round value that gives every run count real headroom (1.1), while staying below
  * intermediate's at every `n` so Ian's issue #34 level ordering (beginner < intermediate <
  * advanced) still holds throughout the ladder, not just at one run count.
+ *
+ * **Beginner's margin is 1.2 since the captain's ruling of 2026-09-20 (issue #103, remedy A1):
+ * 40% of the week at three runs, 30% at four.** The 1.1 that stood from 2026-09-05 left the
+ * three-run beginner 5K at a ~36.7% share ceiling that, together with the tempo session's 8 km
+ * nominal and the no-easy-run-outgrows-the-long-run rule, capped every such week at about 86% of
+ * its target, so the growth base decayed week on week and the peak rendered below the base — one
+ * of the two residual offender families #103 pinned. The ordering still holds: 1.2 sits below
+ * intermediate's `0.32 × 4 = 1.28` at every run count, and at five or more runs the flat 25% floor
+ * governs exactly as before.
  */
 const LONG_RUN_SHARE_MARGIN: Record<ExperienceLevel, number> = {
-  beginner: 1.1,
+  beginner: 1.2,
   intermediate: LONG_RUN_SHARE_CAP.intermediate * 4,
   advanced: LONG_RUN_SHARE_CAP.advanced * 4,
 };

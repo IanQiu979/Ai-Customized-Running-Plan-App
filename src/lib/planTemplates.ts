@@ -121,7 +121,7 @@ const UNDER_18_DISCLAIMER =
  * offender of the invariant itself (escalated to the captain), not a tolerated shape, and says
  * nothing here rather than something false.
  */
-function peakBelowBuildSpike(weeks: readonly Week[]): Week | undefined {
+export function peakBelowBuildSpike(weeks: readonly Week[]): Week | undefined {
   const loading = weeks.filter((week) => !week.isDeload);
   const loadingMaxKm = (phase: Phase) =>
     Math.max(-Infinity, ...loading.filter((week) => week.phase === phase).map((w) => w.volumeKm));
@@ -206,6 +206,13 @@ const FIVE_K_LONG_RUNS = [10, 11, 12, 8, 13, 14, 15, 10, 14, 15, 12] as const;
  * week the curve does not dip on and dip on a week it does not flag — audit §1.3.
  */
 const FIVE_K_AUTHORED_DIP_CADENCE = 4;
+
+/**
+ * Declared weekly volume at and above which a 12-week / 4-day 5K race intake leaves the
+ * coach-authored golden path for `buildGenericWeek` — captain's ruling, 2026-09-20 (issue #103,
+ * remedy B1). See `buildTemplatePlan`.
+ */
+export const GOLDEN_FIVE_K_MAX_WEEKLY_KM = 50;
 
 /**
  * The same 12-week shape — same 34 km baseline, same 48 km peak, same 40/28 taper tail — with the
@@ -515,7 +522,17 @@ function shakeoutRun(
   };
 }
 
-/** Warm-up + cool-down `raceDayWorkout` adds around the race itself (3 km WU, 2 km CD). */
+/**
+ * The warm-up and cool-down the golden fixture's race day was authored with (3 km WU, 2 km CD),
+ * spelled out in `raceDayWorkout`'s `structure`. They are counted inside the fixture's 28 km
+ * race-week total (`FIVE_K_WEEKLY_LOAD`'s last entry), which is why `RACE_WEEK_PRE_RACE_SHARE`
+ * below subtracts them to recover the pre-race running — but since the captain's ruling of
+ * 2026-09-20 (coach sign-off pack) they are **not** part of `Workout.distanceKm`: race day reads
+ * as the bare race distance on both tiers, and race week's volume follows. Until then the paid
+ * skeleton reported 10 / 15 / 26 / 47 km race days against the library's 5.0 / 10.0 / 21.1 / 42.2,
+ * and a paid race week read as a second peak (a 16-week marathon's 69 km against a 70 km peak; a
+ * 12-week 5K's race week its highest week).
+ */
 const RACE_DAY_PADDING_KM = 5;
 
 /**
@@ -537,19 +554,20 @@ const RACE_DAY_PADDING_KM = 5;
  * taper instead, and letting race day sit on top of them, is what a taper week actually is.
  *
  * Both paths use it. At the golden fixture's own 35 km baseline the share and the old subtraction
- * agree exactly (28 - 10 = 18 = 28 × 18/28), so that byte-locked plan is unchanged — but away from
- * that baseline the subtraction bit `buildCanonicalFiveKWeek` too, and the claim that a 5K race day
- * is small enough for it never to matter was simply wrong: a 12 km/wk beginner's 5K race week
- * rendered `1 km | 1 km | 1 km | Race Day 10 km`, the same 1 km-filler signature the audit reported
- * for the marathon. The share is what makes the fixture's own race week reproducible at every other
- * declared volume instead of only at 35 km.
+ * agree exactly (28 - 10 = 18 = 28 × 18/28), so the fixture's 18 km of pre-race running is
+ * unchanged — but away from that baseline the subtraction bit `buildCanonicalFiveKWeek` too, and
+ * the claim that a 5K race day is small enough for it never to matter was simply wrong: a
+ * 12 km/wk beginner's 5K race week rendered `1 km | 1 km | 1 km | Race Day 10 km` (the padded
+ * headline of the time), the same 1 km-filler signature the audit reported for the marathon. The
+ * share is what makes the fixture's own race week reproducible at every other declared volume
+ * instead of only at 35 km.
  *
  * The ratio alone is not enough for a long race, because it is read off a race-*inclusive* 5K
- * total and the race day is then stacked on top of it uncounted: a marathon's 47 km race day is
- * larger than the whole scaled race-week entry, so the assembled week outgrew the block it is
- * meant to taper from. `preRaceBudgetKm` below is the bound that actually holds that line —
- * the pre-race training budget is additionally capped at the plan's own peak training week minus
- * race day. Where that leaves too little for every planned pre-race day to get a real shakeout,
+ * total and the race day is then stacked on top of it uncounted: a marathon's race day (47 km
+ * padded then, the bare 42.2 km now) is larger than the whole scaled race-week entry, so the
+ * assembled week outgrew the block it is meant to taper from. `preRaceBudgetKm` below is the
+ * bound that actually holds that line — the pre-race training budget is additionally capped at
+ * the plan's own peak training week minus race day. Where that leaves too little for every planned pre-race day to get a real shakeout,
  * days are dropped to rest rather than shrunk into filler; see `preRaceSchedule`, which also
  * documents the single exception where the peak bound yields to one 2 km shakeout.
  */
@@ -620,15 +638,14 @@ function preRaceSchedule(
 }
 
 function raceDayWorkout(distance: RaceDistance): Workout {
-  const raceKm = RACE_DISTANCE_KM[distance];
-  // `raceKm` itself is fractional for half/full marathon (21.1 / 42.195), so the padded total
-  // needs rounding — the exact race distance is still spelled out in `structure` below, this is
-  // only the summary number shown next to the workout.
+  // The bare race distance, to a tenth like the library's race day (21.1 / 42.2 for the half and
+  // full marathon); the warm-up and cool-down live in `structure`, not in the number (captain,
+  // 2026-09-20 — see `RACE_DAY_PADDING_KM`).
   return {
     kind: 'run',
     effort: 'interval',
     label: 'Race Day',
-    distanceKm: Math.round(raceKm + RACE_DAY_PADDING_KM),
+    distanceKm: Math.round(RACE_DISTANCE_KM[distance] * 10) / 10,
     effortDescription: RACE_DESCRIPTION,
     structure: `WU 3 km · ${raceDistanceText(distance)} race · CD 2 km`,
   };
@@ -1824,11 +1841,19 @@ export function buildTemplatePlan(params: TemplatePlanParams): Plan {
   // has no volume, long run or session authored for a week-3/6/9 recovery, and inventing one is
   // not ours to do, so that runner is served by `buildGenericWeek` like every other intake off
   // this path — band-sized rest weeks off the de-dipped 5K curve.
+  //
+  // It also serves only a runner whose declared volume is under `GOLDEN_FIVE_K_MAX_WEEKLY_KM`
+  // (captain's ruling, 2026-09-20, issue #103 remedy B1). The curve is written at 35 km/week;
+  // scaled past ~50 km its base and build weeks pin to the flat intermediate share cap with two
+  // easy runs while its two-quality-session peak weeks pin to the same cap with one, so the peak
+  // rendered a few kilometres under the base — the second of the two residual offender families
+  // #103 pinned. Those runners take the generic path like every other intake off this one.
   const useGoldenFiveKShape =
     isRacePlan &&
     raceDistance === '5k' &&
     durationWeeks === 12 &&
     normalizedRunCount(params.intake.daysPerWeek) === 4 &&
+    params.intake.weeklyKm < GOLDEN_FIVE_K_MAX_WEEKLY_KM &&
     (params.intake.age >= 50 || deloadCadence === FIVE_K_AUTHORED_DIP_CADENCE);
   let lastLoadingWeekKm = 0;
   let lastLoadingLongRunKm = 0;

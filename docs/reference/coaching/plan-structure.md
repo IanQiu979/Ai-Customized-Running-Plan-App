@@ -44,6 +44,34 @@ above as the general shape — build aerobic base → introduce structure/thresh
 specificity → taper — scaled proportionally to the plan's total length, rather than a fixed
 4-phase contract. That's how the source itself handles different race distances and durations.
 
+**The peak phase is the plan's highest-volume block, and phases follow volume (Ian's ruling,
+2026-09-20 — coach sign-off pack, issue #103 applied to the Free library).** The sign-off pack
+found every sampled Free plan carrying its single highest week under a `build` label beside a
+lower `peak` (5K week 9 build 25.3 km > week 10 peak 24.8; marathon week 13 build 70.1 > week 11
+peak 66.5; the half's build week 11 above every peak week, reading peak → recovery → build → peak).
+Two things are now true of `buildLibraryPlan` (`src/lib/planLibrary/engine.ts`):
+
+- `HOLD` — the library's peak-specific state — holds the preceding loading week at the **top** of
+  § 5's own 95–100% band, not its midpoint, so a peak week is never 2.5% under the `LOAD` week it
+  follows; and a week is reconciled to its target exactly (§ 5's "exact reconciliation of the seven
+  days"), so the two render the same total. No number outside the source's band is used.
+- Labels are derived from the rendered volumes (`derivePhases`), not the calendar state. The taper
+  states are the taper. **Base** is the opening aerobic block through the first rest week that
+  follows a loading week (the source's "1–3 aerobic foundation, 4 step-back" on every distance).
+  **Peak** starts at the first loading week that renders the plan's highest loading volume and runs
+  to the taper, rest weeks included — the source's own peak block (5K weeks 9–10; marathon week 21,
+  "final specific load", a single week after a recovery week, so a one-week peak is the calendar's
+  shape). **Build** is whatever lies between. A plan pinned flat at its level's weekly ceiling has
+  no volume to place its peak by, so its final loading block is the peak; a plan with no loading
+  block after its base — § 8 rule 3's completion plan, rule 4's under-four-week plan — has no peak
+  and says so. A race plan's "longer race date" prefix is base (§ 8's own "base cycles"); a dateless
+  plan longer than the base/build portion cycles it and is labelled per cycle.
+
+The same invariant the paid engine has carried since #103 — peak high ≥ base high, and now also
+≥ build high on the library, with no phase stepping backwards — is swept over 17,600 Free race
+plans in `src/lib/planLibrary/__tests__/engine.progression.test.ts`, alongside the deload band,
+the long-run share cap and the 180-minute ceiling.
+
 ## Deload cadence and the reduction band
 
 **Ian's decision (authoritative, 2026-09-06): deload weeks reduce volume 15–25%**, superseding the

@@ -53,7 +53,9 @@
  * `Race Day`. Per notation.md's headline-number convention, a `Workout`'s `distanceKm` is the
  * day's TOTAL kilometres — warm-up, cool-down, and recovery jog included — so each day sums
  * cleanly into the week's volume; the `structure` field itemizes the warm-up / work / cool-down
- * / recovery breakdown so the true quality-work size is never hidden inside that total.
+ * / recovery breakdown so the true quality-work size is never hidden inside that total. Race Day
+ * is the one exception (captain, 2026-09-20): its headline is the bare race distance, and its
+ * warm-up and cool-down live in `structure` only, so week 12 sums to 23 km rather than 28.
  *
  * Where the source doc gives only a per-week one-line note and not a full day-by-day breakdown
  * (weeks 2, 3, 5, 6, 7, 8), the days below follow the day-slot pattern the doc establishes
@@ -223,12 +225,15 @@ function shakeoutRun(distanceKm: number, structure: string): Workout {
   };
 }
 
+/** Race day reads the bare race distance on both tiers (captain, 2026-09-20); the warm-up and
+ * cool-down are itemized in `structure` and are not part of the headline — the one exception to
+ * `notation.md`'s headline-number convention. 10 km (3 + 5 + 2) until then. */
 function raceDayWorkout(): Workout {
   return {
     kind: 'run',
     effort: 'interval',
     label: 'Race Day',
-    distanceKm: 10,
+    distanceKm: 5,
     effortDescription: RACE_DESCRIPTION,
     structure: 'WU 3 km · 5 km race · CD 2 km',
   };
@@ -254,7 +259,7 @@ export const examplePlan: Plan = {
   tierAtGeneration: 'pro',
   engine: 'hybrid', // paid tiers are always skeleton-constrained hybrid — 'ai' is never emitted
   isFallback: false,
-  weeklyLoad: [34, 35, 38, 23, 41, 45, 48, 30, 45, 48, 40, 28],
+  weeklyLoad: [34, 35, 38, 23, 41, 45, 48, 30, 45, 48, 40, 23],
   coachIntro:
     'Twelve weeks, built around your current 35 km week and four training days. The first ' +
     'eight weeks lay an aerobic base with two deload weeks along the way, the next two sharpen ' +
@@ -473,7 +478,7 @@ export const examplePlan: Plan = {
       12,
       'taper',
       false,
-      28,
+      23,
       [
         easyRun(8),
         REST,

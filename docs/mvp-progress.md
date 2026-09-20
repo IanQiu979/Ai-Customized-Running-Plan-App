@@ -158,8 +158,22 @@
   peak-below-base offenders were ruled on 2026-09-19 (issue #103): the invariant is peak high ≥
   **base** high, a peak under a mid-build spike is tolerated when the plan discloses it, and two
   engine fixes (taper-aligned curve sampling, held long-run curves) took the sweep from 458 to 348
-  such plans with none entering — the 348 are two named families that need a captain decision
-  ("Blocked" below; counts in "Known debt"). A paid plan with a distance but no date now keeps
+  such plans with none entering. **On 2026-09-20 the captain ruled the two residual families
+  away — the sweep is at 0** (`fm/v22-engine-rulings-r2`): the beginner long-run share margin is
+  1.2 (40% at three runs, 30% at four) and a 12-week/4-day 5K intake declaring ≥50 km/week is served
+  generically rather than by the golden curve; the exact-membership mask is all-clear, disclosed
+  build spikes 32 → 4. The same pack of rulings made the **Free library's peak phase its
+  highest-volume block** (`HOLD` at the top of § 5's 95–100% band, weeks reconciled exactly to
+  target, phases labelled from rendered volume by `derivePhases`; 17,600-plan sweep in
+  `engine.progression.test.ts`, 0 peak-below-build / 0 peak-below-base / 0 backward phase steps —
+  before it, every sampled Free plan had its highest week labelled `build`), put **race day at the
+  bare race distance on both tiers** (paid race day 5 / 10 / 21.1 / 42.2 km, warm-up and cool-down
+  in the structure string only; the golden fixture's race week is 23 km, not 28), made INJ-6's
+  Day-7 pin a cap (issue #119 closed — rest weeks shorten the long run first on `lower_back` too)
+  and confirmed #106's cut-once shape. Still open from that pack: the 150 paid plans whose
+  one-week "peak" phase is a cadence rest week, pinned as a ceiling (`PEAK_ONLY_REST_CEILING`) —
+  "Blocked" below; `docs/change_log.md` 2026-09-20; `scripts/render-coach-pack.js` re-renders
+  the sign-off pack offline. A paid plan with a distance but no date now keeps
   `raceDistance` and is titled a Base Plan (issue #76), and the three source ports carry the 15–25%
   supersession note (issue #101) — `docs/change_log.md` 2026-09-19. **Rest weeks shorten the long run first
   (2026-09-12):** the skeleton's recovery weeks now size Day 7 at `loadRules.ts`'s
@@ -287,9 +301,13 @@
 
 ---
 
-**Last updated:** 2026-09-20 — the v1 dummy purchase is gated server-side to trusted testers on
-`fm/v22-test-purchase-gate` (see "How it is now"); earlier the same day, password recovery and
-email verification (issue #94) landed on `fm/v22-password-recovery-94`.
+**Last updated:** 2026-09-20 — five plan-engine rulings from the coach sign-off pack landed on
+`fm/v22-engine-rulings-r2` (the Free library's peak is its highest block, race day is the bare
+distance on both tiers, #119 and #103's two families closed, #106 confirmed — see "How it is now"
+and "Decided (2026-09-20)"; the bullets below are the dummy-purchase entry's); earlier the same
+day the v1 dummy purchase was gated server-side to trusted testers on
+`fm/v22-test-purchase-gate`, and before that password recovery and email verification (issue
+#94) landed on `fm/v22-password-recovery-94`.
 
 - **The Worker can mail, but only once the captain says so.** `workers/src/lib/mail.ts` is a
   provider-agnostic `sendMail` with a `ResendAdapter` (used when `RESEND_API_KEY` and `MAIL_FROM`
@@ -794,6 +812,25 @@ from 82. Issue #22 remains open.)
   captain — provisioned and verified in local dev 2026-08-05 (see that entry below).
 
 ### Code
+- [x] **Five plan-engine rulings from the coach sign-off pack (2026-09-20,
+      `fm/v22-engine-rulings-r2`; issues #103, #119, #106).** Free library: the peak phase is
+      the plan's highest-volume block — `VOLUME_STATE_TARGETS.HOLD.target` at the top of § 5's
+      band (1.0), `buildWeek` reconciled exactly to target, `derivePhases` labelling base / build /
+      peak / taper from rendered volume (`src/lib/planLibrary/engine.ts`, `registry.ts`); new
+      `engine.progression.test.ts` sweeps 17,600 Free race plans for 0 peak-below-build,
+      0 peak-below-base, 0 backward phase steps, 0 band / share-cap / 180-minute breaches (was
+      5,690 / 14,415 / 14,575 on the first three). Race day headlines the bare race distance on
+      both tiers (`raceDayWorkout` no longer adds `RACE_DAY_PADDING_KM`; golden fixture race week
+      28 → 23 km, `src/lib/fixtures/examplePlan.ts` updated). INJ-6's Day-7 pin is a cap
+      (`min(source, LR-low)`), closing #119; `engine.recovery.test.ts` sweeps `lower_back` on all
+      three invariants. #103's residual families: `LONG_RUN_SHARE_MARGIN.beginner` 1.1 → 1.2 and
+      `GOLDEN_FIVE_K_MAX_WEEKLY_KM = 50` route ≥50 km off the golden path — the 22,000-plan mask is
+      all-clear (348 → 0), disclosed build spikes 32 → 4, the 150 peak-only-rest plans pinned as a
+      ceiling for the captain. #106's cut-once shape confirmed, no code. New
+      `scripts/render-coach-pack.js` re-renders the pack offline. Coaching records:
+      `plan-structure.md`, `injury-rules.md`, `load-rules.md`, `notation.md`,
+      `example-plan-5k-pro.md`, `free-engine-open-questions.md`. Gates: 1,022 root / 181 Workers,
+      green. Detail: `docs/change_log.md`, 2026-09-20.
 - [x] **The v1 dummy purchase gated to trusted testers, server-side (2026-09-20,
       `fm/v22-test-purchase-gate`).** `workers/src/dummyPurchase.ts` (the sole authority, reading
       the two non-secret `wrangler.toml [vars]` `DUMMY_PURCHASE_ENABLED` / `DUMMY_PURCHASE_ALLOWLIST`
@@ -1381,8 +1418,9 @@ to "Decided" below.
 | **Mail provider for password reset and email verification (issue #94, 2026-09-20):** a Resend account and sending domain, its DNS records (DKIM, SPF/return-path, DMARC), and `wrangler secret put RESEND_API_KEY --env production` / `MAIL_FROM --env production`, then a redeploy — [`docs/email-setup.md`](email-setup.md) steps 1–5, `curl /api/email-status` is the proof | any real password-reset or verification mail. Until both secrets exist the Worker's `ConsoleAdapter` sends nothing, `GET /api/email-status` answers `mailConfigured: false`, forgot-password shows the honest "can't send email" message instead of a form, and the Home banner stays hidden | **Ian.** There is no Pace Blueprint domain yet, so this is also the domain decision; `MAIL_FROM` is the only place it appears in code. Nothing here can be done by an agent (`AGENTS.md` → never run `wrangler secret put`) |
 | **Flip `MAIL_VERIFICATION_REQUIRED` to `"true"` in `[env.production.vars]` (issue #94, `docs/email-setup.md` step 6)** — a product decision, not a config chore. On: sign-up creates the account but no session and the app says "Check your inbox"; an unverified sign-in is refused `EMAIL_NOT_VERIFIED` with a resend offered. **Every existing password account has `emailVerified = 0` and would be gated at its next sign-in**; Google accounts are exempt (Google reports the address verified). The Worker honours the flag only when mail is also configured, so the order of this row and the one above cannot lock anyone out | whether an unverified address can sign in at all. Off, the feature is reset-only plus an optional Home banner | **Ian.** Warn testers before flipping, or leave it off until launch |
 | **Copy certification for the whole auth-mail flow (issue #94).** None of these strings has been certified by the captain — flagged the same way as the 13–17 guardian-consent checkbox copy (2026-09-19). App copy, all in `src/lib/authEmail.ts` or the named screen's JSX: *authEmail.ts* — "Password reset isn't available yet — this server can't send email. Ask whoever runs it to reset your password." / "This reset link is invalid or has expired. Request a new one." / "This verification link is invalid or has expired." / "Passwords don't match." / "It expires in an hour."; *`(auth)/forgot-password`* — "Reset password", "Enter your email and we'll send a link.", "Send reset link", "Check your inbox", "If an account exists for {email}, a reset link is on its way. It expires in an hour.", "Back to Sign in"; *`reset-password`* — "New password", "Choose a new password for your account.", placeholders "At least 8 characters" / "Same again", "Set new password", "Password updated", "Sign in with your new password.", "Sign in", "Link expired", "Request a new link", "Back to Today"; *`verify-email`* — "Email verified", "You're all set.", "Sign in to continue.", "Continue", "Link expired", "Send a new link", "Sent. Check {email} for a new link.", "Sign in to request a new link", "Back to Today"; *`VerifyEmailBanner`* — "Verify your email", "We sent a link to {email}. Open it to confirm this address.", "Resend link", "Sent. Check {email} for the link."; *`sign-in`* — "Verify your email before signing in. Check your inbox for the link.", "Didn't get it? Resend the link", "Sent. Check {email} for the link.", "Forgot your password? Reset it"; *`sign-up`* — "Check your inbox", "We sent a verification link to {email}. Open it to finish creating your account, then sign in.", "Go to Sign in"; plus the generic failure fallbacks ("Could not send a reset link. Try again.", "Could not reset your password. Try again.", "Could not send the link. Try again."). Mail copy, in `workers/src/auth-email.ts`: subjects "Verify your Pace Blueprint email" / "Reset your Pace Blueprint password"; bodies "Verify email:" / "Reset password:" followed by the link, then "If you did not create this account, you can ignore this email." / "If you did not request this reset, you can ignore this email." | nothing functionally — the flow works with the copy as written. It blocks calling any of it final | **Ian.** Copy only; the code paths behind each string are tested and stay as they are |
-| **Beginner three-day 5K plans collapse to the tempo floor (issue #103 residual, 320 sweep plans).** With one quality session at the 5K tempo's 8 km nominal (≈23% of the week), the beginner three-run share ceiling (`LONG_RUN_SHARE_MARGIN.beginner` 1.1 → 36.7%) and the no-easy-run-outgrows-the-long-run rule cap a week at ~86% of its target, so the growth base decays week on week to the tempo's 3 km floor: a 30 km/week beginner's 8-week 5K plan renders 25, 22, 17, 14*, 14, 11, **11**, 18. Options: raise the beginner share margin to ≥1.157 (1.2 gives 40% at 3 runs, 30% at 4 — a safety-ceiling loosening #103's own acceptance criteria reserve to the captain); give the generic 5K tempo the 10 km nominal the other distances use (a coaching dose); or accept and disclose | every beginner 3-day 5K plan on the paid skeleton | **Ian.** Both remedies change a number the code is not allowed to pick |
-| **The golden 12-week/4-day 5K path at 50–110 km/week renders its peak under its base (issue #103 residual, 28 sweep plans).** Authored at 35 km/week; scaled past ~50 km its two-easy-run base/build weeks and its one-easy-run, two-quality peak weeks both pin to the flat intermediate share cap, at 54 km and 48 km. Options: route declared volumes above the point where the caps bind off the golden path onto the generic curve (the same class of decision as `golden-cadence3-route`), or accept | intermediate 4-day 12-week 5K runners declaring ≥50 km/week | **Ian.** Who gets the coach's plan is his call |
+| ~~**Beginner three-day 5K plans collapse to the tempo floor (issue #103 residual, 320 sweep plans).**~~ With one quality session at the 5K tempo's 8 km nominal (≈23% of the week), the beginner three-run share ceiling (`LONG_RUN_SHARE_MARGIN.beginner` 1.1 → 36.7%) and the no-easy-run-outgrows-the-long-run rule cap a week at ~86% of its target, so the growth base decays week on week to the tempo's 3 km floor: a 30 km/week beginner's 8-week 5K plan renders 25, 22, 17, 14*, 14, 11, **11**, 18. Options: raise the beginner share margin to ≥1.157 (1.2 gives 40% at 3 runs, 30% at 4 — a safety-ceiling loosening #103's own acceptance criteria reserve to the captain); give the generic 5K tempo the 10 km nominal the other distances use (a coaching dose); or accept and disclose | — | **Ruled 2026-09-20 (remedy A1):** `LONG_RUN_SHARE_MARGIN.beginner` is 1.2 — 40% at three runs, 30% at four, the flat 25% floor unchanged at ≥5. The family is gone from the sweep; `load-rules.md` carries the ruling |
+| ~~**The golden 12-week/4-day 5K path at 50–110 km/week renders its peak under its base (issue #103 residual, 28 sweep plans).**~~ Authored at 35 km/week; scaled past ~50 km its two-easy-run base/build weeks and its one-easy-run, two-quality peak weeks both pin to the flat intermediate share cap, at 54 km and 48 km. Options: route declared volumes above the point where the caps bind off the golden path onto the generic curve (the same class of decision as `golden-cadence3-route`), or accept | — | **Ruled 2026-09-20 (remedy B1):** a declared `weeklyKm >= 50` (`GOLDEN_FIVE_K_MAX_WEEKLY_KM`) is served by `buildGenericWeek`; under 50 km the byte-pinned fixture is untouched. With A1, the 22,000-plan base-high mask is all-clear (348 → 0) |
+| **150 paid plans whose "peak" phase is a single cadence rest week (issue #103 follow-up, named 2026-09-20).** 10- and 14-week 5Ks on every level and 8- and 10-week competitive halves: `allocatePhaseCounts` gives them a one-week peak and the deload cadence lands on it, so the plan has no loading peak at all. The fix that follows from the Free library's "peak is the highest block" ruling — shift the phase boundary a week earlier when the allocator's sole peak week is a cadence rest week — moves coaching content on this engine, because the phase label is an input that picks the peak interval session and the tempo's duration. Pinned as a ceiling (`PEAK_ONLY_REST_CEILING = 150`, shapes named in `planTemplates.progression.test.ts`) | a real peak block for those duration/cadence combinations on the paid skeleton | **Ian.** Whether the boundary shifts, and what sessions the shifted week carries, is a coaching call |
 | Marathon's separate absolute single-run calibration for intermediate/advanced remains open. Since 2026-09-07 `maxSingleRunKm()` returns `Infinity` only for a `prepared` marathoner whose easy pace makes the 180-minute cap enforceable; everyone else (no recent time, advanced, first-timer) keeps the flat ≤25 / ≤35 km table, so the open question is now what number should replace the table for the prepared, pace-known case. The weekly-share number is settled at 35% and is not part of this blocker | the final marathon-specific absolute kilometre ceiling, and whether the unchanged 180-minute duration cap should remain the ultimate duration bound | **Ian.** `report-source.md` says the exact absolute policy is coaching judgment and notes McMillan sometimes permits up to four hours; this work settles the share at 35%, leaving only the absolute calibration and any future time-cap change open. The current 180-minute cap and 10% spike guard remain active. The fixed-position long-run-curve dips that used to land on loading weeks when resampled onto noncanonical durations are gone since 2026-09-19 — the generic path reads the curves with their loading block held at the running maximum (`holdRecoveryDips`), and rest weeks size their own long run from `deloadLongRun`. Valid deloads use the last loading week's denominator, so their displayed own-week ratio is not required to be ≤35%. |
 
 None of the above blocks local work: everything in `workers/` runs offline against `wrangler dev`'s
@@ -1509,6 +1547,21 @@ guidelines scout (`/Users/Guestyyyyyyyy/firstmate/data/v22-apple-kids-guidelines
 | `fifty-plus-golden-deload-weeks` | **Weeks 4, 8, and 12** are deload weeks for 50+ runners on the golden 12-week 5K path — not the generic every-3-weeks modulo (which would land on 3/6/9). This is a golden-path-only override; the generic path's every-3-weeks-for-50+ cadence is unchanged. Week 12 (the race week) is flagged `isDeload: true` in addition to its existing race-day structure. Implementation: `buildCanonicalFiveKWeek()` in `planTemplates.ts`. |
 | `age-floor` (App Store declared minimum age) | **13**, unified with the backend intake validator. The two were briefly treated as separate (the backend floor had been raised to 13 in an earlier, unrelated commit — `8acc27c` — while a prior ruling had separately declined touching it), but the captain resolved that tension mid-task: both the backend validator (`workers/src/routes.ts:210`, already `age < 13`) and the App Store Connect age-rating questionnaire answer are 13. There is no in-repo App Store Connect config to edit — `eas init` has never been run (`docs/apple-dev-blocked.md`) — so the declared floor is recorded here as the value to use once submission is set up; the questionnaire itself remains a captain's-account action at submission time. |
 
+## Decided (2026-09-20) — five plan-engine rulings, coach sign-off pack round 2
+
+Issues #103, #119 and #106, on `fm/v22-engine-rulings-r2`. The evidence was a coach sign-off pack
+(four representative intakes × Free/paid, rendered on `main` that morning; `scripts/render-coach-pack.js`
+reproduces it). Full account: `docs/change_log.md`'s 2026-09-20 entry; coaching records in
+`plan-structure.md`, `injury-rules.md`, `load-rules.md` and `notation.md`.
+
+| Item | Decision |
+|---|---|
+| The Free library's peak phase sat under a `build` week on every sampled plan | **The peak phase is the plan's highest-volume block, and phase labels follow volume.** `HOLD` holds the preceding loading week at the top of § 5's 95–100% band (1.0, not the 0.975 midpoint — no number outside the source's band), `buildWeek` reconciles the seven days to the target exactly, and `derivePhases` labels base (through the first rest week after a loading week) / peak (from the first loading week at the plan's highest loading volume to the taper, rest weeks included) / build (between) from the rendered volumes. A plan flat at its ceiling takes its final loading block as the peak; a 6- or 8-week completion plan with no loading block after base has no peak (1,355 of 17,600, a ceiling). New `engine.progression.test.ts`: 0 / 0 / 0 on peak-below-build, peak-below-base and backward phase steps, from 14,415 / 5,690 / 14,575. |
+| Race day's headline distance, which differed by tier (paid 10 / 15 / 26 / 47 km, Free bare) | **The bare race distance on both tiers; warm-up and cool-down live in the `structure` string only.** `raceDayWorkout` drops `RACE_DAY_PADDING_KM` from `distanceKm`; the constant survives only to derive `RACE_WEEK_PRE_RACE_SHARE` (18/28). A paid race week no longer reads as a second peak; the golden fixture's race week is 23 km and Race Day is `notation.md`'s one exception to the headline convention. |
+| #119 — INJ-6's "keep Day 7 at `LR-low`": cap or value | **A cap.** `min(ladder(source target), ladder('LR-low'))`, so a rest week's Day 7 takes `LR-recovery` and the cut lands on the long run first. `H2`/`H3`'s identical pin reads the same way. `engine.recovery.test.ts` sweeps `lower_back` on all three invariants. |
+| #103's two residual families (320 beginner three-day 5K; 28 golden ≥50 km) | **Remedy A1: `LONG_RUN_SHARE_MARGIN.beginner` 1.1 → 1.2** (40% at three runs, 30% at four, flat 25% floor from five). **Remedy B1: a declared `weeklyKm >= 50` leaves the golden 12-week/4-day 5K path** (`GOLDEN_FIVE_K_MAX_WEEKLY_KM`). Sweep 348 → 0; the mask is tightened to all-clear on the captain's authority (a strict subset, so the "never add an offender" rule is intact); disclosed build spikes 32 → 4. **Named, not fixed:** the 150 plans whose one-week peak phase is a cadence rest week — the boundary shift the Free ruling implies moves coaching content on the paid engine, so it is his; pinned as a ceiling. |
+| #106 — the shape of a declared injury's cut | **Confirmed: cut once on the first loading week, ramp back through the state machine.** No code change; recorded in `injury-rules.md` and `free-engine-open-questions.md`'s "Settled elsewhere". |
+
 ## Decided (2026-09-19) — three plan-engine rulings, `v22-plan-engine-captain-calls-r1`
 
 Issues #76, #103 and #101, each re-verified against `main` before the change. Full account:
@@ -1517,7 +1570,7 @@ Issues #76, #103 and #101, each re-verified against `main` before the change. Fu
 | Item | Decision |
 |---|---|
 | #76 — a paid plan with a race distance but no race date | **Keeps `raceDistance`, titled `"N-Week 10K Base Plan"`, mirroring the Free library.** `raceDate` is the only "a race is booked" signal; every reader audited, and the personalization prompt now says so explicitly. |
-| #103 — which phase comparison is the product invariant | **The peak phase's highest loading week is never below the base phase's.** A peak under a mid-build loading spike is tolerated when disclosed with the standing one-sentence flag (`buildSpikeDisclosure`). Two mechanics fixes — taper-aligned curve sampling and held long-run curves — took the 22,000-plan sweep from 458 to 348 base-high offenders (old pre-peak metric 758 → 352), none entering; the mask in `planTemplates.progression.test.ts` now encodes the base-high invariant (348) and the tolerance property (32 disclosed spikes — those whose build spike is the plan's highest loading week — pinned as a ceiling). The 348 remaining are two families whose remedies are coaching/safety numbers — back to the captain, "Blocked" above. |
+| #103 — which phase comparison is the product invariant | **The peak phase's highest loading week is never below the base phase's.** A peak under a mid-build loading spike is tolerated when disclosed with the standing one-sentence flag (`buildSpikeDisclosure`). Two mechanics fixes — taper-aligned curve sampling and held long-run curves — took the 22,000-plan sweep from 458 to 348 base-high offenders (old pre-peak metric 758 → 352), none entering; the mask in `planTemplates.progression.test.ts` now encodes the base-high invariant (348) and the tolerance property (32 disclosed spikes — those whose build spike is the plan's highest loading week — pinned as a ceiling). The 348 remaining are two families whose remedies are coaching/safety numbers — back to the captain; ruled the next day, see "Decided (2026-09-20)" above. |
 | #101 — the 35–45% ruling annotations in the source ports | **One-line supersession note under each of the four annotations across the three files**, pointing at `load-rules.md` § Deload trigger and the `DELOAD_REDUCTION_MIN`/`_MAX` constants. Wording is the captain's to approve in the PR. |
 
 ## Decided (2026-09-16) — golden 5K path admission, `v22-core-purpose-audit-r1` §1.3
@@ -1691,21 +1744,29 @@ intact underneath.
   (peak weeks 17–19 at 23/24/24 km with 9/9/9 km long runs) is unchanged, and the exact-membership
   mask gate passes, so no plan entered the offender set. Nobody has confirmed the GitHub issue is
   closed.
-- 🟡 **`lower_back` (INJ-6) rest weeks never shorten Day 7 — GitHub issue #119 (2026-09-19).**
-  The "keep Day 7 at `LR-low`" pin is applied on `RECOVERY` weeks too, so the whole 15–25% cut
-  lands on the easy runs (total in band, shape wrong). Found by extending the rest-week sweep to
-  `H1` for #106; whether the pin is a cap or a value is a coaching reading, so it waits on Ian.
-  The recovery suite sweeps that flag for the total band only until then.
-- 🟡 **348 peak-below-base plans remain in the 22,000-plan sweep — GitHub issue #103, two
-  named families awaiting the captain.** History of the counts: 954 broad / 470 literal before
-  #99's Task 1, 770 / 470 after it, 758 broad after the 2026-09-16 golden reroute; the 2026-09-19
-  ruling made peak-high ≥ **base**-high the invariant (458 such plans on `main` that morning) and
-  the two mechanics fixes took it to **348** (the old broad metric to 352) with no plan entering
-  either set. Every one of the 348 is a beginner three-day 5K plan (320) or the golden
-  12-week/4-day 5K path at 50–110 km/week (28) — see "Blocked" for the options; the progression
-  suite asserts that membership by family, so a new offender outside them fails by name. Also
-  surfaced there: 150 sweep plans whose peak *phase* is a single week that is also a rest week, so
-  they have no loading peak at all — not counted by either metric, not yet ruled on.
+- 🟢 **Resolved 2026-09-20: `lower_back` (INJ-6) rest weeks now shorten Day 7 — GitHub issue
+  #119.** The captain ruled "keep Day 7 at `LR-low`" a cap, not a value, so `engine.ts` takes
+  `min(ladder(source target), ladder('LR-low'))` and a rest week's Day 7 takes `LR-recovery`
+  beneath it (the issue's witness week 4: `2.7 2.7 4.5L` → `3.4 3.5 2.9L`, total still 80%).
+  `engine.recovery.test.ts` sweeps `lower_back` on all three invariants; `TOTAL_BAND_ONLY` is
+  gone. Nobody has confirmed the GitHub issue is closed.
+- 🟢 **Resolved 2026-09-20: the 22,000-plan base-high sweep is at 0 — GitHub issue #103's two
+  named families ruled.** History of the counts: 954 broad / 470 literal before #99's Task 1,
+  770 / 470 after it, 758 broad after the 2026-09-16 golden reroute; the 2026-09-19 ruling made
+  peak-high ≥ **base**-high the invariant (458 that morning, 348 after the two mechanics fixes);
+  on 2026-09-20 remedy A1 (`LONG_RUN_SHARE_MARGIN.beginner` 1.2) removed the 320 beginner
+  three-day 5K plans and remedy B1 (`GOLDEN_FIVE_K_MAX_WEEKLY_KM = 50`) the 28 golden-path plans.
+  The exact-membership mask is all-clear (`BASE_HIGH_BASELINE_OFFENDER_COUNT = 0`,
+  `REMAINING_OFFENDER_FAMILIES = []`), so **any** base-high offender now fails by name; disclosed
+  build spikes 32 → 4, pinned as a ceiling.
+- 🟡 **150 paid plans have a one-week "peak" phase that is a cadence rest week — issue #103
+  follow-up, named 2026-09-20, awaiting the captain.** 10- and 14-week 5Ks on every level, 8- and
+  10-week competitive halves: `allocatePhaseCounts` gives a single peak week and the deload
+  cadence lands on it, so there is no loading peak (outside both base-high metrics, which need
+  one). On the paid engine the phase label chooses sessions, so shifting the boundary a week
+  earlier — the fix the Free library's ruling implies — moves coaching content; pinned as a
+  ceiling (`PEAK_ONLY_REST_CEILING = 150`, shapes named in `planTemplates.progression.test.ts`)
+  so the class cannot grow unnoticed. See "Blocked".
 - 🟡 **The client's and the Worker's `better-auth` versions must match, and only the lockfile
   holds them together (2026-09-05).** They are two separate npm projects sharing one wire format
   (cookie envelope, `/sign-in/social` state, session payload). During the

@@ -5,6 +5,120 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-09-20 — Five plan-engine rulings from the coach sign-off pack: the peak is the highest block, race day is the bare distance, #119, #103's two families, #106 confirmed (`fm/v22-engine-rulings-r2`)
+
+Captain's rulings of 2026-09-20 (Ian, certified coach), GitHub issues #103, #119 and #106. The
+evidence was a coach sign-off pack rendered on `main` that morning — four representative intakes
+(5K `some`/4 days/20 km/12 weeks; 10K `regular`/4 days/30 km/12 weeks; half `experienced`/5
+days/40 km/14 weeks; marathon `experienced`/5 days/50 km/16 weeks, none with a recent time) on
+both Free and paid. The pack itself is not in the repo; `scripts/render-coach-pack.js` (below)
+reproduces it. Root gate 62 suites / 1,022 tests, `workers/` 181, both green.
+
+- **Ruling 1 — on the Free library engine the peak phase is the plan's highest-volume block, and
+  phase labels follow volume.** All four sampled Free plans carried their single highest week
+  labelled `build` beside a lower `peak`: 5K week 9 build 25.3 km > week 10 peak 24.8; 10K week 8
+  build 41 > week 9 peak 40.1; half week 11 build 57.6 above every peak week, reading
+  peak → recovery → build → peak → taper; marathon week 13 build 70.1 > week 11 peak 66.5. Three
+  changes in `src/lib/planLibrary/engine.ts` and `registry.ts`, no number outside the source's own
+  bands: (a) `HOLD`, the calendar's peak-specific state, now holds the preceding loading week at
+  the **top** of § 5's 95–100% band (`VOLUME_STATE_TARGETS.HOLD.target = 1.0`) instead of the
+  0.975 midpoint — the only value inside the band under which a peak week is not below the `LOAD`
+  week it follows; (b) `buildWeek` reconciles the seven rounded days to the week's target exactly
+  (§ 5's "exact reconciliation of the seven days"; the residual goes on the largest easy/recovery
+  slot, never a quality dose), so a `HOLD` week renders the same total as its predecessor; (c) the
+  state → phase map (`phaseForState`) is replaced by `derivePhases`, which labels from the
+  rendered volumes: taper states are the taper; **base** runs through the first rest week that
+  follows a loading week; **peak** runs from the first loading week at the plan's highest loading
+  volume to the taper, rest weeks included (a one-week peak is the source calendar's own shape —
+  marathon week 21); **build** is whatever lies between. A plan flat at its level's weekly ceiling
+  takes its final loading block as the peak; a plan with no loading block after its base (the 6-
+  and 8-week completion plans) has no peak; a race plan's "longer race date" prefix is base; a
+  dateless plan longer than the base/build portion cycles it and is labelled per cycle. New sweep
+  `src/lib/planLibrary/__tests__/engine.progression.test.ts` (10 tests) over 17,600 Free race
+  plans (4 distances × 5 experience levels × 3–7 days × 10–110 km × 8 durations × recent time
+  yes/no): **0** peak-below-build, **0** peak-below-base, **0** peak phases made only of rest
+  weeks, **0** backward phase steps, **0** deload-band breaches, **0** share-cap breaches (0.1 km
+  rendering tolerance) and **0** 180-minute breaches; the 1,355 plans (every 6- and 8-week plan)
+  with no peak phase because no loading block follows their base are pinned as a ceiling
+  (`NO_PEAK_CEILING`). Before the change the same sweep had 5,690 peak-below-base, 14,415
+  peak-below-build and 14,575 backward-phase-step plans. Rule recorded in
+  `docs/reference/coaching/plan-structure.md`.
+- **Ruling 2 — Race Day headlines the bare race distance on both tiers; warm-up and cool-down
+  live in the workout note.** `planTemplates.ts`'s `raceDayWorkout` no longer adds
+  `RACE_DAY_PADDING_KM` (5 km) to `distanceKm`, so a paid race day reads 5 / 10 / 21.1 / 42.2 km
+  like the Free library (was 10 / 15 / 26 / 47); `structure` still says
+  `WU 3 km · 5 km race · CD 2 km`. `RACE_DAY_PADDING_KM` survives only to derive
+  `RACE_WEEK_PRE_RACE_SHARE` (18/28) from the fixture's authored 28 km race week. Consequences: a
+  paid race week no longer reads as a second peak (paid marathon race week 69 → 64.2 km against a
+  70 km peak; paid 5K race week 20 → 15 km, no longer the plan's highest week); the golden
+  fixture's race week renders 23 km (18 km pre-race + the 5 km race) —
+  `src/lib/fixtures/examplePlan.ts`, the permanent in-app example plan, now carries race day 5 km,
+  week 12 = 23 km and `weeklyLoad`'s last entry 23; `docs/reference/coaching/example-plan-5k-pro.md`
+  and `notation.md` updated (Race Day is now the one exception to the "headline includes WU/CD"
+  convention). `preRaceBudgetKm`'s peak headroom is measured against the bare race distance, so a
+  low-volume runner gets up to 5 km more pre-race shakeout budget where that bound binds.
+- **Ruling 3 — INJ-6 (lower back) "keep Day 7 at `LR-low`" is a cap, not a fixed value (issue
+  #119).** `engine.ts` now takes `min(ladder(source target), ladder('LR-low'))` when the pin
+  applies, so a rest week's Day 7 still takes `LR-recovery` (60–70% of the preceding long run) and
+  the cut lands on the long run first. The issue's witness (`new`, 3 days, 15 km, 8-week 5K): week
+  4 was `2.7 2.7 4.5L` (Day 7 at 100%, easy runs at 69%) and is now `3.4 3.5 2.9L` (Day 7 at 65%,
+  easy runs at ~88%, total still 80%). `engine.recovery.test.ts` drops its `TOTAL_BAND_ONLY`
+  exemption and sweeps `lower_back` on all three rest-week invariants; `injury.ts`'s comments
+  updated; ruling recorded in `docs/reference/coaching/injury-rules.md`.
+- **Ruling 4 — #103's two residual families, both remedied with a captain-chosen number.**
+  (A1) `LONG_RUN_SHARE_MARGIN.beginner` 1.1 → 1.2 in `src/lib/loadRules.ts` — 40% share at 3
+  runs, 30% at 4, the flat 25% floor unchanged at ≥5 runs, still below intermediate's 1.28 at
+  every run count (`load-rules.md`). (B1) `buildTemplatePlan` routes a declared
+  `weeklyKm >= 50` (`GOLDEN_FIVE_K_MAX_WEEKLY_KM`, exported from `planTemplates.ts`) off the
+  golden 12-week/4-day 5K path onto `buildGenericWeek`; under 50 km the byte-pinned fixture is
+  untouched. Re-run of the 22,000-plan paid sweep (`planTemplates.progression.test.ts`):
+  base-high offenders **348 → 0** — the 348 were the 320 beginner three-day 5K plans plus the 28
+  golden-path ≥50 km plans, so the new residual set is exactly empty, a subset of the old mask,
+  and the exact-membership mask was tightened to all-clear on the captain's authority
+  (`BASE_HIGH_BASELINE_OFFENDER_COUNT = 0`, `REMAINING_OFFENDER_FAMILIES = []`, the two families
+  recorded as history in that file's header); tolerated disclosed build-spike plans 32 → 4
+  (ceiling). **Named follow-up, not fixed: the 150 plans whose "peak" phase is a single cadence
+  rest week** (10- and 14-week 5Ks on every level, 8- and 10-week competitive halves —
+  `allocatePhaseCounts` gives them a one-week peak and the deload cadence lands on it). On the
+  paid engine the phase label is an *input* that chooses sessions (the peak interval session, the
+  tempo's duration), so the fix that follows from ruling 1 — shift the phase boundary a week
+  earlier when the allocator's sole peak week is a cadence rest week — moves coaching content and
+  goes back to the captain; they are pinned as a ceiling (`PEAK_ONLY_REST_CEILING = 150`) with
+  their shapes named in the suite.
+- **Ruling 5 — a declared injury's cut stays "cut once on the first loading week, ramp back"
+  (issue #106).** No code change; Ian confirmed the shape the 2026-09-19 fix took. Recorded in
+  `injury-rules.md` and `free-engine-open-questions.md`'s "Settled elsewhere".
+- **Tests and fixtures touched for rulings 2 and 4.** `planTemplates.golden.test.ts` (race day
+  5 km, week 12 = 23 km); `planTemplates.general.test.ts` (race day = bare distance to a tenth);
+  `planTemplates.genericLongRun.test.ts` (profile F pinned to `[5,5,6,4,6,7,8]` under the 0.30
+  cap; race day 42.2 / 21.1); `planTemplates.longRunCap.test.ts` (golden baselines now
+  20/27/35/45; the 80 km 55-year-old competitive profile is `servedBy: 'generic'`, with a new
+  45 km golden profile pinned at 19/13/56; fixture race week 23 km `[6,6,6,5]`);
+  `planTemplates.distanceSpecific.test.ts` (its RUNNER at 45 km so the 5K stays golden; race-day
+  pins 5 km); `planTemplates.noRace.test.ts` (one-week race plan `[23]`; the base-high disclosure
+  guard now tested on a hand-built shape via the newly exported `peakBelowBuildSpike`, since the
+  sweep has no base-high plan left); `examplePlan.fixture.test.ts`.
+- **New: `scripts/render-coach-pack.ts` plus the launcher `scripts/render-coach-pack.js`.** The
+  launcher registers a `.ts` require hook through the already-installed `typescript`
+  devDependency — no new dependency, no bundler — and renders the pack's four intakes × Free/paid
+  from both engines with no AI call, prose slots as `[coach prose here]`.
+  `node scripts/render-coach-pack.js` prints a Markdown summary table; with an `<out-dir>` it also
+  writes one Markdown and one JSON file per plan. After the change every check reads ok: 5K Free
+  12w 18 → 25.2 km (week 9, peak), long run 7.6 km at week 10 (30.2%), deloads 4/8, race week
+  11.9 km (race day 5); 5K paid 12 → 17 (week 10), long run 3 km, race week 15; 10K Free 30 → 40.8
+  (week 8), long run 13 km (31.9%), deloads 2/6/10, race week 20.8; 10K paid 26 → 40 (week 11),
+  long run 12 km, race week 24; half Free 40 → 58.8 (week 11), long run 18.8 km (32.0%), race
+  week 33.1 (21.1); half paid 34 → 56 (week 13), long run 17, race week 41.1; marathon Free
+  45 → 70 (week 13, first-timer path, no recent time), long run 23.8 km (35.0%), deloads 4/8/12,
+  race week 53 (42.2); marathon paid 41 → 70 (week 13), long run 24 km (34.8%), race week 64.2.
+- **Two observations, recorded and not fixed.** (i) On the generic paid path the intermediate
+  32% share cap binds the 5K and 10K peak long runs to the same whole kilometre for a runner
+  declaring ~50 km/week (21 km of a ~66–69 km peak week, both distances), so the "5K < 10K"
+  peak-long-run ordering holds by the curves, not after the cap — which is why `planTemplates.distanceSpecific.test.ts` now runs its RUNNER at 45 km. (ii) A
+  dateless Free plan longer than the base/build portion cycles the calendar from `ENTRY`
+  (0.9 × baseline) again — pre-existing § 8 "no race date" behaviour, now labelled per cycle by
+  `derivePhases` rather than changed.
+
 ## 2026-09-20 — The v1 dummy purchase is gated to trusted testers, server-side (`fm/v22-test-purchase-gate`)
 
 Until now any signed-in account could call `POST /api/purchase-tier` with `source: 'dummy'` and

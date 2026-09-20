@@ -67,7 +67,10 @@ function buildGoldenPlanAt(weeklyKm: number): Plan {
 }
 
 describe('golden 5K path — long-run weekly-share cap holds at any baseline (scout bug 2 regression)', () => {
-  const BASELINES = [20, 27, 35, 50];
+  // 45, not 50: since the captain's 2026-09-20 ruling (issue #103, remedy B1) a declared volume at
+  // or above `GOLDEN_FIVE_K_MAX_WEEKLY_KM` leaves the coach-authored path for `buildGenericWeek`,
+  // so 45 km/week is the highest baseline this path is still reached with.
+  const BASELINES = [20, 27, 35, 45];
 
   it.each(BASELINES)(
     'replays every long run through clampLongRun unclamped at %i km/week, proving no loading week breaches its share cap',
@@ -169,8 +172,11 @@ const GOLDEN_PROFILES: GoldenProfile[] = [
   { name: 'intermediate — experienced, 45 km/wk, 55 y/o', experience: 'experienced', age: 55, weeklyKm: 45, servedBy: 'golden' },
   // Under 50 and advanced: the 3-week cadence, routed off the golden curve since 2026-09-16.
   { name: 'advanced — competitive, 60 km/wk, 30 y/o (generic path since 2026-09-16)', experience: 'competitive', age: 30, weeklyKm: 60, servedBy: 'generic' },
-  // 50+ and advanced: the 4/8/12 ruling keeps this runner on the coach-authored curve.
-  { name: 'advanced — competitive, 80 km/wk, 55 y/o', experience: 'competitive', age: 55, weeklyKm: 80, servedBy: 'golden' },
+  // 50+ and advanced: the 4/8/12 ruling keeps this runner on the coach-authored curve — up to the
+  // captain's 2026-09-20 volume gate (`GOLDEN_FIVE_K_MAX_WEEKLY_KM`, issue #103 remedy B1): at
+  // 45 km/week the curve still serves; at 80 the same runner is on the generic path.
+  { name: 'advanced — competitive, 45 km/wk, 55 y/o', experience: 'competitive', age: 55, weeklyKm: 45, servedBy: 'golden' },
+  { name: 'advanced — competitive, 80 km/wk, 55 y/o (generic path since 2026-09-20)', experience: 'competitive', age: 55, weeklyKm: 80, servedBy: 'generic' },
 ];
 
 function buildGoldenPlanFor(profile: GoldenProfile): Plan {
@@ -301,7 +307,10 @@ describe('golden 5K path — the coach-authored plan is verified against the cap
     // and, through the growth base, every week after them. 82 km is the curve's own 137% of 60,
     // inside every cap the suite above enforces.
     'advanced — competitive, 60 km/wk, 30 y/o (generic path since 2026-09-16)': { peakLongRunKm: 26, firstLongRunKm: 17, peakLoadingWeekKm: 82 },
-    'advanced — competitive, 80 km/wk, 55 y/o': { peakLongRunKm: 34, firstLongRunKm: 23, peakLoadingWeekKm: 98 },
+    'advanced — competitive, 45 km/wk, 55 y/o': { peakLongRunKm: 19, firstLongRunKm: 13, peakLoadingWeekKm: 56 },
+    // Generic path since 2026-09-20 (B1): 98 km / 34 km on the golden curve before. The generic
+    // curve runs this runner up to the advanced weekly ceiling.
+    'advanced — competitive, 80 km/wk, 55 y/o (generic path since 2026-09-20)': { peakLongRunKm: 34, firstLongRunKm: 23, peakLoadingWeekKm: 110 },
   };
 
   it.each(CASES)('pins the progression the coach-authored plan actually delivers for %s', (name, profile) => {
@@ -325,13 +334,15 @@ describe('golden 5K path — the coach-authored plan is verified against the cap
     expect(preRace.every((day) => (day.distanceKm ?? 0) <= 1)).toBe(false);
   });
 
-  it('leaves the byte-pinned 35 km fixture race week exactly where it was', () => {
+  it('leaves the byte-pinned 35 km fixture race week\'s pre-race running exactly where it was', () => {
     // The share and the old subtraction agree exactly at this baseline (28 - 10 = 18 = 28 x 18/28),
-    // which is what makes the fix safe to apply to the coach-authored path at all.
+    // which is what makes the fix safe to apply to the coach-authored path at all. Race day itself
+    // reads the bare 5 km since the captain's 2026-09-20 ruling (10 km with its warm-up and
+    // cool-down before), so the week sums to 23 while its three pre-race days are unchanged.
     const plan = buildGoldenPlanAt(35);
     const raceWeek = plan.weeks[11];
-    expect(raceWeek.volumeKm).toBe(28);
-    expect(raceWeek.days.filter(isWorkout).map((day) => day.distanceKm)).toEqual([6, 6, 6, 10]);
+    expect(raceWeek.volumeKm).toBe(23);
+    expect(raceWeek.days.filter(isWorkout).map((day) => day.distanceKm)).toEqual([6, 6, 6, 5]);
   });
 
   it('names the intakes where that progression is a coaching question, not a passing grade', () => {

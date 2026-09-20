@@ -180,6 +180,14 @@ outside `notation.md`'s set):
   compression, never a violated cap.
 - **§ 22's disclaimers are mandatory on every plan**, plus the H1–H4 disclaimer where § 22
   specifies it.
+- **A declared injury's cut lands once, on the first loading week, and the plan ramps back**
+  (issue #106; Ian confirmed the shape on 2026-09-20) — § 17's "apply once, never stack", not a
+  per-week reduction. `injury-rules.md` carries the ruling.
+- **INJ-6's "keep Day 7 at `LR-low`" is a cap, not a value** (issue #119, 2026-09-20): a rest
+  week's Day 7 still shortens to `LR-recovery` beneath it. `injury-rules.md` carries the ruling.
+- **The peak phase is the plan's highest-volume block, and phase labels follow volume**
+  (2026-09-20, coach sign-off pack): `HOLD` holds at the top of § 5's 95–100% band and
+  `derivePhases` labels from the rendered volumes. `plan-structure.md` carries the rule.
 
 ## Known follow-ups, not decisions
 

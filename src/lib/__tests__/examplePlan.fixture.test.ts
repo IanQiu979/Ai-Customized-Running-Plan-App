@@ -81,8 +81,10 @@ describe('examplePlan fixture — arithmetic integrity', () => {
   // 200 m to 300 m per rep to stay inside `workout-library.md`'s 40-67%-of-rep-distance
   // menu for 600 m reps, which pushes that day's total from "≈10.2, rounded to 10" to
   // "WU 2 + 4.8 km quality + 2.1 km recovery jog + CD 2 ≈ 10.9, rounded to 11" (Week 9 day
-  // line), so week 9's own Volume-plan row reads "45 km" now, not 44.
-  const EXPECTED_WEEKLY_LOAD = [34, 35, 38, 23, 41, 45, 48, 30, 45, 48, 40, 28];
+  // line), so week 9's own Volume-plan row reads "45 km" now, not 44. Week 12 is 23, not the
+  // 28 the table carried until 2026-09-20: race day headlines the bare 5 km race since the
+  // captain's ruling of that date, so the week is 18 km of pre-race running plus the race.
+  const EXPECTED_WEEKLY_LOAD = [34, 35, 38, 23, 41, 45, 48, 30, 45, 48, 40, 23];
 
   it('matches the doc\'s Volume-plan table exactly, week by week', () => {
     expect(examplePlan.weeklyLoad).toEqual(EXPECTED_WEEKLY_LOAD);
@@ -149,10 +151,12 @@ describe('examplePlan fixture — race-day structure string (issue #34 ruling R6
     expect(raceDay.structure).toBe('WU 3 km · 5 km race · CD 2 km');
   });
 
-  it("sums the race-day structure's segments to the existing 10 km headline distanceKm", () => {
+  it('headlines the bare 5 km race, with the warm-up and cool-down itemized in the structure only', () => {
+    // Captain's ruling, 2026-09-20: race day reads the race distance on both tiers. 10 km — 3 (WU)
+    // + 5 (race) + 2 (CD) — until then.
     const week12 = examplePlan.weeks[11];
     const raceDay = week12.days[6] as Workout;
-    expect(raceDay.distanceKm).toBe(10); // 3 (WU) + 5 (race) + 2 (CD)
+    expect(raceDay.distanceKm).toBe(5);
   });
 
   it('uses only vocabulary already in STRUCTURE_SHORTHAND (WU, CD, ·) — no new glossary token', () => {
