@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
 
 import { DesignWidth, FontFamily, FontSize } from '@/constants/theme';
@@ -26,11 +26,13 @@ import { WeekStrip, stripWidth } from './WeekStrip';
  * 220 ms (Easy 8 · Rest · Rest · Tempo 7 · Rest · Long 10 · Rest — the page's own week); the
  * Number ticks with each landing; then the strip duplicates downward into three faint weeks
  * (0.28 / 0.18 / 0.10) that say the plan is bigger than one week; a legend; and, 0.8 s into the
- * hold, "Continue". 3.0 s of build, 2.2 s of hold, plays once. Every coordinate, size and time
- * below is `v22-01-scene.jsx`'s.
+ * hold, a "Scroll down" hint. 3.0 s of build, 2.2 s of hold, plays once. Every coordinate, size
+ * and time below is `v22-01-scene.jsx`'s.
  *
  * The caller owns the clock (`useBuildClock(HERO_TIMELINE.total)`) so it can gate the screen's
- * primary action on the hero settling, as the previous hero was gated.
+ * primary action on the hero settling, as the previous hero was gated. The hint is informational
+ * only — the mechanic is the scroll itself (captain's ruling, 2026-09-20), not a tap target, so
+ * this component renders a plain `View`, not a `Pressable`.
  */
 
 const { cues } = HERO_TIMELINE;
@@ -60,7 +62,6 @@ export function OnboardingHero({
   width,
   height,
   week = HERO_WEEK,
-  onContinue,
   appName = 'Pace Blueprint',
 }: {
   T: SharedValue<number>;
@@ -68,8 +69,6 @@ export function OnboardingHero({
   width: number;
   height: number;
   week?: StripWeek;
-  /** Tapping the settled hero. */
-  onContinue?: () => void;
   appName?: string;
 }) {
   const theme = useTheme();
@@ -86,14 +85,7 @@ export function OnboardingHero({
   const total = useAnimatedStyle(() => ({ opacity: enter(T.value, cues.Outline + 0.2, 0.4) }));
 
   return (
-    <Pressable
-      onPress={onContinue}
-      accessibilityRole={onContinue ? 'button' : undefined}
-      accessibilityLabel={
-        onContinue ? 'Continue' : undefined
-      }
-      style={{ backgroundColor: theme.surface.base }}
-    >
+    <View style={{ backgroundColor: theme.surface.base }}>
       <DesignCanvas width={width} height={height}>
         <Animated.Text
           style={[
@@ -159,10 +151,10 @@ export function OnboardingHero({
           lift={6}
           style={[styles.cue, { top: G.cueTop }]}
         >
-          <Text style={[styles.cueText, { color: theme.text.primary }]}>Continue</Text>
+          <Text style={[styles.cueText, { color: theme.text.primary }]}>Scroll down</Text>
         </FadeIn>
       </DesignCanvas>
-    </Pressable>
+    </View>
   );
 }
 

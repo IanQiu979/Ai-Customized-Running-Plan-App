@@ -1,4 +1,5 @@
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
+import { ScrollView } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { SETTLE_SLACK_MS } from '@/components/build/useBuildClock';
@@ -15,12 +16,26 @@ import OnboardingScreen from '../onboarding';
  * and this suite is what proves both halves: the clock's own report enables the CTA on a
  * healthy run, and the ceiling releases it — as a fallback, never before the timeline has had
  * every chance to complete — when the clock never reports at all.
+ *
+ * It also covers the captain's 2026-09-20 first-launch scroll lock: the `ScrollView` itself is
+ * disabled while the section currently in view — the hero, first — is still animating, and stays
+ * enabled on a repeat visit or under reduced motion, where there is nothing to lock. The hero's
+ * own "Scroll down" hint and its rendered copy are `build.test.tsx`'s job (`OnboardingHero` is
+ * mocked away here to keep this tree to the gate it proves).
  */
 
 // The clock the screen sees. `ready: false` is a hero that mounts and never reports its build
 // ended — an interrupted animation, an unmount mid-build, or a reduced-motion branch that
 // misses; `ready: true` is the healthy run.
 let mockReady = false;
+
+// The first-launch flag `useFirstOnboardingVisit` resolves to. `true` (or `null`, its loading
+// state) holds the scroll lock; `false` — a repeat visit — never locks regardless of `mockReady`.
+let mockFirstVisit: boolean | null = true;
+
+// Reduced motion bypasses the lock entirely: every clock is already at its end frame, so there is
+// nothing to wait out.
+let mockReduceMotion = false;
 
 jest.mock('@/components/build/OnboardingHero', () => ({
   OnboardingHero: () => null,
@@ -39,7 +54,20 @@ jest.mock('@/components/build/steps', () => ({
   StepEngine: () => null,
   StepMiniPlan: () => null,
 }));
-jest.mock('@/components/build/RunnerFigure', () => ({ RunnerFigure: () => null }));
+jest.mock('@/hooks/use-first-onboarding-visit', () => ({
+  useFirstOnboardingVisit: () => mockFirstVisit,
+}));
+jest.mock('react-native-reanimated', () => {
+  const actual = jest.requireActual<typeof import('react-native-reanimated')>(
+    'react-native-reanimated'
+  );
+  return {
+    __esModule: true,
+    ...actual,
+    default: actual.default,
+    useReducedMotion: () => mockReduceMotion,
+  };
+});
 
 jest.mock('expo-router', () => ({ useRouter: () => ({ push: jest.fn(), navigate: jest.fn() }) }));
 
@@ -60,6 +88,12 @@ function ctaDisabled(node: unknown): boolean | undefined {
     if (found !== undefined) return found;
   }
   return undefined;
+}
+
+/** The rendered `ScrollView`'s `scrollEnabled` — the first-launch lock's one visible effect on
+ * this mocked-down tree. */
+function scrollEnabled(tree: ReactTestRenderer): boolean {
+  return tree.root.findByType(ScrollView).props.scrollEnabled;
 }
 
 function mount(): ReactTestRenderer {
@@ -86,6 +120,8 @@ describe('OnboardingScreen', () => {
   beforeEach(() => {
     jest.useFakeTimers();
     mockReady = false;
+    mockFirstVisit = true;
+    mockReduceMotion = false;
   });
   afterEach(() => jest.useRealTimers());
 
@@ -118,5 +154,45 @@ describe('OnboardingScreen', () => {
       jest.advanceTimersByTime(HERO_TIMELINE_MS + SETTLE_SLACK_MS);
     });
     expect(ctaDisabled(tree.toJSON())).toBe(false);
+  });
+
+  describe('first-launch scroll lock (2026-09-20 ruling)', () => {
+    it('locks the scroll on first launch while the hero is still the animation playing', () => {
+      mockFirstVisit = true;
+      mockReady = false;
+      const tree = mount();
+      expect(scrollEnabled(tree)).toBe(false);
+    });
+
+    it('unlocks once the hero reports its build ended, its completion callback', () => {
+      mockFirstVisit = true;
+      mockReady = true;
+      const tree = mount();
+      // Nothing further down has scrolled into view yet, so there is no next animation to hold
+      // the lock on — the runner is free to act on the hero's "Scroll down" hint.
+      expect(scrollEnabled(tree)).toBe(true);
+    });
+
+    it('never locks the loading state either — `null` is treated as first-visit, not unlocked', () => {
+      mockFirstVisit = null;
+      mockReady = false;
+      const tree = mount();
+      expect(scrollEnabled(tree)).toBe(false);
+    });
+
+    it('never locks a repeat visit, even mid-build', () => {
+      mockFirstVisit = false;
+      mockReady = false;
+      const tree = mount();
+      expect(scrollEnabled(tree)).toBe(true);
+    });
+
+    it('never locks under reduced motion, even on a first visit mid-build', () => {
+      mockFirstVisit = true;
+      mockReduceMotion = true;
+      mockReady = false;
+      const tree = mount();
+      expect(scrollEnabled(tree)).toBe(true);
+    });
   });
 });

@@ -12,7 +12,6 @@ import { HeaderMark } from '../build/HeaderMark';
 import { MiniWeekStrip } from '../build/MiniWeekStrip';
 import { OnboardingHero } from '../build/OnboardingHero';
 import { PlanHero } from '../build/PlanHero';
-import { RunnerFigure } from '../build/RunnerFigure';
 import { StaticWeekStrip } from '../build/StaticWeekStrip';
 import { SurveyIntro } from '../build/SurveyIntro';
 import { WeekStrip } from '../build/WeekStrip';
@@ -202,10 +201,10 @@ describe('CountUp', () => {
 });
 
 describe('OnboardingHero — V22-01 end frame', () => {
-  it('carries the wordmark, the 25 km total, the legend and the Continue cue', () => {
+  it('carries the wordmark, the 25 km total, the legend and the scroll-down cue', () => {
     const tree = render(
       <Clocked total={HERO_TIMELINE.total}>
-        {({ T }) => <OnboardingHero T={T} width={393} height={852} onContinue={jest.fn()} />}
+        {({ T }) => <OnboardingHero T={T} width={393} height={852} />}
       </Clocked>
     );
     const copy = text(tree);
@@ -214,7 +213,8 @@ describe('OnboardingHero — V22-01 end frame', () => {
     expect(copy).toContain('KM / WEEK');
     expect(copy).toContain('Easy');
     expect(copy).toContain('Hard');
-    expect(copy).toContain('Continue');
+    expect(copy).toContain('Scroll down');
+    expect(copy).not.toContain('Continue');
   });
 
   it('paints the dark field regardless of scheme, and nothing cyan', () => {
@@ -347,8 +347,4 @@ describe('static strips — V22-06', () => {
     expect(json).toContain(Session.easy);
   });
 
-  it('RunnerFigure mounts and is hidden from assistive tech', () => {
-    const tree = render(<RunnerFigure />);
-    expect(JSON.stringify(tree.toJSON())).toContain('"aria-hidden":true');
-  });
 });

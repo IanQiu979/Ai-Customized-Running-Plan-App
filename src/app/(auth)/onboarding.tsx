@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -11,14 +11,14 @@ import {
   type NativeSyntheticEvent,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import type { SharedValue } from 'react-native-reanimated';
+import { useReducedMotion, type SharedValue } from 'react-native-reanimated';
 
 import { OnboardingHero } from '@/components/build/OnboardingHero';
-import { RunnerFigure } from '@/components/build/RunnerFigure';
 import { StepEngine, StepIntake, StepMiniPlan } from '@/components/build/steps';
 import { SETTLE_SLACK_MS, useBuildClock } from '@/components/build/useBuildClock';
 import { LinkAction, RevealPrimaryAction } from '@/components/ui/ActionButton';
 import { FontFamily, FontSize, MaxContentWidth, Spacing } from '@/constants/theme';
+import { useFirstOnboardingVisit } from '@/hooks/use-first-onboarding-visit';
 import { useTheme } from '@/hooks/use-theme';
 import { HERO_TIMELINE, STEP_SECONDS } from '@/lib/buildMotion';
 
@@ -27,21 +27,30 @@ import { HERO_TIMELINE, STEP_SECONDS } from '@/lib/buildMotion';
  * 2026-09-13). A full-viewport hero in which a week strip draws itself, its blocks snap in and
  * the total counts up, then a scroll-down walk through what the app does — three steps, each
  * with a small build animation above its copy — and, at the bottom, the primary action drawing
- * itself in under the runner figure.
+ * itself in.
  *
  * **The mechanic is the scroll, not a carousel.** The steps stack vertically under the hero,
- * each a screenful-ish beat. The runner reads by scrolling — there is nothing to swipe, no
- * "next" button, and no state to restore if they leave halfway. That is deliberate: this screen
- * is the anchor for EVERY signed-out session, not just a first install (`(auth)/index.tsx`
- * redirects here), so a returning user must be able to reach the actions without being walked
- * through a tour. The sign-in link is a peer of the CTA at the bottom rather than fine print
- * under it, for exactly that reason — it is the skip. Tapping the settled hero (its "Continue"
- * cue) scrolls to the first step; it never navigates.
+ * each a full-viewport beat, so one animation ever fills the screen at a time. There is nothing
+ * to swipe, no "next" button, and no state to restore if they leave halfway. That is deliberate:
+ * this screen is the anchor for EVERY signed-out session, not just a first install
+ * (`(auth)/index.tsx` redirects here), so a returning user must be able to reach the actions
+ * without being walked through a tour. The sign-in link is a peer of the CTA at the bottom rather
+ * than fine print under it, for exactly that reason — it is the skip.
+ *
+ * **First launch is locked to one animation at a time (captain's ruling, 2026-09-20).** The very
+ * first time onboarding renders on a device (`useFirstOnboardingVisit`), the `ScrollView` is
+ * disabled while the section currently in view is still animating, so scrolling past a build in
+ * progress is impossible; each section's own build clock unlatches the lock once it settles, and
+ * the hero's "Scroll down" hint is what tells the runner to move on. Every visit after the first
+ * — the flag persists via `lib/onboardingVisit.ts` — scrolls freely, exactly as before, and so
+ * does a first visit under reduced motion (`useReducedMotion`): there is nothing to wait out when
+ * every clock starts already settled. This closes `docs/mvp-progress.md`'s long-standing "replays
+ * on every signed-out session" note.
  *
  * Each step's piece plays once, when the step scrolls into view (spec §V22-02), on its own
- * build clock; the hero's clock is owned here so the screen can gate its primary action on the
- * hero settling. Every timing and coordinate lives in the build components and
- * `lib/buildMotion.ts`, ported from the pages.
+ * build clock; the hero's clock is owned here so the screen can gate its primary action, and the
+ * scroll lock, on each section settling. Every timing and coordinate lives in the build
+ * components and `lib/buildMotion.ts`, ported from the pages.
  *
  * Copy is grounded in what the product does and nothing more — ten intake questions
  * (`planning/02-product-requirements.md`), unnamed Day 1–7 slots (`CLAUDE.md`'s coaching-domain
@@ -156,11 +165,35 @@ export default function OnboardingScreen() {
     [viewportHeight, reveal]
   );
 
-  const scrollToSteps = useCallback(() => {
-    scrollRef.current?.scrollTo({ y: viewportHeight, animated: true });
-  }, [viewportHeight]);
+  /**
+   * One animation at a time, first launch only (captain's ruling, 2026-09-20). `null` while the
+   * flag is still loading — `useFirstOnboardingVisit` treats that the same as a first visit, so
+   * the scroll starts locked and only opens up once we positively know this is a repeat visit or
+   * once reduced motion makes the lock meaningless (every clock is already settled).
+   */
+  const firstVisit = useFirstOnboardingVisit();
+  const reduceMotion = useReducedMotion();
+  const lockEnabled = firstVisit !== false && !reduceMotion;
 
-  const stepMinHeight = Math.max(Spacing.seven * 3, viewportHeight * 0.42);
+  // Whether each of the STEPS + Get started sections has finished its own build clock, keyed the
+  // same as `seen`. A section that is `seen` but not yet `sectionReady` is the one animation
+  // currently playing; the lock below holds the scroll there until it latches.
+  const [sectionReady, setSectionReady] = useState<Record<number, boolean>>({});
+  const markSectionReady = useCallback((index: number) => {
+    setSectionReady((prev) => (prev[index] ? prev : { ...prev, [index]: true }));
+  }, []);
+
+  const lockedSectionIndex = useMemo(() => {
+    if (!lockEnabled) return null;
+    if (!heroReady) return -1; // the hero itself is still the animation playing
+    for (let index = 0; index <= STEPS.length; index += 1) {
+      if (seen[index] && !sectionReady[index]) return index;
+    }
+    return null;
+  }, [lockEnabled, heroReady, seen, sectionReady]);
+  const scrollLocked = lockedSectionIndex !== null;
+
+  const stepMinHeight = viewportHeight;
 
   return (
     <View style={[styles.container, { backgroundColor: theme.surface.base }]}>
@@ -173,13 +206,9 @@ export default function OnboardingScreen() {
           showsVerticalScrollIndicator
           onScroll={handleScroll}
           scrollEventThrottle={16}
+          scrollEnabled={!scrollLocked}
         >
-          <OnboardingHero
-            T={hero.T}
-            width={viewportWidth}
-            height={viewportHeight}
-            onContinue={scrollToSteps}
-          />
+          <OnboardingHero T={hero.T} width={viewportWidth} height={viewportHeight} />
 
           <View style={styles.sections}>
             {STEPS.map((step, index) => (
@@ -196,7 +225,14 @@ export default function OnboardingScreen() {
                   { minHeight: stepMinHeight },
                 ]}
               >
-                <Step index={index} heading={step.heading} body={step.body} Piece={step.Piece} visible={Boolean(seen[index])} />
+                <Step
+                  index={index}
+                  heading={step.heading}
+                  body={step.body}
+                  Piece={step.Piece}
+                  visible={Boolean(seen[index])}
+                  onReady={() => markSectionReady(index)}
+                />
               </View>
             ))}
 
@@ -208,6 +244,7 @@ export default function OnboardingScreen() {
                 visible={Boolean(seen[STEPS.length])}
                 disabled={!heroReady}
                 onPress={() => router.push('/(auth)/sign-up')}
+                onReady={() => markSectionReady(STEPS.length)}
               />
               <LinkAction onPress={() => router.push('/(auth)/sign-in')}>
                 Already have an account?{' '}
@@ -222,22 +259,32 @@ export default function OnboardingScreen() {
 }
 
 /** One numbered step: its piece, then its copy. The piece gets its own clock, started the first
- * time the step is on screen. */
+ * time the step is on screen. `onReady` fires once, when that clock latches — the first-launch
+ * scroll lock's per-section unlatch. */
 function Step({
   index,
   heading,
   body,
   Piece,
   visible,
+  onReady,
 }: {
   index: number;
   heading: string;
   body: string;
   Piece: (props: { t: SharedValue<number> }) => React.JSX.Element;
   visible: boolean;
+  onReady: () => void;
 }) {
   const theme = useTheme();
   const clock = useBuildClock({ total: STEP_SECONDS, play: visible });
+  useEffect(() => {
+    if (clock.ready) onReady();
+    // `onReady` is a fresh closure each render; `clock.ready` is the one-way latch this effect
+    // reacts to, and `onReady` itself is idempotent (`markSectionReady`), so omitting it here
+    // avoids re-firing on every parent re-render without risking a missed or duplicate call.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clock.ready]);
   return (
     <View style={styles.step}>
       <Piece t={clock.T} />
@@ -252,20 +299,25 @@ function Step({
   );
 }
 
-/** The last beat: the runner figure, then the primary action drawing itself in. */
+/** The last beat: the primary action drawing itself in. */
 function GetStarted({
   visible,
   disabled,
   onPress,
+  onReady,
 }: {
   visible: boolean;
   disabled: boolean;
   onPress: () => void;
+  onReady: () => void;
 }) {
   const clock = useBuildClock({ total: STEP_SECONDS, play: visible });
+  useEffect(() => {
+    if (clock.ready) onReady();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- see Step's identical latch above
+  }, [clock.ready]);
   return (
     <View style={styles.getStarted}>
-      <RunnerFigure />
       <RevealPrimaryAction
         T={clock.T}
         label="Create your first plan"
@@ -280,7 +332,6 @@ function GetStarted({
 /** The page's step geometry (`v22-02-scene.jsx`): piece, 36pt, then a 300pt copy column. */
 const STEP_GAP = 36;
 const COPY_WIDTH = 300;
-const RUNNER_SIZE = 105;
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
@@ -334,6 +385,5 @@ const styles = StyleSheet.create({
   getStarted: {
     alignItems: 'center',
     gap: Spacing.five,
-    minHeight: RUNNER_SIZE,
   },
 });

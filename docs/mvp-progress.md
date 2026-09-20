@@ -1746,12 +1746,16 @@ intact underneath.
   is closed. **Not open for the signed-out hero:** the captain ruled 2026-08-08 that its shimmer is
   dark-mode-only and final, with the contrast floor untouched; that hero has since been replaced
   twice over regardless.
-- 🟡 **Onboarding replays on every signed-out session, not just first install.** `(auth)/index.tsx`
-  is the anchor for all of them, so a returning user who signed out sees the hero again. Deliberate
-  for now — the sign-in link on that screen is the skip — but persisting a "has seen onboarding"
-  flag is an open product decision. This bullet used to cite the periodization wave's stroke-draw
-  as precedent for the pattern; that motif was deleted with the Trailhead redesign and there is no
-  persisted "already seen" state anywhere in the app today, so the flag would be the first.
+- ✅ **Onboarding still replays on every signed-out session, not just first install — deliberately —
+  and now persists a "has seen onboarding" flag for a narrower purpose (captain's 2026-09-20
+  ruling).** `(auth)/index.tsx` is still the anchor for every signed-out session, and a returning
+  user who signed out still sees the hero again; the sign-in link on that screen remains the skip.
+  What changed: `lib/onboardingVisit.ts` (AsyncStorage) now records whether onboarding has ever
+  rendered on the device, and the screen reads it (`useFirstOnboardingVisit`) to decide whether
+  scrolling is locked to one animation at a time. First-ever launch locks the `ScrollView` to
+  whichever section is currently animating (the hero, then each step in turn) until that
+  section's own build clock settles; every later visit, and any first visit under reduced motion,
+  scrolls freely exactly as before. The flag never skips onboarding itself, only the lock.
 
 ### Standing
 
