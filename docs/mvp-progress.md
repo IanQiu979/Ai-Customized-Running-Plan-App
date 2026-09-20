@@ -316,9 +316,8 @@
   so the captain's test pass runs with every account Elite and the quota gate bypassed. Set the
   top-level value to `"false"` before real users arrive. Recorded in "Latest — 2026-08-09".
 - **Test counts:** 1067 root tests across 66 suites and 195 `workers/` tests across 11 files on
-  `fm/v22-delete-account-password` (1065 / 188 across 10 files verified by running both gates
-  there on 2026-09-20; the same-day review follow-up added 2 root and 7 `workers/` tests,
-  `workers/test/attemptThrottle.test.ts` among them, counted from its diff). Earlier
+  `fm/v22-delete-account-password`, verified by running both gates there on 2026-09-20 after the
+  same-day review follow-up (which added `workers/test/attemptThrottle.test.ts`). Earlier
   figures, for the record: 1017 root tests across 62 suites on `fm/v22-intake-flow-rework`
   (verified by running the root gate there on 2026-09-20) and 174 `workers/` tests across 10 files
   on `fm/v22-password-recovery-94`, verified by running the Workers gate there the same day; 999
