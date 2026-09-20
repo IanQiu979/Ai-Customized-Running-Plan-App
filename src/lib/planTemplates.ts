@@ -554,19 +554,20 @@ const RACE_DAY_PADDING_KM = 5;
  * taper instead, and letting race day sit on top of them, is what a taper week actually is.
  *
  * Both paths use it. At the golden fixture's own 35 km baseline the share and the old subtraction
- * agree exactly (28 - 10 = 18 = 28 × 18/28), so that byte-locked plan is unchanged — but away from
- * that baseline the subtraction bit `buildCanonicalFiveKWeek` too, and the claim that a 5K race day
- * is small enough for it never to matter was simply wrong: a 12 km/wk beginner's 5K race week
- * rendered `1 km | 1 km | 1 km | Race Day 10 km`, the same 1 km-filler signature the audit reported
- * for the marathon. The share is what makes the fixture's own race week reproducible at every other
- * declared volume instead of only at 35 km.
+ * agree exactly (28 - 10 = 18 = 28 × 18/28), so the fixture's 18 km of pre-race running is
+ * unchanged — but away from that baseline the subtraction bit `buildCanonicalFiveKWeek` too, and
+ * the claim that a 5K race day is small enough for it never to matter was simply wrong: a
+ * 12 km/wk beginner's 5K race week rendered `1 km | 1 km | 1 km | Race Day 10 km` (the padded
+ * headline of the time), the same 1 km-filler signature the audit reported for the marathon. The
+ * share is what makes the fixture's own race week reproducible at every other declared volume
+ * instead of only at 35 km.
  *
  * The ratio alone is not enough for a long race, because it is read off a race-*inclusive* 5K
- * total and the race day is then stacked on top of it uncounted: a marathon's 47 km race day is
- * larger than the whole scaled race-week entry, so the assembled week outgrew the block it is
- * meant to taper from. `preRaceBudgetKm` below is the bound that actually holds that line —
- * the pre-race training budget is additionally capped at the plan's own peak training week minus
- * race day. Where that leaves too little for every planned pre-race day to get a real shakeout,
+ * total and the race day is then stacked on top of it uncounted: a marathon's race day (47 km
+ * padded then, the bare 42.2 km now) is larger than the whole scaled race-week entry, so the
+ * assembled week outgrew the block it is meant to taper from. `preRaceBudgetKm` below is the
+ * bound that actually holds that line — the pre-race training budget is additionally capped at
+ * the plan's own peak training week minus race day. Where that leaves too little for every planned pre-race day to get a real shakeout,
  * days are dropped to rest rather than shrunk into filler; see `preRaceSchedule`, which also
  * documents the single exception where the peak bound yields to one 2 km shakeout.
  */

@@ -213,11 +213,13 @@ decreases, which the spike cap never restricts).
 **Peak volume approved (Ian's ruling, 2026-07-12 — issue #34, rendered-plan review round 2).** The
 drop from the old plan's 54 km peak was a direct consequence of ruling 1 (quality sessions no
 longer scale with weekly volume); Ian has now approved the resulting shape on its own merits.
-`weeklyLoad` stays `[34, 35, 38, 23, 41, 45, 48, 30, 45, 48, 40, 28]` — recorded as approved, no
-longer awaiting his eyes. (Since 2026-09-20 the rendered week 12 is 23 km: the captain ruled that
-race day's headline is the bare race distance on both tiers, so the fixture's authored 28 km race
-week — which counted its 3 km warm-up and 2 km cool-down — renders as 18 km of pre-race running
-plus the 5 km race. The curve entry itself is unchanged; only race day's accounting moved.)
+The authored curve (`FIVE_K_WEEKLY_LOAD` in `src/lib/planTemplates.ts`) stays
+`[34, 35, 38, 23, 41, 45, 48, 30, 45, 48, 40, 28]` — recorded as approved, no longer awaiting his
+eyes. (Since 2026-09-20 the rendered week 12 is 23 km, and the fixture's `Plan.weeklyLoad` ends
+`…, 40, 23` to match: the captain ruled that race day's headline is the bare race distance on both
+tiers, so the authored 28 km race week — which counted its 3 km warm-up and 2 km cool-down —
+renders as 18 km of pre-race running plus the 5 km race. The curve entry itself is unchanged; only
+race day's accounting moved.)
 
 **Deload long runs checked against the last loading week (ruling R1c, Ian's follow-up, same day).**
 Week 4's 8 km long run is **21.1%** of week 3's 38 km (the last loading week), and week 8's 10 km
