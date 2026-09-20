@@ -25,10 +25,11 @@ import type { QuotaStatus, Tier } from '@/lib/planTypes';
 
 /**
  * The dummy paywall — reached either proactively (Settings' "Upgrade" row, no `quota` param) or
- * reactively (Home's `generate-plan` catch branch on `over_quota`, which passes the server's
- * `quota` object through as a JSON-stringified route param). There is no real billing here —
- * `purchaseTier()` (`workers/`'s dummy purchase route) flips the tier in the ledger with no
- * payment collected, and the copy says so plainly rather than implying a real charge.
+ * reactively (the intake's "Create plan" catch branch on `over_quota` — Home's until 2026-09-20 —
+ * which passes the server's `quota` object through as a JSON-stringified route param). There is
+ * no real billing here — `purchaseTier()` (`workers/`'s dummy purchase route) flips the tier in
+ * the ledger with no payment collected, and the copy says so plainly rather than implying a real
+ * charge.
  *
  * The pricing-page register: dark vertical slabs on `surface.inverse`, which is dark in
  * BOTH colour schemes — the inversion is the whole gesture, and a card that quietly becomes
