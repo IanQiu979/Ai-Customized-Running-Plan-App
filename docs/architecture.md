@@ -39,10 +39,23 @@ src/
                             #   (components/build/OnboardingHero — "the plan builds itself"), then a
                             #   scroll-down read of three numbered steps, each with a ≤1.5 s piece
                             #   (components/build/steps) that plays once when it scrolls into view,
-                            #   then the runner figure and the primary action drawing itself in
-                            #   (RevealPrimaryAction). No form; the CTA is disabled until the hero
-                            #   settles, bounded by a 4s ceiling so a clock that never completes
-                            #   cannot strand the only forward action
+                            #   then the primary action drawing itself in (RevealPrimaryAction; the
+                            #   stick-runner figure above it was deleted 2026-09-20). No form; the
+                            #   CTA is disabled until the hero settles, bounded by a 4s ceiling so a
+                            #   clock that never completes cannot strand the only forward action.
+                            #   2026-09-20: the very first time the screen ever renders on a device
+                            #   (lib/onboardingVisit.ts + hooks/use-first-onboarding-visit.ts,
+                            #   AsyncStorage), the ScrollView is disabled while the section in view
+                            #   is still animating and re-enabled once that section's build clock
+                            #   settles — one animation at a time. On that first launch the scroll
+                            #   also snaps section to section (snapToOffsets at every section top +
+                            #   disableIntervalMomentum), so a fling lands on exactly one section,
+                            #   and the lock settles the scroll onto the section it engages on. A
+                            #   section is "seen" only once its CONTENT (piece + copy, centred in
+                            #   the full-viewport section) is fully on screen — the geometry is
+                            #   lib/onboardingReveal.ts. Every later visit, and any first visit
+                            #   under reduced motion, scrolls freely with no snapping, as before.
+                            #   The hero's cue is no longer a tap target; it now reads "Scroll down"
       sign-in.tsx            # email/password sign-in + a "Continue with Google" button; Google
                               #   provider live in production since 2026-08-09. Minimal since
                               #   2026-09-14 (spec §V22-06: the auth pages carry nothing) — wordmark,
@@ -158,8 +171,9 @@ src/
                              # StepEngine / StepMiniPlan), SurveyIntro (V22-03), HeaderMark
                              # (V22-04), PlanHero (V22-05), and the two static strips
                              # StaticWeekStrip / MiniWeekStrip (V22-06 and the list rows).
-                             # RunnerFigure is the stick runner above Get started. Timings and
-                             # cue tables live in lib/buildMotion.ts, never here
+                             # RunnerFigure (the stick runner above Get started) was deleted
+                             # 2026-09-20 — captain's ruling, stale asset. Timings and cue tables
+                             # live in lib/buildMotion.ts, never here
     intake/                 # IntakeExitAction — the questionnaire's "Cancel", rendered on a
                              #  re-entry only (a first entry has no exit, 2026-09-20)
     layout/                 # ScreenHeader (eyebrow / title / supporting, plus an optional
@@ -201,7 +215,9 @@ src/
                              #  app.json's splash/adaptive-icon hexes to Colors.dark.surface.base
   hooks/                    # use-theme (resolves to the dark scheme only, see below),
                              #  use-color-scheme, use-plan (one plan by id: real via
-                             #  GET /api/plans/:id or the golden fixture)
+                             #  GET /api/plans/:id or the golden fixture), use-first-onboarding-visit
+                             #  (2026-09-20 — wraps lib/onboardingVisit.ts's AsyncStorage flag for
+                             #  onboarding's first-launch scroll lock)
   lib/
     supabase.ts             # LEGACY, unused — see below
     apiClient.ts             # the one module that talks to `workers/`: better-auth's Expo client

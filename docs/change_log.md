@@ -5,6 +5,54 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-09-20 (later) — Onboarding focus: the runner figure is deleted, first launch locks one animation at a time (`fm/v22-onboarding-focus`)
+
+Captain's rulings from his 2026-09-20 phone test of `(auth)/onboarding.tsx`. Root gate clean
+(`npm run typecheck && npm run lint && npm test`).
+
+- **The stale running figure is gone.** `src/components/build/RunnerFigure.tsx` deleted, along
+  with its render in onboarding's "Get started" beat and its standalone smoke test in
+  `src/components/__tests__/build.test.tsx`. Nothing else rendered it. The rest of the hero
+  animation is unchanged — the captain likes it.
+- **First launch locks the scroll to one animation at a time; every later visit scrolls freely, as
+  before.** New `src/lib/onboardingVisit.ts` (an AsyncStorage flag, fails open to "already
+  visited" so a storage error can never leave the lock stuck) and
+  `src/hooks/use-first-onboarding-visit.ts` (the hook wrapping it, `null` while loading treated the
+  same as a first visit). `(auth)/onboarding.tsx`'s `ScrollView` is disabled
+  (`scrollEnabled`) exactly while the section currently in view — the hero, then each step, then
+  Get started — is `seen` but has not yet reported its own build clock settling; each section's
+  `onReady` latch (mirroring the existing hero-CTA latch) unlocks it in turn. A first visit under
+  `useReducedMotion` never locks, since every clock is already at its end frame with nothing to
+  wait out. Two review findings, both ruled by the captain the same day: (1) a section is `seen`
+  only once its **content** — the piece plus copy, centred in the full-viewport section — is fully
+  on screen, not once the section's top edge is 120 pt inside the fold (which left the piece
+  playing below the fold while the lock held); the geometry is new `src/lib/onboardingReveal.ts`
+  (`isContentFullyOnScreen`, and `lockScrollOffset`, which the screen scrolls to when the lock
+  engages so the animating section fills the viewport and any in-flight momentum is cancelled).
+  (2) On first launch the `ScrollView` snaps section to section (`snapToOffsets` at every section
+  top, `disableIntervalMomentum`, `decelerationRate="fast"`) so a fling can land on exactly one
+  section — `scrollEnabled={false}` alone does not stop a fling already in progress. Repeat visits
+  and reduced motion keep plain free scroll with no snapping. Closes the "Onboarding replays on
+  every signed-out session" note in
+  `docs/mvp-progress.md` — narrowly: onboarding still shows on every signed-out session by design
+  (the sign-in link is the skip), but there is now a persisted "has seen onboarding" flag, used
+  only to gate the lock, not to skip the screen.
+- **"Continue" is gone from onboarding.** The hero's own cue — previously a tappable
+  `Pressable` wrapping the whole hero, labelled "Continue," that scrolled to the first step —
+  is now plain, non-interactive text reading "Scroll down": the mechanic is the scroll gesture
+  itself, not a tap target. `OnboardingHero`'s `onContinue` prop is removed.
+- Sign-in / create-account stayed exactly where they were, at the end of the flow — untouched.
+- Tests: `src/app/(auth)/__tests__/onboarding.test.tsx` gained a `describe` block asserting the
+  `ScrollView`'s `scrollEnabled` across first-visit/mid-build, first-visit/hero-settled,
+  loading (`null`), repeat-visit, and reduced-motion cases, plus the content-box latch (no lock
+  while the section top is in view but its content is below the fold; lock + settle once the
+  content is fully on screen; release on the section's own `ready`) and the first-launch-only
+  snapping props; new `src/lib/__tests__/onboardingReveal.test.ts` pins the reveal geometry
+  including content taller than the viewport; `build.test.tsx`'s `OnboardingHero`
+  end-frame test now asserts "Scroll down" and asserts "Continue" is gone; new
+  `src/lib/__tests__/onboardingVisit.test.ts` pins the storage flag's read/write and its
+  fail-open behavior on a storage error.
+
 ## 2026-09-20 — Intake-flow rework: the intake is mandatory, blank, and creates the plan (`fm/v22-intake-flow-rework`)
 
 The captain's 2026-09-20 phone test produced a set of locked rulings on the sign-up → first plan
