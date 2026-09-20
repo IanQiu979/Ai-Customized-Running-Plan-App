@@ -80,8 +80,10 @@
   checks identity server-side rather than trusting the session alone: for an account with a
   `providerId = 'credential'` row (`D1PlanStore.getCredentialPassword`), the request must carry the
   correct `password`, verified with the same `verifyPassword` (`better-auth/crypto`) sign-in itself
-  uses, or the call is `401 invalid_password` and nothing is deleted; a Google/OAuth-only account
-  keeps the pre-existing confirm-only behavior unchanged. Settings decides which confirmation UI to
+  uses, or the call is `401 invalid_password` and nothing is deleted — and five wrong passwords in
+  15 minutes (per user or per connecting IP, `workers/src/lib/attemptThrottle.ts`) make it
+  `429 rate_limited` before anything is verified; a Google/OAuth-only account keeps the
+  pre-existing confirm-only behavior unchanged. Settings decides which confirmation UI to
   show via `accountHasPassword()` (reads better-auth's `/list-accounts`, fails closed to "assume a
   password is required" on any read error) — a credential account gets the new
   `src/components/settings/DeleteAccountDialog.tsx`, an OAuth-only account keeps the existing
@@ -313,8 +315,10 @@
   `[vars]` of `workers/wrangler.toml` (the committed `[env.production.vars]` value is `"false"`),
   so the captain's test pass runs with every account Elite and the quota gate bypassed. Set the
   top-level value to `"false"` before real users arrive. Recorded in "Latest — 2026-08-09".
-- **Test counts:** 1065 root tests across 66 suites and 188 `workers/` tests across 10 files on
-  `fm/v22-delete-account-password`, verified by running both gates there on 2026-09-20. Earlier
+- **Test counts:** 1067 root tests across 66 suites and 195 `workers/` tests across 11 files on
+  `fm/v22-delete-account-password` (1065 / 188 across 10 files verified by running both gates
+  there on 2026-09-20; the same-day review follow-up added 2 root and 7 `workers/` tests,
+  `workers/test/attemptThrottle.test.ts` among them, counted from its diff). Earlier
   figures, for the record: 1017 root tests across 62 suites on `fm/v22-intake-flow-rework`
   (verified by running the root gate there on 2026-09-20) and 174 `workers/` tests across 10 files
   on `fm/v22-password-recovery-94`, verified by running the Workers gate there the same day; 999

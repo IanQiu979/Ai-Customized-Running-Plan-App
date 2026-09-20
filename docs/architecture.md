@@ -96,10 +96,13 @@ src/
                               #  Home), a Free-tier "Upgrade" entry point to /paywall, a Legal ->
                               #  Privacy policy row (issue #89; opens through
                               #  src/lib/openPrivacyPolicy.ts, with a visible accessible error
-                              #  if opening fails), and Delete Account
-                              #  (confirmDestructive() — the OS alert on native, the
-                              #  browser's own confirm on web, since 2026-09-16 / issue #96 ->
-                              #  deleteAccount() -> authClient.signOut()). Quota refreshes
+                              #  if opening fails), and Delete Account — since 2026-09-20 a
+                              #  credential account re-enters its password in
+                              #  <DeleteAccountDialog>, a Google-only one keeps
+                              #  confirmDestructive() (the OS alert on native, the browser's
+                              #  own confirm on web, 2026-09-16 / issue #96); either path ->
+                              #  deleteAccount() -> authClient.signOut(). Contract: the
+                              #  POST /api/delete-account row below. Quota refreshes
                               #  cache-first on every focus.
       glossary.tsx           # compact accessible disclosure rows, collapsed by default; terms and
                               #  expanded definitions are sourced from notation.ts, nothing hardcoded

@@ -377,7 +377,7 @@ export function purchaseTier(tier: 'pro' | 'elite'): Promise<{
  * `password` is required by the Worker whenever the account has a `providerId = 'credential'`
  * row, and ignored (send nothing) for a Google/OAuth-only account — see `workers/src/routes.ts`'s
  * `handleDeleteAccount`. The client never decides which case it is; it reads that from
- * `hasPassword()` and shapes its own confirmation UI accordingly, but the server is the one that
+ * `accountHasPassword()` and shapes its own confirmation UI accordingly, but the server is the one that
  * actually enforces it.
  */
 export function deleteAccount(password?: string): Promise<{ deleted: true }> {
