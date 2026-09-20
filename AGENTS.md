@@ -202,6 +202,13 @@ Built-ins also available: `Explore`, `Plan`, `general-purpose`. Plugin agents ar
   redirect plugin navigates to it after success — hence `sendOnSignIn: false` and the explicit
   `resendVerificationEmail`), and `useSession().data` types as `never` because of the `expoClient`
   cast, so read the user through `apiClient.ts`'s `useSessionUser`.
+- **The v1 dummy purchase (`POST /api/purchase-tier`) is gated server-side, trusted testers only
+  until public launch.** `workers/src/dummyPurchase.ts` is the sole authority — `DUMMY_PURCHASE_ENABLED`
+  (`"true"` in local/dev, absent/off in `[env.production.vars]`) and `DUMMY_PURCHASE_ALLOWLIST`
+  (exact, case-insensitive emails) are both non-secret `wrangler.toml [vars]`. The result is exposed
+  to the client only as `QuotaStatus.purchasesAvailable`; the paywall (`src/app/paywall.tsx`) renders
+  that flag and never decides availability itself. See `workers/README.md`'s "The v1 dummy purchase
+  gate" for the exact vars and how the captain allowlists a production tester.
 - **`ANTHROPIC_API_KEY` never leaves the server.** Any agent touching env goes through
   `env-config-manager`. Two committed-file traps, not one: `EXPO_PUBLIC_*` is plain text in the app
   bundle, and `workers/wrangler.toml` is committed — secrets go in `workers/.dev.vars` (gitignored)

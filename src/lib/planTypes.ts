@@ -308,4 +308,9 @@ export interface QuotaStatus {
   periodEnd: string | null;
   /** True only for the temporary captain-requested all-users test override. */
   unlimited: boolean;
+  /**
+   * Whether the v1 dummy purchase is open to this account — server-decided
+   * (`workers/src/dummyPurchase.ts`); the client only renders it, never computes it.
+   */
+  purchasesAvailable: boolean;
 }

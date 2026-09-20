@@ -65,6 +65,21 @@ point is `src/access.ts`: every authenticated account is evaluated as Elite and 
 bypassed, while subscriptions, purchases, and the normal quota ledger stay intact underneath.
 Set the variable to `"false"` in both Wrangler environments before real users arrive.
 
+## The v1 dummy purchase gate
+
+`POST /api/purchase-tier` (`source: 'dummy'`) is gated by two non-secret vars, read only in
+`src/dummyPurchase.ts`: `DUMMY_PURCHASE_ENABLED` (`"true"` opens it to every authenticated caller)
+and `DUMMY_PURCHASE_ALLOWLIST` (comma-separated exact emails, matched case-insensitively but never
+as a substring, allowed through even when disabled). Local/dev's `wrangler.toml [vars]` sets
+`DUMMY_PURCHASE_ENABLED = "true"`; `[env.production.vars]` leaves it absent (equivalent to
+`"false"`) with an empty allowlist, so production ships with the dummy purchase off for everyone
+until the captain adds a tester. Both `GET /api/quota-status` and `POST /api/purchase-tier` decide
+this server-side and expose it as `purchasesAvailable` — the paywall only renders that flag, it
+never computes availability itself. To let a trusted tester in on production, the captain edits
+`DUMMY_PURCHASE_ALLOWLIST` in `wrangler.toml`'s `[env.production.vars]` (append the email) and
+runs `wrangler deploy --env production` — it is a committed `[vars]` value, not a secret, so there
+is no `wrangler secret put` for it.
+
 ## What works today, and what does not
 
 Working end to end, verified against `wrangler dev` and the Worker test suite:

@@ -13,6 +13,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { createAuth } from '../src/auth';
 import { normalizeAllowedBrowserOrigin } from '../src/cors';
 import type { Env } from '../src/env';
+import worker from '../src/index';
 
 const APP_ROUTES: [string, string][] = [
   ['POST', '/api/generate-plan'],
@@ -294,6 +295,9 @@ describe('better-auth on D1', () => {
       unlimited: false,
       // Free's allowance is lifetime, so there is no countdown to render.
       periodEnd: null,
+      // Local/dev's `DUMMY_PURCHASE_ENABLED` is "true" (`wrangler.toml [vars]`) — see
+      // "the v1 dummy purchase gate" below for the production-shaped ("false" + allowlist) cases.
+      purchasesAvailable: true,
     });
   });
 
@@ -305,6 +309,102 @@ describe('better-auth on D1', () => {
     });
 
     expect(response.status).toBeGreaterThanOrEqual(400);
+  });
+});
+
+describe('the v1 dummy purchase gate', () => {
+  // `SELF.fetch` always runs against `vitest.config.ts`'s one fixed env, which — like local/dev —
+  // leaves `DUMMY_PURCHASE_ENABLED` at wrangler.toml's top-level "true". To exercise the
+  // production shape (absent/"false" + an allowlist) this suite calls the exported Worker's own
+  // `fetch()` directly with an overridden env, the same technique the CORS suite above uses for
+  // production-shaped `BETTER_AUTH_URL`/`CORS_ALLOWED_ORIGINS`.
+  function withEnv(overrides: Partial<Env>): Env {
+    return { ...(env as unknown as Env), ...overrides };
+  }
+
+  function fakeExecutionContext(): ExecutionContext {
+    return { waitUntil: () => {}, passThroughOnException: () => {} } as unknown as ExecutionContext;
+  }
+
+  async function purchase(token: string, purchaseEnv: Env) {
+    return worker.fetch(
+      new Request('https://example.test/api/purchase-tier', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({ tier: 'pro', source: 'dummy' }),
+      }),
+      purchaseEnv,
+      fakeExecutionContext()
+    );
+  }
+
+  it('allows the purchase when DUMMY_PURCHASE_ENABLED is "true" (local/dev)', async () => {
+    const token = await signUp('dev-tester@example.test');
+    const devEnv = withEnv({ DUMMY_PURCHASE_ENABLED: 'true', DUMMY_PURCHASE_ALLOWLIST: '' });
+
+    const response = await purchase(token, devEnv);
+
+    const body = await response.text();
+    expect(response.status, body).toBe(200);
+    expect(JSON.parse(body)).toMatchObject({ tier: 'pro' });
+  });
+
+  it('allows an exact allowlisted email even when disabled, matching production for a trusted tester', async () => {
+    const token = await signUp('Allowlisted-Tester@example.test');
+    const prodShapedAllowlisted = withEnv({
+      DUMMY_PURCHASE_ENABLED: undefined,
+      // Mixed case and surrounding whitespace, another entry that must not match: the lookup is
+      // case-insensitive/trimmed but exact, never a substring.
+      DUMMY_PURCHASE_ALLOWLIST: ' allowlisted-tester@example.test , other-tester@example.test ',
+    });
+
+    const response = await purchase(token, prodShapedAllowlisted);
+
+    const body = await response.text();
+    expect(response.status, body).toBe(200);
+    expect(JSON.parse(body)).toMatchObject({ tier: 'pro' });
+  });
+
+  it('refuses a non-allowlisted caller with 403 purchases_unavailable when disabled, matching production', async () => {
+    const token = await signUp('stranger@example.test');
+    const prodShaped = withEnv({ DUMMY_PURCHASE_ENABLED: undefined, DUMMY_PURCHASE_ALLOWLIST: '' });
+
+    const response = await purchase(token, prodShaped);
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ code: 'purchases_unavailable' });
+  });
+
+  it('never matches an allowlist entry as a substring', async () => {
+    // "stranger@example.test" is not the same account as an allowlisted
+    // "another-stranger@example.test" — a naive `.includes()` on the raw string would wrongly
+    // match it.
+    const token = await signUp('stranger@example.test');
+    const prodShaped = withEnv({
+      DUMMY_PURCHASE_ENABLED: undefined,
+      DUMMY_PURCHASE_ALLOWLIST: 'another-stranger@example.test',
+    });
+
+    const response = await purchase(token, prodShaped);
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ code: 'purchases_unavailable' });
+  });
+
+  it('reflects the same gate on GET /api/quota-status\'s purchasesAvailable field', async () => {
+    const token = await signUp('quota-status-tester@example.test');
+    const prodShaped = withEnv({ DUMMY_PURCHASE_ENABLED: undefined, DUMMY_PURCHASE_ALLOWLIST: '' });
+
+    const response = await worker.fetch(
+      new Request('https://example.test/api/quota-status', {
+        headers: { authorization: `Bearer ${token}` },
+      }),
+      prodShaped,
+      fakeExecutionContext()
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ purchasesAvailable: false });
   });
 });
 

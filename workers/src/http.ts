@@ -15,6 +15,8 @@ export type ErrorCode =
   | 'method_not_allowed'
   | 'invalid_request'
   | 'over_quota'
+  /** v1 dummy purchase refused a non-trusted-tester caller — see `dummyPurchase.ts`. */
+  | 'purchases_unavailable'
   /** Intake has not been completed, so there is nothing to build a plan from. */
   | 'intake_required'
   /** The plan engine is not bound yet — see `lib/planEngine.ts`. Distinct from a crash. */
