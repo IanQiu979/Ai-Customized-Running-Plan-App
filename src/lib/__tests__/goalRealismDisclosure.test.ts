@@ -53,18 +53,6 @@ describe('goal-realism disclosure', () => {
     );
   });
 
-  it('speaks in the future tense before a plan exists', () => {
-    expect(getGoalRealismNoticeCopy(ambitious, 'preview')).toEqual({
-      title: 'Your goal is ambitious.',
-      body: "Based on your recent performance, that's roughly an 11% improvement — an ambitious target. Your plan will keep the goal pace you entered; it won't be capped.",
-    });
-    expect(getGoalRealismNoticeCopy(implausible, 'preview')).toEqual({
-      title: 'Your goal pace will be adjusted.',
-      body: "Based on your recent performance, a 20% improvement isn't realistic to build a plan around — your plan will target a more sustainable finish time instead.",
-    });
-    expect(getGoalRealismNoticeCopy(realistic, 'preview')).toBeNull();
-  });
-
   it('picks the indefinite article by how the percentage is spoken', () => {
     const withPct = (pct: number): string =>
       getGoalRealismNoticeCopy({ ...ambitious, impliedImprovementPct: pct })?.body ?? '';

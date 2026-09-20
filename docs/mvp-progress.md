@@ -1539,7 +1539,10 @@ reasoning, worked cases, and the type contract:
 live preview at both goal-entry points (Intake, Home), closing the gap between this ruling and what
 the runner actually saw. **Corrected 2026-08-15:** the plan-screen branch now includes both
 `ambitious` and `implausible`; ambitious copy explicitly says the declared goal pace was kept, and
-Intake no longer claims that ambitious goals are adjusted. See `docs/change_log.md`.
+Intake no longer claims that ambitious goals are adjusted. **Superseded 2026-09-20:** Home no longer
+enters a goal, so the intake is the only pre-generation warning point (`getGoalRealismIntakeCopy`)
+and the notice's future-tense `'preview'` variant is deleted; the plan-screen notice is unchanged.
+See `docs/change_log.md`.
 
 ## Decided (2026-08-06) — youth (under-18) HR-zone policy, `v22-youth-policy-research-s1` §6-A/E
 

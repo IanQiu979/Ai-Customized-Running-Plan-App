@@ -30,7 +30,10 @@ untouched; the plan length still travels on the `generate-plan` request exactly 
   Notes (optional) field and its Free-tier `LockedPanel`, the "ON PRO & ELITE" `PlanContentTeaser`
   panel (both components deleted — `src/components/home/LockedPanel.tsx`,
   `src/components/home/PlanContentTeaser.tsx`; the `home/` directory is gone), the goal-realism
-  preview, and every generate / idempotency / paywall branch. Home now renders, in order: the
+  preview, and every generate / idempotency / paywall branch. With that preview gone, the
+  `'preview'` variant of `getGoalRealismNoticeCopy` / `GoalRealismNotice` (the future-tense
+  wording, `src/lib/goalRealismDisclosure.ts`) had no caller and is deleted; the intake speaks
+  through `getGoalRealismIntakeCopy`, unchanged. Home now renders, in order: the
   header (tier · quota eyebrow, "Today"), `VerifyEmailBanner`, the **subscription box first**
   (`HeaderMark` + tier + plans-used + "See plans →" → `/paywall`), then a "CURRENT PLAN" summary
   row for the newest plan by `createdAt` (title, `N WEEKS · WEEK k`, opening `/plan/[id]` with
