@@ -22,7 +22,8 @@ environment, live at `https://pace-blueprint-production.i78979848.workers.dev` (
 personalizer 2026-08-10); the remaining gap is `ANTHROPIC_API_KEY`, unset everywhere, so paid-tier
 requests still receive the quota-exempt template fallback. On the client side, `src/lib/apiClient.ts`
 (better-auth's Expo client plus typed fetch wrappers for the other `/api/*` routes),
-`src/app/(auth)/onboarding.tsx`, `sign-in.tsx`/`sign-up.tsx`, the intake screen, the generate-plan action, the plan
+`src/app/(auth)/onboarding.tsx`, `sign-in.tsx`/`sign-up.tsx`, the intake screen (which, since 2026-09-20, also owns
+the generate-plan action — its "Create plan" saves and generates in one press; Home asks nothing), the plan
 view (real plans plus the permanent example-plan fixture), and the My Plans list all exist, and
 `src/app/_layout.tsx` gates the whole app behind a session — email/password works in production,
 and the Google provider is registered there as of 2026-08-09 (registration only; a real end-to-end
@@ -160,7 +161,7 @@ clean `typecheck && lint && test`. Never force-push without explicit user approv
 ## Testing
 
 jest-expo is installed. New logic added to `src/lib/` gets a test alongside it (see
-`src/lib/__tests__/supabase.test.ts`). Screens are not unit-tested for now. Seven rendered-screen
+`src/lib/__tests__/supabase.test.ts`). Screens are not unit-tested for now. Eight rendered-screen
 suites are deliberate exceptions, each because the bug or behaviour under test lives in the
 screen's own render branches with no logic layer underneath to test instead: the two in
 `src/app/(auth)/__tests__/` (2026-09-04) — `onboarding.test.tsx` (the CTA gate and its bounded
@@ -171,9 +172,12 @@ regression proof cited in `docs/change_log.md`'s same-dated entry),
 issue #24), `src/app/__tests__/root-layout-font-gate.test.tsx` (2026-09-16, the root layout's
 splash gate settling on a font-load *failure* as well as a success — issue #21),
 `src/app/__tests__/intake-guardian-consent.test.tsx` (2026-09-19, the 13–17 consent checkbox's
-render branch and save-time gate, issue #89) and `src/app/(tabs)/__tests__/settings-privacy.test.tsx`
-(2026-09-19, the Settings privacy-policy link's role and its visible failure copy, issue #89). Each
-file's header states the reason; add an eighth only on the same grounds.
+render branch and save-time gate, issue #89), `src/app/(tabs)/__tests__/settings-privacy.test.tsx`
+(2026-09-19, the Settings privacy-policy link's role and its visible failure copy, issue #89) and
+`src/app/__tests__/intake-flow.test.tsx` (2026-09-20, the captain's intake-flow rulings —
+unskippable first entry, blank re-entry, required target distance, one "Create plan" that saves
+then generates — which live in the screen's render branches and submit handler). Each file's
+header states the reason; add a ninth only on the same grounds.
 
 ## Keep these docs updated — this is a standing rule, not a suggestion
 

@@ -1,17 +1,18 @@
 /**
- * What Home may ask, and what it sends to `generate-plan`.
+ * What the intake asks, and what it sends to `generate-plan`.
  *
  * **Why this exists.** On 2026-08-15 the captain reported taking "the intake test two times, the
  * survey two times, only one time is necessary before you actually create the plan". There is only
- * one intake *screen*, but there were two intake *surfaces*: `/intake`, which asks for a target
+ * one intake *screen*, but there were two intake *surfaces*: `/intake`, which asked for a target
  * race and a race date, and Home's generate panel, which asked for a goal type, a race distance
- * and a race date all over again — and, unlike intake, refused to proceed without them. A runner
- * who had just answered "no target race (optional)" was then blocked by "Select a race distance."
+ * and a race date all over again — and, unlike intake, refused to proceed without them.
  *
- * The rule this module encodes: **intake owns the runner's target; Home never re-asks it.** Home
- * derives the target from the saved intake and asks for exactly one thing intake cannot know —
- * how long an open-ended plan should run — and only when there is no race date to derive it from.
- * Changing a target goes back to `/intake`, the one place those questions live.
+ * The rule this module encodes: **intake owns the runner's target, and, since the captain's
+ * 2026-09-20 phone test, intake owns plan creation too.** The questionnaire ends in one "Create
+ * plan" that saves the answers and generates from them in the same press; Home never asks a
+ * question and never sends a request — its "Create a new plan" only opens the intake. The one
+ * thing asked here beyond the ten intake fields is how long an open-ended plan should run, and
+ * only when there is no race date to derive it from (`needsPlanLength`).
  *
  * Pure and dependency-free so the flow is unit-testable without rendering a screen.
  */
@@ -49,29 +50,10 @@ export function planTargetFromIntake(intake: IntakeResponses | null | undefined)
   return { kind: 'distance', raceDistance: intake.raceDistance };
 }
 
-const DISTANCE_LABELS: Record<RaceDistance, string> = {
-  '5k': '5K',
-  '10k': '10K',
-  half: 'Half Marathon',
-  marathon: 'Marathon',
-};
-
-/** The one-line summary Home shows instead of re-asking. */
-export function describePlanTarget(target: PlanTarget): string {
-  switch (target.kind) {
-    case 'race':
-      return `${DISTANCE_LABELS[target.raceDistance]} on ${target.raceDate}`;
-    case 'distance':
-      return `${DISTANCE_LABELS[target.raceDistance]} — no date set`;
-    case 'general':
-      return 'General fitness — no target race';
-  }
-}
-
 /**
- * Whether Home must ask for a plan length. Only when no race date exists to derive one from —
- * asking a runner who already gave a race date how long their plan should be would be the same
- * duplicated question this module exists to remove.
+ * Whether the intake must ask for a plan length. Only when no race date exists to derive one
+ * from — asking a runner who already gave a race date how long their plan should be would be the
+ * same duplicated question this module exists to remove.
  */
 export function needsPlanLength(target: PlanTarget): boolean {
   return target.kind !== 'race';
@@ -82,16 +64,12 @@ export type BuildRequestResult =
   | { ok: false; error: string };
 
 /**
- * One condition, told the same way on both screens: the first sentence is shared, and each screen
- * names the control it actually has. Home's is the "Change" link beside the read-only target;
- * intake's is the race-date field itself, where clearing the target race is a legitimate answer
- * because the race is optional.
+ * The one stale-date refusal, told once. The intake is the only screen that sends a request now,
+ * so the message names the control it actually has — the race-date field — and the way out:
+ * the race is required, but its date is not.
  */
-const RACE_DATE_PASSED = 'That race date has already passed.';
-
-export const RACE_DATE_PASSED_MESSAGE = `${RACE_DATE_PASSED} Tap Change to set a new target in your intake.`;
-
-export const INTAKE_RACE_DATE_PASSED_MESSAGE = `${RACE_DATE_PASSED} Enter a future date, or clear your target race — a race is optional.`;
+export const RACE_DATE_PASSED_MESSAGE =
+  'That race date has already passed. Enter a future date, or clear the date — a race date is optional.';
 
 function isoDay(date: Date): string {
   const year = String(date.getFullYear()).padStart(4, '0');
@@ -110,30 +88,31 @@ export function isRaceDatePast(raceDate: string, now: Date): boolean {
 }
 
 /**
- * Intake's half of the same guard, kept here rather than in the screen so all four cases are
- * unit-testable. Refusing to *generate* against a stale date while still letting intake *save* it
- * would trap a runner in a loop: tap Change, see the same date, save clean, get refused again.
+ * The intake's save-time guard, kept here rather than in the screen so all four cases are
+ * unit-testable. The intake saves and generates in one press, so a stale date has to be refused
+ * before either happens — otherwise the answers would be stored and the generation charged for a
+ * degenerate one-week plan.
  *
- * A blank date is not an error — both the target race and its date are optional.
+ * A blank date is not an error — the target race is required, its date is optional.
  */
 export function intakeRaceDateError(raceDate: string | undefined, now: Date): string | null {
   if (!raceDate) return null;
-  return isRaceDatePast(raceDate, now) ? INTAKE_RACE_DATE_PASSED_MESSAGE : null;
+  return isRaceDatePast(raceDate, now) ? RACE_DATE_PASSED_MESSAGE : null;
 }
 
 /**
  * Assembles the request.
  *
- * Two failures are possible. One is a bad plan length — the only thing the runner types on this
- * screen. The other is a race date that has already passed: intake owns the target, so Home shows
- * it read-only, and a runner coming back after their race would otherwise have a stale date sent
- * verbatim. `weeksUntilRace` (`workers/src/lib/planEngine.ts`) floors at one week, and the quota
+ * Two failures are possible. One is a bad plan length. The other is a race date that has already
+ * passed: `weeksUntilRace` (`workers/src/lib/planEngine.ts`) floors at one week, and the quota
  * slot is reserved before the skeleton is built, so that request would charge a generation for a
- * degenerate one-week plan. It is refused here instead, before anything is sent. The server-side
- * floor is deliberate behaviour for other callers and is untouched.
+ * degenerate one-week plan. It is refused here instead, before anything is sent — the intake
+ * checks the same condition earlier through `intakeRaceDateError`, so this is the second net, not
+ * the first. The server-side floor is deliberate behaviour for other callers and is untouched.
  *
  * A missing race can never be an error here: `general` and `distance` both produce a valid
- * `duration` request.
+ * `duration` request. (The intake screen itself requires a distance — captain's 2026-09-20
+ * ruling — but that is the screen's rule; this builder stays a faithful encoder of any target.)
  *
  * `distance` deliberately still sends `raceDistance`. The server's `validateIntake` only *requires*
  * it for a race goal type, and `buildTemplatePlan` uses it to shape the periodization, so a runner

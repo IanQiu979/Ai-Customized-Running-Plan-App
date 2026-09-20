@@ -9,7 +9,8 @@ export function IntakeExitAction({
 }: {
   color: string;
   onPress: () => void;
-  /** "Skip for now" before a save, "Done" once intake existed on load or was just saved. */
+  /** "Cancel" — rendered only on a re-entry from Home's "Create a new plan". A first entry has no
+   * exit at all (captain's 2026-09-20 ruling: the intake cannot be skipped). */
   label: string;
 }) {
   return (
@@ -26,10 +27,8 @@ export function IntakeExitAction({
 }
 
 const styles = StyleSheet.create({
-  // The navigation header gives `headerRight` no edge inset of its own, so without this the label
-  // sits flush against the screen edge — verified in the web build 2026-09-01, where the
-  // pressable's right edge measured exactly the viewport width while the header *title* carried
-  // the usual 16pt margin. The padding is the inset; `hitSlop` above still widens the target.
+  // Sits on `ScreenHeader`'s eyebrow row since the 2026-09-20 re-cut (the native header is off);
+  // the padding keeps a finger's width of target around a short word, `hitSlop` widens it further.
   action: {
     paddingHorizontal: Spacing.two,
   },

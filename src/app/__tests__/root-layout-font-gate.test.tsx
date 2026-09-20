@@ -59,7 +59,7 @@ jest.mock('expo-router', () => {
     DarkTheme,
     Stack,
     ThemeProvider: ({ children }: { children: React.ReactNode }) => children,
-    useRouter: () => ({ replace: jest.fn() }),
+    useRouter: () => ({ replace: jest.fn(), push: jest.fn() }),
   };
 });
 

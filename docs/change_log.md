@@ -5,6 +5,95 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-09-20 — Intake-flow rework: the intake is mandatory, blank, and creates the plan (`fm/v22-intake-flow-rework`)
+
+The captain's 2026-09-20 phone test produced a set of locked rulings on the sign-up → first plan
+path. Until now Home carried a generate panel of its own — the saved target read back with a
+"Change" link, a plan-length field, Notes, a Free-tier locked panel and a Pro/Elite teaser — and
+the intake could be skipped, prefilled itself from the stored answers, and ended in "Save intake".
+All of that moves into one place: the intake asks every question and creates the plan; Home asks
+nothing and generates nothing. Client only — the Worker, its routes and the plan engines are
+untouched; the plan length still travels on the `generate-plan` request exactly as before.
+
+- **Intake is mandatory on first entry.** Home (`src/app/(tabs)/index.tsx`) reads `getIntake()`
+  on focus and `router.push`es a signed-in runner with no intake on file to `/intake` (skipped if
+  Home has already blurred, so the root layout's post-signup redirect never stacks two intakes; a
+  *failed* lookup shows an error and never redirects — it is not proof of "no intake"). On the
+  intake, a first entry has no Cancel, swipe-back is off (`gestureEnabled: false`) and a
+  `beforeRemove` listener refuses removal until the plan exists — the one removal allowed through
+  is the screen's own replace to the new plan. Gone: Home's "Let's find your starting line" /
+  "Start intake" empty state and the intake's "Skip for now" / "Done" header action. A re-entry
+  (Home's "Create a new plan") shows a "Cancel" (`IntakeExitAction`, now rendered in
+  `ScreenHeader`'s new optional `action` slot; the native header is hidden) that goes back to Home.
+- **Home's one CTA is "Create a new plan", and it only opens the intake.** Removed from Home,
+  explicitly: the "YOUR TARGET" card and its "Change" link, the "PLAN LENGTH (WEEKS)" field, the
+  Notes (optional) field and its Free-tier `LockedPanel`, the "ON PRO & ELITE" `PlanContentTeaser`
+  panel (both components deleted — `src/components/home/LockedPanel.tsx`,
+  `src/components/home/PlanContentTeaser.tsx`; the `home/` directory is gone), the goal-realism
+  preview, and every generate / idempotency / paywall branch. With that preview gone, the
+  `'preview'` variant of `getGoalRealismNoticeCopy` / `GoalRealismNotice` (the future-tense
+  wording, `src/lib/goalRealismDisclosure.ts`) had no caller and is deleted; the intake speaks
+  through `getGoalRealismIntakeCopy`, unchanged. Home now renders, in order: the
+  header (tier · quota eyebrow, "Today"), `VerifyEmailBanner`, the **subscription box first**
+  (`HeaderMark` + tier + plans-used + "See plans →" → `/paywall`), then a "CURRENT PLAN" summary
+  row for the newest plan by `createdAt` (title, `N WEEKS · WEEK k`, opening `/plan/[id]` with
+  its `createdAt`) when one exists, then the "Create a new plan" `PrimaryAction`, then the
+  "Everything you've built → My Plans" row. Tier remains a display of `getQuotaStatus()`, never a
+  decision.
+- **The intake ends with one "Create plan"** (was "Save intake") that runs `putIntake(payload)`
+  then `generatePlan(request)` in the same press, then `router.replace`s itself with `/plan/[id]`
+  so the plan's back arrow lands on Home. Quota and error outcomes are handled exactly as Home
+  used to: `over_quota` → `router.push('/paywall', { quota })`; a terminal `invalid_request`
+  ("previously failed") re-mints the idempotency key; transport failures keep it. The request is
+  `buildGeneratePlanRequest({ target: planTargetFromIntake(payload), planLengthWeeks, notes: '' })`
+  — built from the answers being saved, never from a re-read of the server.
+- **The per-plan Notes field is dropped, not moved.** It left with Home's panel and was not
+  added to the intake; `notes` is sent empty. Free-text context for the model still reaches it
+  through `injuryNotes`.
+- **Plan length moved into the intake** as a "PLAN LENGTH (WEEKS)" `NumberField`
+  (accessibility label "Plan length in weeks", default `DEFAULT_PLAN_WEEKS` = 12, validated 1..104
+  by `buildGeneratePlanRequest`), shown only while the race date is blank — the `needsPlanLength`
+  rule applied live to the date being typed.
+- **The intake starts blank every time.** `getIntake()` is read once, for a boolean only — intake
+  on file? → `'repeat'` vs `'first'` — and never prefills. The stored intake stays server-side as
+  the record of what the last plan was built from; `GET /api/intake` is still used by Home's gate
+  and by that first/repeat decision.
+- **Target race distance is required** (it was labelled optional). New client message: "Choose
+  your target race distance." Race date and goal time stay optional and are labelled
+  "(OPTIONAL)"; the target-race chips no longer toggle off. Every validation error now names its
+  field: the message renders under that field **and** as an assertive alert beside the button. The
+  13–17 guardian-consent flow is unchanged.
+- **Blueprint re-cut of the intake.** `ScreenHeader` (eyebrow "INTAKE", title "About your
+  running", a supporting line), five sections on hairlines — YOU (goal, age, consent, experience),
+  TRAINING (days per week, weekly distance), TARGET (target race, race date, goal time, plan
+  length), RECENT RESULT, HEALTH (injuries, injury notes) — two body sizes (`FontSize.xs` labels
+  and messages, `FontSize.sm` controls), tokens only. The survey intro (V22-03) still plays on a
+  first entry only.
+- **`src/lib/planRequest.ts`.** Header rewritten: intake owns the target *and* plan creation.
+  `describePlanTarget` and Home's "Tap Change…" `RACE_DATE_PASSED_MESSAGE` are removed; the one
+  remaining `RACE_DATE_PASSED_MESSAGE` reads "That race date has already passed. Enter a future
+  date, or clear the date — a race date is optional." `needsPlanLength`,
+  `planTargetFromIntake`, `isRaceDatePast`, `intakeRaceDateError` and `buildGeneratePlanRequest`
+  are kept; the builder still encodes a `general` target faithfully — the required distance is the
+  screen's rule, not the builder's.
+- **Root layout.** The post-signup redirect is now `router.push('/intake')` (was `replace`), so
+  `(tabs)` stays underneath and the intake's replace-to-plan leaves Home under the plan.
+- **Tests.** `src/app/(tabs)/__tests__/home.test.tsx` rewritten: the first-entry gate (including
+  no redirect on a failed fetch), "Create a new plan" opens the intake and generates nothing, no
+  target / length / Notes / teaser controls for Free or paid, subscription box above the summary
+  above the CTA, the summary opens the newest plan, the issue #25 copy suite kept. New
+  `src/app/__tests__/intake-flow.test.tsx` (the eighth rendered-screen exception, `CLAUDE.md` →
+  Testing): blank on re-entry; Cancel on re-entry; first entry — intro → questions, no Cancel,
+  `beforeRemove` refused and allowed only for the screen's own replace to the plan; race distance
+  required with the field error while date and time stay optional; a race date hides the plan
+  length and sends a `race` request; save → generate order and the replace to the plan;
+  `over_quota` → paywall with the quota; a generation refusal as an assertive alert; a refused save
+  never generates. `intake-guardian-consent.test.tsx` updated (the button is "Create plan"; it
+  fills the required fields itself since nothing prefills); `intake-exit.test.tsx` asserts the
+  "Cancel" label; `render.test.tsx` lost the `LockedPanel` / `PlanContentTeaser` suites and gained
+  a `ScreenHeader` action-slot case; `planRequest.test.ts` updated for the removed helpers and
+  message. Root gate green: 62 suites, 1017 tests.
+
 ## 2026-09-20 — Five plan-engine rulings from the coach sign-off pack: the peak is the highest block, race day is the bare distance, #119, #103's two families, #106 confirmed (`fm/v22-engine-rulings-r2`)
 
 Captain's rulings of 2026-09-20 (Ian, certified coach), GitHub issues #103, #119 and #106. The
