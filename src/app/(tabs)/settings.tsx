@@ -5,9 +5,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActionRow, Group, Row } from '@/components/layout/GroupedRows';
 import { ScreenHeader } from '@/components/layout/ScreenHeader';
+import { DeleteAccountDialog } from '@/components/settings/DeleteAccountDialog';
 import { FontFamily, FontSize, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { API_BASE_URL, authClient, deleteAccount, describeError, getQuotaStatus } from '@/lib/apiClient';
+import {
+  API_BASE_URL,
+  accountHasPassword,
+  authClient,
+  deleteAccount,
+  describeError,
+  getQuotaStatus,
+} from '@/lib/apiClient';
 import { openPrivacyPolicy } from '@/lib/openPrivacyPolicy';
 import { confirmDestructive } from '@/lib/confirmDestructive';
 import { formatQuotaLine } from '@/lib/quotaDisplay';
@@ -17,11 +25,22 @@ import type { QuotaStatus } from '@/lib/planTypes';
  * Settings. On focus, fetches `getQuotaStatus()` and renders the runner's tier and quota line
  * (`formatQuotaLine`). Free tier gets a proactive "Upgrade" entry point to `/paywall` (no quota
  * param — that route is reserved for the 402 redirect out of Home). Sign-out (moved here from
- * Home) and Delete Account (a real confirmation on every platform via `confirmDestructive`, then
- * `deleteAccount()`) round it out — on delete-account success, an explicit `authClient.signOut()`
- * invalidates the local session store so `src/app/_layout.tsx`'s `Stack.Protected` guard bounces
- * to `(auth)`. A "Legal" group links the published privacy policy (`PRIVACY_POLICY_URL`, issue
- * #89) — the in-app link the store guidelines require alongside the listing's URL.
+ * Home) round it out. A "Legal" group links the published privacy policy (`PRIVACY_POLICY_URL`,
+ * issue #89) — the in-app link the store guidelines require alongside the listing's URL.
+ *
+ * **Delete account re-auth** (captain's decision, change-list item 10, 2026-09-20 — "confirm
+ * identity with the password, like V2.3"). Which confirmation a tap on "Delete account" opens is
+ * decided by `accountHasPassword()` (`apiClient.ts`, read via better-auth's `list-accounts`), read
+ * once on focus alongside the quota status:
+ *   - a credential account (`hasPassword: true`, or still unknown/loading — fail closed, never
+ *     skip the check) opens `<DeleteAccountDialog requiresPassword>`, which sends the entered
+ *     password to `deleteAccount(password)`; the Worker is the actual authority (`workers/src/routes.ts`).
+ *   - a Google/OAuth-only account (`hasPassword: false`) keeps the pre-existing path exactly:
+ *     `confirmDestructive` (the native alert / web `confirm()` seam from issue #96), then
+ *     `deleteAccount()` with no password — never locked out of deleting their own account.
+ * Either path funnels into the same `handleDeleteAccount`, and on success calls
+ * `authClient.signOut()` to invalidate the local session store so `src/app/_layout.tsx`'s
+ * `Stack.Protected` guard bounces to `(auth)`.
  *
  * **Zero accent, no exception** (`docs/design/instrument-visual-system.md` §1). This screen is flat
  * grouped rows and hairlines. The "Upgrade" row is deliberately not a signal-marked button: the offer
@@ -39,6 +58,10 @@ export default function SettingsScreen() {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [privacyPolicyError, setPrivacyPolicyError] = useState<string | null>(null);
+  // `null` = not yet read, so the dialog path (the safer default) is used until we positively
+  // know otherwise — see the header.
+  const [hasPassword, setHasPassword] = useState<boolean | null>(null);
+  const [dialogVisible, setDialogVisible] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -59,6 +82,10 @@ export default function SettingsScreen() {
         }
       })();
 
+      accountHasPassword().then((result) => {
+        if (!cancelled) setHasPassword(result);
+      });
+
       return () => {
         cancelled = true;
       };
@@ -68,7 +95,9 @@ export default function SettingsScreen() {
   // Not `Alert.alert` directly: react-native-web implements that as an empty method, which made
   // this row do nothing at all on web (issue #96). `confirmDestructive` keeps the OS alert on
   // native and asks the browser's own dialog on web; either way only an explicit confirm deletes.
-  function confirmDeleteAccount() {
+  // Only ever reached for an account `accountHasPassword()` positively confirmed has no
+  // credential — a credential (or still-unknown) account opens the password dialog instead.
+  function confirmDeleteAccountNoPassword() {
     try {
       confirmDestructive(
         {
@@ -76,12 +105,21 @@ export default function SettingsScreen() {
           message: 'This permanently deletes your account, intake, and plans. This cannot be undone.',
           confirmLabel: 'Delete',
         },
-        handleDeleteAccount
+        () => handleDeleteAccount()
       );
     } catch (confirmError) {
       // A runtime with no dialog at all (never a real browser) fails closed inside the lib; React
       // does not catch handler throws, so surface it here rather than repeat #96's silent tap.
       setDeleteError(describeError(confirmError, 'Could not open the confirmation.', API_BASE_URL));
+    }
+  }
+
+  function handleDeleteAccountPress() {
+    setDeleteError(null);
+    if (hasPassword === false) {
+      confirmDeleteAccountNoPassword();
+    } else {
+      setDialogVisible(true);
     }
   }
 
@@ -108,16 +146,20 @@ export default function SettingsScreen() {
     setPrivacyPolicyError(await openPrivacyPolicy());
   }
 
-  async function handleDeleteAccount() {
+  async function handleDeleteAccount(password?: string) {
     setDeleteError(null);
     setDeleting(true);
     try {
-      await deleteAccount();
+      await deleteAccount(password);
+      setDialogVisible(false);
       // The server-side session row is gone, but `authClient`'s own session store doesn't know
       // that yet — it only refetches on an explicit sign-in/out call, not on a plain `apiFetch`.
       // Call `signOut()` to invalidate it locally so `Stack.Protected`'s `!!session` guard reacts.
       await authClient.signOut();
     } catch (deleteAccountError) {
+      // A wrong-password `401 invalid_password` reads through `describeError` as the server's own
+      // "That password is incorrect." — shown inline in the dialog, which stays open so the
+      // runner can retry rather than losing the flow to a toast that vanishes.
       setDeleteError(describeError(deleteAccountError, 'Something went wrong. Try again.', API_BASE_URL));
     } finally {
       setDeleting(false);
@@ -183,15 +225,27 @@ export default function SettingsScreen() {
               hint="Permanently deletes your account, intake and plans"
               tone="destructive"
               busy={deleting}
-              onPress={confirmDeleteAccount}
+              onPress={handleDeleteAccountPress}
             />
           </Group>
 
-          {deleteError && (
+          {deleteError && !dialogVisible && (
             <Text style={[styles.error, { color: theme.status.error }]}>{deleteError}</Text>
           )}
         </ScrollView>
       </SafeAreaView>
+
+      <DeleteAccountDialog
+        visible={dialogVisible}
+        requiresPassword={hasPassword !== false}
+        busy={deleting}
+        error={deleteError}
+        onCancel={() => {
+          setDialogVisible(false);
+          setDeleteError(null);
+        }}
+        onConfirm={handleDeleteAccount}
+      />
     </View>
   );
 }

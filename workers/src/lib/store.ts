@@ -639,6 +639,23 @@ export class D1PlanStore implements PlanStore {
   }
 
   /**
+   * The stored password hash for the account's `providerId = 'credential'` row, or `null` when the
+   * user has none — meaning the account was created (or exclusively linked) via an OAuth provider
+   * such as Google. `better-auth`'s own sign-in handler reads the identical column; this is the
+   * seam `handleDeleteAccount` uses to tell "verify a password" from "confirm-only, like V2.3's
+   * passwordless path" apart, per `AGENTS.md`'s "no business rules in the client" — that decision
+   * has to be made from a real row, not a client-asserted flag.
+   */
+  async getCredentialPassword(userId: string): Promise<string | null> {
+    const row = await this.db
+      .prepare(`SELECT password FROM account WHERE userId = ? AND providerId = 'credential'`)
+      .bind(userId)
+      .first<{ password: string | null }>();
+
+    return row?.password ?? null;
+  }
+
+  /**
    * Erase a user, everything they own, and every session they hold.
    *
    * Written as an explicit ordered batch rather than leaning on `ON DELETE CASCADE`. The cascades

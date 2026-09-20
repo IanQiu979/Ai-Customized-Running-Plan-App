@@ -5,6 +5,40 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-09-20 (later still) — Delete account now re-confirms with the password, like V2.3 (`fm/v22-delete-account-password`)
+
+Captain's decision, change-list item 10, approved 2026-09-20 14:40 +07: a valid session alone is
+no longer enough to delete an account. Root and Workers gates both clean.
+
+- **The Worker checks a real password against the stored hash before deleting anything.**
+  `D1PlanStore.getCredentialPassword(userId)` (`workers/src/lib/store.ts`) reads the `account`
+  table's `providerId = 'credential'` row, or `null` for a Google/OAuth-only account.
+  `handleDeleteAccount` (`workers/src/routes.ts`) branches on that: a credential account must send
+  the correct `password` in the POST body, checked with `deps.verifyPassword` — bound in
+  `workers/src/deps.ts` to `better-auth/crypto`'s own `verifyPassword`, the identical function
+  `emailAndPassword`'s sign-in handler uses, so the check can never drift from what a real sign-in
+  would accept. A missing or wrong password is `401 invalid_password` (new error code,
+  `workers/src/http.ts`) and the account is never touched; an OAuth-only account keeps the
+  pre-existing confirm-only behavior exactly, so a passwordless runner is never locked out.
+  `workers/src/index.ts` now passes `request` through to the handler so it can read the body.
+- **The client asks the right question before it asks anything.** `src/lib/apiClient.ts`'s
+  `deleteAccount(password?)` sends the password when given one; new `accountHasPassword()` reads
+  better-auth's `/list-accounts` to decide which confirmation UI to show, failing closed to "assume
+  a password is required" on any read failure — the Worker enforces the real check regardless.
+  New `src/components/settings/DeleteAccountDialog.tsx` (Blueprint tokens, `AuthField`, an inline
+  error on a wrong password) collects the password for a credential account;
+  `src/app/(tabs)/settings.tsx` still falls back to the existing `confirmDestructive` native
+  alert / web `confirm()` (issue #96) for a Google-only account, with no password field.
+- **Tests.** `workers/test/worker.test.ts` drives the real route (`SELF.fetch`, real D1, real
+  better-auth) through missing password, wrong password, correct password, and a simulated
+  passwordless OAuth-only account, checking the account row's actual presence/absence after each
+  call. `workers/test/store.test.ts` covers `getCredentialPassword` directly.
+  `src/components/settings/__tests__/DeleteAccountDialog.test.tsx` covers the empty-password
+  disabled state, the inline wrong-password error, and the `requiresPassword` branch.
+- **Not yet deployed.** Implemented and tested locally only; the Worker change needs
+  `wrangler deploy --env production` from the captain before it is live — see
+  `docs/mvp-progress.md`.
+
 ## 2026-09-20 (later) — Onboarding focus: the runner figure is deleted, first launch locks one animation at a time (`fm/v22-onboarding-focus`)
 
 Captain's rulings from his 2026-09-20 phone test of `(auth)/onboarding.tsx`. Root gate clean

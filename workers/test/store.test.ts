@@ -619,3 +619,30 @@ describe('deleteAccount', () => {
     expect(row?.n).toBe(1);
   });
 });
+
+describe('getCredentialPassword', () => {
+  async function insertAccount(providerId: string, userId: string, password: string | null) {
+    await env.DB.prepare(
+      `INSERT INTO account (id, accountId, providerId, userId, password, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, 0, 0)`
+    )
+      .bind(`${providerId}-${userId}`, `${providerId}-account-id`, providerId, userId, password)
+      .run();
+  }
+
+  it('returns the stored hash for a credential account', async () => {
+    await insertAccount('credential', USER, 'a-hashed-password');
+
+    expect(await store().getCredentialPassword(USER)).toBe('a-hashed-password');
+  });
+
+  it('returns null for a user with only a social account — the passwordless OAuth case', async () => {
+    await insertAccount('google', USER, null);
+
+    expect(await store().getCredentialPassword(USER)).toBeNull();
+  });
+
+  it('returns null for a user with no account rows at all', async () => {
+    expect(await store().getCredentialPassword(USER)).toBeNull();
+  });
+});

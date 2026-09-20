@@ -127,7 +127,7 @@ async function dispatch(request: Request, env: Env, options: DispatchOptions = {
     case 'POST /api/purchase-tier':
       return handlePurchaseTier(request, userId, session.user.email, deps);
     case 'POST /api/delete-account':
-      return handleDeleteAccount(userId, deps);
+      return handleDeleteAccount(request, userId, deps);
     case 'GET /api/intake':
       return handleGetIntake(userId, deps);
     case 'PUT /api/intake':

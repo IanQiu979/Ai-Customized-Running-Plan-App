@@ -75,6 +75,23 @@
   **not redeployed**, so those code fixes are not live until the captain runs `wrangler deploy
   --env production`. The `paceblueprint://` deep-link scheme matches `app.json` but has never been
   exercised by a real built app.
+- **Delete account now re-confirms with the account's own password, matching V2.3
+  (2026-09-20, `fm/v22-delete-account-password`, change-list item 10).** `POST /api/delete-account`
+  checks identity server-side rather than trusting the session alone: for an account with a
+  `providerId = 'credential'` row (`D1PlanStore.getCredentialPassword`), the request must carry the
+  correct `password`, verified with the same `verifyPassword` (`better-auth/crypto`) sign-in itself
+  uses, or the call is `401 invalid_password` and nothing is deleted; a Google/OAuth-only account
+  keeps the pre-existing confirm-only behavior unchanged. Settings decides which confirmation UI to
+  show via `accountHasPassword()` (reads better-auth's `/list-accounts`, fails closed to "assume a
+  password is required" on any read error) — a credential account gets the new
+  `src/components/settings/DeleteAccountDialog.tsx`, an OAuth-only account keeps the existing
+  `confirmDestructive` native alert / web `confirm()` from issue #96. Tested end to end against
+  real D1 and real better-auth in `workers/test/worker.test.ts` (missing/wrong/correct password,
+  plus a simulated passwordless account), `workers/test/store.test.ts`, and
+  `src/components/settings/__tests__/DeleteAccountDialog.test.tsx`. **Implemented and tested, not
+  yet deployed** — the Worker change needs `wrangler deploy --env production` from the captain
+  before it takes effect live; the currently deployed Worker still deletes on a bare session, no
+  password asked. Detail: `change_log.md`, 2026-09-20.
 - **The v1 dummy purchase is trusted-testers-only, decided on the server (2026-09-20,
   `fm/v22-test-purchase-gate`).** `POST /api/purchase-tier` refuses `403 purchases_unavailable`
   unless `DUMMY_PURCHASE_ENABLED === "true"` (local/dev's `wrangler.toml [vars]` only) or the
@@ -296,10 +313,12 @@
   `[vars]` of `workers/wrangler.toml` (the committed `[env.production.vars]` value is `"false"`),
   so the captain's test pass runs with every account Elite and the quota gate bypassed. Set the
   top-level value to `"false"` before real users arrive. Recorded in "Latest — 2026-08-09".
-- **Test counts:** 1017 root tests across 62 suites on `fm/v22-intake-flow-rework` (verified by
-  running the root gate there on 2026-09-20) and 174 `workers/` tests across 10 files on
-  `fm/v22-password-recovery-94`, verified by running the Workers gate there the same day. Earlier
-  figures, for the record: 999 root tests across 60 suites on `fm/v22-password-recovery-94`
+- **Test counts:** 1065 root tests across 66 suites and 188 `workers/` tests across 10 files on
+  `fm/v22-delete-account-password`, verified by running both gates there on 2026-09-20. Earlier
+  figures, for the record: 1017 root tests across 62 suites on `fm/v22-intake-flow-rework`
+  (verified by running the root gate there on 2026-09-20) and 174 `workers/` tests across 10 files
+  on `fm/v22-password-recovery-94`, verified by running the Workers gate there the same day; 999
+  root tests across 60 suites on `fm/v22-password-recovery-94`
   (2026-09-20); 899 root tests across 52 suites on `fm/v22-delete-account-web-noop-96` (after rebasing onto #116),
   verified by running the root gate there on 2026-09-16; 870
   root tests across 48 suites on `fm/v22-animations-lane3`, verified by running
@@ -321,13 +340,15 @@
 
 ---
 
-**Last updated:** 2026-09-20 — the intake-flow rework (`fm/v22-intake-flow-rework`: the intake is
-mandatory on first entry, starts blank, asks the plan length, requires a target distance and
-creates the plan; Home only shows the subscription box, the newest plan and "Create a new plan" —
-see "How it is now" and `change_log.md`); the same day the v1 dummy purchase was gated
-server-side to trusted testers on `fm/v22-test-purchase-gate`, and earlier, password recovery and
-email verification (issue #94) landed on `fm/v22-password-recovery-94`. The bullets below are the
-#94 record.
+**Last updated:** 2026-09-20 — delete account now re-confirms with the account's password before
+deleting (`fm/v22-delete-account-password`, change-list item 10 — see "How it is now" and
+`change_log.md`; implemented and tested, not yet deployed). The same day: the intake-flow rework
+(`fm/v22-intake-flow-rework`: the intake is mandatory on first entry, starts blank, asks the plan
+length, requires a target distance and creates the plan; Home only shows the subscription box, the
+newest plan and "Create a new plan" — see "How it is now" and `change_log.md`); the v1 dummy
+purchase was gated server-side to trusted testers on `fm/v22-test-purchase-gate`; and, earlier,
+password recovery and email verification (issue #94) landed on `fm/v22-password-recovery-94`. The
+bullets below are the #94 record.
 
 - **The Worker can mail, but only once the captain says so.** `workers/src/lib/mail.ts` is a
   provider-agnostic `sendMail` with a `ResendAdapter` (used when `RESEND_API_KEY` and `MAIL_FROM`

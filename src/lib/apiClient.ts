@@ -373,8 +373,41 @@ export function purchaseTier(tier: 'pro' | 'elite'): Promise<{
   });
 }
 
-export function deleteAccount(): Promise<{ deleted: true }> {
-  return apiFetch('/api/delete-account', { method: 'POST' });
+/**
+ * `password` is required by the Worker whenever the account has a `providerId = 'credential'`
+ * row, and ignored (send nothing) for a Google/OAuth-only account — see `workers/src/routes.ts`'s
+ * `handleDeleteAccount`. The client never decides which case it is; it reads that from
+ * `hasPassword()` and shapes its own confirmation UI accordingly, but the server is the one that
+ * actually enforces it.
+ */
+export function deleteAccount(password?: string): Promise<{ deleted: true }> {
+  return apiFetch('/api/delete-account', {
+    method: 'POST',
+    body: password ? JSON.stringify({ password }) : undefined,
+  });
+}
+
+/**
+ * Whether the signed-in account can authenticate with a password — i.e. has a
+ * `providerId = 'credential'` row — read through better-auth's own `/list-accounts` (issue: the
+ * captain's 2026-09-20 delete-account re-auth ruling, change-list item 10). A Google-only account
+ * has no such entry, so Settings can offer the confirm-only delete path V2.3 uses for the same
+ * case, instead of asking for a password nobody set.
+ *
+ * Fails open to `true` (require a password) on any read failure: the Worker enforces the real
+ * check regardless, so the failure mode here is only ever "an OAuth-only runner briefly sees a
+ * password field they can't fill" — never a credential account skipping the check client-side.
+ */
+type ListedAccount = NonNullable<Awaited<ReturnType<typeof authClient.listAccounts>>['data']>[number];
+
+export async function accountHasPassword(): Promise<boolean> {
+  try {
+    const { data, error } = await authClient.listAccounts();
+    if (error || !data) return true;
+    return data.some((account: ListedAccount) => account.providerId === 'credential');
+  } catch {
+    return true;
+  }
 }
 
 export function getIntake(): Promise<{ intake: IntakeResponses | null }> {

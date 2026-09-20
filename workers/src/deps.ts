@@ -24,6 +24,8 @@
  * Both swaps are bound; only the key is still missing.
  */
 
+import { verifyPassword } from 'better-auth/crypto';
+
 import { isAllUsersUnlimitedAccessEnabled } from './access';
 import { dummyPurchaseGrant, isDummyPurchaseAvailable, type DummyPurchaseGrant } from './dummyPurchase';
 import type { Env } from './env';
@@ -40,6 +42,13 @@ export interface Deps {
   purchasesAvailable: (email: string | null | undefined) => boolean;
   /** Which gate branch admits the caller (`'enabled'` | `'allowlist'`), or `null` — same source. */
   purchaseGrant: (email: string | null | undefined) => DummyPurchaseGrant;
+  /**
+   * Checks a plaintext password against a stored hash. Bound to `better-auth/crypto`'s own
+   * `verifyPassword` — the identical function `emailAndPassword`'s sign-in handler calls — so
+   * `handleDeleteAccount`'s re-auth check can never drift from what a real sign-in would accept.
+   * Injected (rather than imported directly in `routes.ts`) so tests can fake it without hashing.
+   */
+  verifyPassword: (input: { hash: string; password: string }) => Promise<boolean>;
 }
 
 export function createDeps(env: Env): Deps {
@@ -56,6 +65,7 @@ export function createDeps(env: Env): Deps {
     store,
     purchasesAvailable: (email) => isDummyPurchaseAvailable(env, email),
     purchaseGrant: (email) => dummyPurchaseGrant(env, email),
+    verifyPassword,
     generatePlan: {
       store,
       skeleton: createTemplateSkeletonBuilder(), // swap 1 — see the header
