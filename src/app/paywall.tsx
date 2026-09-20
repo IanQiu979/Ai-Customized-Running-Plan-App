@@ -17,7 +17,7 @@ import { PrimaryAction, SecondaryAction } from '@/components/ui/ActionButton';
 import { API_BASE_URL, describeError, getQuotaStatus, purchaseTier } from '@/lib/apiClient';
 import {
   DUMMY_PURCHASE_UNAVAILABLE_COPY,
-  isDummyPurchaseAvailable,
+  resolvePurchaseAvailability,
 } from '@/lib/purchaseAvailability';
 import { formatQuotaLine } from '@/lib/quotaDisplay';
 import { TIER_PLAN_LIMITS } from '@/lib/tierLimits';
@@ -51,8 +51,9 @@ export default function PaywallScreen() {
   const [error, setError] = useState<string | null>(null);
   // Fresh, independent of `quota` above (a possibly-stale route param): whether the dummy
   // purchase is open for THIS account, decided server-side and never assumed while loading —
-  // `null` renders as unavailable, same as an explicit `false` (fail closed).
-  const [availability, setAvailability] = useState<QuotaStatus | null>(null);
+  // `undefined` is the fetch in flight (neither buttons nor the unavailable notice render), and
+  // `null` is a failed fetch, which renders as unavailable, same as an explicit `false`.
+  const [availability, setAvailability] = useState<QuotaStatus | null | undefined>(undefined);
 
   useEffect(() => {
     let cancelled = false;
@@ -61,7 +62,8 @@ export default function PaywallScreen() {
         const status = await getQuotaStatus();
         if (!cancelled) setAvailability(status);
       } catch {
-        // Fail closed: leave `availability` null, which hides the purchase buttons.
+        // Fail closed: settle on `null`, which hides the purchase buttons.
+        if (!cancelled) setAvailability(null);
       }
     })();
     return () => {
@@ -69,7 +71,8 @@ export default function PaywallScreen() {
     };
   }, []);
 
-  const purchasesAvailable = isDummyPurchaseAvailable(availability);
+  const purchaseAvailability = resolvePurchaseAvailability(availability);
+  const purchasesAvailable = purchaseAvailability === 'available';
 
   async function handlePurchase(tier: Exclude<Tier, 'free'>) {
     setError(null);
@@ -144,13 +147,15 @@ export default function PaywallScreen() {
             onPress={() => handlePurchase('elite')}
           />
 
-          <View style={[styles.disclaimer, { borderColor: theme.hairline }]}>
-            <Text style={[styles.disclaimerText, { color: theme.text.secondary }]}>
-              {purchasesAvailable
-                ? 'This is a test upgrade — no payment required.'
-                : DUMMY_PURCHASE_UNAVAILABLE_COPY}
-            </Text>
-          </View>
+          {purchaseAvailability !== 'pending' ? (
+            <View style={[styles.disclaimer, { borderColor: theme.hairline }]}>
+              <Text style={[styles.disclaimerText, { color: theme.text.secondary }]}>
+                {purchasesAvailable
+                  ? 'This is a test upgrade — no payment required.'
+                  : DUMMY_PURCHASE_UNAVAILABLE_COPY}
+              </Text>
+            </View>
+          ) : null}
         </ScrollView>
       </SafeAreaView>
     </View>
@@ -168,7 +173,8 @@ function parseQuotaParam(raw: string | undefined): QuotaStatus | null {
       typeof parsed.used === 'number' &&
       (parsed.limit === null || typeof parsed.limit === 'number') &&
       (parsed.periodEnd === null || typeof parsed.periodEnd === 'string') &&
-      typeof parsed.unlimited === 'boolean'
+      typeof parsed.unlimited === 'boolean' &&
+      typeof parsed.purchasesAvailable === 'boolean'
     ) {
       return parsed as QuotaStatus;
     }

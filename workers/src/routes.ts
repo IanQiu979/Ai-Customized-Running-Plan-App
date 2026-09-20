@@ -139,7 +139,8 @@ export async function handlePurchaseTier(
   // purchase stays available for the captain's testers until public launch, and off for anyone
   // else. This is the server-side check the design demands; nothing upstream of it may substitute
   // a client-side flag.
-  if (!deps.purchasesAvailable(userEmail)) {
+  const grant = deps.purchaseGrant(userEmail);
+  if (grant === null) {
     return fail(403, 'purchases_unavailable', 'Test upgrades are not available yet.');
   }
 
@@ -158,6 +159,9 @@ export async function handlePurchaseTier(
 
   const now = new Date().toISOString();
   await deps.store.recordPurchase(userId, body.tier, 'dummy', now);
+  if (grant === 'allowlist') {
+    console.log('dummy purchase granted via allowlist', { userId });
+  }
 
   // Computed, not stored — see `subscriptions` in `0002_app_schema.sql`.
   const window = await deps.store.quotaWindow(userId, now);

@@ -8,7 +8,7 @@
  */
 
 import { env, SELF } from 'cloudflare:test';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createAuth } from '../src/auth';
 import { normalizeAllowedBrowserOrigin } from '../src/cors';
@@ -338,7 +338,16 @@ describe('the v1 dummy purchase gate', () => {
     );
   }
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function allowlistGrantLogs(log: { mock: { calls: unknown[][] } }) {
+    return log.mock.calls.filter(([message]) => message === 'dummy purchase granted via allowlist');
+  }
+
   it('allows the purchase when DUMMY_PURCHASE_ENABLED is "true" (local/dev)', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
     const token = await signUp('dev-tester@example.test');
     const devEnv = withEnv({ DUMMY_PURCHASE_ENABLED: 'true', DUMMY_PURCHASE_ALLOWLIST: '' });
 
@@ -347,6 +356,7 @@ describe('the v1 dummy purchase gate', () => {
     const body = await response.text();
     expect(response.status, body).toBe(200);
     expect(JSON.parse(body)).toMatchObject({ tier: 'pro' });
+    expect(allowlistGrantLogs(log)).toHaveLength(0);
   });
 
   it('allows an exact allowlisted email even when disabled, matching production for a trusted tester', async () => {
@@ -358,11 +368,17 @@ describe('the v1 dummy purchase gate', () => {
       DUMMY_PURCHASE_ALLOWLIST: ' allowlisted-tester@example.test , other-tester@example.test ',
     });
 
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
     const response = await purchase(token, prodShapedAllowlisted);
 
     const body = await response.text();
     expect(response.status, body).toBe(200);
     expect(JSON.parse(body)).toMatchObject({ tier: 'pro' });
+
+    const grants = allowlistGrantLogs(log);
+    expect(grants).toHaveLength(1);
+    expect(grants[0][1]).toEqual({ userId: expect.any(String) });
+    expect(JSON.stringify(grants[0]).toLowerCase()).not.toContain('example.test');
   });
 
   it('refuses a non-allowlisted caller with 403 purchases_unavailable when disabled, matching production', async () => {

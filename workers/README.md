@@ -78,7 +78,14 @@ this server-side and expose it as `purchasesAvailable` — the paywall only rend
 never computes availability itself. To let a trusted tester in on production, the captain edits
 `DUMMY_PURCHASE_ALLOWLIST` in `wrangler.toml`'s `[env.production.vars]` (append the email) and
 runs `wrangler deploy --env production` — it is a committed `[vars]` value, not a secret, so there
-is no `wrangler secret put` for it.
+is no `wrangler secret put` for it. **Only allowlist an email after that tester has already created
+their account.** Production runs with `MAIL_VERIFICATION_REQUIRED = "false"`, so the allowlist
+matches the session's email without proof of ownership; an allowlisted address that nobody has
+registered yet could be claimed by a stranger who signs up with it first, and they would receive
+Pro/Elite. Once the real account exists, better-auth refuses a duplicate sign-up and the window is
+closed. Every purchase admitted through the allowlist (rather than the enabled-for-everyone
+switch) logs `dummy purchase granted via allowlist` with the `userId` only, so the Worker's logs
+show which grants relied on it.
 
 ## What works today, and what does not
 

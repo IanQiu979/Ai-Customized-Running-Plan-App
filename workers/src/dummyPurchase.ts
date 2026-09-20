@@ -10,11 +10,18 @@
 
 import type { Env } from './env';
 
-export function isDummyPurchaseAvailable(env: Env, email: string | null | undefined): boolean {
+/** Which branch of the gate let the caller through, or `null` when neither did. */
+export type DummyPurchaseGrant = 'enabled' | 'allowlist' | null;
+
+export function dummyPurchaseGrant(env: Env, email: string | null | undefined): DummyPurchaseGrant {
   if (env.DUMMY_PURCHASE_ENABLED?.trim().toLowerCase() === 'true') {
-    return true;
+    return 'enabled';
   }
-  return isAllowlisted(env.DUMMY_PURCHASE_ALLOWLIST, email);
+  return isAllowlisted(env.DUMMY_PURCHASE_ALLOWLIST, email) ? 'allowlist' : null;
+}
+
+export function isDummyPurchaseAvailable(env: Env, email: string | null | undefined): boolean {
+  return dummyPurchaseGrant(env, email) !== null;
 }
 
 /** Exact match only, case-insensitive — never a substring/`includes` check on the raw string. */
