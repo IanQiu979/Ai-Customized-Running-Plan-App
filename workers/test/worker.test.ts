@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createAuth } from '../src/auth';
 import { normalizeAllowedBrowserOrigin } from '../src/cors';
 import type { Env } from '../src/env';
+import { deleteAccountThrottle } from '../src/lib/attemptThrottle';
 import worker from '../src/index';
 
 const APP_ROUTES: [string, string][] = [
@@ -628,5 +629,139 @@ describe('guardian consent (13–17 intake) — captain ruling 2026-09-19', () =
       .first<{ id: string }>();
     const row = await consentRow(user!.id);
     expect(row).toBeNull();
+  });
+});
+
+describe('DELETE /api/delete-account password re-auth — captain ruling 2026-09-20 (change-list item 10)', () => {
+  const PASSWORD = 'a-long-enough-password'; // matches `signUp`'s own fixed password.
+
+  async function deleteAccount(token: string, body?: Record<string, unknown>) {
+    return SELF.fetch('https://example.test/api/delete-account', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  }
+
+  async function userRow(email: string) {
+    return env.DB.prepare('SELECT id FROM user WHERE email = ?').bind(email).first<{ id: string }>();
+  }
+
+  it('rejects a missing password with 401 and deletes nothing', async () => {
+    const email = 'no-password-body@example.test';
+    const token = await signUp(email);
+
+    const response = await deleteAccount(token);
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toMatchObject({ code: 'invalid_password' });
+    expect(await userRow(email)).not.toBeNull();
+  });
+
+  it('rejects a wrong password with 401 and deletes nothing', async () => {
+    const email = 'wrong-password@example.test';
+    const token = await signUp(email);
+
+    const response = await deleteAccount(token, { password: 'not-the-right-password' });
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toMatchObject({ code: 'invalid_password' });
+    expect(await userRow(email)).not.toBeNull();
+  });
+
+  it('deletes the account on the correct password', async () => {
+    const email = 'right-password@example.test';
+    const token = await signUp(email);
+
+    const response = await deleteAccount(token, { password: PASSWORD });
+
+    const body = await response.text();
+    expect(response.status, body).toBe(200);
+    expect(JSON.parse(body)).toEqual({ deleted: true });
+    expect(await userRow(email)).toBeNull();
+  });
+
+  describe('the per-route attempt budget (5 wrong passwords per 15 minutes)', () => {
+    beforeEach(() => deleteAccountThrottle.reset());
+    afterEach(() => deleteAccountThrottle.reset());
+
+    it('answers 429 after the budget is spent and deletes nothing — even on the correct password', async () => {
+      const email = 'brute-force@example.test';
+      const token = await signUp(email);
+
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        const response = await deleteAccount(token, { password: `wrong-${attempt}` });
+        expect(response.status).toBe(401);
+      }
+      const fifth = await deleteAccount(token, { password: 'wrong-4' });
+      expect(fifth.status).toBe(429);
+      expect(await fifth.json()).toMatchObject({ code: 'rate_limited' });
+
+      const sixth = await deleteAccount(token, { password: 'wrong-5' });
+      expect(sixth.status).toBe(429);
+
+      const correctWhileThrottled = await deleteAccount(token, { password: PASSWORD });
+      expect(correctWhileThrottled.status).toBe(429);
+      expect(await userRow(email)).not.toBeNull();
+    });
+
+    it('shares the budget across users behind one connecting IP', async () => {
+      const first = await signUp('same-ip-a@example.test');
+      const second = await signUp('same-ip-b@example.test');
+      const headers = { 'cf-connecting-ip': '203.0.113.7' };
+
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        await SELF.fetch('https://example.test/api/delete-account', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', authorization: `Bearer ${first}`, ...headers },
+          body: JSON.stringify({ password: 'wrong' }),
+        });
+      }
+
+      const response = await SELF.fetch('https://example.test/api/delete-account', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${second}`, ...headers },
+        body: JSON.stringify({ password: PASSWORD }),
+      });
+      expect(response.status).toBe(429);
+      expect(await userRow('same-ip-b@example.test')).not.toBeNull();
+
+      const elsewhere = await deleteAccount(second, { password: PASSWORD });
+      expect(elsewhere.status).toBe(200);
+    });
+
+    it('a correct password inside the budget still deletes and clears the count', async () => {
+      const email = 'recovers@example.test';
+      const token = await signUp(email);
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        await deleteAccount(token, { password: 'wrong' });
+      }
+
+      const response = await deleteAccount(token, { password: PASSWORD });
+      expect(response.status).toBe(200);
+      expect(await userRow(email)).toBeNull();
+    });
+  });
+
+  it('deletes a passwordless OAuth-only account with no password field, matching the pre-existing confirm-only path', async () => {
+    // No real Google round trip in this harness — simulate what a Google-only sign-up leaves
+    // behind: no `providerId = 'credential'` row for the user, only a social one.
+    const email = 'google-only@example.test';
+    const token = await signUp(email);
+    const user = await userRow(email);
+    await env.DB.batch([
+      env.DB.prepare("DELETE FROM account WHERE userId = ? AND providerId = 'credential'").bind(user!.id),
+      env.DB.prepare(
+        `INSERT INTO account (id, accountId, providerId, userId, createdAt, updatedAt)
+         VALUES (?, ?, 'google', ?, ?, ?)`
+      ).bind(crypto.randomUUID(), 'google-sub-id', user!.id, Date.now(), Date.now()),
+    ]);
+
+    const response = await deleteAccount(token);
+
+    const body = await response.text();
+    expect(response.status, body).toBe(200);
+    expect(JSON.parse(body)).toEqual({ deleted: true });
+    expect(await userRow(email)).toBeNull();
   });
 });

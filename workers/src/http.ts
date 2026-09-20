@@ -15,6 +15,10 @@ export type ErrorCode =
   | 'method_not_allowed'
   | 'invalid_request'
   | 'over_quota'
+  /** Delete-account's password confirmation didn't match the stored credential — see `routes.ts`. */
+  | 'invalid_password'
+  /** Too many wrong delete-account passwords in the window — see `lib/attemptThrottle.ts`. */
+  | 'rate_limited'
   /** v1 dummy purchase refused a non-trusted-tester caller — see `dummyPurchase.ts`. */
   | 'purchases_unavailable'
   /** Intake has not been completed, so there is nothing to build a plan from. */

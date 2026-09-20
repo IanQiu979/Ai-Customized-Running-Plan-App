@@ -172,6 +172,10 @@ export async function handlePurchaseTier(
 // POST /api/delete-account
 // ---------------------------------------------------------------------------------------------
 
+interface DeleteAccountBody {
+  password?: unknown;
+}
+
 /**
  * Erase the account and everything it owns.
  *
@@ -181,10 +185,50 @@ export async function handlePurchaseTier(
  *
  * It is also the ONLY route that deletes a plan. There is deliberately no per-plan delete: count-
  * based quota depends on plans being undeletable, or a user could reset their own count.
+ *
+ * RE-AUTH, like V2.3's `delete-account.tsx` (captain's decision, change-list item 10, 2026-09-20):
+ * a valid session alone is not enough for this one destructive action. `deps.store.getCredentialPassword`
+ * reads the account's real `providerId = 'credential'` row — never a client-asserted flag, per
+ * `AGENTS.md`'s "no business rules in the client" — and the two cases branch here:
+ *   - a credential row exists: the request MUST carry the correct plaintext `password`, checked
+ *     with the identical `deps.verifyPassword` (`better-auth/crypto`'s `verifyPassword`) that
+ *     `emailAndPassword`'s own sign-in handler uses. A missing or wrong password is a `401` and
+ *     `deps.store.deleteAccount` is never called — the check happens strictly before the delete.
+ *   - no credential row (Google/OAuth-only): the existing confirm-only path is preserved exactly,
+ *     so a passwordless runner is never locked out of deleting their own account.
  */
-export async function handleDeleteAccount(userId: string, deps: Deps): Promise<Response> {
+export async function handleDeleteAccount(request: Request, userId: string, deps: Deps): Promise<Response> {
+  const credentialHash = await deps.store.getCredentialPassword(userId);
+
+  if (credentialHash !== null) {
+    const throttleKeys = [`user:${userId}`, ipThrottleKey(request)];
+    if (deps.deleteAccountThrottle.isThrottled(throttleKeys)) {
+      return fail(429, 'rate_limited', 'Too many attempts. Try again in 15 minutes.');
+    }
+    const body = await readJson<DeleteAccountBody>(request);
+    const password = typeof body?.password === 'string' ? body.password : '';
+    if (!password) {
+      return fail(401, 'invalid_password', 'Enter your password to delete your account.');
+    }
+    const valid = await deps.verifyPassword({ hash: credentialHash, password });
+    if (!valid) {
+      deps.deleteAccountThrottle.recordFailure(throttleKeys);
+      if (deps.deleteAccountThrottle.isThrottled(throttleKeys)) {
+        return fail(429, 'rate_limited', 'Too many attempts. Try again in 15 minutes.');
+      }
+      return fail(401, 'invalid_password', 'That password is incorrect.');
+    }
+    deps.deleteAccountThrottle.reset(throttleKeys);
+  }
+
   await deps.store.deleteAccount(userId);
   return ok({ deleted: true });
+}
+
+/** Cloudflare sets `cf-connecting-ip` at the edge; absent (local `wrangler dev`, tests) → no IP key. */
+function ipThrottleKey(request: Request): string | null {
+  const ip = request.headers.get('cf-connecting-ip');
+  return ip ? `ip:${ip}` : null;
 }
 
 // ---------------------------------------------------------------------------------------------

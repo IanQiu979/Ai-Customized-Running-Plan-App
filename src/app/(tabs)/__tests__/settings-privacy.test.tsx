@@ -21,6 +21,7 @@ jest.mock('expo-web-browser', () => ({
 
 jest.mock('@/lib/apiClient', () => ({
   API_BASE_URL: 'https://example.invalid',
+  accountHasPassword: jest.fn().mockResolvedValue(true),
   authClient: { signOut: jest.fn() },
   deleteAccount: jest.fn(),
   describeError: (_error: unknown, fallback: string) => fallback,
