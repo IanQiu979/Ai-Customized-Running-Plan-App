@@ -23,7 +23,17 @@ Captain's rulings from his 2026-09-20 phone test of `(auth)/onboarding.tsx`. Roo
   Get started — is `seen` but has not yet reported its own build clock settling; each section's
   `onReady` latch (mirroring the existing hero-CTA latch) unlocks it in turn. A first visit under
   `useReducedMotion` never locks, since every clock is already at its end frame with nothing to
-  wait out. Closes the "Onboarding replays on every signed-out session" note in
+  wait out. Two review findings, both ruled by the captain the same day: (1) a section is `seen`
+  only once its **content** — the piece plus copy, centred in the full-viewport section — is fully
+  on screen, not once the section's top edge is 120 pt inside the fold (which left the piece
+  playing below the fold while the lock held); the geometry is new `src/lib/onboardingReveal.ts`
+  (`isContentFullyOnScreen`, and `lockScrollOffset`, which the screen scrolls to when the lock
+  engages so the animating section fills the viewport and any in-flight momentum is cancelled).
+  (2) On first launch the `ScrollView` snaps section to section (`snapToOffsets` at every section
+  top, `disableIntervalMomentum`, `decelerationRate="fast"`) so a fling can land on exactly one
+  section — `scrollEnabled={false}` alone does not stop a fling already in progress. Repeat visits
+  and reduced motion keep plain free scroll with no snapping. Closes the "Onboarding replays on
+  every signed-out session" note in
   `docs/mvp-progress.md` — narrowly: onboarding still shows on every signed-out session by design
   (the sign-in link is the skip), but there is now a persisted "has seen onboarding" flag, used
   only to gate the lock, not to skip the screen.
@@ -34,7 +44,11 @@ Captain's rulings from his 2026-09-20 phone test of `(auth)/onboarding.tsx`. Roo
 - Sign-in / create-account stayed exactly where they were, at the end of the flow — untouched.
 - Tests: `src/app/(auth)/__tests__/onboarding.test.tsx` gained a `describe` block asserting the
   `ScrollView`'s `scrollEnabled` across first-visit/mid-build, first-visit/hero-settled,
-  loading (`null`), repeat-visit, and reduced-motion cases; `build.test.tsx`'s `OnboardingHero`
+  loading (`null`), repeat-visit, and reduced-motion cases, plus the content-box latch (no lock
+  while the section top is in view but its content is below the fold; lock + settle once the
+  content is fully on screen; release on the section's own `ready`) and the first-launch-only
+  snapping props; new `src/lib/__tests__/onboardingReveal.test.ts` pins the reveal geometry
+  including content taller than the viewport; `build.test.tsx`'s `OnboardingHero`
   end-frame test now asserts "Scroll down" and asserts "Continue" is gone; new
   `src/lib/__tests__/onboardingVisit.test.ts` pins the storage flag's read/write and its
   fail-open behavior on a storage error.

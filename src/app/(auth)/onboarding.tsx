@@ -21,6 +21,7 @@ import { FontFamily, FontSize, MaxContentWidth, Spacing } from '@/constants/them
 import { useFirstOnboardingVisit } from '@/hooks/use-first-onboarding-visit';
 import { useTheme } from '@/hooks/use-theme';
 import { HERO_TIMELINE, STEP_SECONDS } from '@/lib/buildMotion';
+import { isContentFullyOnScreen, lockScrollOffset, type ContentBox } from '@/lib/onboardingReveal';
 
 /**
  * The signed-out landing screen — "the plan builds itself" (V22-01 + V22-02, approved
@@ -38,19 +39,25 @@ import { HERO_TIMELINE, STEP_SECONDS } from '@/lib/buildMotion';
  * than fine print under it, for exactly that reason — it is the skip.
  *
  * **First launch is locked to one animation at a time (captain's ruling, 2026-09-20).** The very
- * first time onboarding renders on a device (`useFirstOnboardingVisit`), the `ScrollView` is
- * disabled while the section currently in view is still animating, so scrolling past a build in
- * progress is impossible; each section's own build clock unlatches the lock once it settles, and
- * the hero's "Scroll down" hint is what tells the runner to move on. Every visit after the first
- * — the flag persists via `lib/onboardingVisit.ts` — scrolls freely, exactly as before, and so
- * does a first visit under reduced motion (`useReducedMotion`): there is nothing to wait out when
- * every clock starts already settled. This closes `docs/mvp-progress.md`'s long-standing "replays
- * on every signed-out session" note.
+ * first time onboarding renders on a device (`useFirstOnboardingVisit`), the `ScrollView` snaps
+ * section to section — `snapToOffsets` at every section's top with `disableIntervalMomentum`, so a
+ * fling can only ever land on the next section, never carry past it — and is disabled while the
+ * section currently in view is still animating, so scrolling past a build in progress is
+ * impossible; each section's own build clock unlatches the lock once it settles, and the hero's
+ * "Scroll down" hint is what tells the runner to move on. When the lock engages on a section the
+ * scroll is settled onto it (`lockScrollOffset`), so the one animation playing fills the screen.
+ * Every visit after the first — the flag persists via `lib/onboardingVisit.ts` — scrolls freely
+ * with no snapping, exactly as before, and so does a first visit under reduced motion
+ * (`useReducedMotion`): there is nothing to wait out when every clock starts already settled. This
+ * closes `docs/mvp-progress.md`'s long-standing "replays on every signed-out session" note.
  *
- * Each step's piece plays once, when the step scrolls into view (spec §V22-02), on its own
- * build clock; the hero's clock is owned here so the screen can gate its primary action, and the
- * scroll lock, on each section settling. Every timing and coordinate lives in the build
- * components and `lib/buildMotion.ts`, ported from the pages.
+ * Each step's piece plays once, when the step's CONTENT — piece and copy, centred in a
+ * full-viewport section — is fully on screen (spec §V22-02; the latch is
+ * `lib/onboardingReveal.ts`'s, on the content's own bounding box rather than the section's top
+ * edge, so a piece never starts below the fold), on its own build clock; the hero's clock is
+ * owned here so the screen can gate its primary action, and the scroll lock, on each section
+ * settling. Every timing and coordinate lives in the build components and `lib/buildMotion.ts`,
+ * ported from the pages.
  *
  * Copy is grounded in what the product does and nothing more — ten intake questions
  * (`planning/02-product-requirements.md`), unnamed Day 1–7 slots (`CLAUDE.md`'s coaching-domain
@@ -91,9 +98,6 @@ const HERO_BUILD_END = HERO_TIMELINE.cues.Hold;
  */
 const HERO_READY_CEILING_MS = HERO_TIMELINE.total * 1000 + 2 * SETTLE_SLACK_MS;
 
-/** A step counts as on screen once its top is this far inside the bottom of the viewport. */
-const STEP_VISIBLE_MARGIN = 120;
-
 export default function OnboardingScreen() {
   const theme = useTheme();
   const router = useRouter();
@@ -127,26 +131,36 @@ export default function OnboardingScreen() {
     return () => clearTimeout(ceiling);
   }, [heroReady]);
 
-  // Which sections have scrolled into view, by index (0..2 the steps, 3 the Get started beat).
-  // Once visible always visible: a piece plays once and holds, never rewinds. The scroll offset
-  // and the section tops live in refs and the latch is computed in the handlers, so a scroll
-  // frame re-renders the tree only when it first reveals a section — never at 60 Hz.
+  // Which sections' content has scrolled fully into view, by index (0..2 the steps, 3 the Get
+  // started beat). Once visible always visible: a piece plays once and holds, never rewinds. The
+  // scroll offset, the section tops and the content boxes live in refs and the latch is computed
+  // in the handlers, so a scroll frame re-renders the tree only when it first reveals a section —
+  // never at 60 Hz.
   const scrollY = useRef(0);
   const sectionTops = useRef<Record<number, number>>({});
+  // Each section's content box relative to its section: the piece plus copy, centred in the
+  // full-viewport section, which is what the latch measures rather than the section itself.
+  const contentLayouts = useRef<Record<number, { y: number; height: number }>>({});
   const seenRef = useRef<Record<number, boolean>>({});
   const [seen, setSeen] = useState<Record<number, boolean>>({});
+  const contentBox = useCallback((index: number): ContentBox | null => {
+    const top = sectionTops.current[index];
+    const layout = contentLayouts.current[index];
+    if (top === undefined || layout === undefined) return null;
+    return { contentTop: top + layout.y, contentHeight: layout.height };
+  }, []);
   const reveal = useCallback(() => {
-    const threshold = scrollY.current + viewportHeight - STEP_VISIBLE_MARGIN;
     let changed = false;
-    for (const [key, top] of Object.entries(sectionTops.current)) {
-      const index = Number(key);
-      if (!seenRef.current[index] && top <= threshold) {
+    for (let index = 0; index <= STEPS.length; index += 1) {
+      if (seenRef.current[index]) continue;
+      const box = contentBox(index);
+      if (box && isContentFullyOnScreen({ scrollY: scrollY.current, viewportHeight, ...box })) {
         seenRef.current[index] = true;
         changed = true;
       }
     }
     if (changed) setSeen({ ...seenRef.current });
-  }, [viewportHeight]);
+  }, [contentBox, viewportHeight]);
 
   const handleScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -156,13 +170,31 @@ export default function OnboardingScreen() {
     [reveal]
   );
   // The step sections are laid out inside a wrapper below the hero, so their `y` is offset by
-  // the hero's height (one viewport) to land in scroll-content coordinates.
+  // the hero's height (one viewport) to land in scroll-content coordinates. The tops double as
+  // the first-launch snap points, so they are mirrored into state for the `ScrollView`.
+  const [snapOffsets, setSnapOffsets] = useState<number[]>([0]);
   const sectionLayout = useCallback(
     (index: number) => (event: LayoutChangeEvent) => {
       sectionTops.current[index] = event.nativeEvent.layout.y + viewportHeight;
+      const next = [0];
+      for (let i = 0; i <= STEPS.length; i += 1) {
+        const top = sectionTops.current[i];
+        if (top !== undefined) next.push(top);
+      }
+      setSnapOffsets((prev) =>
+        prev.length === next.length && prev.every((y, i) => y === next[i]) ? prev : next
+      );
       reveal();
     },
     [viewportHeight, reveal]
+  );
+  const contentLayout = useCallback(
+    (index: number) => (event: LayoutChangeEvent) => {
+      const { y, height } = event.nativeEvent.layout;
+      contentLayouts.current[index] = { y, height };
+      reveal();
+    },
+    [reveal]
   );
 
   /**
@@ -193,6 +225,17 @@ export default function OnboardingScreen() {
   }, [lockEnabled, heroReady, seen, sectionReady]);
   const scrollLocked = lockedSectionIndex !== null;
 
+  // When the lock engages on a section, settle the scroll onto it: a drag that stopped with the
+  // content just inside the fold, or a snap still decelerating, both end on the section filling
+  // the viewport, and a programmatic scroll cancels any momentum the disabled `ScrollView` would
+  // otherwise let run out.
+  useEffect(() => {
+    if (lockedSectionIndex === null || lockedSectionIndex < 0) return;
+    const box = contentBox(lockedSectionIndex);
+    if (!box) return;
+    scrollRef.current?.scrollTo({ y: lockScrollOffset({ viewportHeight, ...box }), animated: true });
+  }, [lockedSectionIndex, contentBox, viewportHeight]);
+
   const stepMinHeight = viewportHeight;
 
   return (
@@ -207,6 +250,11 @@ export default function OnboardingScreen() {
           onScroll={handleScroll}
           scrollEventThrottle={16}
           scrollEnabled={!scrollLocked}
+          // First launch only: section-to-section snapping, one section per gesture. A repeat
+          // visit and reduced motion keep plain free scroll — there is nothing to lock there.
+          snapToOffsets={lockEnabled ? snapOffsets : undefined}
+          disableIntervalMomentum={lockEnabled}
+          decelerationRate={lockEnabled ? 'fast' : undefined}
         >
           <OnboardingHero T={hero.T} width={viewportWidth} height={viewportHeight} />
 
@@ -214,6 +262,7 @@ export default function OnboardingScreen() {
             {STEPS.map((step, index) => (
               <View
                 key={step.heading}
+                testID={`onboarding-section-${index}`}
                 onLayout={sectionLayout(index)}
                 style={[
                   styles.section,
@@ -225,31 +274,40 @@ export default function OnboardingScreen() {
                   { minHeight: stepMinHeight },
                 ]}
               >
-                <Step
-                  index={index}
-                  heading={step.heading}
-                  body={step.body}
-                  Piece={step.Piece}
-                  visible={Boolean(seen[index])}
-                  onReady={() => markSectionReady(index)}
-                />
+                <View testID={`onboarding-section-content-${index}`} onLayout={contentLayout(index)}>
+                  <Step
+                    index={index}
+                    heading={step.heading}
+                    body={step.body}
+                    Piece={step.Piece}
+                    visible={Boolean(seen[index])}
+                    onReady={() => markSectionReady(index)}
+                  />
+                </View>
               </View>
             ))}
 
             <View
+              testID={`onboarding-section-${STEPS.length}`}
               onLayout={sectionLayout(STEPS.length)}
-              style={[styles.section, styles.actions, { borderTopColor: theme.hairline, minHeight: stepMinHeight }]}
+              style={[styles.section, { borderTopColor: theme.hairline, minHeight: stepMinHeight }]}
             >
-              <GetStarted
-                visible={Boolean(seen[STEPS.length])}
-                disabled={!heroReady}
-                onPress={() => router.push('/(auth)/sign-up')}
-                onReady={() => markSectionReady(STEPS.length)}
-              />
-              <LinkAction onPress={() => router.push('/(auth)/sign-in')}>
-                Already have an account?{' '}
-                <Text style={{ color: theme.text.primary }}>Sign in</Text>
-              </LinkAction>
+              <View
+                testID={`onboarding-section-content-${STEPS.length}`}
+                onLayout={contentLayout(STEPS.length)}
+                style={styles.actions}
+              >
+                <GetStarted
+                  visible={Boolean(seen[STEPS.length])}
+                  disabled={!heroReady}
+                  onPress={() => router.push('/(auth)/sign-up')}
+                  onReady={() => markSectionReady(STEPS.length)}
+                />
+                <LinkAction onPress={() => router.push('/(auth)/sign-in')}>
+                  Already have an account?{' '}
+                  <Text style={{ color: theme.text.primary }}>Sign in</Text>
+                </LinkAction>
+              </View>
             </View>
           </View>
         </ScrollView>

@@ -47,9 +47,15 @@ src/
                             #   (lib/onboardingVisit.ts + hooks/use-first-onboarding-visit.ts,
                             #   AsyncStorage), the ScrollView is disabled while the section in view
                             #   is still animating and re-enabled once that section's build clock
-                            #   settles — one animation at a time. Every later visit, and any first
-                            #   visit under reduced motion, scrolls freely as before. The hero's cue
-                            #   is no longer a tap target; it now reads "Scroll down"
+                            #   settles — one animation at a time. On that first launch the scroll
+                            #   also snaps section to section (snapToOffsets at every section top +
+                            #   disableIntervalMomentum), so a fling lands on exactly one section,
+                            #   and the lock settles the scroll onto the section it engages on. A
+                            #   section is "seen" only once its CONTENT (piece + copy, centred in
+                            #   the full-viewport section) is fully on screen — the geometry is
+                            #   lib/onboardingReveal.ts. Every later visit, and any first visit
+                            #   under reduced motion, scrolls freely with no snapping, as before.
+                            #   The hero's cue is no longer a tap target; it now reads "Scroll down"
       sign-in.tsx            # email/password sign-in + a "Continue with Google" button; Google
                               #   provider live in production since 2026-08-09. Minimal since
                               #   2026-09-14 (spec §V22-06: the auth pages carry nothing) — wordmark,
