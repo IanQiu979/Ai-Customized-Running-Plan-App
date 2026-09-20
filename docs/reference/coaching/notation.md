@@ -86,10 +86,14 @@ exported set stay identical.
 - Strides, appended to an easy run: **`4 × 30 s Strides`** — always `count × seconds`, always the
   full word "Strides," never an abbreviation.
 - Race day (Ian's ruling, 2026-07-12 — issue #34, rendered-plan review round 2; closes issue #29):
-  **`WU 3 km · 5 km race · CD 2 km`** — a 3 km warm-up, the 5 km race itself, then a 2 km cool-down,
-  summing to the 10 km headline. Replaces `5 km warm-up/cool-down + 5 km race`, which broke the
-  grammar (a spelled-out "warm-up/cool-down" and a `+` the glossary above cannot explain) and
-  introduces no new token — see `example-plan-5k-pro.md` week 12.
+  **`WU 3 km · 5 km race · CD 2 km`** — a 3 km warm-up, the 5 km race itself, then a 2 km cool-down.
+  Replaces `5 km warm-up/cool-down + 5 km race`, which broke the grammar (a spelled-out
+  "warm-up/cool-down" and a `+` the glossary above cannot explain) and introduces no new token —
+  see `example-plan-5k-pro.md` week 12. **Since the captain's ruling of 2026-09-20 the race day's
+  headline is the bare race distance (5 km here; 10.0 / 21.1 / 42.2 for the other distances), on
+  both tiers** — the warm-up and cool-down are carried by this structure string only. Until then
+  the paid skeleton headlined the padded total (10 km), the Free library the bare distance, and a
+  paid race week read as a second peak.
 
 Reps are prescribed as **count × distance**, never a bare distance or a bare time (Ian's ruling —
 `"8 × 600 m"` style). The source library (`workout-library.md`) only had time-based interval
@@ -108,6 +112,12 @@ convention, on purpose:
 and recovery jogs included, not just the quality "work."** The `structure` string still itemizes
 WU / work / CD (and recovery jog distance, for interval/race-pace sessions) so the runner always
 sees the true size of the hard portion.
+
+**The one exception is Race Day (captain's ruling, 2026-09-20).** Its headline is the bare race
+distance — the event the runner entered, identical on both tiers — and its warm-up and cool-down
+live in the structure string only. Race week's total therefore counts the race and not the
+padding, so the wave chart shows a race week that tapers instead of one that climbs back toward
+the peak.
 
 **Why this diverges from the published-plan norm:** the app's plan view sums every day's
 `distanceKm` into the week's total, and the wave chart on the plan screen charts that same real

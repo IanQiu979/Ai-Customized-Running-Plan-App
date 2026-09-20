@@ -1,5 +1,5 @@
 import { deloadLongRun } from '../loadRules';
-import { buildTemplatePlan } from '../planTemplates';
+import { buildTemplatePlan, peakBelowBuildSpike } from '../planTemplates';
 import type { Day, IntakeResponses, Phase, Plan, Workout } from '../planTypes';
 
 /**
@@ -186,9 +186,9 @@ describe('a plan generates with no race specified', () => {
 
   it('still reads the taper tail, not the loading peak, for a one-week race plan', () => {
     // Same runner, same degenerate length, but a race plan reads the full curve, whose last entry
-    // is the taper's 28 km — the number that distinguishes the two curves. On the sliced curve the
-    // last entry is the 48 km peak, which the baseline clamp would then show as 35, so asserting
-    // "at or below baseline" here would pass on either curve and prove nothing.
+    // is the taper's 28 km race week — the number that distinguishes the two curves. On the sliced
+    // curve the last entry is the 48 km peak, which the baseline clamp would then show as 35, so
+    // asserting "at or below baseline" here would pass on either curve and prove nothing.
     const plan = buildTemplatePlan({
       intake: { ...NO_RACE_INTAKE, raceDistance: '5k' },
       goalType: 'race',
@@ -198,7 +198,9 @@ describe('a plan generates with no race specified', () => {
       tierAtGeneration: 'free',
       density: 'free',
     });
-    expect(plan.weeklyLoad).toEqual([28]);
+    // 23, not 28, since the captain's 2026-09-20 race-day ruling: the curve entry is still the
+    // fixture's 28 km, but the race day it contains reads the bare 5 km rather than 10.
+    expect(plan.weeklyLoad).toEqual([23]);
   });
 
   it.each([1, 2, 3, 5, 8, 26])('builds a coherent %i-week plan with no race', (durationWeeks) => {
@@ -357,17 +359,6 @@ describe('the build-spike disclosure names the highest week, and a race only whe
     injuries: ['none'],
     raceDistance: '5k',
   };
-  // 5K / new / 3 days / 30 km / 8 weeks: a Family A residual offender whose base high is above its
-  // build spike, so it must not claim a highest week.
-  const baseHighIntake: IntakeResponses = {
-    goal: 'Run a 5K',
-    age: 35,
-    experience: 'new',
-    daysPerWeek: 3,
-    weeklyKm: 30,
-    injuries: ['none'],
-    raceDistance: '5k',
-  };
   const disclosureOf = (plan: Plan) =>
     plan.disclaimers.find((line) => line.startsWith('Your highest-distance week is week '));
   const loadingMax = (plan: Plan, phase: Phase) =>
@@ -399,20 +390,35 @@ describe('the build-spike disclosure names the highest week, and a race only whe
   it('says nothing when the base phase, not the build spike, holds the highest week', () => {
     // 25, 22, 17, 14*, 14, 11, 11, 18 km: the build high (week 5, 14 km) is above the 11 km peak
     // but below the 25 km base high, so "your highest-distance week is week 5" would be false —
-    // the plan carries no build-spike line at all.
-    const plan = buildTemplatePlan({
-      intake: baseHighIntake,
-      goalType: 'race',
-      durationWeeks: 8,
-      raceDistance: '5k',
-      raceDate: '2026-12-25',
-      tierAtGeneration: 'pro',
-      density: 'paid',
+    // the plan carries no build-spike line at all. Until the captain's 2026-09-20 rulings this was
+    // a real plan (5K / new / 3 days / 30 km / 8 weeks, a Family A residual offender of #103);
+    // the beginner share margin of 1.2 removed that family, and the 22,000-plan sweep now has no
+    // base-high plan at all, so the guard is exercised on the shape directly.
+    const restDay = { kind: 'rest' } as const;
+    const week = (weekNumber: number, phase: Phase, volumeKm: number, isDeload = false): Plan['weeks'][number] => ({
+      weekNumber,
+      totalWeeks: 8,
+      phase,
+      isDeload,
+      volumeKm,
+      days: [restDay, restDay, restDay, restDay, restDay, restDay, restDay],
     });
-    expect(loadingMax(plan, 'build')).toBeGreaterThan(loadingMax(plan, 'peak'));
-    expect(loadingMax(plan, 'base')).toBeGreaterThan(loadingMax(plan, 'build'));
-    expect(disclosureOf(plan)).toBeUndefined();
-    expect(plan.disclaimers.some((line) => line.includes('highest-distance week'))).toBe(false);
+    const weeks = [
+      week(1, 'base', 25),
+      week(2, 'base', 22),
+      week(3, 'base', 17),
+      week(4, 'base', 14, true),
+      week(5, 'build', 14),
+      week(6, 'peak', 11),
+      week(7, 'peak', 11),
+      week(8, 'taper', 18),
+    ];
+    expect(peakBelowBuildSpike(weeks)).toBeUndefined();
+    // The same shape with the base high below the spike is the tolerated, disclosed one.
+    expect(
+      peakBelowBuildSpike([week(1, 'base', 13), week(2, 'base', 12), week(3, 'base', 11), ...weeks.slice(3)])
+        ?.weekNumber,
+    ).toBe(5);
   });
 
   it('never frames a dateless Base Plan as a race build', () => {

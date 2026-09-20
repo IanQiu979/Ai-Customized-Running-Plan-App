@@ -268,7 +268,14 @@ export const INJURY_H1_SINGLE_QUALITY: readonly Exclude<InjuryFlag, 'none'>[] = 
   'hip_glute',
 ];
 
-/** `INJ-6`'s `H1` row pins Day 7 at `LR-low`. */
+/**
+ * `INJ-6`'s `H1` row "keep Day 7 at `LR-low`" — a **cap**, not a fixed value (captain's ruling on
+ * issue #119, 2026-09-20): Day 7 never rises above `LR-low`, and a rest week's Day 7 still takes
+ * § 9's `LR-recovery` (60–70% of the preceding long run) below it, so the recovery cut keeps
+ * landing on the long run first instead of on the easy runs alone. Read as a value until then,
+ * the pin held a rest week's Day 7 at full `LR-low` length and the easy runs absorbed the whole
+ * 15–25% cut — the opposite of § 6 "shorten Day 7".
+ */
 export const INJURY_H1_LONG_RUN_LOW: readonly Exclude<InjuryFlag, 'none'>[] = ['lower_back'];
 
 export function declaredInjuries(
@@ -294,7 +301,8 @@ export interface ComposedInjuryEffect {
   hardSessionReductionPct: number;
   /** True when any module's `H1` row caps the week at one quality session. */
   singleQualityOnly: boolean;
-  /** § 18 rule 5: "the shortest permitted Day 7". */
+  /** § 18 rule 5: "the shortest permitted Day 7" — a ceiling of `LR-low` on Day 7, under which a
+   * rest week's `LR-recovery` still applies (issue #119, see `INJURY_H1_LONG_RUN_LOW`). */
   longRunPinnedLow: boolean;
   /** § 18 rule 6: "Display each relevant location warning without claiming the locations share
    * one diagnosis." */

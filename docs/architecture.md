@@ -641,13 +641,23 @@ src/lib/
                             #          curve with its recovery dips held at the running maximum
                             #          (`holdRecoveryDips`) — rest weeks size their own long run.
                             #          A peak that sits below a build-phase loading spike is
-                            #          disclosed in one sentence. A distance named with no race
-                            #          date yields an "N-Week 10K Base Plan" that keeps
-                            #          `raceDistance` (issue #76); `raceDate` alone means a race.
-                            #          The byte-pinned golden fixture remains its
+                            #          disclosed in one sentence; the 22,000-plan sweep in
+                            #          `planTemplates.progression.test.ts` holds the base-high
+                            #          invariant at zero offenders since the captain's 2026-09-20
+                            #          rulings (beginner share margin 1.2; ≥50 km/week leaves the
+                            #          golden path), and pins the 150 plans whose one-week peak
+                            #          phase is a cadence rest week as a ceiling awaiting him.
+                            #          Race Day's `distanceKm` is the bare race distance (5 / 10 /
+                            #          21.1 / 42.2) on both tiers since 2026-09-20 — warm-up and
+                            #          cool-down live in the `structure` string only, so a race
+                            #          week tapers instead of reading as a second peak. A distance
+                            #          named with no race date yields an "N-Week 10K Base Plan"
+                            #          that keeps `raceDistance` (issue #76); `raceDate` alone
+                            #          means a race. The byte-pinned golden fixture remains its
                             #          own path, admitted only for a 12-week / 4-day / 5K race
-                            #          intake on the 4-week recovery cadence or the 50+ 4/8/12
-                            #          (2026-09-16); any other cadence is served generically.
+                            #          intake under 50 km/week (`GOLDEN_FIVE_K_MAX_WEEKLY_KM`) on
+                            #          the 4-week recovery cadence or the 50+ 4/8/12 (2026-09-16,
+                            #          2026-09-20); anything else is served generically.
   planLibrary/            # exists (2026-09-09) — the Free tier's entire engine: the 40-plan
                             #          deterministic library, a port of
                             #          `planning/research/plan-blueprint-examples.md`'s "V1
@@ -659,9 +669,18 @@ src/lib/
                             #          four canonical week-by-week calendars verbatim: 5K/12,
                             #          10K/14, half/16, marathon/24), `injury.ts` (the H0-H4 state
                             #          machine, all seven injury modules, multiple-injury
-                            #          composition), `engine.ts` (`buildLibraryPlan` — the source
+                            #          composition; INJ-6's "Day 7 at `LR-low`" is a cap, so a
+                            #          rest week still shortens the long run first — #119,
+                            #          2026-09-20), `engine.ts` (`buildLibraryPlan` — the source
                             #          document's resolution order plus its mandatory
-                            #          disclaimers), `openQuestions.ts` (the six coaching decisions
+                            #          disclaimers; every week is reconciled exactly to its
+                            #          target, `HOLD` holds at the top of § 5's 95–100% band, and
+                            #          `derivePhases` labels base / build / peak / taper from the
+                            #          rendered volumes so the peak phase is always the plan's
+                            #          highest-volume block — captain's ruling 2026-09-20, swept
+                            #          over 17,600 plans by `__tests__/engine.progression.test.ts`;
+                            #          a 6- or 8-week completion plan with no loading block after
+                            #          its base has no peak), `openQuestions.ts` (the six coaching decisions
                             #          the source does NOT make, all six ruled by Ian 2026-09-10
                             #          and isolated in one file — see
                             #          `docs/reference/coaching/free-engine-open-questions.md`).
@@ -750,7 +769,9 @@ generation still falls back to the same template every tier gets, honestly marke
    `createTemplateSkeletonBuilder()`). A **Free** request is served entirely by
    `src/lib/planLibrary/`'s `buildLibraryPlan`: the 40-plan deterministic library selects a plan
    from the register, applies the calendar, the volume state machine, the injury state and the
-   mandatory disclaimers, and that plan is the finished product — the pipeline stops at step 6.
+   mandatory disclaimers, labels its phases from the rendered volumes (`derivePhases` — the peak
+   phase is always the plan's highest-volume block, captain's ruling 2026-09-20), and that plan is
+   the finished product — the pipeline stops at step 6.
    The library is not a fallback for the AI generator and not a parameter source for it; the two
    never meet. The one request shape the register does not cover — a Free runner naming no race
    distance at all — is **refused** with `invalid_request`, the quota reservation released so the
@@ -837,15 +858,22 @@ and `holdRecoveryDips` in `planTemplates.ts`. The coach-authored golden
 5K path uses the flat per-level share table, the flat absolute table, the raw fractional spike
 ceiling, and the un-held `FIVE_K_LONG_RUNS` with whole-curve interpolation. That path is admitted only for a 12-week / 4-day / 5K race intake whose recovery cadence
 lands on the curve's authored dips at weeks 4 and 8 — the 4-week cadence, or the 50+ ruling's
-4/8/12; every other intake, including the under-50 advanced runner's 3-week cadence, is built by
-the generic path (captain's `golden-cadence3-route` ruling, 2026-09-16, audit §1.3). Generic easy runs are
+4/8/12 — and whose declared volume is under 50 km/week (`GOLDEN_FIVE_K_MAX_WEEKLY_KM`, captain's
+#103 remedy B1, 2026-09-20); every other intake, including the under-50 advanced runner's 3-week
+cadence and any ≥50 km/week runner, is built by the generic path (captain's `golden-cadence3-route`
+ruling, 2026-09-16, audit §1.3). Generic easy runs are
 capped at the final clamped LR distance. Quality/tempo sessions are not: the safety cap may put LR
 below one of them rather than rewriting the authored stimulus. `reconcileVolumeToTarget()` trims
 whole kilometres without dropping scheduled training runs; an extremely small target can therefore
 remain above target when every session has reached its 1 km floor.
 
-Race-day distance is not charged against the pre-race taper budget. Both paths derive that budget
-from `RACE_WEEK_PRE_RACE_SHARE`; on a generic low-volume/high-frequency plan, the engine schedules
+Race Day's `distanceKm` is the bare race distance on both engines (captain's ruling, 2026-09-20);
+its warm-up and cool-down appear only in the `structure` string, so the golden fixture's race week
+sums to 23 km (18 km of pre-race running plus the 5 km race) and a paid race week never reads as a
+second peak. Race-day distance is not charged against the pre-race taper budget. Both paths derive
+that budget from `RACE_WEEK_PRE_RACE_SHARE` (18/28, still derived from the fixture's authored
+28 km race week through `RACE_DAY_PADDING_KM`), and `preRaceBudgetKm`'s peak-relative bound is
+measured against the bare race distance; on a generic low-volume/high-frequency plan, the engine schedules
 only as many pre-race runs as the budget can fund at the existing 2 km non-filler threshold and
 leaves the other slots as rest. The original layout still governs placement, so Race Day remains
 Day 7 and SR is the final pre-race run. Normally funded audit profiles and the golden fixture keep

@@ -23,6 +23,31 @@ Swimming/cycling") are not reproduced verbatim below: some slots specify cross-t
 scope for running-only plans (Ian's decision #1). The frequency/duration/spacing guidance below
 carries the same content, with those slots simply left as rest.
 
+## The Free library's declared-injury modules — two rulings, 2026-09-20
+
+The Free library (`src/lib/planLibrary/injury.ts`, § 15–18 of
+`planning/research/plan-blueprint-examples.md`) applies a declared injury as a module rather than
+through the protocol below. Two questions its sweeps raised are Ian's, and he ruled on both on
+2026-09-20:
+
+**INJ-6 (lower back) "keep Day 7 at `LR-low`" is a cap, not a fixed value — issue #119.** Day 7
+never rises above `LR-low`; beneath that ceiling the calendar's own Day-7 target still applies, so
+a rest week's Day 7 takes § 9's `LR-recovery` (60–70% of the preceding long run) and the
+recovery cut lands on the long run first, exactly as § 6 "shorten Day 7" says. Read as a value,
+the pin had held every rest week's Day 7 at full `LR-low` length and left the whole 15–25% cut to
+the easy runs (the issue's witness: `new`, 3 days, 15 km, 8-week 5K — week 4 at 80% of week 3
+with Day 7 at 100% and the easy runs at 69%). `H2`/`H3`, which carry the same pin, read it the
+same way. `engine.recovery.test.ts` now sweeps `lower_back` on all three rest-week invariants like
+the other six modules.
+
+**A declared injury's volume cut lands once, on the first loading week, and the plan ramps back
+from there — issue #106, confirmed.** § 17: "Percentage reductions apply to the validated
+baseline once; they never stack." Ian confirmed the shape the 2026-09-19 fix took — the module's
+cut (and § 16's 90% for `H1`) on the first non-`RECOVERY` week only, later weeks building off that
+week's reduced volume through the state machine and `clampWeeklyVolume` — rather than a per-week
+reduction, which had compounded (0.85 × 0.85 × …) and collapsed an injured plan to 29% of its
+healthy twin by week 12. No code changed for this ruling; it closes the question.
+
 ## Phase 1: Pain-free clearance
 
 *(injury_flags.md § Part 2 › Phase 1)*

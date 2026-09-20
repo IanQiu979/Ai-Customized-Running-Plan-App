@@ -1,6 +1,6 @@
 import { buildTemplatePlan } from '../planTemplates';
 import { DELOAD_REDUCTION_MAX, DELOAD_REDUCTION_MIN, WEEKLY_INCREASE_REJECT_ABOVE } from '../loadRules';
-import type { Day, ExperienceAnswer, GoalType, IntakeResponses, Plan, RaceDistance, Workout } from '../planTypes';
+import { RACE_DISTANCE_KM, type Day, type ExperienceAnswer, type GoalType, type IntakeResponses, type Plan, type RaceDistance, type Workout } from '../planTypes';
 
 /**
  * A deload week is generated at `deloadVolume()`'s midpoint of the deload band, not its shallow
@@ -102,9 +102,10 @@ describe('buildTemplatePlan — parametric inputs', () => {
     );
     const raceDay = plan.weeks.at(-1)?.days.filter(isWorkout).find((day) => day.label === 'Race Day');
     expect(raceDay).toBeDefined();
-    // Half (21.1 km) and marathon (42.195 km) race distances are fractional — the rendered
-    // padded total must round to a whole km, never leak the raw decimal into the UI.
-    expect(raceDay?.distanceKm).toBe(Math.round(raceDay?.distanceKm ?? 0));
+    // Race day is the bare race distance on both tiers (captain, 2026-09-20), rendered to a tenth
+    // exactly as the Free library renders it: half (21.0975 km) and marathon (42.195 km) read
+    // 21.1 and 42.2, never the raw decimal and never a warm-up/cool-down padded total.
+    expect(raceDay?.distanceKm).toBe(Math.round(RACE_DISTANCE_KM[raceDistance] * 10) / 10);
   });
 
   it.each([2, 3, 4, 5, 6, 7])(

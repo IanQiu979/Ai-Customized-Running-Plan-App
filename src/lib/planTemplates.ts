@@ -121,7 +121,7 @@ const UNDER_18_DISCLAIMER =
  * offender of the invariant itself (escalated to the captain), not a tolerated shape, and says
  * nothing here rather than something false.
  */
-function peakBelowBuildSpike(weeks: readonly Week[]): Week | undefined {
+export function peakBelowBuildSpike(weeks: readonly Week[]): Week | undefined {
   const loading = weeks.filter((week) => !week.isDeload);
   const loadingMaxKm = (phase: Phase) =>
     Math.max(-Infinity, ...loading.filter((week) => week.phase === phase).map((w) => w.volumeKm));
@@ -206,6 +206,13 @@ const FIVE_K_LONG_RUNS = [10, 11, 12, 8, 13, 14, 15, 10, 14, 15, 12] as const;
  * week the curve does not dip on and dip on a week it does not flag — audit §1.3.
  */
 const FIVE_K_AUTHORED_DIP_CADENCE = 4;
+
+/**
+ * Declared weekly volume at and above which a 12-week / 4-day 5K race intake leaves the
+ * coach-authored golden path for `buildGenericWeek` — captain's ruling, 2026-09-20 (issue #103,
+ * remedy B1). See `buildTemplatePlan`.
+ */
+export const GOLDEN_FIVE_K_MAX_WEEKLY_KM = 50;
 
 /**
  * The same 12-week shape — same 34 km baseline, same 48 km peak, same 40/28 taper tail — with the
@@ -515,7 +522,17 @@ function shakeoutRun(
   };
 }
 
-/** Warm-up + cool-down `raceDayWorkout` adds around the race itself (3 km WU, 2 km CD). */
+/**
+ * The warm-up and cool-down the golden fixture's race day was authored with (3 km WU, 2 km CD),
+ * spelled out in `raceDayWorkout`'s `structure`. They are counted inside the fixture's 28 km
+ * race-week total (`FIVE_K_WEEKLY_LOAD`'s last entry), which is why `RACE_WEEK_PRE_RACE_SHARE`
+ * below subtracts them to recover the pre-race running — but since the captain's ruling of
+ * 2026-09-20 (coach sign-off pack) they are **not** part of `Workout.distanceKm`: race day reads
+ * as the bare race distance on both tiers, and race week's volume follows. Until then the paid
+ * skeleton reported 10 / 15 / 26 / 47 km race days against the library's 5.0 / 10.0 / 21.1 / 42.2,
+ * and a paid race week read as a second peak (a 16-week marathon's 69 km against a 70 km peak; a
+ * 12-week 5K's race week its highest week).
+ */
 const RACE_DAY_PADDING_KM = 5;
 
 /**
@@ -620,15 +637,14 @@ function preRaceSchedule(
 }
 
 function raceDayWorkout(distance: RaceDistance): Workout {
-  const raceKm = RACE_DISTANCE_KM[distance];
-  // `raceKm` itself is fractional for half/full marathon (21.1 / 42.195), so the padded total
-  // needs rounding — the exact race distance is still spelled out in `structure` below, this is
-  // only the summary number shown next to the workout.
+  // The bare race distance, to a tenth like the library's race day (21.1 / 42.2 for the half and
+  // full marathon); the warm-up and cool-down live in `structure`, not in the number (captain,
+  // 2026-09-20 — see `RACE_DAY_PADDING_KM`).
   return {
     kind: 'run',
     effort: 'interval',
     label: 'Race Day',
-    distanceKm: Math.round(raceKm + RACE_DAY_PADDING_KM),
+    distanceKm: Math.round(RACE_DISTANCE_KM[distance] * 10) / 10,
     effortDescription: RACE_DESCRIPTION,
     structure: `WU 3 km · ${raceDistanceText(distance)} race · CD 2 km`,
   };
@@ -1824,11 +1840,19 @@ export function buildTemplatePlan(params: TemplatePlanParams): Plan {
   // has no volume, long run or session authored for a week-3/6/9 recovery, and inventing one is
   // not ours to do, so that runner is served by `buildGenericWeek` like every other intake off
   // this path — band-sized rest weeks off the de-dipped 5K curve.
+  //
+  // It also serves only a runner whose declared volume is under `GOLDEN_FIVE_K_MAX_WEEKLY_KM`
+  // (captain's ruling, 2026-09-20, issue #103 remedy B1). The curve is written at 35 km/week;
+  // scaled past ~50 km its base and build weeks pin to the flat intermediate share cap with two
+  // easy runs while its two-quality-session peak weeks pin to the same cap with one, so the peak
+  // rendered a few kilometres under the base — the second of the two residual offender families
+  // #103 pinned. Those runners take the generic path like every other intake off this one.
   const useGoldenFiveKShape =
     isRacePlan &&
     raceDistance === '5k' &&
     durationWeeks === 12 &&
     normalizedRunCount(params.intake.daysPerWeek) === 4 &&
+    params.intake.weeklyKm < GOLDEN_FIVE_K_MAX_WEEKLY_KM &&
     (params.intake.age >= 50 || deloadCadence === FIVE_K_AUTHORED_DIP_CADENCE);
   let lastLoadingWeekKm = 0;
   let lastLoadingLongRunKm = 0;

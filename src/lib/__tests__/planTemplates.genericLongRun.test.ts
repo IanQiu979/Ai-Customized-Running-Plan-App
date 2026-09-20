@@ -442,15 +442,16 @@ describe('generic path — the long run must still be able to grow', () => {
   });
 
   it('pins profile F to the trajectory the share cap actually allows it', () => {
-    // A beginner running 20 km across 4 days is share-capped at 0.275, so F's long run tracks the
-    // 10K curve's own volume (17, 19, 21, 17d, 23, 26, 26) and never exceeds floor(0.275 × week).
+    // A beginner running 20 km across 4 days is share-capped at 0.30 (the captain's 2026-09-20
+    // beginner margin of 1.2 — 0.275 before it), so F's long run tracks the 10K curve's own volume
+    // (17, 19, 21, 17d, 23, 26, 27) and never exceeds floor(0.30 × week): 5, 5, 6, 4d, 6, 7, 8.
     // On the stretched-5K curve this plan used to read, F peaked at 5 km and ended where it began;
     // the 10K curve climbs through the block, so the long run climbs with it. Pinned so a change
     // that breaks this correct behaviour still fails something. Week 4 is the deload: since
     // 2026-09-12 a rest week's long run is `deloadLongRun` of the preceding loading week's
-    // (0.65 × 5 → 3), not a point on the curve.
+    // (0.65 × 6 → 4), not a point on the curve.
     const series = longRunSeries(PROFILES.find((p) => p.name.startsWith('F'))!);
-    expect(series.map((point) => point.longRunKm)).toEqual([4, 5, 5, 3, 6, 7, 7]);
+    expect(series.map((point) => point.longRunKm)).toEqual([5, 5, 6, 4, 6, 7, 8]);
     const cap = longRunShareCap('beginner', 4, '10k');
     for (const point of series.filter((p) => !p.isDeload)) {
       expect(point.longRunKm).toBeLessThanOrEqual(Math.floor(cap * point.volumeKm));
@@ -815,8 +816,9 @@ describe('generic path — race week is a taper, not budget math around the race
     const plan = buildFor(PROFILES.find((p) => p.name.startsWith('B'))!);
     const raceWeek = plan.weeks[15];
     const raceDay = findRaceDay(raceWeek);
-    // The race-day line item is unchanged: 42.195 km rounded up with its 5 km of warm-up/cool-down.
-    expect(raceDay?.distanceKm).toBe(47);
+    // The race-day line item is the bare race distance, 42.195 km to a tenth (captain, 2026-09-20;
+    // 47 km with its 5 km of warm-up/cool-down until then — those now live in `structure` only).
+    expect(raceDay?.distanceKm).toBe(42.2);
     const preRace = raceWeek.days.filter(isWorkout).filter((day) => day.label !== 'Race Day');
     const preRaceKm = preRace.reduce((sum, day) => sum + (day.distanceKm ?? 0), 0);
     // Audit before-state: four 1 km runs (4 km of pre-race running) inside a "51 km" week.
@@ -829,7 +831,7 @@ describe('generic path — race week is a taper, not budget math around the race
   it('sizes half-marathon race week the same way', () => {
     const plan = buildFor(PROFILES.find((p) => p.name.startsWith('C'))!);
     const raceWeek = plan.weeks[11];
-    expect(findRaceDay(raceWeek)?.distanceKm).toBe(26);
+    expect(findRaceDay(raceWeek)?.distanceKm).toBe(21.1);
     const preRaceKm = raceWeek.days
       .filter(isWorkout)
       .filter((day) => day.label !== 'Race Day')

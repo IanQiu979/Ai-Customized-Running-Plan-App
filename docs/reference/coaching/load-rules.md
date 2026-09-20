@@ -106,6 +106,15 @@ them by run count for every other path — see that function's own comment for t
 and the reasoning behind beginner's single small adjustment (its flat cap sat exactly on the
 reachability boundary at every run count, not just at 3).
 
+**Ian's ruling, 2026-09-20 (issue #103, remedy A1) — the beginner margin is 1.2, so a beginner's
+long run may take 40% of a three-run week and 30% of a four-run week** (was 1.1: 36.7% and
+27.5%). The #103 sweep's larger residual family — every beginner three-day 5K plan, 320 of the 348
+— was this margin: with one quality session sized at the 5K tempo's 8 km nominal, the 36.7%
+ceiling and the no-easy-run-outgrows-the-long-run rule together capped the week at about 86% of
+its target, so the growth base decayed week on week and the peak rendered below week 1. At five or
+more runs the flat 25% floor governs exactly as before, and 1.2 still sits below intermediate's
+1.28 at every run count, so the level ordering holds. The sweep has no base-high offender left.
+
 **The ladder only ever loosens the table; it never tightens it.** `longRunShareCap` is floored at
 the flat per-level cap, so 4-, 5-, 6- and 7-run weeks stay on exactly the numbers above and only
 3-run weeks (and beginner's 4-run week) move. That floor is deliberate and was added after a first
@@ -332,6 +341,14 @@ land on 3, 6, 9 and drop off the plan by week 9). This aligns with the natural v
 `FIVE_K_WEEKLY_LOAD` already carries at weeks 4 and 8, and additionally flags week 12 — the race
 week — as a deload for 50+ runners specifically, on top of its existing taper/race structure. The
 generic (non-golden) path is unaffected and still uses the every-3-weeks modulo above.
+
+**Golden path volume gate (captain ruling, 2026-09-20, issue #103 remedy B1):** a 12-week /
+4-day / 5K race intake declaring **50 km/week or more** is served by `buildGenericWeek`, not the
+coach-authored curve (`GOLDEN_FIVE_K_MAX_WEEKLY_KM` in `planTemplates.ts`). The curve is written
+at 35 km/week; scaled past ~50 km its base and build weeks pinned to the flat intermediate share
+cap with two easy runs while its two-quality-session peak weeks pinned to the same cap with one,
+so the peak rendered a few kilometres under the base — the #103 sweep's other residual family,
+28 plans. Under 50 km/week nothing changes; the byte-pinned 35 km fixture is untouched.
 
 **Golden path admission (captain ruling, `golden-cadence3-route`, 2026-09-16):** the coach-authored
 golden plan (`FIVE_K_WEEKLY_LOAD`, `FIVE_K_LONG_RUNS`, the tempo/interval tables) is one artefact

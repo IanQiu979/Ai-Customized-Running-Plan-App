@@ -15,10 +15,10 @@
  * The grid sweeps `H0` and every one of § 17's seven `H1` modules (issue #106, 2026-09-19): a
  * declared injury's module reduction used to be re-applied on every week, on top of `RECOVERY`'s
  * own cut, so an injured runner's rest weeks fell to ~68% of the preceding week, below the band.
- * `lower_back` (INJ-6) is swept for the total band only: its "keep Day 7 at `LR-low`" pin is
- * applied on rest weeks too, so Day 7 never shortens there and the easy runs carry the whole cut
- * — a separate, pre-existing shape defect whose reading (is the pin a value or a cap?) is the
- * captain's, tracked as issue #119. The other six modules pass all three invariants.
+ * `lower_back` (INJ-6) is swept on all three invariants since the captain's ruling on issue #119
+ * (2026-09-20) that its "keep Day 7 at `LR-low`" pin is a cap, not a value: until then the pin was
+ * applied on rest weeks too, so Day 7 never shortened there and the easy runs carried the whole
+ * cut, and this suite swept that module for the total band only.
  */
 
 import {
@@ -52,9 +52,6 @@ const INJURY_ANSWERS: InjuryFlag[][] = [
   ['lower_back'],
   ['plantar_arch'],
 ];
-/** See the header: the Day-7 pin keeps these plans out of the two shape invariants for now. */
-const TOTAL_BAND_ONLY: InjuryFlag[] = ['lower_back'];
-
 function runsOf(week: Week): Workout[] {
   return week.days.filter((day): day is Workout => day.kind === 'run');
 }
@@ -90,7 +87,7 @@ function restWeekPairs(plan: Plan): { loading: Week; rest: Week }[] {
 /** The library renders to 0.1 km, so the tolerance is a tenth, not the skeleton's whole kilometre. */
 const ROUNDING_KM = 0.1;
 
-function restWeekBreaches(plan: Plan, label: string, shape = true): string[] {
+function restWeekBreaches(plan: Plan, label: string): string[] {
   const breaches: string[] = [];
   for (const { loading, rest } of restWeekPairs(plan)) {
     const where = `${label} week ${rest.weekNumber} (after ${loading.volumeKm} km loading week ${loading.weekNumber})`;
@@ -108,8 +105,6 @@ function restWeekBreaches(plan: Plan, label: string, shape = true): string[] {
     ) {
       breaches.push(`${where}: total ${rest.volumeKm} km is ${(ratio * 100).toFixed(0)}% — ${detail}`);
     }
-    if (!shape) continue;
-
     // 2. No easy run collapses below the band's own deepest permitted cut.
     const loadingOthers = otherRunsKm(loading);
     const restOthers = otherRunsKm(rest);
@@ -199,7 +194,6 @@ describe('every recovery week in the 40-plan register is a real, sane reduction'
                     ...restWeekBreaches(
                       plan,
                       `${experience}/${daysPerWeek}d/${weeklyKm}km/${weeks}w/${goalType}/${recentPerformance ? 'timed' : 'untimed'}/${injuries[0] ?? 'H0'}`,
-                      !injuries.some((flag) => TOTAL_BAND_ONLY.includes(flag)),
                     ),
                   );
                 }

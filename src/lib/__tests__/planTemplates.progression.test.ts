@@ -52,55 +52,64 @@ const MATRIX_SIZE = 22_000;
  * plan, not encoded here. Until that ruling this mask encoded the stricter "below any pre-peak
  * loading week" comparison (758 offenders, 770 before the `golden-cadence3-route` ruling); under
  * the base-high rule the same sweep had 458 offenders before the taper alignment and held
- * long-run curves landed with the ruling, and has the 348 below after them — every one of them in
- * two named families that need a decision above this code (`REMAINING_OFFENDER_FAMILIES`).
+ * long-run curves landed with the ruling, 348 after them — every one in two named families that
+ * needed a decision above this code — and **0 since the captain's 2026-09-20 rulings on those two
+ * families** (`REMAINING_OFFENDER_FAMILIES` records what they were and what he ruled).
  *
  * This is an exact membership baseline, not a model of the production rules: a change may remove
  * any of these offenders, but must not add one. Matrix order is distance → experience → days/week
  * → weekly km → duration → recent performance. Do not re-encode this mask to make a failure go
- * away — read the failing case list instead.
+ * away — read the failing case list instead. (The mask is all-clear today; it stays so that a
+ * regression fails by name rather than by count.)
  */
-const BASE_HIGH_BASELINE_OFFENDER_COUNT = 348;
+const BASE_HIGH_BASELINE_OFFENDER_COUNT = 0;
 /**
- * Every remaining offender belongs to one of these two families, and the test below asserts that
+ * Every remaining offender must belong to one of these families, and the test below asserts that
  * membership, so a new offender outside them fails by name and a fix inside them shows up as a
- * deliberate edit to this list rather than a count that drifted.
+ * deliberate edit to this list rather than a count that drifted. The list is empty: the two
+ * families the 2026-09-19 baseline pinned were both resolved by the captain on 2026-09-20 —
  *
- * - **Beginner three-day 5K plans** (`new`/`some`, 3 days, 20–110 km/week, every duration). Not a
- *   curve problem: with one quality session sized at the 5K tempo's 8 km nominal (`≈ 23%` of the
- *   week), the beginner three-run share ceiling (`longRunShareCap` = 1.1 / 3 ≈ 36.7%) and the
- *   no-easy-run-outgrows-the-long-run rule together cap the week at about 86% of its target, so
- *   the growth base decays week on week down to the tempo's 3 km floor — week 1 is the base high
- *   and the peak renders at ~11 km. Every remedy changes a coaching or safety number (the share
- *   margin, or the 5K tempo dose), which #103's own acceptance criteria reserve to the captain.
- * - **The golden 12-week / 4-day 5K path at 50–110 km/week** (`regular`/`experienced`). The
- *   coach-authored curve is written at 35 km/week; scaled past ~50 km its base and build weeks pin
- *   to the flat intermediate share cap with two easy runs, while its two-quality-session peak
- *   weeks pin to the same cap with one, so the peak renders a few km under the base. Routing those
- *   volumes off the golden path is the same class of decision as `golden-cadence3-route`.
+ * - **Beginner three-day 5K plans** (`new`/`some`, 3 days, 20–110 km/week, every duration; 320 of
+ *   the 348). With one quality session sized at the 5K tempo's 8 km nominal, the beginner
+ *   three-run share ceiling (`longRunShareCap` = 1.1 / 3 ≈ 36.7%) and the no-easy-run-outgrows-
+ *   the-long-run rule together capped the week at about 86% of its target, so the growth base
+ *   decayed week on week and the peak rendered below week 1. **Remedy A1:** the beginner share
+ *   margin is 1.2 (40% at three runs, 30% at four) — `loadRules.ts`'s `LONG_RUN_SHARE_MARGIN`.
+ * - **The golden 12-week / 4-day 5K path at 50–110 km/week** (`regular`/`experienced`; the other
+ *   28). The coach-authored curve is written at 35 km/week; scaled past ~50 km its base and build
+ *   weeks pinned to the flat intermediate share cap with two easy runs while its two-quality-
+ *   session peak weeks pinned to the same cap with one. **Remedy B1:** a declared
+ *   `weeklyKm >= GOLDEN_FIVE_K_MAX_WEEKLY_KM` (50) is routed off the golden path onto
+ *   `buildGenericWeek` — `planTemplates.ts`'s `useGoldenFiveKShape`.
  */
-const REMAINING_OFFENDER_FAMILIES: readonly ((caseDescription: string) => boolean)[] = [
-  (description) => /^5k \/ (new|some) \/ 3 days \//.test(description),
-  (description) =>
-    /^5k \/ (regular|experienced) \/ 4 days \/ (50|60|70|80|90|100|110) km\/week \/ 12 weeks \//.test(
-      description,
-    ),
-];
+const REMAINING_OFFENDER_FAMILIES: readonly ((caseDescription: string) => boolean)[] = [];
 /**
  * How many plans in the sweep render their peak below a build-phase loading spike that is also the
  * plan's highest loading week — tolerated, disclosed, and pinned as a ceiling so that growth in the
  * tolerated class is a visible edit. 48 until the disclosure's trigger was tightened to that
- * "highest loading week" condition the same day: the 16 plans that left the class have a base high
- * above their build spike, so they are residual offenders of the invariant itself (`REMAINING_
- * OFFENDER_FAMILIES`) and now say nothing rather than misname their highest week.
+ * "highest loading week" condition on 2026-09-19 (the 16 plans that left the class had a base high
+ * above their build spike), 32 until the 2026-09-20 rulings above, 4 since.
  */
-const TOLERATED_BUILD_SPIKE_COUNT = 32;
+const TOLERATED_BUILD_SPIKE_COUNT = 4;
+/**
+ * Plans whose peak phase is a single rest week: `allocatePhaseCounts` gives a 10- or 14-week 5K
+ * (and an 8- or 10-week competitive half) a one-week peak, and the runner's deload cadence lands on
+ * exactly that week, so the "peak" is a deload and the plan has no peak loading week at all (150 of
+ * the sweep; they are outside the base-high comparison above, which needs a loading peak to
+ * compare). Named in the captain's 2026-09-20 rulings (issue #103) with the fix that follows from
+ * "a peak phase must be a real training block": shift the phase boundary a week earlier when the
+ * allocator's sole peak week is a cadence rest week. Not done here — on this engine the phase
+ * label is an input that chooses sessions (`buildGenericWeek`'s peak interval session, the
+ * tempo's duration), so the fix moves coaching content and is a follow-up for the captain, not a
+ * relabel. Pinned as a ceiling so the class cannot grow unnoticed.
+ */
+const PEAK_ONLY_REST_CEILING = 150;
 const BASE_HIGH_BASELINE_MASK =
-  'AAD//////////////////////////wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' +
-    'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP//////////////////////////AAAAAAAAAAAAAAAAAAAAAAAA' +
+  'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' +
     'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' +
-    'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMAAwADAAMAAwADAAMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' +
-    'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwADAAMAAwADAAMAAwAAA' +
+    'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' +
+    'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' +
+    'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' +
     'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' +
     'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' +
     'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' +
@@ -166,6 +175,12 @@ interface MatrixResult {
   isOffender: boolean;
   isBuildSpike: boolean;
   isDisclosed: boolean;
+  isPeakOnlyRest: boolean;
+}
+
+function isPeakOnlyRest(plan: Plan): boolean {
+  const peakWeeks = plan.weeks.filter((week) => week.phase === 'peak');
+  return peakWeeks.length > 0 && peakWeeks.every((week) => week.isDeload);
 }
 
 function matrixResults(): MatrixResult[] {
@@ -206,6 +221,7 @@ function matrixResults(): MatrixResult[] {
                 isOffender: isPeakBelowBaseHigh(plan),
                 isBuildSpike: isPeakBelowBuildSpike(plan),
                 isDisclosed: hasBuildSpikeDisclosure(plan),
+                isPeakOnlyRest: isPeakOnlyRest(plan),
               });
             }
           }
@@ -363,5 +379,21 @@ describe('generic peak-week capacity progression', () => {
     expect(results.filter(({ isBuildSpike }) => isBuildSpike).length).toBeLessThanOrEqual(
       TOLERATED_BUILD_SPIKE_COUNT,
     );
+  });
+
+  it('pins the plans whose peak phase is a single rest week as a ceiling, pending the captain\'s follow-up', () => {
+    const results = matrixResults();
+    const peakOnlyRest = results.filter(({ isPeakOnlyRest }) => isPeakOnlyRest);
+    expect(peakOnlyRest.length).toBeLessThanOrEqual(PEAK_ONLY_REST_CEILING);
+    // The class is exactly the allocator's one-week peaks: 10- and 14-week 5Ks on every level, and
+    // 8- and 10-week competitive halves — a new member outside those shapes fails here by name.
+    const outside = peakOnlyRest
+      .map(({ caseDescription }) => caseDescription)
+      .filter(
+        (description) =>
+          !/^5k \/ [a-z]+ \/ \d days \/ \d+ km\/week \/ (10|14) weeks \//.test(description) &&
+          !/^half \/ competitive \/ \d days \/ \d+ km\/week \/ (8|10) weeks \//.test(description),
+      );
+    expect(outside).toEqual([]);
   });
 });

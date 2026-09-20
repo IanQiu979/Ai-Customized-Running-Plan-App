@@ -291,7 +291,10 @@ Built-ins also available: `Explore`, `Plan`, `general-purpose`. Plugin agents ar
   15-week 10K, 17-week half, 25-week marathon) opens on a prepended rest week, and a cut gated on
   `index === 0` is spent there and never reaches a loading week. `engine.injury.test.ts` sweeps
   every module for both shapes, and `engine.recovery.test.ts` sweeps rest weeks for `H0` plus all
-  seven `H1` modules (`lower_back` for the total band only until the captain rules on #119).
+  seven `H1` modules. The captain confirmed that cut-once shape on 2026-09-20 (#106) and ruled the
+  same day that INJ-6's "keep Day 7 at `LR-low`" is a **cap**, not a value (#119): a rest week's
+  Day 7 still shortens to `LR-recovery` beneath it, so `lower_back` is swept on all three rest-week
+  invariants like the other six. Both rulings: `docs/reference/coaching/injury-rules.md`.
 - **A race target is optional, and nothing may default one.** `buildTemplatePlan` carries
   `raceDistance?: RaceDistance` with no fallback; race week, the taper phase and the taper tail of
   the load curve are all gated on `isRacePlan`. Re-introducing a `?? '5k'` silently gives a
@@ -368,18 +371,42 @@ Built-ins also available: `Explore`, `Plan`, `general-purpose`. Plugin agents ar
   loading week is never below the base phase's** — a peak under a mid-build loading spike is
   tolerated only when the plan carries `buildSpikeDisclosure`, emitted only when that spike is the
   plan's highest loading week (a base high above it makes the plan an offender, not a tolerated
-  shape, and it says nothing), which the same suite asserts for every swept plan (32 such plans,
-  pinned as a ceiling). The 348 residual offenders it pins fall
-  in two named families (`REMAINING_OFFENDER_FAMILIES`: beginner three-day 5K plans; the golden
-  12-week/4-day 5K path at ≥50 km/week) whose remedies are coaching or safety numbers awaiting
-  the captain (`docs/mvp-progress.md` → Blocked) — not a bug to fix in passing. History: encoded
-  the stricter peak-below-any-pre-peak-week comparison until 2026-09-19 (770 → 758 on the
-  2026-09-16 `golden-cadence3-route` ruling, 458 → 348 under the base-high rule with the taper
-  alignment and held long-run curves) — `docs/change_log.md` 2026-09-09, 2026-09-16, 2026-09-19.
+  shape, and it says nothing), which the same suite asserts for every swept plan (4 such plans,
+  pinned as a ceiling). **The mask is all-clear since 2026-09-20**: the 348 residual offenders it
+  pinned fell in two named families whose remedies the captain ruled that day (issue #103 — A1:
+  `LONG_RUN_SHARE_MARGIN.beginner` 1.1 → 1.2; B1: a declared ≥ 50 km/week leaves the golden
+  12-week/4-day 5K path, `GOLDEN_FIVE_K_MAX_WEEKLY_KM`), and `REMAINING_OFFENDER_FAMILIES` is empty
+  on purpose so a new offender fails by name. The suite also pins, as a ceiling, the 150 plans
+  whose "peak" phase is a single cadence rest week (10/14-week 5Ks, 8/10-week competitive halves)
+  — a named follow-up for the captain, since on this engine the phase label chooses sessions.
+  History: encoded the stricter peak-below-any-pre-peak-week comparison until 2026-09-19 (770 →
+  758 on the 2026-09-16 `golden-cadence3-route` ruling, 458 → 348 under the base-high rule with
+  the taper alignment and held long-run curves, 348 → 0 on 2026-09-20) — `docs/change_log.md`
+  2026-09-09, 2026-09-16, 2026-09-19, 2026-09-20.
+- **The Free library's peak phase is its highest-volume block, and its phase labels follow
+  volume** (captain, 2026-09-20 — coach sign-off pack). `HOLD` holds the preceding loading week at
+  the top of § 5's 95–100% band, `buildWeek` reconciles a week to its target exactly, and
+  `planLibrary/engine.ts`'s `derivePhases` labels base/build/peak/taper from the rendered volumes
+  (base through the first rest week, peak from the first plan-high loading week to the taper; a
+  flat plan's final loading block; per cycle on a cycled dateless plan). Do not reintroduce a
+  state → phase map, and do not move `HOLD` inside its band without the captain: the rule and its
+  reasons are in `docs/reference/coaching/plan-structure.md`, and
+  `planLibrary/__tests__/engine.progression.test.ts` sweeps 17,600 race plans for peak ≥ build /
+  base, no backward step, the deload band, the share cap and the 180-minute ceiling.
+- **Race Day is the bare race distance on both tiers** (captain, 2026-09-20): 5 / 10 / 21.1 /
+  42.2 km, the warm-up and cool-down in `structure` only (`notation.md`'s one exception to the
+  headline-number convention). `planTemplates.ts`'s `RACE_DAY_PADDING_KM` survives only to derive
+  `RACE_WEEK_PRE_RACE_SHARE` from the fixture's authored 28 km race week; never add it back to
+  `distanceKm`. The golden fixture's race week renders 23 km.
+- **`scripts/render-coach-pack.js` re-renders the coach sign-off grid** — four intakes × Free /
+  paid, offline, prose slots as placeholders — so a plan-engine change can be diffed before and
+  after. Run it (summary to stdout, or `<out-dir>` for the full plans) and paste the table into a
+  plan-engine PR.
 - **The coach-authored golden 5K path serves only a runner whose recovery cadence lands on its
   authored dips.** `FIVE_K_WEEKLY_LOAD` dips at weeks 4 and 8, so `buildTemplatePlan` admits a
   12-week / 4-day / 5K race intake to `buildCanonicalFiveKWeek` only on the 4-week cadence or the
-  50+ ruling's 4/8/12; the under-50 advanced runner's 3-week cadence goes to `buildGenericWeek`,
+  50+ ruling's 4/8/12, and only under 50 km/week declared (2026-09-20, #103 remedy B1); the
+  under-50 advanced runner's 3-week cadence goes to `buildGenericWeek`,
   keeping 3/6/9 (captain's `golden-cadence3-route` ruling, option A, 2026-09-16 — audit §1.3, where
   those flagged weeks had gone *up* 14–51%). Do not re-admit that cadence, and do not author a
   week-3/6/9 recovery for the curve: the coach never wrote one. Race week 12 stays flagged

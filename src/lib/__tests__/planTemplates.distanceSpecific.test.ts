@@ -43,12 +43,20 @@ function peakOf(longRuns: number[]): number {
   return Math.max(...longRuns);
 }
 
+/**
+ * 45 km/week, not 50: this runner's 12-week 5K is the coach-authored golden curve, which is what
+ * the ordering below has always compared the three generic curves against, and since the captain's
+ * 2026-09-20 ruling (issue #103, remedy B1) a declared 50 km/week or more leaves that path for
+ * `buildGenericWeek` — where the intermediate 32% share cap binds the 5K and 10K peak long runs to
+ * the same whole kilometre (21 km of a ~66–69 km week), so the strict order is the cap's, not the
+ * curves'.
+ */
 const RUNNER: IntakeResponses = {
   goal: 'Marathon',
   age: 35,
   experience: 'experienced',
   daysPerWeek: 4,
-  weeklyKm: 50,
+  weeklyKm: 45,
   recentPerformance: { distance: 'half', timeSec: 6600 },
   injuries: ['none'],
 };
@@ -581,16 +589,17 @@ describe('distance-aware ceilings and the curves that feed them', () => {
     });
     const raceWeek = plan.weeks[plan.weeks.length - 1];
 
-    // The six requested days cannot all receive a real run from this race-week budget (the peak
-    // training week is 16 km — 15 before the 2026-09-19 taper alignment — so 6 km is all the room
-    // above a 10 km race day). The survivors belong in the latest slots the six-run layout leaves
-    // before Sunday; Monday stays genuine rest instead of receiving the first surviving run by
-    // array order.
+    // The six requested days cannot all receive a real run from this race-week budget: the taper
+    // ratio leaves 6 km of pre-race running (and the peak bound, 16 km peak training week less the
+    // bare 5 km race day since the captain's 2026-09-20 race-day ruling, no longer binds first —
+    // it was the tighter of the two against a 10 km padded race day). The survivors belong in the
+    // latest slots the six-run layout leaves before Sunday; Monday stays genuine rest instead of
+    // receiving the first surviving run by array order.
     expect(
       raceWeek.days.map((day) =>
         day.kind === 'rest' ? 'rest' : `${day.label}:${day.distanceKm ?? 0}`,
       ),
-    ).toEqual(['rest', 'rest', 'ER:2', 'rest', 'ER:2', 'SR:2', 'Race Day:10']);
+    ).toEqual(['rest', 'rest', 'ER:2', 'rest', 'ER:2', 'SR:2', 'Race Day:5']);
   });
 
   it.each([2, 3])(
@@ -611,7 +620,7 @@ describe('distance-aware ceilings and the curves that feed them', () => {
         raceWeek.days.map((day) =>
           day.kind === 'rest' ? 'rest' : `${day.label}:${day.distanceKm ?? 0}`,
         ),
-      ).toEqual(['rest', 'rest', 'rest', 'rest', 'rest', 'SR:2', 'Race Day:10']);
+      ).toEqual(['rest', 'rest', 'rest', 'rest', 'rest', 'SR:2', 'Race Day:5']);
     },
   );
 
