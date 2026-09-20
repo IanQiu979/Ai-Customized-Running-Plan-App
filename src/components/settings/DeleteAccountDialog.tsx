@@ -22,7 +22,7 @@ import { useTheme } from '@/hooks/use-theme';
  *
  * The dialog owns the password field's own local state so a cancel, or the settings screen
  * clearing `error` after a fresh open, never leaves a stale password sitting in memory or on
- * screen — it resets whenever `visible` flips true.
+ * screen — it clears on every cancel and again whenever `visible` flips true.
  */
 export function DeleteAccountDialog({
   visible,
@@ -44,12 +44,17 @@ export function DeleteAccountDialog({
 
   const disabled = busy || (requiresPassword && password.length === 0);
 
+  function cancel() {
+    setPassword('');
+    onCancel();
+  }
+
   return (
     <Modal
       visible={visible}
       transparent
       animationType="fade"
-      onRequestClose={onCancel}
+      onRequestClose={cancel}
       // Not a `useEffect` — resetting from render would be a setState-in-effect cascade. `onShow`
       // is RN's own "the native dialog just became visible" callback, so a stale password from a
       // previous open (or the last runner's, if the screen re-mounts across sessions) never shows.
@@ -60,7 +65,7 @@ export function DeleteAccountDialog({
           style={StyleSheet.absoluteFill}
           accessibilityRole="button"
           accessibilityLabel="Dismiss"
-          onPress={busy ? undefined : onCancel}
+          onPress={busy ? undefined : cancel}
         />
         <View style={[styles.card, { backgroundColor: theme.surface.raised }]}>
           <Text style={[styles.title, { color: theme.text.primary }]}>Delete account</Text>
@@ -96,7 +101,7 @@ export function DeleteAccountDialog({
               accessibilityRole="button"
               accessibilityLabel="Cancel"
               disabled={busy}
-              onPress={onCancel}
+              onPress={cancel}
               style={({ pressed }) => [styles.cancel, pressed && !busy && styles.pressed]}
             >
               <Text style={[styles.cancelLabel, { color: theme.text.primary }]}>Cancel</Text>

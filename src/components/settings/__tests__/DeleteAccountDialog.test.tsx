@@ -1,3 +1,4 @@
+import { Modal } from 'react-native';
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
 
 import { DeleteAccountDialog } from '../DeleteAccountDialog';
@@ -112,6 +113,37 @@ describe('DeleteAccountDialog', () => {
       confirmButton(tree).props.onPress();
     });
     expect(onConfirm).toHaveBeenCalledWith('');
+  });
+
+  it('clears the typed password on cancel, so a re-open starts empty and confirm is disabled again', () => {
+    const { tree, onCancel } = render();
+    typePassword(tree, 'correct horse battery staple');
+    expect(passwordField(tree)!.props.value).toBe('correct horse battery staple');
+
+    act(() => {
+      tree.root.find((node) => node.props.accessibilityLabel === 'Cancel').props.onPress();
+    });
+
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(passwordField(tree)!.props.value).toBe('');
+    expect(confirmButton(tree).props.accessibilityState).toMatchObject({ disabled: true });
+  });
+
+  it('clears the typed password when the scrim or the hardware back dismisses it', () => {
+    const { tree, onCancel } = render();
+    typePassword(tree, 'correct horse battery staple');
+
+    act(() => {
+      tree.root.find((node) => node.props.accessibilityLabel === 'Dismiss').props.onPress();
+    });
+    expect(passwordField(tree)!.props.value).toBe('');
+
+    typePassword(tree, 'again');
+    act(() => {
+      tree.root.findByType(Modal).props.onRequestClose();
+    });
+    expect(passwordField(tree)!.props.value).toBe('');
+    expect(onCancel).toHaveBeenCalledTimes(2);
   });
 
   it('disables the confirm button while busy, even with a password entered', () => {

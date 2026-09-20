@@ -25,6 +25,9 @@ export type ApiErrorCode =
   | 'method_not_allowed'
   | 'invalid_request'
   | 'over_quota'
+  | 'invalid_password'
+  | 'rate_limited'
+  | 'purchases_unavailable'
   | 'intake_required'
   | 'engine_unavailable'
   | 'internal_error';

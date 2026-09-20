@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createAuth } from '../src/auth';
 import { normalizeAllowedBrowserOrigin } from '../src/cors';
 import type { Env } from '../src/env';
+import { deleteAccountThrottle } from '../src/lib/attemptThrottle';
 import worker from '../src/index';
 
 const APP_ROUTES: [string, string][] = [
@@ -678,6 +679,68 @@ describe('DELETE /api/delete-account password re-auth — captain ruling 2026-09
     expect(response.status, body).toBe(200);
     expect(JSON.parse(body)).toEqual({ deleted: true });
     expect(await userRow(email)).toBeNull();
+  });
+
+  describe('the per-route attempt budget (5 wrong passwords per 15 minutes)', () => {
+    beforeEach(() => deleteAccountThrottle.reset());
+    afterEach(() => deleteAccountThrottle.reset());
+
+    it('answers 429 after the budget is spent and deletes nothing — even on the correct password', async () => {
+      const email = 'brute-force@example.test';
+      const token = await signUp(email);
+
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        const response = await deleteAccount(token, { password: `wrong-${attempt}` });
+        expect(response.status).toBe(401);
+      }
+      const fifth = await deleteAccount(token, { password: 'wrong-4' });
+      expect(fifth.status).toBe(429);
+      expect(await fifth.json()).toMatchObject({ code: 'rate_limited' });
+
+      const sixth = await deleteAccount(token, { password: 'wrong-5' });
+      expect(sixth.status).toBe(429);
+
+      const correctWhileThrottled = await deleteAccount(token, { password: PASSWORD });
+      expect(correctWhileThrottled.status).toBe(429);
+      expect(await userRow(email)).not.toBeNull();
+    });
+
+    it('shares the budget across users behind one connecting IP', async () => {
+      const first = await signUp('same-ip-a@example.test');
+      const second = await signUp('same-ip-b@example.test');
+      const headers = { 'cf-connecting-ip': '203.0.113.7' };
+
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        await SELF.fetch('https://example.test/api/delete-account', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', authorization: `Bearer ${first}`, ...headers },
+          body: JSON.stringify({ password: 'wrong' }),
+        });
+      }
+
+      const response = await SELF.fetch('https://example.test/api/delete-account', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${second}`, ...headers },
+        body: JSON.stringify({ password: PASSWORD }),
+      });
+      expect(response.status).toBe(429);
+      expect(await userRow('same-ip-b@example.test')).not.toBeNull();
+
+      const elsewhere = await deleteAccount(second, { password: PASSWORD });
+      expect(elsewhere.status).toBe(200);
+    });
+
+    it('a correct password inside the budget still deletes and clears the count', async () => {
+      const email = 'recovers@example.test';
+      const token = await signUp(email);
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        await deleteAccount(token, { password: 'wrong' });
+      }
+
+      const response = await deleteAccount(token, { password: PASSWORD });
+      expect(response.status).toBe(200);
+      expect(await userRow(email)).toBeNull();
+    });
   });
 
   it('deletes a passwordless OAuth-only account with no password field, matching the pre-existing confirm-only path', async () => {

@@ -21,6 +21,15 @@ no longer enough to delete an account. Root and Workers gates both clean.
   `workers/src/http.ts`) and the account is never touched; an OAuth-only account keeps the
   pre-existing confirm-only behavior exactly, so a passwordless runner is never locked out.
   `workers/src/index.ts` now passes `request` through to the handler so it can read the body.
+- **The password check is budgeted, route-scoped, so a stolen session is not an unlimited
+  oracle** (review finding, same day). `workers/src/lib/attemptThrottle.ts` counts wrong passwords
+  per user id and per `cf-connecting-ip` in a 15-minute sliding window; the fifth miss and
+  everything after it — including a correct password — answers `429 rate_limited` (new error
+  code) before any verification runs, so nothing is deleted while throttled. In-memory on
+  purpose: the Worker binds no KV and a D1 table is a migration the captain has not asked for,
+  so the bound is per isolate rather than global — a hard stop for a tight loop, which is the
+  threat. better-auth's own `rateLimit` only wraps `/api/auth/*` and cannot reach this route.
+  The dialog also clears its typed password on every cancel, not only on the next `onShow`.
 - **The client asks the right question before it asks anything.** `src/lib/apiClient.ts`'s
   `deleteAccount(password?)` sends the password when given one; new `accountHasPassword()` reads
   better-auth's `/list-accounts` to decide which confirmation UI to show, failing closed to "assume

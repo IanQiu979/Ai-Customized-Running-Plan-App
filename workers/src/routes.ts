@@ -201,6 +201,10 @@ export async function handleDeleteAccount(request: Request, userId: string, deps
   const credentialHash = await deps.store.getCredentialPassword(userId);
 
   if (credentialHash !== null) {
+    const throttleKeys = [`user:${userId}`, ipThrottleKey(request)];
+    if (deps.deleteAccountThrottle.isThrottled(throttleKeys)) {
+      return fail(429, 'rate_limited', 'Too many attempts. Try again in 15 minutes.');
+    }
     const body = await readJson<DeleteAccountBody>(request);
     const password = typeof body?.password === 'string' ? body.password : '';
     if (!password) {
@@ -208,12 +212,23 @@ export async function handleDeleteAccount(request: Request, userId: string, deps
     }
     const valid = await deps.verifyPassword({ hash: credentialHash, password });
     if (!valid) {
+      deps.deleteAccountThrottle.recordFailure(throttleKeys);
+      if (deps.deleteAccountThrottle.isThrottled(throttleKeys)) {
+        return fail(429, 'rate_limited', 'Too many attempts. Try again in 15 minutes.');
+      }
       return fail(401, 'invalid_password', 'That password is incorrect.');
     }
+    deps.deleteAccountThrottle.reset(throttleKeys);
   }
 
   await deps.store.deleteAccount(userId);
   return ok({ deleted: true });
+}
+
+/** Cloudflare sets `cf-connecting-ip` at the edge; absent (local `wrangler dev`, tests) → no IP key. */
+function ipThrottleKey(request: Request): string | null {
+  const ip = request.headers.get('cf-connecting-ip');
+  return ip ? `ip:${ip}` : null;
 }
 
 // ---------------------------------------------------------------------------------------------

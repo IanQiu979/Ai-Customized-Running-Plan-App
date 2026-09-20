@@ -29,6 +29,7 @@ import { verifyPassword } from 'better-auth/crypto';
 import { isAllUsersUnlimitedAccessEnabled } from './access';
 import { dummyPurchaseGrant, isDummyPurchaseAvailable, type DummyPurchaseGrant } from './dummyPurchase';
 import type { Env } from './env';
+import { deleteAccountThrottle, type AttemptThrottle } from './lib/attemptThrottle';
 import type { GeneratePlanDeps } from './lib/generate-plan-flow';
 import { createPlanPersonalizer, createTemplateSkeletonBuilder } from './lib/planEngine';
 import { resolveModelCaller } from './lib/model';
@@ -49,6 +50,11 @@ export interface Deps {
    * Injected (rather than imported directly in `routes.ts`) so tests can fake it without hashing.
    */
   verifyPassword: (input: { hash: string; password: string }) => Promise<boolean>;
+  /**
+   * Failed-password budget for `POST /api/delete-account` only — see `lib/attemptThrottle.ts`.
+   * A module-level instance so the count survives across requests within the isolate.
+   */
+  deleteAccountThrottle: AttemptThrottle;
 }
 
 export function createDeps(env: Env): Deps {
@@ -66,6 +72,7 @@ export function createDeps(env: Env): Deps {
     purchasesAvailable: (email) => isDummyPurchaseAvailable(env, email),
     purchaseGrant: (email) => dummyPurchaseGrant(env, email),
     verifyPassword,
+    deleteAccountThrottle,
     generatePlan: {
       store,
       skeleton: createTemplateSkeletonBuilder(), // swap 1 — see the header
