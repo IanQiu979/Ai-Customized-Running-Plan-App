@@ -80,6 +80,15 @@ today → race day) or a fixed **duration** (a number of weeks).
 > `src/lib/planRequest.ts`, with the guardrail in [`AGENTS.md`](../../AGENTS.md). Everything below
 > that shows a distance chip row or a date control outside intake is superseded by it.
 
+> **Superseded further, 2026-09-20 — the intake creates the plan, and Home asks nothing.** The
+> captain's phone-test rulings moved the last of the per-plan questions into the intake: it asks
+> the plan length itself (only while the race date is blank), requires a target race distance
+> (the date and goal time stay optional), starts blank on every entry, cannot be skipped on a
+> first entry, and ends in one **"Create plan"** that saves and generates in the same press. Home
+> has no target card, no plan-length field, no Notes and no teasers; its one CTA, **"Create a new
+> plan"**, opens the intake. The per-plan Notes field was dropped, not moved. Every "configure"
+> or "generate" surface described below is superseded by it — `docs/change_log.md`, 2026-09-20.
+
 **Sign-up is required.** Google, Apple, email/password. No guest mode in v1 — never write "continue
 as guest" or "skip for now" on auth. Apple Sign-In must appear in the design even though it is not
 yet configured server-side (App Store rules require it once Google is offered).
@@ -591,6 +600,14 @@ device, earned without inventing an extra field.
 
 ### Home / Create · *system theme*
 
+> **Superseded, 2026-09-20.** Shipped Home has one shape, not two: the tier · quota header, the
+> **subscription box first** (header mark, tier, plans used, "See plans →"), a CURRENT PLAN
+> summary row for the newest plan when one exists, the single hivis **"Create a new plan"** —
+> which only opens the intake — and the My Plans row. There is no empty-state ghost ribbon, no
+> "View plan" hivis swap, no outline demotion, and no target, plan-length, Notes or teaser
+> controls; a runner with no intake on file never sees Home's controls at all, since Home pushes
+> them to the intake. The quota copy rules in the blockquote below still apply.
+
 Two states, and the focal point moves between them.
 
 **Empty.** Mid-screen, a single desaturated ghost-ribbon row with a short caption framing it as a
@@ -623,6 +640,15 @@ link — not a dead disabled control.
 > disclosure, and the generate CTA — shipped inline on Home, which shows the saved target
 > read-only with a **Change** link to `/intake` and asks for a plan length only when there is no
 > race date to derive one from.
+
+> **Superseded in full, 2026-09-20.** There is no configure surface anywhere — not a modal, not
+> inline on Home. The intake is the configure screen: its TARGET section holds the target race
+> (required), the optional race date and goal time, and PLAN LENGTH (WEEKS) while the date is
+> blank; its bottom **"Create plan"** is the generate CTA (`PUT /api/intake` then
+> `POST /api/generate-plan`, then a replace to `plan/[id]` so back lands on Home). The notes
+> disclosure is gone — dropped, not moved. Home's "Change" link went with the panel; changing a
+> target means creating a new plan, which means a fresh, blank intake. "Where configure-plan and
+> generating live" below is therefore historical too.
 
 No ribbon, no wave. This is a decision screen, not a celebration screen — withholding the motif here is
 what makes its arrival at the reveal feel *earned* rather than wallpapered everywhere.

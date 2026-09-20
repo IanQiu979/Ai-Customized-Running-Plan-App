@@ -65,19 +65,19 @@ src/
       _layout.tsx          # icon-only tab bar — Home, Glossary, My Plans, Settings. Every icon
                             #  keeps an explicit screen-reader label; the active state is an ink
                             #  tick, never the accent. Home's glyph is the week strip (2026-09-14)
-      index.tsx             # Home — the top header replaces the static product eyebrow with the
-                             #  server-provided tier + formatted quota, followed immediately by the
-                             #  primary Create plan action. The runner's target is READ BACK from
-                             #  saved intake (never re-asked); the only field left is plan length,
-                             #  shown only when there is no race date to derive one from. Notes and
-                             #  Free's paid-plan teaser appear only after GET /api/plans confirms a
-                             #  persisted plan, refreshed on focus; "Change" routes to /intake.
-                             #  Decision logic lives in src/lib/planRequest.ts, not here. The
-                             #  tier row at the bottom carries the header mark (V22-04,
-                             #  components/build/HeaderMark): a 7-slot strip that fills to the
-                             #  current week's elapsed days (src/lib/planProgress.ts) on open and
-                             #  re-runs only when that count changes; the no-plan state shows a
-                             #  static empty strip
+      index.tsx             # Home — asks nothing and generates nothing (captain's 2026-09-20
+                             #  rulings). On focus it reads GET /api/intake and pushes a runner
+                             #  with no intake on file to /intake (never on a failed fetch). Then,
+                             #  in order: the header (tier · quota eyebrow, "Today"),
+                             #  VerifyEmailBanner, the subscription box FIRST (the header mark —
+                             #  V22-04, components/build/HeaderMark, a 7-slot strip filling to the
+                             #  current week's elapsed days via src/lib/planProgress.ts, re-run
+                             #  only when that count changes — beside tier + plans used and
+                             #  "See plans →" to /paywall), a CURRENT PLAN summary row for the
+                             #  newest plan by createdAt (title, "N WEEKS · WEEK k", opens
+                             #  /plan/[id]) when one exists, the one CTA "Create a new plan"
+                             #  (always opens the intake, blank), and the My Plans row. No
+                             #  target card, plan-length field, Notes, locked panel or teaser
       settings.tsx           # Settings tab (new 2026-08-05) — tier + quota (GET
                               #  /api/quota-status, src/lib/quotaDisplay.ts), sign-out (moved off
                               #  Home), a Free-tier "Upgrade" entry point to /paywall, a Legal ->
@@ -94,21 +94,31 @@ src/
                               #  plans come from GET /api/plans and refetch on every tab focus, with
                               #  the last-known list visible during the background request. There is
                               #  no empty state; the most-recent stat links to max(createdAt)
-      __tests__/             # state render tests for Home's persisted-plan gate, My Plans' permanent
-                              #  example/latest link, and the Glossary's independent disclosures
-    intake.tsx               # onboarding questionnaire — THE ONLY place a target race is asked
-                              # for (2026-08-15). A first-time runner (no saved intake) first sees
-                              # the survey intro (V22-03, components/build/SurveyIntro): a
-                              # full-viewport build that holds, then PRESS TO CONTINUE reveals the
-                              # questions; the questions never animate. Numeric answers use src/components/inputs/
-                              # (segmented YYYY-MM-DD and H:MM:SS boxes, digit-filtered).
-                              # Against GET/PUT /api/intake. An age of 13–17 reveals a required
-                              # guardian-consent checkbox (issue #89, 2026-09-19) whose policy
-                              # link goes through lib/openPrivacyPolicy.ts; save sends
-                              # guardianConsent: true and the server refuses without it. Its
-                              # exit-header action replaces to Home ("Done" once intake exists,
-                              # "Skip for now" otherwise), and as of 2026-08-05 a successful save
-                              # also router.replace('/(tabs)')s there instead of staying put
+      __tests__/             # state render tests for Home's first-entry gate and control set, My
+                              #  Plans' permanent example/latest link, and the Glossary's
+                              #  independent disclosures
+    intake.tsx               # the questionnaire AND the only place a plan is created (captain's
+                              # 2026-09-20 rulings; the only place a target race is asked for since
+                              # 2026-08-15). Starts blank every time — GET /api/intake is read once
+                              # for a boolean (intake on file → 'repeat', else 'first'), never to
+                              # prefill. First entry: the survey intro (V22-03,
+                              # components/build/SurveyIntro) holds until PRESS TO CONTINUE, then
+                              # the questions; no Cancel, swipe-back off, beforeRemove refused
+                              # until the plan exists. Re-entry (Home's "Create a new plan"):
+                              # straight to the questions, with a Cancel back to Home in the
+                              # ScreenHeader's action slot (native header hidden). Blueprint
+                              # sections on hairlines: YOU, TRAINING, TARGET (target race required;
+                              # race date and goal time optional; PLAN LENGTH (WEEKS) only while
+                              # the date is blank — needsPlanLength, live), RECENT RESULT, HEALTH.
+                              # Numeric answers use src/components/inputs/ (segmented YYYY-MM-DD
+                              # and H:MM:SS boxes, digit-filtered). An age of 13–17 reveals a
+                              # required guardian-consent checkbox (issue #89, 2026-09-19) whose
+                              # policy link goes through lib/openPrivacyPolicy.ts; the server
+                              # refuses without guardianConsent: true. The one bottom "Create
+                              # plan" runs PUT /api/intake then POST /api/generate-plan (notes
+                              # empty; over_quota → /paywall with the quota; a terminal
+                              # invalid_request re-mints the idempotency key) and replaces itself
+                              # with /plan/[id], so the plan's back arrow lands on Home
     plan/[id]/               # plan detail (V22-06, rebuilt 2026-09-14 as three read-only pushes;
                               #  the accordion/ribbon view and its contour route line are gone)
       index.tsx               #  A · overview — one row per week: W#, a 120×22 miniature strip,
@@ -123,7 +133,8 @@ src/
                               #   headline, stats (km / HR zone or RPE / pace when present), then
                               #   STRUCTURE, EFFORT and WHY as they exist on the Workout
     paywall.tsx              # dummy paywall (new 2026-08-05) — a Stack route, reached from
-                              #  Settings or from Home's generate-plan 402 over_quota catch;
+                              #  Settings, Home's subscription box, or the intake's Create-plan
+                              #  402 over_quota catch (Home's until 2026-09-20);
                               #  calls POST /api/purchase-tier, honest "test upgrade" copy
     reset-password.tsx       # issue #94 (2026-09-20) — where the mailed reset link lands, at the
                               #  ROOT and outside both Stack.Protected groups (a deep link opens in
@@ -149,10 +160,11 @@ src/
                              # StaticWeekStrip / MiniWeekStrip (V22-06 and the list rows).
                              # RunnerFigure is the stick runner above Get started. Timings and
                              # cue tables live in lib/buildMotion.ts, never here
-    home/                   # LockedPanel, PlanContentTeaser — the post-first-plan Free-tier lock
-                             #  and its paid-content teaser
-    intake/                 # IntakeExitAction — the questionnaire's header "Skip for now" / "Done"
-    layout/                 # ScreenHeader, GroupedRows (Group / Row / ActionRow)
+    intake/                 # IntakeExitAction — the questionnaire's "Cancel", rendered on a
+                             #  re-entry only (a first entry has no exit, 2026-09-20)
+    layout/                 # ScreenHeader (eyebrow / title / supporting, plus an optional
+                             #  `action` slot on the eyebrow row — the intake's Cancel is its one
+                             #  caller), GroupedRows (Group / Row / ActionRow)
     nav/                    # TabBarIcon — the four tab glyphs, drawn not shipped as assets
     plan/                   # PlanTopBar (back arrow + mono eyebrow), PlanListRow (a My Plans
                              # row: miniature strip, title, meta), planScreen.ts (the three detail
@@ -243,9 +255,9 @@ src/
     quotaPeriod.ts                # canonical — `currentPeriod(anchorDate, now)`, the purchase-day
                                    #            anchored window with the month-end clamp. Shared
                                    #            by the app and `workers/`. 10 unit tests
-    planRequest.ts           # pure (new 2026-08-15) — intake owns the runner's target and Home
-                              #  never re-asks it; also the shared stale-race-date guard. See the
-                              #  src/lib/ notes below
+    planRequest.ts           # pure (new 2026-08-15) — intake owns the runner's target and, since
+                              #  2026-09-20, plan creation; Home never asks. Also the
+                              #  stale-race-date guard. See the src/lib/ notes below
     fieldInput.ts            # pure (new 2026-08-15) — the digit/decimal filters and clock/date part
                               #  parsers behind src/components/inputs/
     buildMotion.ts           # pure (new 2026-09-14) — the build animations' vocabulary: the
@@ -462,11 +474,15 @@ driven by `sign-up.tsx`'s own `useEffect` can lose that unmount race. The fix is
 `src/lib/postSignupRedirect.ts`: a one-shot module-level flag (`markPostSignupRedirect()` /
 `consumePostSignupRedirect()`), set by `sign-up.tsx` on a successful signup and consumed by
 `_layout.tsx` — which never unmounts — in its own `useEffect` watching `session`, followed by
-`router.replace('/intake')`. Any future post-signup routing decision belongs in `_layout.tsx` for
-the same reason, not in a screen that's about to unmount. Intake itself therefore owns an explicit,
-always-visible "Skip for now" header action that replaces to `/(tabs)`: Home permits a missing
-intake and presents the existing "Complete your intake" prompt, so this is a working escape without
-weakening the deliberate one-shot post-signup replace.
+`router.push('/intake')` (a push, not a replace, since 2026-09-20: the intake ends by replacing
+itself with the new plan, whose back arrow must land on Home, so `(tabs)` has to stay
+underneath). Any future post-signup routing decision belongs in `_layout.tsx` for the same
+reason, not in a screen that's about to unmount. Since 2026-09-20 the redirect is also no longer
+the only way in: Home reads `GET /api/intake` on every focus and pushes a runner with no intake on
+file to `/intake` itself (skipped if Home has already blurred, so the two paths never stack two
+intakes), and the intake has no "Skip for now" — a first entry has no Cancel, swipe-back off, and
+`beforeRemove` refused until the plan exists. The 2026-08-05 escape hatch is gone by the captain's
+ruling; the intake is mandatory.
 
 A known type-only friction: `@better-auth/expo` declares
 a `typescript: ^6.0.3` peer against this project's pinned `~5.9.2`; `apiClient.ts` carries a
@@ -527,10 +543,12 @@ src/app/
   verify-email             # exists today (2026-09-20) — the verification link's landing; same
                            # placement. Both are reached only by deep link (paceblueprint://…,
                            # exp://…/--/…, or the web origin), never by in-app navigation
-  (tabs)/index          # Home / Create plan — tier + quota and the primary action lead the screen;
-                         # Notes/subscription disclosures wait for a persisted generated plan.
-                         # Carries VerifyEmailBanner under the header (issue #94), which renders
-                         # only for an unverified account on a mail-capable Worker
+  (tabs)/index          # Home — gates first entry (no intake on file → push /intake), then the
+                         # subscription box, the newest plan's summary row, "Create a new plan"
+                         # (opens the intake, blank) and the My Plans row. Asks nothing, generates
+                         # nothing (2026-09-20). Carries VerifyEmailBanner under the header (issue
+                         # #94), which renders only for an unverified account on a mail-capable
+                         # Worker
   (tabs)/glossary       # compact, collapsed-by-default abbreviation disclosures; not in the
                          # original blueprint's tab list; added for Ian's 2026-07-11 notation ruling
   (tabs)/my-plans       # My Plans — permanent Example Plan plus GET /api/plans rows; no empty
@@ -539,15 +557,17 @@ src/app/
                          # account, an "Upgrade" entry point to /paywall (decision 1, 2026-07-10),
                          # and issue #89's accessible Legal -> Privacy policy link (via
                          # src/lib/openPrivacyPolicy.ts)
-  intake/                # onboarding questionnaire (stack) — exists today, against GET/PUT
-                         #  /api/intake
+  intake                 # the questionnaire and the plan-creation press (stack) — exists today,
+                         #  against GET/PUT /api/intake then POST /api/generate-plan; mandatory
+                         #  and unskippable on first entry, blank on every entry (2026-09-20)
   plan/[id]              # plan overview (V22-06 A) — exists today; renders a real generated plan
                          #  via GET /api/plans/:id, or the permanent static golden fixture for the
                          #  example-plan id. One row per week, current week highlighted
   plan/[id]/week/[week]  # week (V22-06 B, 2026-09-14) — the static strip and the seven day rows
   plan/[id]/week/[week]/day/[day]  # session or rest day (V22-06 C/D, 2026-09-14)
   paywall                # exists today (2026-08-05) — dummy purchase-tier UI, a Stack route
-                         #  reached from Settings or from Home's 402 over_quota catch
+                         #  reached from Settings, Home's subscription box, or the intake's 402
+                         #  over_quota catch
 ```
 
 **Decision 1 (2026-07-10):** the paywall and a settings-lite screen (sign out, tier display,
@@ -557,12 +577,14 @@ restore purchases) are restored to MVP scope, using the blueprint's reserved thi
 counterpart yet since v1's in-app purchase flow is dummy-only, with no real store receipt to
 restore.
 
-**Decision 5 (2026-07-10):** Home leads with "Create plan" and quota state, then shows the saved
-intake target and only the input needed to build the next plan. Notes and subscription disclosures
-are a second-stage surface, hidden until `GET /api/plans` confirms that the runner has generated a
-plan. There is still no "next workout" or "current week" card: no current-week arithmetic exists
-in v1; days are unnamed and there are no check-offs, so "next" has no well-defined meaning without
-one. This is Ian's override of the recommended `floor(days since created_at / 7) + 1` design.
+**Decision 5 (2026-07-10), as revised by the captain's 2026-09-20 rulings:** Home leads with
+quota state (the tier · quota eyebrow and the subscription box), then the newest plan's summary
+row, then "Create a new plan" — which only opens the intake. Home shows no intake target, asks
+for no plan length and has no Notes or subscription disclosures; every question and the create
+press live on `/intake`. The original decision's "no next workout card" stands in spirit: the
+summary row prints `N WEEKS · WEEK k` from `planProgress.ts`'s elapsed-days arithmetic (there
+since V22-04's header mark) but names no workout, since days are unnamed and there are no
+check-offs, so "next" has no well-defined meaning.
 
 ## Current + planned — `src/lib/` layout
 
@@ -690,17 +712,23 @@ src/lib/
   paceDerivation.ts        # exists — Riegel cross-distance equivalency, source-relative training
                             #          bands, and the ruled goal-realism/race-pace cap (decision
                             #          13, 2026-07-10)
-  planRequest.ts           # exists (2026-08-15) — the rule that intake owns the runner's target and
-                            #          Home never re-asks it: `planTargetFromIntake()`,
-                            #          `needsPlanLength()`, `buildGeneratePlanRequest()`. Pure, so
-                            #          the "asked exactly once" and "no race needed" guarantees are
-                            #          unit-tested without rendering a screen. Also owns the
-                            #          stale-race-date guard both screens share — `isRaceDatePast()`
-                            #          (`now` is injected, never read from the clock in here),
-                            #          `intakeRaceDateError()` and the two messages. Home sends no
-                            #          request and intake saves nothing when the date has passed, so
-                            #          no quota slot is charged for the one-week plan the server's
-                            #          `weeksUntilRace` floor would otherwise produce.
+  planRequest.ts           # exists (2026-08-15; header rewritten 2026-09-20) — the rule that
+                            #          intake owns the runner's target and, since 2026-09-20, plan
+                            #          creation; Home never asks and never sends a request:
+                            #          `planTargetFromIntake()`, `needsPlanLength()` (plan length
+                            #          is asked only when no race date fixes it),
+                            #          `buildGeneratePlanRequest()`. Pure, so the "asked exactly
+                            #          once" and "no race needed" guarantees are unit-tested without
+                            #          rendering a screen (the builder still encodes a `general`
+                            #          target — the required distance is the screen's rule). Also
+                            #          owns the stale-race-date guard — `isRaceDatePast()` (`now`
+                            #          is injected, never read from the clock in here),
+                            #          `intakeRaceDateError()` and the one
+                            #          `RACE_DATE_PASSED_MESSAGE`. The intake refuses before it
+                            #          saves or generates, so no quota slot is charged for the
+                            #          one-week plan the server's `weeksUntilRace` floor would
+                            #          otherwise produce. `describePlanTarget` and Home's "Tap
+                            #          Change" message went with Home's panel.
   fieldInput.ts            # exists (2026-08-15) — digit/decimal filters and the clock/date part
                             #          parsers behind `src/components/inputs/`. Its header records
                             #          why `keyboardType` alone is not enough (it restricts nothing;
@@ -749,7 +777,8 @@ generation still falls back to the same template every tier gets, honestly marke
 1. **Auth** — verify the session, reject anonymous requests. Happens once in
    `workers/src/index.ts`, ahead of dispatch, so no handler can be reached anonymously.
 2. **Idempotency replay** — `GeneratePlanRequest.idempotencyKey` is minted client-side when the
-   configure modal opens. If `(user_id, idempotency_key)` already has a row in `plans`, return
+   intake screen mounts (Home's, until 2026-09-20), held across retries of the same attempt, and
+   re-minted after a success or a terminal `invalid_request`. If `(user_id, idempotency_key)` already has a row in `plans`, return
    that row instead of generating again. This is what makes a network-timeout retry safe.
 3. **Atomic quota gate** — one conditional `INSERT ... SELECT ... WHERE (SELECT count(*) ...) <
    limit` statement checks the tier limit, counts non-fallback plans in the current period, and
@@ -906,9 +935,9 @@ it `getSession()` ignores the header and every route 403s a user who just signed
 | `GET /api/quota-status` | session | — | `{ tier, used, limit, periodEnd, unlimited, purchasesAvailable }` | Drives Home's and Settings' "N of M plans used" line (`src/lib/quotaDisplay.ts`'s `formatQuotaLine()`, consumed by both since 2026-08-05). `used` counts **non-fallback** plans in the current purchase-anchored period, server-side, never a client counter. `periodEnd` is `null` for Free (lifetime allowance) and also `null` while the temporary `ALL_USERS_UNLIMITED_ACCESS` override is on (see below) — the UI must not render a countdown for either. `purchasesAvailable` (2026-09-20) is whether the v1 dummy purchase is open to *this* account, decided by `workers/src/dummyPurchase.ts` from `DUMMY_PURCHASE_ENABLED` / `DUMMY_PURCHASE_ALLOWLIST`; the paywall renders it (`src/lib/purchaseAvailability.ts`) and never computes it. |
 | `POST /api/purchase-tier` | session | `{ tier: "pro"\|"elite", source: "dummy" }` | `{ tier, periodStart: string \| null, periodEnd: string \| null }`, or `403 purchases_unavailable` | v1 dummy flow, called from `src/app/paywall.tsx` (new 2026-08-05) with honest "test upgrade, no payment required" copy. Since 2026-09-20 gated server-side to trusted testers: refused `403 purchases_unavailable` unless `DUMMY_PURCHASE_ENABLED === "true"` (local/dev only) or the session's email is on `DUMMY_PURCHASE_ALLOWLIST` (exact, case-insensitive) — `workers/README.md` → "The v1 dummy purchase gate". Production ships with it off and the allowlist empty. v2 swaps `source` to `"revenuecat"` and verifies the receipt — same route, same table write. `source: "revenuecat"` is refused in v1 rather than trusted. |
 | `POST /api/delete-account` | session | — | `{ deleted: true }` | Really deletes; no soft-delete flag, because the app's own copy promises erasure. The only route that deletes a plan. Called from Settings' Delete Account flow (new 2026-08-05) after a confirmation on every platform (`src/lib/confirmDestructive.ts`, 2026-09-16 — before that, react-native-web's empty `Alert.alert` meant the web row never reached this route; issue #96), followed client-side by `authClient.signOut()` to invalidate the local session store. |
-| `GET /api/intake` | session | — | `{ intake }` or `{ intake: null }` | Was a direct client read under Supabase. |
-| `PUT /api/intake` | session | `IntakeResponses & { guardianConsent?: boolean }` | `{ saved: true }` or `400 invalid_request` | Was a direct client upsert under Supabase. Since 2026-09-19, an `age` of 13–17 requires `guardianConsent: true`; without it the request is refused before anything is persisted. With it, the intake row and a `guardian_consent` event (timestamp + policy version) are written atomically in the same D1 batch (`workers/src/lib/store.ts`'s `upsertIntake`). 18+ requests are unaffected. |
-| `GET /api/plans` | session | — | `{ plans: [summary] }` | Drives My Plans and Home's persisted-plan stage. My Plans keeps the permanent static example outside this response, links its most-recent stat to `max(createdAt)`, and has no empty-library state. Home uses only whether the list is non-empty to reveal its post-first-plan Notes/subscription panels. Summaries only — full documents would be megabytes for a heavy user. |
+| `GET /api/intake` | session | — | `{ intake }` or `{ intake: null }` | Was a direct client read under Supabase. Since 2026-09-20 it is read for a boolean only: Home's first-entry gate (`null` → push `/intake`; a failed fetch never redirects) and the intake's first/repeat decision. Nothing prefills from it — the stored row is the record of what the last plan was built from. |
+| `PUT /api/intake` | session | `IntakeResponses & { guardianConsent?: boolean }` | `{ saved: true }` or `400 invalid_request` | Was a direct client upsert under Supabase. Since 2026-09-20 the intake's one "Create plan" calls it and then `POST /api/generate-plan` in the same press; a refused save never generates. Since 2026-09-19, an `age` of 13–17 requires `guardianConsent: true`; without it the request is refused before anything is persisted. With it, the intake row and a `guardian_consent` event (timestamp + policy version) are written atomically in the same D1 batch (`workers/src/lib/store.ts`'s `upsertIntake`). 18+ requests are unaffected. |
+| `GET /api/plans` | session | — | `{ plans: [summary] }` | Drives My Plans and Home's CURRENT PLAN summary row. My Plans keeps the permanent static example outside this response, links its most-recent stat to `max(createdAt)`, and has no empty-library state. Home shows the newest plan by `createdAt` (title, `N WEEKS · WEEK k` once `GET /api/plans/:id` supplies the length) and renders no summary before one exists; a failed refresh keeps the last-known plan. Summaries only — full documents would be megabytes for a heavy user. |
 | `GET /api/plans/:id` | session | — | `{ plan, planId, isFallback, quotaConsumed }` or `404` | Someone else's plan id is a `404`, not a `403`: it does not exist to you. |
 
 There is deliberately **no `DELETE /api/plans/:id`**. Count-based quota depends on plans being

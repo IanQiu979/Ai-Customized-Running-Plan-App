@@ -4,23 +4,32 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import HomeScreen from '../index';
 
+/**
+ * Home after the captain's 2026-09-20 phone test: it asks nothing and generates nothing. These
+ * cases pin the three things it does instead — the first-entry gate to the intake, the
+ * subscription box above the plan summary, and the one "Create a new plan" CTA — and, just as
+ * deliberately, the controls that left with that ruling: the target card and its "Change", the
+ * plan-length field, Notes and its locked panel, and the "On Pro & Elite" teaser.
+ */
+
 const mockPush = jest.fn();
+// A stable object, as the real `useRouter()` returns one — Home's focus effect lists `router` in
+// its deps, and a fresh object per render would re-run the effect (and its fetches) forever.
+const mockRouter = { push: mockPush };
 const mockGetIntake = jest.fn();
 const mockGetQuotaStatus = jest.fn();
 const mockListPlans = jest.fn();
 const mockGeneratePlan = jest.fn();
 
-let mockFocusedEffect: (() => void | (() => void)) | undefined;
 let mockFocusCleanup: (() => void) | undefined;
 
 jest.mock('expo-router', () => {
   const React = jest.requireActual<typeof import('react')>('react');
 
   return {
-    useRouter: () => ({ push: mockPush }),
+    useRouter: () => mockRouter,
     useFocusEffect: (effect: () => void | (() => void)) => {
       React.useEffect(() => {
-        mockFocusedEffect = effect;
         const cleanup = effect();
         mockFocusCleanup = typeof cleanup === 'function' ? cleanup : undefined;
 
@@ -33,8 +42,8 @@ jest.mock('expo-router', () => {
   };
 });
 
-// The header mark reads the newest plan's length through the plan cache; hold it unresolved so
-// these cases stay about the subscription disclosures.
+// The header mark and the plan summary read the newest plan's length through the plan cache;
+// hold it unresolved so these cases stay about the screen's own branches.
 jest.mock('@/hooks/use-plan', () => ({
   peekPlan: () => undefined,
   loadPlan: () => new Promise(() => {}),
@@ -49,8 +58,7 @@ jest.mock('@/lib/apiClient', () => ({
   getQuotaStatus: (...args: unknown[]) => mockGetQuotaStatus(...args),
   listPlans: (...args: unknown[]) => mockListPlans(...args),
   // `VerifyEmailBanner` (issue #94) reads these and renders nothing for a verified runner or an
-  // unconfigured mail provider; both are held at "nothing to show" so the disclosures under test
-  // are the only variable.
+  // unconfigured mail provider; both are held at "nothing to show".
   getEmailStatus: async () => ({ mailConfigured: false, verificationRequired: false }),
   resendVerificationEmail: async () => ({ ok: true }),
   useSessionUser: () => null,
@@ -62,6 +70,7 @@ const intake = {
   experience: 'regular' as const,
   daysPerWeek: 4,
   weeklyKm: 32,
+  raceDistance: '10k' as const,
   injuries: ['none' as const],
 };
 
@@ -103,15 +112,6 @@ async function renderScreen(element: ReactElement): Promise<ReactTestRenderer> {
   return tree;
 }
 
-async function refocus(): Promise<void> {
-  act(() => {
-    mockFocusCleanup?.();
-    const cleanup = mockFocusedEffect?.();
-    mockFocusCleanup = typeof cleanup === 'function' ? cleanup : undefined;
-  });
-  await settleUpdates();
-}
-
 async function settleUpdates(): Promise<void> {
   for (let turn = 0; turn < 6; turn += 1) {
     await act(async () => {
@@ -126,10 +126,14 @@ function labels(tree: ReactTestRenderer, accessibilityLabel: string) {
   );
 }
 
-function controls(tree: ReactTestRenderer, accessibilityLabel: string): ReactTestInstance[] {
+function controls(
+  tree: ReactTestRenderer,
+  accessibilityLabel: string,
+  role: 'button' | 'link' = 'button'
+): ReactTestInstance[] {
   return tree.root.findAll(
     (node) =>
-      node.props.accessibilityRole === 'button' &&
+      node.props.accessibilityRole === role &&
       node.props.accessibilityLabel === accessibilityLabel &&
       typeof node.props.onPress === 'function'
   );
@@ -145,32 +149,93 @@ function flatten(children: unknown): string {
   return '';
 }
 
-describe('Home subscription disclosures', () => {
-  beforeEach(() => {
-    mockPush.mockClear();
-    mockGetIntake.mockReset().mockResolvedValue({ intake });
-    mockGetQuotaStatus.mockReset();
-    mockListPlans.mockReset();
-    mockGeneratePlan.mockReset();
-    mockFocusedEffect = undefined;
-    mockFocusCleanup = undefined;
+function resetMocks() {
+  mockPush.mockClear();
+  mockGetIntake.mockReset().mockResolvedValue({ intake });
+  mockGetQuotaStatus.mockReset().mockResolvedValue(freeQuota);
+  mockListPlans.mockReset().mockResolvedValue({ plans: [] });
+  mockGeneratePlan.mockReset();
+  mockFocusCleanup = undefined;
+}
+
+function unmountAll() {
+  act(() => {
+    mountedTrees.splice(0).forEach((tree) => tree.unmount());
+  });
+}
+
+describe('Home first-entry gate (captain\'s ruling 1, 2026-09-20)', () => {
+  beforeEach(resetMocks);
+  afterEach(unmountAll);
+
+  it('sends a signed-in runner with no intake on file to the intake, and offers nothing else', async () => {
+    mockGetIntake.mockResolvedValue({ intake: null });
+
+    const tree = await renderScreen(<HomeScreen />);
+
+    expect(mockPush).toHaveBeenCalledWith('/intake');
+    // No way to stay: no CTA, no "Start intake" prompt, no plan-creation controls of any kind.
+    expect(labels(tree, 'Create a new plan')).toHaveLength(0);
+    expect(labels(tree, 'Start intake')).toHaveLength(0);
+    expect(flatten(tree.root)).not.toContain("Let's find your starting line.");
   });
 
-  afterEach(() => {
+  it('does not redirect when the intake lookup fails — a failed fetch is not "no intake"', async () => {
+    mockGetIntake.mockRejectedValue(new Error('offline'));
+
+    const tree = await renderScreen(<HomeScreen />);
+
+    expect(mockPush).not.toHaveBeenCalledWith('/intake');
+    expect(flatten(tree.root)).toContain('Could not load your intake.');
+  });
+
+  it('does not redirect once the intake exists', async () => {
+    await renderScreen(<HomeScreen />);
+
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+});
+
+describe('Home controls after the 2026-09-20 rework', () => {
+  beforeEach(resetMocks);
+  afterEach(unmountAll);
+
+  it('shows one "Create a new plan" that opens the intake, and generates nothing itself', async () => {
+    const tree = await renderScreen(<HomeScreen />);
+    const cta = controls(tree, 'Create a new plan');
+
+    expect(cta).toHaveLength(1);
+    if (cta.length !== 1) return;
+    expect(cta[0].props.accessibilityState).toEqual({ disabled: false });
+
     act(() => {
-      mountedTrees.splice(0).forEach((tree) => tree.unmount());
+      (cta[0].props.onPress as () => void)();
     });
+
+    expect(mockPush).toHaveBeenCalledWith('/intake');
+    expect(mockGeneratePlan).not.toHaveBeenCalled();
+    expect(labels(tree, 'Create plan')).toHaveLength(0);
   });
 
-  it('hides Notes and the paid-plan teaser for a paid runner with no generated plan', async () => {
-    mockGetQuotaStatus.mockResolvedValue({ ...freeQuota, tier: 'pro', limit: 5 });
-    mockListPlans.mockResolvedValue({ plans: [] });
+  it('carries no target or plan-length controls — those questions belong to the intake', async () => {
+    mockGetIntake.mockResolvedValue({ intake: { ...intake, raceDate: '2027-03-01' } });
 
     const tree = await renderScreen(<HomeScreen />);
     const renderedText = flatten(tree.root);
 
-    expect(renderedText).toContain('YOUR TARGET');
-    expect(renderedText).toContain('PRO');
+    expect(labels(tree, 'Change target')).toHaveLength(0);
+    expect(labels(tree, 'Plan length in weeks')).toHaveLength(0);
+    expect(renderedText).not.toContain('YOUR TARGET');
+    expect(renderedText).not.toContain('PLAN LENGTH');
+    expect(renderedText).not.toContain('2027-03-01');
+  });
+
+  it('shows neither the Notes teaser nor the "On Pro & Elite" teaser to a Free runner with a plan', async () => {
+    mockListPlans.mockResolvedValue({ plans: [generatedPlan] });
+
+    const tree = await renderScreen(<HomeScreen />);
+    const renderedText = flatten(tree.root);
+
     expect(labels(tree, 'Notes')).toHaveLength(0);
     expect(labels(tree, 'Notes — locked. Available on Pro and Elite.')).toHaveLength(0);
     expect(
@@ -178,149 +243,96 @@ describe('Home subscription disclosures', () => {
     ).toHaveLength(0);
     expect(renderedText).not.toContain('NOTES (OPTIONAL)');
     expect(renderedText).not.toContain('ON PRO & ELITE');
+    expect(renderedText).not.toContain('UPGRADE TO UNLOCK');
   });
 
-  it('keeps the plan creation basics available before any generated plan exists', async () => {
-    mockGetQuotaStatus.mockResolvedValue(freeQuota);
-    mockListPlans.mockResolvedValue({ plans: [] });
-
-    const tree = await renderScreen(<HomeScreen />);
-    const renderedText = flatten(tree.root);
-    const createPlanControls = labels(tree, 'Create plan');
-
-    expect(createPlanControls).toHaveLength(1);
-    if (createPlanControls.length !== 1) return;
-    expect(createPlanControls[0].props.accessibilityRole).toBe('button');
-    expect(createPlanControls[0].props.accessibilityState).toEqual({ disabled: false });
-    expect(labels(tree, 'Plan length in weeks')).toHaveLength(1);
-    expect(renderedText).toContain('YOUR TARGET');
-    expect(renderedText).toContain('General fitness — no target race');
-    expect(renderedText).toContain('PLAN LENGTH (WEEKS)');
-  });
-
-  it('announces a generation error as an assertive alert after Create plan is pressed', async () => {
-    mockGetQuotaStatus.mockResolvedValue(freeQuota);
-    mockListPlans.mockResolvedValue({ plans: [] });
-    mockGeneratePlan.mockRejectedValue(new Error('connection failed'));
-
-    const tree = await renderScreen(<HomeScreen />);
-    const createPlanControls = controls(tree, 'Create plan');
-    expect(createPlanControls).toHaveLength(1);
-    if (createPlanControls.length !== 1) return;
-
-    act(() => {
-      (createPlanControls[0].props.onPress as () => void)();
-    });
-    await settleUpdates();
-
-    const errorMessage = 'Something went wrong. Try again.';
-    expect(flatten(tree.root)).toContain(errorMessage);
-    const errorNodes = tree.root.findAll(
-      (node) =>
-        typeof node.type === 'string' && flatten(node.props.children) === errorMessage
-    );
-    expect(errorNodes).toHaveLength(1);
-    if (errorNodes.length !== 1) return;
-    expect(errorNodes[0].props.accessibilityRole).toBe('alert');
-    expect(errorNodes[0].props.accessibilityLiveRegion).toBe('assertive');
-  });
-
-  it('shows editable Notes without an upgrade teaser for a paid runner with a persisted plan', async () => {
+  it('shows no Notes field to a paid runner with a plan either', async () => {
     mockGetQuotaStatus.mockResolvedValue({ ...freeQuota, tier: 'pro', limit: 5 });
-    mockListPlans.mockResolvedValue({
-      plans: [{ ...generatedPlan, tierAtGeneration: 'pro' }],
-    });
+    mockListPlans.mockResolvedValue({ plans: [{ ...generatedPlan, tierAtGeneration: 'pro' }] });
+
+    const tree = await renderScreen(<HomeScreen />);
+
+    expect(labels(tree, 'Notes')).toHaveLength(0);
+    expect(flatten(tree.root)).not.toContain('NOTES (OPTIONAL)');
+  });
+
+  it('puts the subscription box above the plan summary, and the summary above the CTA', async () => {
+    mockListPlans.mockResolvedValue({ plans: [generatedPlan] });
 
     const tree = await renderScreen(<HomeScreen />);
     const renderedText = flatten(tree.root);
-    const notesFields = labels(tree, 'Notes');
 
-    expect(notesFields).toHaveLength(1);
-    if (notesFields.length !== 1) return;
-    expect(notesFields[0].props.editable).toBe(true);
-    expect(renderedText).toContain('NOTES (OPTIONAL)');
-    expect(renderedText).not.toContain('ON PRO & ELITE');
-    expect(labels(tree, 'Notes — locked. Available on Pro and Elite.')).toHaveLength(0);
-    expect(
-      labels(tree, "Pace targets, HR zones and coach's notes — locked. Available on Pro and Elite.")
-    ).toHaveLength(0);
+    const subscriptionAt = renderedText.indexOf('See plans →');
+    const summaryAt = renderedText.indexOf('Settled plan');
+    const ctaAt = renderedText.indexOf('Create a new plan');
+    const myPlansAt = renderedText.indexOf('My Plans →');
+
+    expect(subscriptionAt).toBeGreaterThanOrEqual(0);
+    expect(summaryAt).toBeGreaterThan(subscriptionAt);
+    expect(ctaAt).toBeGreaterThan(summaryAt);
+    expect(myPlansAt).toBeGreaterThan(ctaAt);
+
+    // The subscription box is the door to the paywall, labelled with the tier and the count.
+    const box = controls(tree, 'Free plan, 0 of 1 plans used. See plans', 'link');
+    expect(box).toHaveLength(1);
+    act(() => {
+      (box[0].props.onPress as () => void)();
+    });
+    expect(mockPush).toHaveBeenCalledWith('/paywall');
   });
 
-  it('reveals the free-tier subscription disclosures after a refocus finds the first persisted plan', async () => {
-    mockGetQuotaStatus.mockResolvedValue(freeQuota);
-    mockListPlans
-      .mockResolvedValueOnce({ plans: [] })
-      .mockResolvedValueOnce({ plans: [generatedPlan] });
+  it('opens the newest plan from the summary row', async () => {
+    mockListPlans.mockResolvedValue({
+      plans: [generatedPlan, { ...generatedPlan, planId: 'older', title: 'Older', createdAt: '2026-08-01T00:00:00.000Z' }],
+    });
 
     const tree = await renderScreen(<HomeScreen />);
+    const summary = controls(tree, 'Current plan: Settled plan. Open plan', 'link');
 
-    expect(labels(tree, 'Notes — locked. Available on Pro and Elite.')).toHaveLength(0);
-    expect(
-      labels(tree, "Pace targets, HR zones and coach's notes — locked. Available on Pro and Elite.")
-    ).toHaveLength(0);
+    expect(summary).toHaveLength(1);
+    expect(flatten(tree.root)).not.toContain('Older');
+    act(() => {
+      (summary[0].props.onPress as () => void)();
+    });
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/plan/[id]',
+      params: { id: 'settled-plan', createdAt: generatedPlan.createdAt },
+    });
+  });
 
-    await refocus();
+  it('shows no plan summary before any plan exists', async () => {
+    const tree = await renderScreen(<HomeScreen />);
 
-    expect(labels(tree, 'Notes — locked. Available on Pro and Elite.')).toHaveLength(1);
-    expect(
-      labels(tree, "Pace targets, HR zones and coach's notes — locked. Available on Pro and Elite.")
-    ).toHaveLength(1);
-    expect(labels(tree, 'Notes')).toHaveLength(1);
-    expect(labels(tree, 'Notes')[0].props.editable).toBe(false);
-    expect(flatten(tree.root)).toContain('ON PRO & ELITE');
+    expect(flatten(tree.root)).not.toContain('CURRENT PLAN');
+    expect(labels(tree, 'Create a new plan')).toHaveLength(1);
   });
 });
 
 /**
  * Copy-vs-behaviour (issue #25). The frontend audit of 2026-07-11 caught Home telling a tester
  * "Intake, generation, and plan view land in later build phases" directly above a working
- * plan-view link. Both the sentence and that link left this screen when it was wired to the real
- * backend (#62), so the fix is already in; these cases exist so the claim cannot come back — in
- * either branch of the screen — and so every pressable Home renders keeps announcing a role.
+ * plan-view link. These cases exist so the claim cannot come back and so every pressable Home
+ * renders keeps announcing a role.
  */
 describe('Home copy matches what the app does (issue #25)', () => {
   beforeEach(() => {
-    mockPush.mockClear();
-    mockGetIntake.mockReset();
-    mockGetQuotaStatus.mockReset().mockResolvedValue(freeQuota);
-    mockListPlans.mockReset().mockResolvedValue({ plans: [generatedPlan] });
-    mockGeneratePlan.mockReset();
-    mockFocusedEffect = undefined;
-    mockFocusCleanup = undefined;
+    resetMocks();
+    mockListPlans.mockResolvedValue({ plans: [generatedPlan] });
   });
-
-  afterEach(() => {
-    act(() => {
-      mountedTrees.splice(0).forEach((tree) => tree.unmount());
-    });
-  });
+  afterEach(unmountAll);
 
   const placeholderClaims = [/later build phase/i, /build phases/i, /\(demo\)/i, /not yet available/i];
 
-  it('never claims a capability is missing before intake', async () => {
-    mockGetIntake.mockResolvedValue({ intake: null });
-
-    const tree = await renderScreen(<HomeScreen />);
-    const renderedText = flatten(tree.root);
-
-    expect(renderedText).toContain("Let's find your starting line.");
-    for (const claim of placeholderClaims) expect(renderedText).not.toMatch(claim);
-  });
-
   it('never claims a capability is missing once intake and a plan exist', async () => {
-    mockGetIntake.mockResolvedValue({ intake });
-
     const tree = await renderScreen(<HomeScreen />);
     const renderedText = flatten(tree.root);
 
-    expect(renderedText).toContain('YOUR TARGET');
+    expect(renderedText).toContain('Create a new plan');
     expect(renderedText).toContain('My Plans →');
     for (const claim of placeholderClaims) expect(renderedText).not.toMatch(claim);
   });
 
   it('gives every pressable on Home a role a screen reader can announce', async () => {
-    mockGetIntake.mockResolvedValue({ intake });
-
     const tree = await renderScreen(<HomeScreen />);
     const pressables = tree.root.findAll(
       (node) =>
@@ -329,8 +341,8 @@ describe('Home copy matches what the app does (issue #25)', () => {
         typeof node.props.onPress === 'function'
     );
 
-    // The one CTA, the Change link, the My Plans row, the tier row, and the two locked panels'
-    // unlock controls — none of them may be a bare, role-less Pressable.
+    // The subscription box, the plan summary, the one CTA and the My Plans row — none of them may
+    // be a bare, role-less Pressable.
     expect(pressables.length).toBeGreaterThanOrEqual(4);
     for (const pressable of pressables) {
       expect(['button', 'link']).toContain(pressable.props.accessibilityRole);

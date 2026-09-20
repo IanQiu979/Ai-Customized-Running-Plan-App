@@ -1,8 +1,6 @@
 import {
   buildGeneratePlanRequest,
   DEFAULT_PLAN_WEEKS,
-  describePlanTarget,
-  INTAKE_RACE_DATE_PASSED_MESSAGE,
   intakeRaceDateError,
   isRaceDatePast,
   MAX_PLAN_WEEKS,
@@ -61,17 +59,9 @@ describe('planTargetFromIntake — intake is the only place a target is asked fo
     expect(planTargetFromIntake(null)).toEqual({ kind: 'general' });
     expect(planTargetFromIntake(undefined)).toEqual({ kind: 'general' });
   });
-
-  it('describes every target in words the runner can check against what they answered', () => {
-    expect(describePlanTarget({ kind: 'race', raceDistance: 'half', raceDate: '2026-09-26' })).toBe(
-      'Half Marathon on 2026-09-26',
-    );
-    expect(describePlanTarget({ kind: 'distance', raceDistance: '10k' })).toBe('10K — no date set');
-    expect(describePlanTarget({ kind: 'general' })).toBe('General fitness — no target race');
-  });
 });
 
-describe('needsPlanLength — Home asks for exactly one thing intake cannot know', () => {
+describe('needsPlanLength — the intake asks for a length only when no race date fixes it', () => {
   it('does not ask when a race date already fixes the length', () => {
     expect(
       needsPlanLength({ kind: 'race', raceDistance: 'half', raceDate: '2026-09-26' }),
@@ -175,13 +165,12 @@ describe('buildGeneratePlanRequest — a plan generates with no race specified',
 });
 
 describe('a saved race date that has already passed', () => {
-  // Home shows the target read-only now, so a runner returning after their race would have sent a
-  // stale date verbatim. `weeksUntilRace` floors at one week and the quota slot is reserved before
-  // the skeleton is built, so that request charges a generation for a degenerate one-week plan.
-  // Refused here, client-side, before anything is sent; the server-side floor is untouched.
+  // `weeksUntilRace` floors at one week and the quota slot is reserved before the skeleton is
+  // built, so a stale date would charge a generation for a degenerate one-week plan. Refused here,
+  // client-side, before anything is sent; the server-side floor is untouched.
   const passed = { kind: 'race', raceDistance: 'half', raceDate: '2026-08-01' } as const;
 
-  it('refuses the request and points at the Change affordance', () => {
+  it('refuses the request with the one stale-date message', () => {
     expect(request({ target: passed })).toEqual({ ok: false, error: RACE_DATE_PASSED_MESSAGE });
   });
 
@@ -228,21 +217,20 @@ describe('a saved race date that has already passed', () => {
 });
 
 describe('intakeRaceDateError — the way out of the refusal', () => {
-  // Home refusing to generate against a stale date while intake still happily saves that same date
-  // would be a closed loop: tap Change, see the same date, save clean, get refused again. Intake
-  // refuses too, and says what to do about it.
+  // The intake saves and generates in one press, so it refuses a stale date before either
+  // happens, and says what to do about it: the race is required, its date is not.
   it('refuses a past race date and gives the runner both ways out', () => {
-    expect(intakeRaceDateError('2026-08-14', NOW)).toBe(INTAKE_RACE_DATE_PASSED_MESSAGE);
-    expect(INTAKE_RACE_DATE_PASSED_MESSAGE).toContain('future date');
-    expect(INTAKE_RACE_DATE_PASSED_MESSAGE).toContain('clear your target race');
+    expect(intakeRaceDateError('2026-08-14', NOW)).toBe(RACE_DATE_PASSED_MESSAGE);
+    expect(RACE_DATE_PASSED_MESSAGE).toContain('future date');
+    expect(RACE_DATE_PASSED_MESSAGE).toContain('clear the date');
+    expect(RACE_DATE_PASSED_MESSAGE).not.toContain('Change');
   });
 
-  it('tells the same story as Home about the same condition', () => {
-    expect(INTAKE_RACE_DATE_PASSED_MESSAGE).toContain('That race date has already passed.');
+  it('is the same message the request builder uses for the same condition', () => {
     expect(RACE_DATE_PASSED_MESSAGE).toContain('That race date has already passed.');
   });
 
-  it('accepts race day itself, matching Home, where race day still generates', () => {
+  it('accepts race day itself — race day still generates', () => {
     expect(intakeRaceDateError('2026-08-15', NOW)).toBeNull();
   });
 

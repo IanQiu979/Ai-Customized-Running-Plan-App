@@ -88,9 +88,12 @@ export default function RootLayout() {
 
   // This layout never unmounts, unlike `sign-up.tsx` — see `postSignupRedirect.ts`'s header for
   // why the redirect has to be consumed from here rather than from the sign-up screen itself.
+  // A push, not a replace (2026-09-20): the intake ends by replacing itself with the new plan,
+  // whose back arrow must land on Home — so `(tabs)` has to stay underneath. Home's own
+  // first-entry gate covers every path that does not come through here.
   useEffect(() => {
     if (session && consumePostSignupRedirect()) {
-      router.replace('/intake');
+      router.push('/intake');
     }
   }, [session, router]);
 

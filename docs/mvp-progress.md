@@ -22,8 +22,8 @@
 | Milestone | State |
 |---|---|
 | M1 — Foundation (account → empty Home) | **In progress.** Server (auth + schema + account routes) is deployed on Cloudflare (`workers/`, live `production` environment); client-side email/password works in production, and Google is registered in production since 2026-08-09 (registration only — see "How it is now" for the two unproven riders). Password reset and email verification are built and tested end to end as of 2026-09-20 (issue #94) but **inert until the captain configures a mail provider** — `docs/email-setup.md`; see "How it is now" and "Blocked" |
-| M2 — Intake (questionnaire persists) | **In progress.** Intake is asked exactly once: Home reads the target back from the saved intake and asks only for a plan length, and only when there is no race date to derive one from (`src/lib/planRequest.ts`) |
-| M3 — Plan engine (3 tiers produce valid plans) | **In progress.** The engine splits by tier as of 2026-09-09: Free is served entirely from the 40-plan deterministic library (`src/lib/planLibrary/`), paying tiers keep the template/pace engine as the AI skeleton. Both are wired into the Worker's `generate-plan` route and the client's generate-plan action; the plan view renders a real generated plan (via `GET /api/plans/:id`) alongside the permanent static golden fixture. Paid tiers still serve the quota-exempt template fallback — see "How it is now" |
+| M2 — Intake (questionnaire persists) | **In progress.** Since 2026-09-20 the intake is mandatory on first entry (Home pushes a runner with no intake on file to it; no Cancel, no swipe-back until a plan exists), starts blank on every entry, asks the plan length itself when no race date fixes it, requires a target race distance, and ends in the one "Create plan" that saves and generates in a single press. Home asks nothing (`src/lib/planRequest.ts`) — see "How it is now" |
+| M3 — Plan engine (3 tiers produce valid plans) | **In progress.** The engine splits by tier as of 2026-09-09: Free is served entirely from the 40-plan deterministic library (`src/lib/planLibrary/`), paying tiers keep the template/pace engine as the AI skeleton. Both are wired into the Worker's `generate-plan` route and the intake's "Create plan" press (Home's until 2026-09-20); the plan view renders a real generated plan (via `GET /api/plans/:id`) alongside the permanent static golden fixture. Paid tiers still serve the quota-exempt template fallback — see "How it is now" |
 | M4 — Tiers & quotas (server-side, unbypassable) | **In progress.** The quota ledger, atomic gate, fallback exemption, `quota-status` and `purchase-tier` are built and tested server-side; Home now leads with the server-backed tier/quota line, Settings also displays it, and a dummy paywall lets a runner call `purchase-tier`. Since 2026-09-20 that dummy purchase is gated server-side to trusted testers (`workers/src/dummyPurchase.ts`): production as committed has it off with an empty allowlist, and the paywall renders `quota-status`'s `purchasesAvailable` rather than deciding — see "How it is now" and "Blocked" |
 | M5 — My Plans (history) | **In progress.** My Plans keeps the permanent Example Plan, lists generated plans off `GET /api/plans`, and links MOST RECENT to the newest generated plan; there is no contradictory empty state |
 | M6 — Polish & TestFlight | **In progress.** The visual system is **Blueprint** (2026-09-14, `fm/v22-animations-lane3`): the captain's V22 theme sheet plus the six approved build animations, replacing Instrument (2026-09-03, on `main`) which replaced Trailhead. Every screen — signed-out and signed-in — has now been rendered on Expo **web** at 393×852 and compared against the approved Claude Design pages (the visual-match pass, 2026-09-14); no screen has ever been run on a real iOS or Android device or simulator. See "How it is now". The first EAS build exists as of 2026-09-19 — an Android **development-client** .apk (build `9ca20e4e`, issue #93's Android half; recipe, artifact URL and the Google-sign-in config check in `docs/build.md`); it has not yet been installed and exercised on a phone, and iOS/TestFlight still waits on the Apple Developer Program |
@@ -210,19 +210,37 @@
   now 15–25% cuts instead of loading weeks flagged as rest (they had gone up 14–51%). Paid-tier
   skeleton only; Free and the example-plan fixture are untouched. Captain's `golden-cadence3-route`
   ruling — see "Decided (2026-09-16)"; pinned by `planTemplates.goldenDeload.test.ts`.
-- **Intake is asked once and a race target is optional.** Home reads the target off the saved
-  intake and asks only for a plan length when there is no race date. A no-race plan never ends on
-  a deload; a past race date is refused on both screens (race day and a blank date remain valid);
-  numeric inputs are structured (`src/components/inputs/` + `src/lib/fieldInput.ts`). Full
-  account: the "Last updated" entry below.
-- **Home and navigation now follow the captain's 2026-09-12 audit.** Home's header shows tier and
-  server-backed quota in place of the static product eyebrow, and its Create plan action is the
-  first control. Before `GET /api/plans` confirms a persisted generated plan, Home stays focused
-  on the target, conditional plan length and creation basics; Notes and subscription disclosures
-  appear only after that first plan. My Plans always has the Example Plan, never says the library
-  is empty, and links MOST RECENT to the newest generated plan. The four tabs are icon-only but
-  retain explicit screen-reader labels. Glossary definitions keep their existing `notation.ts`
-  content behind independent, collapsed-by-default, accessible disclosure rows.
+- **The first-plan path is sign-up → intake (unskippable) → Create plan → plan → Home
+  (2026-09-20, `fm/v22-intake-flow-rework`, captain's phone-test rulings).** The intake is the
+  only place a question is asked and the only place a plan is created. Home reads
+  `GET /api/intake` on focus and pushes a runner with no intake on file to `/intake` (a failed
+  fetch never redirects); the root layout's post-signup redirect is now a `push` too, so `(tabs)`
+  stays underneath. A first entry has no Cancel, swipe-back off and `beforeRemove` refused until
+  the plan exists; a re-entry from Home's "Create a new plan" has a Cancel back to Home. The form
+  starts blank every time (`GET /api/intake` is read for a boolean only, never to prefill), asks
+  the plan length itself while the race date is blank (`needsPlanLength`, live; default 12),
+  requires a target race distance ("Choose your target race distance."; race date and goal time
+  stay optional, labelled so), names the field on every validation error, and ends in one "Create
+  plan" that runs `PUT /api/intake` then `POST /api/generate-plan` and replaces itself with
+  `/plan/[id]` so the plan's back arrow lands on Home. `over_quota` → `/paywall` with the quota, a
+  terminal `invalid_request` re-mints the idempotency key — exactly as Home used to. Home now
+  shows the tier · quota header, the **subscription box first** (header mark, tier, plans used,
+  "See plans →"), a CURRENT PLAN summary row for the newest plan (`N WEEKS · WEEK k`, opens it),
+  the one "Create a new plan" CTA, and the My Plans row. Gone from Home: the "YOUR TARGET" card
+  and "Change" link, the plan-length field, the Notes field and its Free-tier `LockedPanel`, the
+  "ON PRO & ELITE" `PlanContentTeaser` (both components deleted), the goal-realism preview and
+  every generate branch; gone from the intake: "Skip for now" / "Done" and prefilling. The
+  per-plan Notes field was dropped, not moved (`notes` is sent empty; `injuryNotes` still reaches
+  the model). Worker, contract and plan engines untouched. A no-race plan never ends on a deload;
+  a past race date is still refused before anything is saved or charged (race day and a blank date
+  remain valid); numeric inputs are structured (`src/components/inputs/` + `src/lib/fieldInput.ts`).
+  Root gate green at 62 suites / 1017 tests. Detail: `change_log.md`, 2026-09-20.
+- **Home and navigation follow the captain's 2026-09-12 audit, as re-cut on 2026-09-20 (bullet
+  above).** Home's header shows tier and server-backed quota in place of the static product
+  eyebrow. My Plans always has the Example Plan, never says the library is empty, and links MOST
+  RECENT to the newest generated plan. The four tabs are icon-only but retain explicit
+  screen-reader labels. Glossary definitions keep their existing `notation.ts` content behind
+  independent, collapsed-by-default, accessible disclosure rows.
 - **The design system was "Instrument" from 2026-09-03 to 2026-09-14 — superseded by Blueprint
   (first bullet above) for colour, type and the accent; its rules carry over.** The record below
   is kept as written on 2026-09-03/04, and the pulse trace it describes is now deleted.
@@ -278,9 +296,11 @@
   `[vars]` of `workers/wrangler.toml` (the committed `[env.production.vars]` value is `"false"`),
   so the captain's test pass runs with every account Elite and the quota gate bypassed. Set the
   top-level value to `"false"` before real users arrive. Recorded in "Latest — 2026-08-09".
-- **Test counts:** 999 root tests across 60 suites and 174 `workers/` tests across 10 files on
-  `fm/v22-password-recovery-94`, verified by running both gates there on 2026-09-20. Earlier
-  figures, for the record: 899 root tests across 52 suites on `fm/v22-delete-account-web-noop-96` (after rebasing onto #116),
+- **Test counts:** 1017 root tests across 62 suites on `fm/v22-intake-flow-rework` (verified by
+  running the root gate there on 2026-09-20) and 174 `workers/` tests across 10 files on
+  `fm/v22-password-recovery-94`, verified by running the Workers gate there the same day. Earlier
+  figures, for the record: 999 root tests across 60 suites on `fm/v22-password-recovery-94`
+  (2026-09-20); 899 root tests across 52 suites on `fm/v22-delete-account-web-noop-96` (after rebasing onto #116),
   verified by running the root gate there on 2026-09-16; 870
   root tests across 48 suites on `fm/v22-animations-lane3`, verified by running
   the root gate there on 2026-09-14; 785 root tests across 39 suites on `fm/v22-3day-peak-below-base`, verified by
@@ -301,13 +321,13 @@
 
 ---
 
-**Last updated:** 2026-09-20 — five plan-engine rulings from the coach sign-off pack landed on
-`fm/v22-engine-rulings-r2` (the Free library's peak is its highest block, race day is the bare
-distance on both tiers, #119 and #103's two families closed, #106 confirmed — see "How it is now"
-and "Decided (2026-09-20)"; the bullets below are the dummy-purchase entry's); earlier the same
-day the v1 dummy purchase was gated server-side to trusted testers on
-`fm/v22-test-purchase-gate`, and before that password recovery and email verification (issue
-#94) landed on `fm/v22-password-recovery-94`.
+**Last updated:** 2026-09-20 — the intake-flow rework (`fm/v22-intake-flow-rework`: the intake is
+mandatory on first entry, starts blank, asks the plan length, requires a target distance and
+creates the plan; Home only shows the subscription box, the newest plan and "Create a new plan" —
+see "How it is now" and `change_log.md`); the same day the v1 dummy purchase was gated
+server-side to trusted testers on `fm/v22-test-purchase-gate`, and earlier, password recovery and
+email verification (issue #94) landed on `fm/v22-password-recovery-94`. The bullets below are the
+#94 record.
 
 - **The Worker can mail, but only once the captain says so.** `workers/src/lib/mail.ts` is a
   provider-agnostic `sendMail` with a `ResendAdapter` (used when `RESEND_API_KEY` and `MAIL_FROM`
@@ -812,6 +832,19 @@ from 82. Issue #22 remains open.)
   captain — provisioned and verified in local dev 2026-08-05 (see that entry below).
 
 ### Code
+- [x] **Intake-flow rework — the intake is mandatory, blank, and creates the plan (2026-09-20,
+      `fm/v22-intake-flow-rework`).** Home (`src/app/(tabs)/index.tsx`) gates first entry on
+      `GET /api/intake` and is reduced to the subscription box, the newest plan's summary row,
+      "Create a new plan" and the My Plans row; `src/app/intake.tsx` starts blank, refuses to be
+      left on a first entry until a plan exists, asks the plan length while the race date is
+      blank, requires a target distance, and ends in "Create plan" (`putIntake` → `generatePlan`
+      → replace to `/plan/[id]`), re-cut on `ScreenHeader` (new `action` slot) in five Blueprint
+      sections. `src/components/home/` (`LockedPanel`, `PlanContentTeaser`) deleted;
+      `planRequest.ts` loses `describePlanTarget` and Home's stale-date message; the root layout's
+      post-signup redirect is a `push`. Tests: `home.test.tsx` rewritten, new
+      `src/app/__tests__/intake-flow.test.tsx` (the eighth rendered-screen exception),
+      `intake-guardian-consent`, `intake-exit`, `render` and `planRequest` suites updated. Worker
+      untouched. Root gate: 62 suites / 1017 tests. Detail: `docs/change_log.md`, 2026-09-20.
 - [x] **Five plan-engine rulings from the coach sign-off pack (2026-09-20,
       `fm/v22-engine-rulings-r2`; issues #103, #119, #106).** Free library: the peak phase is
       the plan's highest-volume block — `VOLUME_STATE_TARGETS.HOLD.target` at the top of § 5's

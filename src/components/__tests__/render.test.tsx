@@ -4,8 +4,6 @@ import { Text } from 'react-native';
 
 import { Accent, Colors } from '@/constants/theme';
 
-import { LockedPanel } from '../home/LockedPanel';
-import { PlanContentTeaser } from '../home/PlanContentTeaser';
 import { ActionRow, Group, Row } from '../layout/GroupedRows';
 import { ScreenHeader } from '../layout/ScreenHeader';
 import { TabBarIcon, type TabIconName } from '../nav/TabBarIcon';
@@ -64,6 +62,15 @@ describe('TabBarIcon', () => {
 });
 
 describe('ScreenHeader', () => {
+  it('renders an optional action on the eyebrow row', () => {
+    const tree = render(
+      <ScreenHeader eyebrow="Intake" title="About your running" action={<Text>Cancel</Text>} />
+    );
+    const text = JSON.stringify(tree.toJSON());
+    expect(text).toContain('INTAKE');
+    expect(text).toContain('Cancel');
+  });
+
   it('renders with the hairline rule', () => {
     expect(render(<ScreenHeader title="My Plans" />).toJSON()).toBeTruthy();
     expect(render(<ScreenHeader title="Settings" />).toJSON()).toBeTruthy();
@@ -76,47 +83,6 @@ describe('ScreenHeader', () => {
     const text = JSON.stringify(tree.toJSON());
     expect(text).toContain('YOUR LIBRARY');
     expect(text).toContain("Everything you've built.");
-  });
-});
-
-describe('LockedPanel', () => {
-  it('renders children bare when unlocked — no frame, no unlock affordance', () => {
-    const tree = render(
-      <LockedPanel locked={false} label="Notes" onUnlock={jest.fn()}>
-        <ScreenHeader title="Visible" />
-      </LockedPanel>
-    );
-    expect(JSON.stringify(tree.toJSON())).not.toContain('UPGRADE TO UNLOCK');
-  });
-
-  it('frames the children and offers the upgrade route when locked', () => {
-    const onUnlock = jest.fn();
-    const tree = render(
-      <LockedPanel locked label="Notes" onUnlock={onUnlock}>
-        <ScreenHeader title="Hidden" />
-      </LockedPanel>
-    );
-    expect(JSON.stringify(tree.toJSON())).toContain('UPGRADE TO UNLOCK');
-  });
-
-  it('announces the lock, so the dim is never the only channel carrying it', () => {
-    // The dim is decoration. A screen reader gets nothing from `opacity: 0.45`, so the state has
-    // to be in the label or it does not exist for that user.
-    const tree = render(
-      <LockedPanel locked label="Notes" onUnlock={jest.fn()}>
-        <ScreenHeader title="Hidden" />
-      </LockedPanel>
-    );
-    expect(JSON.stringify(tree.toJSON())).toContain('Notes — locked');
-  });
-});
-
-describe('PlanContentTeaser', () => {
-  it('renders the sample pace, HR zone and coach note the Free tier is being shown', () => {
-    const text = JSON.stringify(render(<PlanContentTeaser />).toJSON());
-    expect(text).toContain('PACE');
-    expect(text).toContain('HR ZONE');
-    expect(text).toContain("COACH'S NOTE");
   });
 });
 
