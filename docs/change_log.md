@@ -5,6 +5,41 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-09-20 — The v1 dummy purchase is gated to trusted testers, server-side (`fm/v22-test-purchase-gate`)
+
+Until now any signed-in account could call `POST /api/purchase-tier` with `source: 'dummy'` and
+receive Pro or Elite for free — fine in local dev, not for a deployed Worker strangers can reach.
+The gate is a switch on the existing route, decided only on the server; nothing else about the
+purchase flow, auth, the schema or the RevenueCat placeholder changed.
+
+- **Two non-secret `wrangler.toml [vars]`, read in exactly one file.** `DUMMY_PURCHASE_ENABLED`
+  (`"true"` in the top-level `[vars]` for local/dev; deliberately absent, which reads as disabled,
+  in `[env.production.vars]`) and `DUMMY_PURCHASE_ALLOWLIST` (comma-separated exact emails, empty
+  in both environments), typed on `workers/src/env.ts` and read only by `workers/src/dummyPurchase.ts`.
+  The allowlist match is exact and case-insensitive after trimming — never a substring check —
+  and the list itself is never logged. As committed, production ships with the dummy purchase
+  **off for everyone**; a tester is admitted by editing the allowlist line and redeploying, a
+  captain-only step (`workers/README.md` → "The v1 dummy purchase gate").
+- **`handlePurchaseTier` refuses `403 purchases_unavailable` before reading the body** unless the
+  switch is on or the session's email is allowlisted. A purchase admitted through the allowlist
+  (rather than the everyone-switch) logs `dummy purchase granted via allowlist` with the `userId`
+  only. New `ErrorCode` `purchases_unavailable` in `workers/src/http.ts`; the session's email is
+  now passed from `index.ts`'s dispatch into both this handler and `handleQuotaStatus`.
+- **Availability reaches the app on the payload it already fetches.** `GET /api/quota-status`
+  gains `purchasesAvailable: boolean` (`QuotaStatus` in `src/lib/planTypes.ts`), the same
+  server-side decision. `src/lib/purchaseAvailability.ts` interprets it for rendering —
+  `'pending'` while the fetch is in flight, `'available'`, or `'unavailable'` (a failed fetch fails
+  closed) — and `src/app/paywall.tsx` hides both "Choose" buttons and shows a restrained
+  "Test upgrades are limited to invited testers right now." notice when unavailable; while pending
+  it renders neither the buttons nor the notice. The client never decides availability itself.
+- **Tests.** `workers/test/worker.test.ts` covers the three gate cases (enabled; disabled but
+  allowlisted; disabled and not allowlisted → `403`) plus `quota-status`'s flag;
+  `src/lib/__tests__/purchaseAvailability.test.ts` pins the client-side parsing.
+- **Docs.** `workers/README.md` gains "The v1 dummy purchase gate" (the two vars, the exact
+  production allowlisting command, and the rule to allowlist an email only after that tester's
+  account exists — production runs without email verification, so an unregistered allowlisted
+  address could otherwise be claimed by a stranger); `AGENTS.md` gains the guardrail.
+
 ## 2026-09-20 — Password recovery and email verification, built on both sides and off by default (issue #94)
 
 Until now a runner who forgot their password had no way back into their account, and nothing
