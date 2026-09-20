@@ -25,6 +25,7 @@
  */
 
 import { isAllUsersUnlimitedAccessEnabled } from './access';
+import { dummyPurchaseGrant, isDummyPurchaseAvailable, type DummyPurchaseGrant } from './dummyPurchase';
 import type { Env } from './env';
 import type { GeneratePlanDeps } from './lib/generate-plan-flow';
 import { createPlanPersonalizer, createTemplateSkeletonBuilder } from './lib/planEngine';
@@ -35,6 +36,10 @@ import { D1PlanStore } from './lib/store';
 export interface Deps {
   store: D1PlanStore;
   generatePlan: GeneratePlanDeps;
+  /** Whether the caller (by email) may use the v1 dummy purchase — see `dummyPurchase.ts`. */
+  purchasesAvailable: (email: string | null | undefined) => boolean;
+  /** Which gate branch admits the caller (`'enabled'` | `'allowlist'`), or `null` — same source. */
+  purchaseGrant: (email: string | null | undefined) => DummyPurchaseGrant;
 }
 
 export function createDeps(env: Env): Deps {
@@ -49,6 +54,8 @@ export function createDeps(env: Env): Deps {
 
   return {
     store,
+    purchasesAvailable: (email) => isDummyPurchaseAvailable(env, email),
+    purchaseGrant: (email) => dummyPurchaseGrant(env, email),
     generatePlan: {
       store,
       skeleton: createTemplateSkeletonBuilder(), // swap 1 — see the header

@@ -17,6 +17,7 @@ function makeStatus(overrides: Partial<QuotaStatus>): QuotaStatus {
     limit: 1,
     periodEnd: '2026-09-01T00:00:00.000Z',
     unlimited: false,
+    purchasesAvailable: true,
     ...overrides,
   };
 }

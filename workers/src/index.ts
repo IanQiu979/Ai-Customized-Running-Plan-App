@@ -123,9 +123,9 @@ async function dispatch(request: Request, env: Env, options: DispatchOptions = {
     case 'POST /api/generate-plan':
       return handleGeneratePlan(request, userId, deps);
     case 'GET /api/quota-status':
-      return handleQuotaStatus(userId, deps);
+      return handleQuotaStatus(userId, session.user.email, deps);
     case 'POST /api/purchase-tier':
-      return handlePurchaseTier(request, userId, deps);
+      return handlePurchaseTier(request, userId, session.user.email, deps);
     case 'POST /api/delete-account':
       return handleDeleteAccount(userId, deps);
     case 'GET /api/intake':

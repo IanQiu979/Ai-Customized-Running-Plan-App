@@ -88,7 +88,11 @@ export async function handleGeneratePlan(request: Request, userId: string, deps:
  * `docs/reference/plan-generation.md` requires one shared period function precisely so this
  * endpoint cannot promise a slot that `generate-plan` then refuses.
  */
-export async function handleQuotaStatus(userId: string, deps: Deps): Promise<Response> {
+export async function handleQuotaStatus(
+  userId: string,
+  userEmail: string | null | undefined,
+  deps: Deps
+): Promise<Response> {
   const now = new Date().toISOString();
   const window = await deps.store.quotaWindow(userId, now);
   const used = await deps.store.countUsed(userId, window, now);
@@ -101,6 +105,8 @@ export async function handleQuotaStatus(userId: string, deps: Deps): Promise<Res
     // Free's allowance is lifetime, so there is no period end to report and the client must not
     // render a countdown for it (`tierLimits.ts`'s `FREE_IS_LIFETIME`).
     periodEnd: window.periodEnd,
+    // Server-decided, per `dummyPurchase.ts` — the paywall renders this, never computes it.
+    purchasesAvailable: deps.purchasesAvailable(userEmail),
   });
 }
 
@@ -123,7 +129,21 @@ interface PurchaseTierBody {
  * `'revenuecat'` and verifies a receipt here: same route, same table write, unchanged client
  * contract.
  */
-export async function handlePurchaseTier(request: Request, userId: string, deps: Deps): Promise<Response> {
+export async function handlePurchaseTier(
+  request: Request,
+  userId: string,
+  userEmail: string | null | undefined,
+  deps: Deps
+): Promise<Response> {
+  // Trusted-testers-only gate ahead of everything else (`dummyPurchase.ts`) — the v1 dummy
+  // purchase stays available for the captain's testers until public launch, and off for anyone
+  // else. This is the server-side check the design demands; nothing upstream of it may substitute
+  // a client-side flag.
+  const grant = deps.purchaseGrant(userEmail);
+  if (grant === null) {
+    return fail(403, 'purchases_unavailable', 'Test upgrades are not available yet.');
+  }
+
   const body = await readJson<PurchaseTierBody>(request);
   if (!body) {
     return fail(400, 'invalid_request', 'Request body must be valid JSON.');
@@ -139,6 +159,9 @@ export async function handlePurchaseTier(request: Request, userId: string, deps:
 
   const now = new Date().toISOString();
   await deps.store.recordPurchase(userId, body.tier, 'dummy', now);
+  if (grant === 'allowlist') {
+    console.log('dummy purchase granted via allowlist', { userId });
+  }
 
   // Computed, not stored — see `subscriptions` in `0002_app_schema.sql`.
   const window = await deps.store.quotaWindow(userId, now);

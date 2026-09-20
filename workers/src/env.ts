@@ -31,6 +31,16 @@ export interface Env {
    * without a configured mail provider keep working.
    */
   MAIL_VERIFICATION_REQUIRED?: string;
+  /**
+   * `"true"` opens the v1 dummy purchase (`POST /api/purchase-tier`) to every authenticated user.
+   * `"true"` in local/dev; absent (treated as `"false"`) in production — see `dummyPurchase.ts`.
+   */
+  DUMMY_PURCHASE_ENABLED?: string;
+  /**
+   * Comma-separated exact emails allowed to use the dummy purchase when it is otherwise disabled
+   * — the production trusted-tester list. Empty by default. Never logged; see `dummyPurchase.ts`.
+   */
+  DUMMY_PURCHASE_ALLOWLIST?: string;
 
   // --- server-only settings/secrets, from `.dev.vars` / `wrangler secret put` -----------------
 

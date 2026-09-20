@@ -1,5 +1,5 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -14,7 +14,11 @@ import {
 } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { PrimaryAction, SecondaryAction } from '@/components/ui/ActionButton';
-import { API_BASE_URL, describeError, purchaseTier } from '@/lib/apiClient';
+import { API_BASE_URL, describeError, getQuotaStatus, purchaseTier } from '@/lib/apiClient';
+import {
+  DUMMY_PURCHASE_UNAVAILABLE_COPY,
+  resolvePurchaseAvailability,
+} from '@/lib/purchaseAvailability';
 import { formatQuotaLine } from '@/lib/quotaDisplay';
 import { TIER_PLAN_LIMITS } from '@/lib/tierLimits';
 import type { QuotaStatus, Tier } from '@/lib/planTypes';
@@ -45,6 +49,30 @@ export default function PaywallScreen() {
 
   const [purchasing, setPurchasing] = useState<Tier | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Fresh, independent of `quota` above (a possibly-stale route param): whether the dummy
+  // purchase is open for THIS account, decided server-side and never assumed while loading —
+  // `undefined` is the fetch in flight (neither buttons nor the unavailable notice render), and
+  // `null` is a failed fetch, which renders as unavailable, same as an explicit `false`.
+  const [availability, setAvailability] = useState<QuotaStatus | null | undefined>(undefined);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const status = await getQuotaStatus();
+        if (!cancelled) setAvailability(status);
+      } catch {
+        // Fail closed: settle on `null`, which hides the purchase buttons.
+        if (!cancelled) setAvailability(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const purchaseAvailability = resolvePurchaseAvailability(availability);
+  const purchasesAvailable = purchaseAvailability === 'available';
 
   async function handlePurchase(tier: Exclude<Tier, 'free'>) {
     setError(null);
@@ -101,6 +129,7 @@ export default function PaywallScreen() {
             recommended={false}
             pending={purchasing === 'pro'}
             disabled={purchasing !== null}
+            showAction={purchasesAvailable}
             onPress={() => handlePurchase('pro')}
           />
           <TierCard
@@ -114,14 +143,19 @@ export default function PaywallScreen() {
             recommended
             pending={purchasing === 'elite'}
             disabled={purchasing !== null}
+            showAction={purchasesAvailable}
             onPress={() => handlePurchase('elite')}
           />
 
-          <View style={[styles.disclaimer, { borderColor: theme.hairline }]}>
-            <Text style={[styles.disclaimerText, { color: theme.text.secondary }]}>
-              This is a test upgrade — no payment required.
-            </Text>
-          </View>
+          {purchaseAvailability !== 'pending' ? (
+            <View style={[styles.disclaimer, { borderColor: theme.hairline }]}>
+              <Text style={[styles.disclaimerText, { color: theme.text.secondary }]}>
+                {purchasesAvailable
+                  ? 'This is a test upgrade — no payment required.'
+                  : DUMMY_PURCHASE_UNAVAILABLE_COPY}
+              </Text>
+            </View>
+          ) : null}
         </ScrollView>
       </SafeAreaView>
     </View>
@@ -139,7 +173,8 @@ function parseQuotaParam(raw: string | undefined): QuotaStatus | null {
       typeof parsed.used === 'number' &&
       (parsed.limit === null || typeof parsed.limit === 'number') &&
       (parsed.periodEnd === null || typeof parsed.periodEnd === 'string') &&
-      typeof parsed.unlimited === 'boolean'
+      typeof parsed.unlimited === 'boolean' &&
+      typeof parsed.purchasesAvailable === 'boolean'
     ) {
       return parsed as QuotaStatus;
     }
@@ -178,6 +213,7 @@ function TierCard({
   recommended,
   pending,
   disabled,
+  showAction,
   onPress,
 }: {
   title: string;
@@ -186,6 +222,8 @@ function TierCard({
   recommended: boolean;
   pending: boolean;
   disabled: boolean;
+  /** Server-decided (`purchaseAvailability.ts`) — false hides the CTA, not just disables it. */
+  showAction: boolean;
   onPress: () => void;
 }) {
   const theme = useTheme();
@@ -226,28 +264,30 @@ function TierCard({
         ))}
       </View>
 
-      {recommended ? (
-        // On a `surface.inverse` slab the primary action's fill matches the slab exactly, so the
-        // cyan edge IS the control. No special case needed — see `ActionButton.tsx`'s header.
-        <PrimaryAction
-          label={`Choose ${title}`}
-          accessibilityLabel={`Upgrade to ${title}`}
-          disabled={disabled}
-          busy={pending}
-          onPress={onPress}
-          style={styles.tierButton}
-        />
-      ) : (
-        <SecondaryAction
-          label={`Choose ${title}`}
-          accessibilityLabel={`Upgrade to ${title}`}
-          tone="onInverse"
-          disabled={disabled}
-          busy={pending}
-          onPress={onPress}
-          style={styles.tierButton}
-        />
-      )}
+      {showAction ? (
+        recommended ? (
+          // On a `surface.inverse` slab the primary action's fill matches the slab exactly, so
+          // the cyan edge IS the control. No special case needed — see `ActionButton.tsx`'s header.
+          <PrimaryAction
+            label={`Choose ${title}`}
+            accessibilityLabel={`Upgrade to ${title}`}
+            disabled={disabled}
+            busy={pending}
+            onPress={onPress}
+            style={styles.tierButton}
+          />
+        ) : (
+          <SecondaryAction
+            label={`Choose ${title}`}
+            accessibilityLabel={`Upgrade to ${title}`}
+            tone="onInverse"
+            disabled={disabled}
+            busy={pending}
+            onPress={onPress}
+            style={styles.tierButton}
+          />
+        )
+      ) : null}
     </View>
   );
 }

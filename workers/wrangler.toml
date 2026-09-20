@@ -58,6 +58,13 @@ ALL_USERS_UNLIMITED_ACCESS = "true"
 # API key and sender address belong in `.dev.vars` / Cloudflare secrets, never this committed file.
 MAIL_VERIFICATION_REQUIRED = "false"
 
+# v1 dummy purchase (`POST /api/purchase-tier`) — open for everyone in local/dev. Production keeps
+# this "false" (see below) until public launch; captain-only testers get in via the allowlist.
+DUMMY_PURCHASE_ENABLED = "true"
+# Comma-separated exact emails. Empty here — nothing to allowlist when the switch above is already
+# on.
+DUMMY_PURCHASE_ALLOWLIST = ""
+
 [env.production.vars]
 # THE DEPLOYED ORIGIN, EXACTLY. This is not cosmetic: better-auth derives the OAuth `redirect_uri`
 # it hands Google from this value, so it must match, character for character, both the Worker's
@@ -91,6 +98,14 @@ ALL_USERS_UNLIMITED_ACCESS = "false"
 # Named environments do not inherit `[vars]`; keep this explicit so an unconfigured production
 # deployment never starts requiring verification before it can deliver verification email.
 MAIL_VERIFICATION_REQUIRED = "false"
+
+# OFF for public launch. `DUMMY_PURCHASE_ENABLED` is deliberately absent (undefined reads as
+# disabled, same as `"false"` — `dummyPurchase.ts`), and the allowlist starts empty. `[vars]` is
+# not a secret, so there is no `wrangler secret put` for it — a trusted tester is added by editing
+# this line (comma-separated exact emails) and deploying:
+#   wrangler deploy --env production
+# Never flip DUMMY_PURCHASE_ENABLED to "true" here before public launch.
+DUMMY_PURCHASE_ALLOWLIST = ""
 
 # Required — see the header: a named environment does not inherit top-level bindings.
 [[env.production.d1_databases]]
