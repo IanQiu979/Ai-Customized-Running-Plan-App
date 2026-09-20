@@ -181,7 +181,9 @@ Built-ins also available: `Explore`, `Plan`, `general-purpose`. Plugin agents ar
   `jobs-queues-edge`, not `frontend-builder`.
 - **The privacy policy has one source and a publication gate.** `docs/privacy-policy.md` is the
   source; `src/constants/legal.ts` is the in-app URL; `.github/workflows/publish-legal-pages.yml`
-  publishes only that policy after a qualifying push to `main`. Keep all three aligned, and never
+  publishes only that policy after a qualifying push to `main`, rendered through
+  `docs/privacy-policy-theme/` (a hand copy of `theme.ts`'s Blueprint tokens that the contrast
+  suite does not cover — re-check `style.css` after any hex edit). Keep all four aligned, and never
   call `https://ianqiu979.github.io/Ai-Customized-Running-Plan-App/privacy-policy/` live until the
   Pages run succeeds. The policy's 13–17 guardian-consent condition is now enforced and recorded
   in `workers/` (schema: `workers/migrations/0004_guardian_consent.sql`; route: `handlePutIntake`

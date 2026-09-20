@@ -14,7 +14,9 @@
 > `barHeight` as the non-hue channel; and **contrast enforced by test** —
 > `src/constants/__tests__/theme.contrast.test.ts` recomputes every ratio below from `theme.ts`'s
 > hexes and asserts it against its floor, so a hex edited into illegibility fails the suite. It
-> still does not pin the printed numbers; re-running the table is still a human step.
+> still does not pin the printed numbers; re-running the table is still a human step. One copy of
+> these hexes lives outside that net: `docs/privacy-policy-theme/style.css` (the published
+> privacy policy, 2026-09-21) transcribes them by hand, so a hex edit here is also an edit there.
 
 ## B.1 The sheet
 

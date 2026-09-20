@@ -5,6 +5,32 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-09-21 — The published privacy policy renders in the app's own Blueprint theme (change-list item 11)
+
+Captain's decision, change-list item 11, approved 2026-09-20 14:40 +07 after he saw the generic
+`jekyll-theme-primer` page on his phone. Mirrors sibling repo running-form-v2.3's PR 239
+(2026-09-20), which did the same thing for its own privacy policy with V2.3's own theme — this PR
+uses V2.2's own Blueprint tokens, not V2.3's palette. Root gate clean: typecheck, lint, 1067 tests.
+
+- **New `docs/privacy-policy-theme/`** — a Jekyll layout (`default.html`) and stylesheet
+  (`style.css`) transcribing `src/constants/theme.ts`'s Blueprint dark tokens (near-black field,
+  ink headings, dim labels), plus self-hosted OFL webfonts (Barlow Condensed 700/800, IBM Plex Sans
+  400/600, subsetted to latin) under `fonts/` — GitHub Pages serves no external font requests.
+- **`.github/workflows/publish-legal-pages.yml` now stages that theme and renders
+  `docs/privacy-policy.md` through the `default` layout**, replacing the prior unthemed rendering. A
+  new `docs/privacy-policy-theme/**` trigger path was added. The index page and the
+  `privacy-policy/` output path are unchanged, so `PRIVACY_POLICY_URL`
+  (`src/constants/legal.ts`) still resolves to the same URL — the target path in "Current —
+  privacy policy and publication" (`architecture.md`) is untouched; only the rendering and that one
+  trigger path changed.
+- **The policy's text is byte-identical** — `docs/privacy-policy.md` was not touched.
+- **Verified with an actual local Jekyll build** (`gem install jekyll`) against the workflow's own
+  staging script, plus a rendered screenshot at a 390×844 mobile viewport confirming the dark
+  Blueprint palette, condensed display heading, and dim "Last updated" line — not the old generic
+  Jekyll look. `src/constants/__tests__/legal.test.ts` extended to stage and assert against the new
+  theme directory structure (7 tests).
+- **Out of scope:** any in-app screen, the policy wording itself, and the Worker.
+
 ## 2026-09-20 (later still) — Delete account now re-confirms with the password, like V2.3 (`fm/v22-delete-account-password`)
 
 Captain's decision, change-list item 10, approved 2026-09-20 14:40 +07: a valid session alone is

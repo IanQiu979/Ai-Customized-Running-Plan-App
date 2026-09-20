@@ -1,0 +1,29 @@
+<!--
+  Custom Jekyll layout for the published privacy policy (change-list item 11, approved
+  2026-09-20 14:40 +07 — "privacy-policy page in the app theme", raised after the captain saw
+  the generic Jekyll default on his phone). The app has no in-app route for the policy — Settings
+  links out to `PRIVACY_POLICY_URL` (`src/constants/legal.ts`) and opens it in the system browser
+  — so this page IS the in-app experience of it: themed to match "Blueprint"
+  (`src/constants/theme.ts`, `docs/design/instrument-visual-system.md`) instead of the default
+  `jekyll-theme-primer` it rendered with before. Staged into `legal-site/_layouts/` by
+  `.github/workflows/publish-legal-pages.yml`, alongside `style.css` and the vendored `fonts/`
+  from this same directory. Mirrors the structure the running-form-v2.3 sibling repo landed in
+  its PR 239 (2026-09-20) for the same reason, with V2.2's own Blueprint palette and type instead
+  of V2.3's theme. The webfonts are self-hosted so the published page makes no third-party
+  request — a privacy policy that pinged Google Fonts on every visit would disclose nothing about
+  it and contradict itself.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ page.title }}</title>
+  <link rel="stylesheet" href="{{ '/assets/style.css' | relative_url }}">
+</head>
+<body>
+  <main class="policy">
+    {{ content }}
+  </main>
+</body>
+</html>

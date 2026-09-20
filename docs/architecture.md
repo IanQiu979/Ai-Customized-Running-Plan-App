@@ -351,14 +351,25 @@ ordinary and flagged-request retention, including trust-and-safety scores.
 
 Publication is intentionally isolated from the app and the internal documentation tree:
 `.github/workflows/publish-legal-pages.yml` runs after a qualifying push to `main` (or manual
-dispatch), stages the policy as `privacy-policy/index.md` with Jekyll front matter plus one root
-redirect, and uses GitHub's official Pages Jekyll build action to produce an otherwise-empty Pages
-artifact. It targets
+dispatch, or a change under `docs/privacy-policy-theme/**` since 2026-09-21), stages the policy as
+`privacy-policy/index.md` with Jekyll front matter plus one root redirect, and uses GitHub's
+official Pages Jekyll build action to produce an otherwise-empty Pages artifact. It targets
 `https://ianqiu979.github.io/Ai-Customized-Running-Plan-App/privacy-policy/`. The URL is a configured
 target, **not a proven live endpoint until a qualifying Pages workflow succeeds**.
 `src/constants/legal.ts` holds the same URL for Settings → Legal → Privacy policy;
 `src/constants/__tests__/legal.test.ts` pins the controller identity and age posture and checks that
 the workflow's Markdown input/output path still agrees with the app constant.
+
+**Since 2026-09-21 (change-list item 11), the policy renders through the app's own Blueprint
+theme, not GitHub's default Jekyll theme.** `docs/privacy-policy-theme/` supplies a `default.html`
+layout and `style.css` transcribing `src/constants/theme.ts`'s Blueprint dark tokens, plus
+self-hosted OFL webfonts (Barlow Condensed 700/800, IBM Plex Sans 400/600, latin-subsetted) under
+`fonts/`, so the deployed page needs no external font requests. The workflow stages that directory
+alongside the policy and renders it through the `default` layout instead of the prior
+unthemed/default-Jekyll rendering; the staged path, the output path, and `PRIVACY_POLICY_URL`
+itself are all unchanged. `docs/privacy-policy.md`'s text is byte-identical. Mirrors sibling repo
+running-form-v2.3's PR 239 (2026-09-20), which did the same for its own policy with V2.3's own
+theme. Detail: `docs/change_log.md`, 2026-09-21.
 
 ## Current — the backend, in `workers/`
 

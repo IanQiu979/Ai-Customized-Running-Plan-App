@@ -3,13 +3,22 @@
 # — the public URL `src/constants/legal.ts` links to and the store listings cite (issue #89).
 #
 # This is NOT CI. The repo deliberately has none (`no-mistakes` is the gate); this workflow only
-# runs on `main`, only when the policy or this file changes, and publishes nothing else — the
-# Pages site is built from a staging directory holding the rendered policy alone, so pointing
-# Pages at `/docs` (which would publish every internal doc) is never needed. The same approach
-# the V2.3 sibling settled on (Pages, `build_type: workflow`).
+# runs on `main`, only when the policy, the theme, or this file changes, and publishes nothing
+# else — the Pages site is built from a staging directory holding the rendered policy alone, so
+# pointing Pages at `/docs` (which would publish every internal doc) is never needed. The same
+# approach the V2.3 sibling settled on (Pages, `build_type: workflow`).
 #
-# The official Pages Jekyll action renders the staged Markdown; no runner-level converter is
-# assumed. GitHub Pages itself must already be configured with `build_type: workflow`.
+# The policy renders through `docs/privacy-policy-theme/` (change-list item 11, approved
+# 2026-09-20 14:40 +07 — "privacy-policy page in the app theme") instead of the default
+# `jekyll-theme-primer` it used before: `default.html` is the Jekyll layout, `style.css` is
+# transcribed from `src/constants/theme.ts`'s "Blueprint" tokens, and `fonts/` self-hosts the two
+# webfonts the page uses so it makes no third-party request. See that directory's own file
+# headers for the full rationale; mirrors the running-form-v2.3 sibling's PR 239 (2026-09-20)
+# structure with V2.2's own palette and type.
+#
+# The official Pages Jekyll action renders the staged Markdown through that layout; no
+# runner-level converter is assumed. GitHub Pages itself must already be configured with
+# `build_type: workflow`.
 name: Publish legal pages
 
 on:
@@ -17,6 +26,7 @@ on:
     branches: [main]
     paths:
       - docs/privacy-policy.md
+      - docs/privacy-policy-theme/**
       - .github/workflows/publish-legal-pages.yml
   workflow_dispatch:
 
@@ -32,21 +42,26 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - name: Stage the policy as an otherwise-empty Jekyll source
+      - name: Stage the policy, the Blueprint theme, and nothing else
         run: |
           set -euo pipefail
-          mkdir -p legal-site/privacy-policy
+          mkdir -p legal-site/privacy-policy legal-site/_layouts legal-site/assets/fonts
           {
-            printf '%s\n' '---' 'title: Pace Blueprint — Privacy Policy' 'lang: en' '---' ''
+            printf '%s\n' '---' 'layout: default' 'title: Pace Blueprint — Privacy Policy' 'lang: en' '---' ''
             sed 's/\r$//' docs/privacy-policy.md
           } > legal-site/privacy-policy/index.md
-          # A root page so the site never 404s at its base; it only points at the policy.
+          # A root page so the site never 404s at its base; it only points at the policy. Kept as
+          # a plain, unthemed redirect — the change is scoped to the policy page itself.
           cat > legal-site/index.html <<'HTML'
           <!doctype html>
           <html lang="en"><head><meta charset="utf-8"><title>Pace Blueprint</title>
           <meta http-equiv="refresh" content="0; url=privacy-policy/"></head>
           <body><p><a href="privacy-policy/">Pace Blueprint — Privacy Policy</a></p></body></html>
           HTML
+          printf 'title: Pace Blueprint\ndescription: Privacy policy for the Pace Blueprint app\n' > legal-site/_config.yml
+          cp docs/privacy-policy-theme/default.html legal-site/_layouts/default.html
+          cp docs/privacy-policy-theme/style.css legal-site/assets/style.css
+          cp docs/privacy-policy-theme/fonts/*.woff2 legal-site/assets/fonts/
           test -s legal-site/privacy-policy/index.md
 
       - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0

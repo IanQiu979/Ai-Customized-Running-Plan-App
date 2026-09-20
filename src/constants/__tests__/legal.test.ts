@@ -86,10 +86,19 @@ function stagingScript(): string {
   return stagingSteps[0].run as string;
 }
 
-/** Runs the workflow's own staging script against a scratch checkout holding only the policy. */
+/**
+ * Runs the workflow's own staging script against a scratch checkout holding the policy and the
+ * theme it renders through — `docs/privacy-policy-theme/` (layout, stylesheet, self-hosted
+ * fonts), not the whole repo.
+ */
 function stagePolicy(scratch: string): void {
   mkdirSync(join(scratch, 'docs'));
   cpSync(join(ROOT, 'docs', 'privacy-policy.md'), join(scratch, 'docs', 'privacy-policy.md'));
+  cpSync(
+    join(ROOT, 'docs', 'privacy-policy-theme'),
+    join(scratch, 'docs', 'privacy-policy-theme'),
+    { recursive: true }
+  );
   execFileSync('bash', ['-c', stagingScript()], { cwd: scratch });
 }
 
@@ -128,31 +137,47 @@ describe('the privacy policy the app links to', () => {
     expect(published).toMatch(/consent of a parent or guardian/);
   });
 
-  it('publishes from main only, and only when the policy or the workflow itself changes', () => {
+  it('publishes from main only, and only when the policy, its theme, or the workflow itself changes', () => {
     expect(workflow.on.push?.branches).toEqual(['main']);
     expect(workflow.on.push?.paths).toEqual([
       'docs/privacy-policy.md',
+      'docs/privacy-policy-theme/**',
       '.github/workflows/publish-legal-pages.yml',
     ]);
     expect(workflow.jobs.deploy.needs).toBe('build');
   });
 
-  it('stages only the policy as a renderable Jekyll source', () => {
+  it('stages the policy and its Blueprint theme as a renderable Jekyll source', () => {
     withScratch((scratch) => {
       stagePolicy(scratch);
 
       expect(readdirSync(join(scratch, 'legal-site')).sort()).toEqual([
+        '_config.yml',
+        '_layouts',
+        'assets',
         'index.html',
         'privacy-policy',
       ]);
       expect(readdirSync(join(scratch, 'legal-site', 'privacy-policy'))).toEqual(['index.md']);
+      expect(readdirSync(join(scratch, 'legal-site', '_layouts'))).toEqual(['default.html']);
+      expect(readdirSync(join(scratch, 'legal-site', 'assets')).sort()).toEqual([
+        'fonts',
+        'style.css',
+      ]);
+      // Every font the theme vendors is staged; no third-party font request survives into the
+      // published page.
+      expect(readdirSync(join(scratch, 'legal-site', 'assets', 'fonts')).sort()).toEqual(
+        readdirSync(join(ROOT, 'docs', 'privacy-policy-theme', 'fonts'))
+          .filter((name) => name.endsWith('.woff2'))
+          .sort()
+      );
 
       const stagedPolicy = readFileSync(
         join(scratch, 'legal-site', 'privacy-policy', 'index.md'),
         'utf8'
       );
       expect(stagedPolicy).toMatch(
-        /^---\ntitle: Pace Blueprint — Privacy Policy\nlang: en\n---\n\n<!--/
+        /^---\nlayout: default\ntitle: Pace Blueprint — Privacy Policy\nlang: en\n---\n\n<!--/
       );
       expect(stagedPolicy.slice(stagedPolicy.indexOf('<!--'))).toBe(policy.replace(/\r/g, ''));
 

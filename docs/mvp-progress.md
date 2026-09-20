@@ -152,6 +152,11 @@
   (`workers/migrations/0004_guardian_consent.sql`) in the same D1 batch as the intake row.
   It treats linked intake/plans as health/fitness data without claiming the injury picker records
   explicit consent, and documents GitHub Pages metadata plus Cloudflare/Anthropic retention.
+  Since 2026-09-21 (change-list item 11) the rendered page uses the app's own Blueprint theme
+  (`docs/privacy-policy-theme/`) instead of the generic default Jekyll theme the captain saw on his
+  phone — same policy text, same URL, one added trigger path (`docs/privacy-policy-theme/**`),
+  only the rendering changed; mirrors V2.3's PR 239 for its own theme. Detail: `change_log.md`,
+  2026-09-21.
 - **Plan engine is fully wired, and every distance now gets its own training shape.** The pure
   template/pace engine (`src/lib/planTemplates.ts` + `src/lib/paceDerivation.ts`) is bound into
   `generate-plan` via `workers/src/deps.ts`; the plan view renders real generated plans. As of
@@ -932,6 +937,16 @@ from 82. Issue #22 remains open.)
       `legal.test.ts` pins the controller identity, age posture, workflow source/output path and app
       URL together. The target URL is **not yet claimed live**: a successful Pages run is still
       required.
+- [x] **The published privacy policy renders in the app's own Blueprint theme, not the generic
+      default Jekyll theme (2026-09-21, change-list item 11).** New `docs/privacy-policy-theme/`
+      (a `default.html` Jekyll layout, `style.css` transcribing `theme.ts`'s Blueprint dark tokens,
+      and self-hosted OFL Barlow Condensed / IBM Plex Sans webfonts under `fonts/`);
+      `publish-legal-pages.yml` now stages that theme and renders `docs/privacy-policy.md` through
+      it, with a new `docs/privacy-policy-theme/**` trigger path. Policy text is byte-identical, and
+      the target URL is unchanged. Verified with an actual local Jekyll
+      build plus a rendered 390×844 screenshot; `legal.test.ts` extended to 7 tests for the new
+      theme directory structure. Mirrors sibling repo running-form-v2.3's PR 239, same day, with
+      V2.2's own theme rather than V2.3's palette. Detail: `change_log.md`, 2026-09-21.
 - [x] **Issue #106 closed — a declared injury cuts a Free plan once, not every week
       (2026-09-19).** `src/lib/planLibrary/engine.ts` applied the § 17 module reduction to every
       week's target while later targets build on the previous (already cut) loading week, so a
