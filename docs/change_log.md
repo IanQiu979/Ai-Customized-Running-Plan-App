@@ -37,8 +37,11 @@ green.
   write-once: an identical retry is `200`, a conflicting choice or a grandfathered account is
   `409 age_assurance_conflict`. It returns `{ ageBand, guardianConsentRecorded }`.
 - **Intake follows the account.** `PUT /api/intake` no longer asks a recorded `13_17` account for
-  consent again, refuses an intake age under 18 from a recorded `18_plus` account, and keeps the
-  2026-09-19 intake-time checkbox for grandfathered accounts only.
+  consent again, and holds the intake age to the recorded band in both directions — a recorded
+  `18_plus` account is refused an intake age under 18, a recorded `13_17` account an intake age
+  over 17 (both `400 invalid_request`) — and keeps the 2026-09-19 intake-time checkbox for
+  grandfathered accounts only. Deliberate: a runner who turns 18 on a `13_17` account stays in the
+  minor regime (cannot enter an age of 18 or over) until a separately approved aging policy exists.
 - **Client.** New `src/components/auth/AgeBandChoice.tsx` (the shared "18 or older" / "13–17 — my
   parent or guardian agrees" choice plus the guardian checkbox and policy link); `sign-up.tsx`
   cannot submit without it. New `src/components/auth/AgeAssuranceGate.tsx` wraps the whole stack in

@@ -1214,10 +1214,34 @@ describe('guardian consent (13–17 intake) — captain ruling 2026-09-19', () =
   it('refuses a minor exact age for a recorded adult account', async () => {
     const token = await signUp('recorded-adult-minor-intake@example.test');
 
-    const response = await putIntake(token, intakeBody(17, { guardianConsent: true }));
+    const refused = await putIntake(token, intakeBody(17, { guardianConsent: true }));
+    expect(refused.status).toBe(400);
+    expect(await refused.json()).toMatchObject({
+      code: 'invalid_request',
+      error: 'age must be at least 18 for this account.',
+    });
 
-    expect(response.status).toBe(400);
-    expect(await response.json()).toMatchObject({ code: 'invalid_request' });
+    const accepted = await putIntake(token, intakeBody(18));
+    expect(accepted.status, await accepted.text()).toBe(200);
+  });
+
+  it('refuses an adult exact age for a recorded minor account', async () => {
+    const token = await signUp('recorded-minor-adult-intake@example.test', {
+      ageBand: '13_17',
+      guardianConsent: true,
+    });
+
+    for (const age of [18, 30]) {
+      const refused = await putIntake(token, intakeBody(age));
+      expect(refused.status).toBe(400);
+      expect(await refused.json()).toMatchObject({
+        code: 'invalid_request',
+        error: 'age must be 17 or under for this account.',
+      });
+    }
+
+    const accepted = await putIntake(token, intakeBody(17));
+    expect(accepted.status, await accepted.text()).toBe(200);
   });
 });
 

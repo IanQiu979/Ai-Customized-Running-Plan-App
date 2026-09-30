@@ -344,6 +344,9 @@ export async function handlePutIntake(request: Request, userId: string, deps: De
   if (assurance.status === 'recorded' && assurance.ageBand === '18_plus' && body.age < 18) {
     return fail(400, 'invalid_request', 'age must be at least 18 for this account.');
   }
+  if (assurance.status === 'recorded' && assurance.ageBand === '13_17' && body.age > 17) {
+    return fail(400, 'invalid_request', 'age must be 17 or under for this account.');
+  }
 
   const requiresGuardianConsent = requiresLegacyIntakeConsent(assurance.status, body.age);
   if (requiresGuardianConsent && body.guardianConsent !== true) {
