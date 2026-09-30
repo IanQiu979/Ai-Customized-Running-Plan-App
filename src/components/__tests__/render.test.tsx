@@ -170,6 +170,7 @@ describe('PrimaryAction', () => {
     // ...but the control is still "Sign in" to a screen reader. A spinner with no accessible name
     // is an unlabelled button, which is the bug this shape is easy to write by accident.
     expect(findProp(tree.toJSON(), 'accessibilityLabel')).toBe('Sign in');
+    expect(findProp(tree.toJSON(), 'accessibilityState')).toMatchObject({ busy: true });
   });
 });
 
@@ -185,6 +186,12 @@ describe('SecondaryAction', () => {
       <SecondaryAction label="Choose Pro" tone="onInverse" onPress={jest.fn()} />
     );
     expect(styleOf(tree.toJSON()).borderColor).toBe(Colors.dark.text.onInverse);
+  });
+
+  it('exposes the busy state when a secondary action is working', () => {
+    const tree = render(<SecondaryAction label="Signing out" busy onPress={jest.fn()} />);
+
+    expect(findProp(tree.toJSON(), 'accessibilityState')).toMatchObject({ busy: true });
   });
 });
 

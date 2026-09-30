@@ -37,7 +37,14 @@ async function signUp(
   return authRequest(auth, '/sign-up/email', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email, password: PASSWORD, name: 'Runner', callbackURL }),
+    body: JSON.stringify({
+      email,
+      password: PASSWORD,
+      name: 'Runner',
+      callbackURL,
+      ageBand: '18_plus',
+      guardianConsent: false,
+    }),
   });
 }
 

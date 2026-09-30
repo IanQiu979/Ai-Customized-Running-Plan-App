@@ -185,10 +185,15 @@ Built-ins also available: `Explore`, `Plan`, `general-purpose`. Plugin agents ar
   `docs/privacy-policy-theme/` (a hand copy of `theme.ts`'s Blueprint tokens that the contrast
   suite does not cover — re-check `style.css` after any hex edit). Keep all four aligned, and never
   call `https://ianqiu979.github.io/Ai-Customized-Running-Plan-App/privacy-policy/` live until the
-  Pages run succeeds. The policy's 13–17 guardian-consent condition is now enforced and recorded
-  in `workers/` (schema: `workers/migrations/0004_guardian_consent.sql`; route: `handlePutIntake`
-  in `workers/src/routes.ts`) — keep that flow's behavior and the policy's Age section in sync;
-  the consent checkbox's exact copy still needs the captain's/legal's certification before ship.
+  Pages run succeeds. The policy's age posture is enforced and recorded in `workers/` at two
+  levels: since 2026-10-01 (issue #95) at the account — a write-once age band plus, for 13–17,
+  guardian consent written in the same statement as the `user` row
+  (`workers/migrations/0005_age_assurance.sql`, `workers/src/age-assurance.ts`, and
+  `POST /api/age-assurance` for a `pending` Google account, which 403s everything else) — and,
+  for pre-0005 `grandfathered` accounts only, the older intake-time checkbox
+  (`0004_guardian_consent.sql`, `handlePutIntake` in `workers/src/routes.ts`). Keep both flows'
+  behavior and the policy's Age section in sync; the age/consent checkbox copy still needs the
+  captain's/legal's certification before ship.
   Treat the account-linked intake and plans conservatively as health/fitness data, and document
   provider retention from current official sources rather than inferring consent or deletion
   behavior.

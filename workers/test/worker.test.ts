@@ -10,6 +10,7 @@
 import { env, SELF } from 'cloudflare:test';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { PRIVACY_POLICY_VERSION } from '../../src/constants/legal';
 import { createAuth } from '../src/auth';
 import { normalizeAllowedBrowserOrigin } from '../src/cors';
 import type { Env } from '../src/env';
@@ -21,6 +22,7 @@ const APP_ROUTES: [string, string][] = [
   ['GET', '/api/quota-status'],
   ['POST', '/api/purchase-tier'],
   ['POST', '/api/delete-account'],
+  ['POST', '/api/age-assurance'],
   ['GET', '/api/intake'],
   ['PUT', '/api/intake'],
   ['GET', '/api/plans'],
@@ -28,11 +30,22 @@ const APP_ROUTES: [string, string][] = [
 ];
 
 /** Signs a fresh user up through the real adapter and returns their session token. */
-async function signUp(email: string): Promise<string> {
+async function signUp(
+  email: string,
+  assurance: { ageBand: '18_plus' | '13_17'; guardianConsent: boolean } = {
+    ageBand: '18_plus',
+    guardianConsent: false,
+  }
+): Promise<string> {
   const response = await SELF.fetch('https://example.test/api/auth/sign-up/email', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email, password: 'a-long-enough-password', name: 'Runner' }),
+    body: JSON.stringify({
+      email,
+      password: 'a-long-enough-password',
+      name: 'Runner',
+      ...assurance,
+    }),
   });
 
   const body = await response.text();
@@ -41,6 +54,50 @@ async function signUp(email: string): Promise<string> {
   const token = (JSON.parse(body) as { token?: string }).token;
   expect(token).toBeTruthy();
   return token as string;
+}
+
+async function createPendingOAuthSession(email: string): Promise<{ token: string; userId: string }> {
+  const auth = createAuth(env as unknown as Env);
+  const context = await auth.$context;
+  const { user } = await context.internalAdapter.createOAuthUser(
+    { name: 'Google Runner', email, emailVerified: true, image: null },
+    { providerId: 'google', accountId: `google-${email}` }
+  );
+  const session = await context.internalAdapter.createSession(user.id);
+  return { token: session.token, userId: user.id };
+}
+
+async function makeGrandfathered(userId: string): Promise<void> {
+  await env.DB.exec('DROP TRIGGER age_assurance_is_write_once;');
+  try {
+    await env.DB.prepare(
+      "UPDATE user SET age_assurance_status = 'grandfathered' WHERE id = ?"
+    )
+      .bind(userId)
+      .run();
+  } finally {
+    await env.DB.prepare(`
+      CREATE TRIGGER age_assurance_is_write_once
+      BEFORE UPDATE ON user
+      FOR EACH ROW
+      WHEN (
+        NEW.age_band IS NOT OLD.age_band
+        OR NEW.age_assurance_status IS NOT OLD.age_assurance_status
+        OR NEW.age_policy_version IS NOT OLD.age_policy_version
+      )
+      AND NOT (
+        OLD.age_assurance_status = 'pending'
+        AND OLD.age_band IS NULL
+        AND OLD.age_policy_version IS NULL
+        AND NEW.age_assurance_status = 'recorded'
+        AND NEW.age_band IN ('18_plus', '13_17')
+        AND length(trim(NEW.age_policy_version)) > 0
+      )
+      BEGIN
+        SELECT RAISE(ABORT, 'age assurance is write-once');
+      END;
+    `).run();
+  }
 }
 
 beforeEach(async () => {
@@ -77,6 +134,282 @@ describe('the authentication gate', () => {
     // dispatch. Route existence is not something an unauthenticated caller gets to probe.
     const response = await SELF.fetch('https://example.test/api/nope');
     expect(response.status).toBe(403);
+  });
+});
+
+describe('POST /api/age-assurance and the pending-session gate', () => {
+  async function record(
+    session: { token: string; userId: string },
+    body: Record<string, unknown>
+  ): Promise<Response> {
+    return SELF.fetch('https://example.test/api/age-assurance', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${session.token}` },
+      body: JSON.stringify({ expectedUserId: session.userId, ...body }),
+    });
+  }
+
+  async function assuranceRow(userId: string) {
+    return env.DB.prepare(
+      `SELECT age_band, age_assurance_status, age_policy_version
+       FROM user WHERE id = ?`
+    )
+      .bind(userId)
+      .first<{
+        age_band: string | null;
+        age_assurance_status: string;
+        age_policy_version: string | null;
+      }>();
+  }
+
+  it('binds the write to the session user and ignores a caller-supplied user id', async () => {
+    const caller = await createPendingOAuthSession('pending-caller@example.test');
+    const other = await createPendingOAuthSession('pending-other@example.test');
+
+    const response = await record(caller, {
+      userId: other.userId,
+      ageBand: '18_plus',
+      guardianConsent: false,
+      policyVersion: 'caller-controlled',
+    });
+
+    expect(response.status).toBe(200);
+    expect(await assuranceRow(caller.userId)).toEqual({
+      age_band: '18_plus',
+      age_assurance_status: 'recorded',
+      age_policy_version: PRIVACY_POLICY_VERSION,
+    });
+    expect(await assuranceRow(other.userId)).toMatchObject({
+      age_band: null,
+      age_assurance_status: 'pending',
+      age_policy_version: null,
+    });
+  });
+
+  it('records adult and minor choices with the canonical response and server policy stamp', async () => {
+    const adult = await createPendingOAuthSession('pending-adult@example.test');
+    const minor = await createPendingOAuthSession('pending-minor@example.test');
+
+    const adultResponse = await record(adult, {
+      ageBand: '18_plus',
+      guardianConsent: true,
+      policyVersion: 'not-the-server-version',
+    });
+    const minorResponse = await record(minor, {
+      ageBand: '13_17',
+      guardianConsent: true,
+    });
+
+    expect(adultResponse.status).toBe(200);
+    expect(await adultResponse.json()).toEqual({
+      ageBand: '18_plus',
+      guardianConsentRecorded: false,
+    });
+    expect(minorResponse.status).toBe(200);
+    expect(await minorResponse.json()).toEqual({
+      ageBand: '13_17',
+      guardianConsentRecorded: true,
+    });
+    expect(await assuranceRow(adult.userId)).toMatchObject({
+      age_policy_version: PRIVACY_POLICY_VERSION,
+    });
+    expect(await assuranceRow(minor.userId)).toMatchObject({
+      age_policy_version: PRIVACY_POLICY_VERSION,
+    });
+    const consent = await env.DB.prepare(
+      'SELECT policy_version FROM guardian_consent WHERE user_id = ?'
+    )
+      .bind(minor.userId)
+      .first<{ policy_version: string }>();
+    expect(consent).toEqual({ policy_version: PRIVACY_POLICY_VERSION });
+  });
+
+  it('refuses a minor choice without guardian consent and leaves the user pending', async () => {
+    const pending = await createPendingOAuthSession('pending-no-consent@example.test');
+
+    const response = await record(pending, {
+      ageBand: '13_17',
+      guardianConsent: false,
+    });
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ code: 'guardian_consent_required' });
+    expect(await assuranceRow(pending.userId)).toMatchObject({
+      age_band: null,
+      age_assurance_status: 'pending',
+    });
+  });
+
+  it('makes the winning choice idempotent and returns 409 for a conflicting retry', async () => {
+    const pending = await createPendingOAuthSession('pending-retry@example.test');
+
+    expect((await record(pending, { ageBand: '18_plus' })).status).toBe(200);
+    expect((await record(pending, { ageBand: '18_plus' })).status).toBe(200);
+    const conflict = await record(pending, {
+      ageBand: '13_17',
+      guardianConsent: true,
+    });
+
+    expect(conflict.status).toBe(409);
+    expect(await conflict.json()).toMatchObject({ code: 'age_assurance_conflict' });
+    expect(await assuranceRow(pending.userId)).toMatchObject({ age_band: '18_plus' });
+  });
+
+  it('lets only one of two concurrent conflicting choices win', async () => {
+    const pending = await createPendingOAuthSession('pending-race@example.test');
+
+    const responses = await Promise.all([
+      record(pending, { ageBand: '18_plus' }),
+      record(pending, { ageBand: '13_17', guardianConsent: true }),
+    ]);
+
+    expect(responses.map((response) => response.status).sort()).toEqual([200, 409]);
+  });
+
+  it('refuses a stale tab whose gate was rendered for a different account', async () => {
+    const current = await createPendingOAuthSession('pending-current-tab@example.test');
+    const previous = await createPendingOAuthSession('pending-previous-tab@example.test');
+
+    const response = await record(current, {
+      expectedUserId: previous.userId,
+      ageBand: '13_17',
+      guardianConsent: true,
+    });
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: 'age_assurance_account_mismatch' });
+    for (const session of [current, previous]) {
+      expect(await assuranceRow(session.userId)).toMatchObject({
+        age_band: null,
+        age_assurance_status: 'pending',
+      });
+    }
+    const consent = await env.DB.prepare('SELECT COUNT(*) AS n FROM guardian_consent').first<{
+      n: number;
+    }>();
+    expect(consent?.n).toBe(0);
+  });
+
+  it('refuses a choice that does not name the expected account', async () => {
+    const pending = await createPendingOAuthSession('pending-no-expected@example.test');
+
+    const response = await record(pending, { expectedUserId: undefined, ageBand: '18_plus' });
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ code: 'invalid_request' });
+    expect(await assuranceRow(pending.userId)).toMatchObject({ age_assurance_status: 'pending' });
+  });
+
+  it('rolls the assurance update back when minor consent insertion fails', async () => {
+    const pending = await createPendingOAuthSession('pending-rollback@example.test');
+    await env.DB.prepare(`
+      CREATE TRIGGER fail_route_age_assurance_consent
+      BEFORE INSERT ON guardian_consent
+      BEGIN
+        SELECT RAISE(ABORT, 'test route consent failure');
+      END;
+    `).run();
+
+    try {
+      const response = await record(pending, {
+        ageBand: '13_17',
+        guardianConsent: true,
+      });
+      expect(response.status).toBe(500);
+      expect(await assuranceRow(pending.userId)).toMatchObject({
+        age_band: null,
+        age_assurance_status: 'pending',
+      });
+    } finally {
+      await env.DB.exec('DROP TRIGGER IF EXISTS fail_route_age_assurance_consent;');
+    }
+  });
+
+  it.each([
+    ['GET', '/api/quota-status'],
+    ['POST', '/api/purchase-tier'],
+    ['GET', '/api/intake'],
+    ['PUT', '/api/intake'],
+    ['GET', '/api/plans'],
+    ['GET', '/api/plans/some-id'],
+    ['POST', '/api/generate-plan'],
+    ['GET', '/api/not-a-route'],
+  ])('refuses pending users before ordinary %s %s dispatch', async (method, path) => {
+    const pending = await createPendingOAuthSession(
+      `pending-${method}-${path.replace(/\W/g, '-')}-${crypto.randomUUID()}@example.test`
+    );
+
+    const response = await SELF.fetch(`https://example.test${path}`, {
+      method,
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${pending.token}` },
+      body: method === 'GET' ? undefined : '{}',
+    });
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({
+      error: 'Choose your age range before using Pace Blueprint.',
+      code: 'age_assurance_required',
+    });
+  });
+
+  it('allows a pending OAuth account to delete itself', async () => {
+    const pending = await createPendingOAuthSession('pending-delete@example.test');
+
+    const response = await SELF.fetch('https://example.test/api/delete-account', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${pending.token}` },
+    });
+
+    expect(response.status).toBe(200);
+    expect(await assuranceRow(pending.userId)).toBeNull();
+  });
+
+  it('allows a pending OAuth account to sign out through better-auth', async () => {
+    const pending = await createPendingOAuthSession('pending-sign-out@example.test');
+
+    const response = await SELF.fetch('https://example.test/api/auth/sign-out', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${pending.token}` },
+    });
+    expect(response.status).toBe(200);
+
+    const afterSignOut = await SELF.fetch('https://example.test/api/quota-status', {
+      headers: { authorization: `Bearer ${pending.token}` },
+    });
+    expect(afterSignOut.status).toBe(403);
+    expect(await afterSignOut.json()).toMatchObject({ code: 'unauthenticated' });
+  });
+
+  it('allows recorded and grandfathered users through the ordinary route gate', async () => {
+    const recordedToken = await signUp('recorded-route@example.test');
+    const grandfathered = await createPendingOAuthSession('grandfathered-route@example.test');
+    await makeGrandfathered(grandfathered.userId);
+
+    const [recordedResponse, grandfatheredResponse] = await Promise.all([
+      SELF.fetch('https://example.test/api/quota-status', {
+        headers: { authorization: `Bearer ${recordedToken}` },
+      }),
+      SELF.fetch('https://example.test/api/quota-status', {
+        headers: { authorization: `Bearer ${grandfathered.token}` },
+      }),
+    ]);
+
+    expect(recordedResponse.status).toBe(200);
+    expect(grandfatheredResponse.status).toBe(200);
+  });
+
+  it('refuses age assurance rewrites for grandfathered users', async () => {
+    const grandfathered = await createPendingOAuthSession('grandfathered-write@example.test');
+    await makeGrandfathered(grandfathered.userId);
+
+    const response = await record(grandfathered, { ageBand: '18_plus' });
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: 'age_assurance_conflict' });
+    expect(await assuranceRow(grandfathered.userId)).toMatchObject({
+      age_band: null,
+      age_assurance_status: 'grandfathered',
+    });
   });
 });
 
@@ -126,6 +459,8 @@ describe('CORS', () => {
         email: 'cors-web@example.test',
         password: 'a-long-enough-password',
         name: 'Web Runner',
+        ageBand: '18_plus',
+        guardianConsent: false,
       }),
     });
 
@@ -163,6 +498,8 @@ describe('CORS', () => {
           email: `prod-shaped-${origin.replace(/[^a-z0-9]/gi, '')}@example.test`,
           password: 'a-long-enough-password',
           name: 'Prod Shaped',
+          ageBand: '18_plus',
+          guardianConsent: false,
         }),
       });
       return createAuth(authEnv).handler(normalizeAllowedBrowserOrigin(request, authEnv));
@@ -219,6 +556,8 @@ describe('CORS', () => {
             email: 'fold-proof@example.test',
             password: 'a-long-enough-password',
             name: 'Fold Proof',
+            ageBand: '18_plus',
+            guardianConsent: false,
           }),
         })
       );
@@ -271,6 +610,198 @@ describe('the route table', () => {
   });
 });
 
+describe('the age-assurance schema', () => {
+  function insertUser(
+    id: string,
+    overrides: {
+      ageBand?: string | null;
+      ageAssuranceStatus?: string;
+      agePolicyVersion?: string | null;
+    } = {}
+  ) {
+    const columns = ['id', 'name', 'email', 'emailVerified', 'createdAt', 'updatedAt'];
+    const values: unknown[] = [id, 'Schema Runner', `${id}@example.test`, 0, Date.now(), Date.now()];
+
+    if ('ageBand' in overrides) {
+      columns.push('age_band');
+      values.push(overrides.ageBand);
+    }
+    if ('ageAssuranceStatus' in overrides) {
+      columns.push('age_assurance_status');
+      values.push(overrides.ageAssuranceStatus);
+    }
+    if ('agePolicyVersion' in overrides) {
+      columns.push('age_policy_version');
+      values.push(overrides.agePolicyVersion);
+    }
+
+    return env.DB.prepare(
+      `INSERT INTO user (${columns.join(', ')}) VALUES (${columns.map(() => '?').join(', ')})`
+    )
+      .bind(...values)
+      .run();
+  }
+
+  it('defaults a newly inserted user to the canonical pending tuple', async () => {
+    await insertUser('default-pending');
+
+    const row = await env.DB.prepare(
+      `SELECT age_band, age_assurance_status, age_policy_version
+       FROM user WHERE id = ?`
+    )
+      .bind('default-pending')
+      .first<{
+        age_band: string | null;
+        age_assurance_status: string;
+        age_policy_version: string | null;
+      }>();
+
+    expect(row).toEqual({
+      age_band: null,
+      age_assurance_status: 'pending',
+      age_policy_version: null,
+    });
+  });
+
+  it('rejects an explicit grandfathered insert after the migration', async () => {
+    await expect(
+      insertUser('grandfathered-user', { ageAssuranceStatus: 'grandfathered' })
+    ).rejects.toThrow();
+
+    const row = await env.DB.prepare('SELECT id FROM user WHERE id = ?')
+      .bind('grandfathered-user')
+      .first();
+    expect(row).toBeNull();
+  });
+
+  it.each([
+    ['pending with a band', { ageBand: '18_plus', ageAssuranceStatus: 'pending' }],
+    [
+      'grandfathered with a policy version',
+      { ageAssuranceStatus: 'grandfathered', agePolicyVersion: '2026-09-19' },
+    ],
+    ['recorded without a policy version', { ageBand: '18_plus', ageAssuranceStatus: 'recorded' }],
+    [
+      'recorded with an unknown band',
+      {
+        ageBand: 'under_13',
+        ageAssuranceStatus: 'recorded',
+        agePolicyVersion: '2026-09-19',
+      },
+    ],
+  ])('rejects %s', async (_name, tuple) => {
+    await expect(insertUser(`invalid-${_name.replace(/\W+/g, '-')}`, tuple)).rejects.toThrow();
+  });
+
+  it('allows only pending to recorded assurance changes', async () => {
+    await insertUser('pending-stays-pending');
+    await expect(
+      env.DB.prepare(
+        "UPDATE user SET age_assurance_status = 'grandfathered' WHERE id = ?"
+      )
+        .bind('pending-stays-pending')
+        .run()
+    ).rejects.toThrow();
+
+    await insertUser('pending-to-recorded');
+    await env.DB.prepare(
+      `UPDATE user
+       SET age_band = '18_plus', age_assurance_status = 'recorded', age_policy_version = ?
+       WHERE id = ?`
+    )
+      .bind('2026-09-19', 'pending-to-recorded')
+      .run();
+
+    await expect(
+      env.DB.prepare("UPDATE user SET age_band = '13_17' WHERE id = ?")
+        .bind('pending-to-recorded')
+        .run()
+    ).rejects.toThrow();
+
+    const row = await env.DB.prepare(
+      'SELECT age_band, age_assurance_status, age_policy_version FROM user WHERE id = ?'
+    )
+      .bind('pending-to-recorded')
+      .first();
+    expect(row).toEqual({
+      age_band: '18_plus',
+      age_assurance_status: 'recorded',
+      age_policy_version: '2026-09-19',
+    });
+  });
+
+  it('inserts minor consent from both user insert and pending-to-recorded update', async () => {
+    await insertUser('minor-on-insert', {
+      ageBand: '13_17',
+      ageAssuranceStatus: 'recorded',
+      agePolicyVersion: 'policy-insert',
+    });
+    await insertUser('minor-on-update');
+    await env.DB.prepare(
+      `UPDATE user
+       SET age_band = '13_17', age_assurance_status = 'recorded', age_policy_version = ?
+       WHERE id = ?`
+    )
+      .bind('policy-update', 'minor-on-update')
+      .run();
+
+    const rows = await env.DB.prepare(
+      `SELECT user_id, granted_at, policy_version
+       FROM guardian_consent
+       WHERE user_id IN (?, ?)
+       ORDER BY user_id`
+    )
+      .bind('minor-on-insert', 'minor-on-update')
+      .all<{ user_id: string; granted_at: string; policy_version: string }>();
+
+    expect(rows.results).toEqual([
+      {
+        user_id: 'minor-on-insert',
+        granted_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/),
+        policy_version: 'policy-insert',
+      },
+      {
+        user_id: 'minor-on-update',
+        granted_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/),
+        policy_version: 'policy-update',
+      },
+    ]);
+  });
+
+  it('rolls back a recorded-minor user insert when consent insertion fails', async () => {
+    await env.DB.prepare(`
+      CREATE TRIGGER fail_test_guardian_consent_insert
+      BEFORE INSERT ON guardian_consent
+      BEGIN
+        SELECT RAISE(ABORT, 'test consent failure');
+      END;
+    `).run();
+
+    try {
+      await expect(
+        insertUser('minor-rollback', {
+          ageBand: '13_17',
+          ageAssuranceStatus: 'recorded',
+          agePolicyVersion: '2026-09-19',
+        })
+      ).rejects.toThrow();
+
+      const user = await env.DB.prepare('SELECT id FROM user WHERE id = ?')
+        .bind('minor-rollback')
+        .first();
+      const consent = await env.DB.prepare(
+        'SELECT user_id FROM guardian_consent WHERE user_id = ?'
+      )
+        .bind('minor-rollback')
+        .first();
+      expect(user).toBeNull();
+      expect(consent).toBeNull();
+    } finally {
+      await env.DB.exec('DROP TRIGGER IF EXISTS fail_test_guardian_consent_insert;');
+    }
+  });
+});
+
 describe('better-auth on D1', () => {
   it('signs a user up, writes the row, and issues a session that the app routes accept', async () => {
     // End to end through the real adapter: this is what proves the D1 dialect and
@@ -306,7 +837,13 @@ describe('better-auth on D1', () => {
     const response = await SELF.fetch('https://example.test/api/auth/sign-up/email', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: 'short@example.test', password: 'abc', name: 'Short' }),
+      body: JSON.stringify({
+        email: 'short@example.test',
+        password: 'abc',
+        name: 'Short',
+        ageBand: '18_plus',
+        guardianConsent: false,
+      }),
     });
 
     expect(response.status).toBeGreaterThanOrEqual(400);
@@ -439,7 +976,10 @@ describe('the intake age floor', () => {
   });
 
   it('rejects age 12 and accepts age 13', async () => {
-    const token = await signUp('agegate@example.test');
+    const token = await signUp('agegate@example.test', {
+      ageBand: '13_17',
+      guardianConsent: true,
+    });
     const put = (age: number) =>
       SELF.fetch('https://example.test/api/intake', {
         method: 'PUT',
@@ -573,9 +1113,10 @@ describe('guardian consent (13–17 intake) — captain ruling 2026-09-19', () =
   }
 
   it('rejects a 13–17 intake with no guardianConsent, and persists nothing', async () => {
-    const token = await signUp('minor-no-consent@example.test');
+    const grandfathered = await createPendingOAuthSession('minor-no-consent@example.test');
+    await makeGrandfathered(grandfathered.userId);
 
-    const response = await putIntake(token, intakeBody(15));
+    const response = await putIntake(grandfathered.token, intakeBody(15));
 
     const body = await response.json();
     expect(response.status).toBe(400);
@@ -590,18 +1131,26 @@ describe('guardian consent (13–17 intake) — captain ruling 2026-09-19', () =
   });
 
   it('rejects a 13–17 intake with guardianConsent: false, and persists nothing', async () => {
-    const token = await signUp('minor-false-consent@example.test');
+    const grandfathered = await createPendingOAuthSession('minor-false-consent@example.test');
+    await makeGrandfathered(grandfathered.userId);
 
-    const response = await putIntake(token, intakeBody(16, { guardianConsent: false }));
+    const response = await putIntake(
+      grandfathered.token,
+      intakeBody(16, { guardianConsent: false })
+    );
 
     expect(response.status).toBe(400);
     expect(await response.json()).toMatchObject({ code: 'invalid_request' });
   });
 
   it('accepts a 13–17 intake with guardianConsent: true and records a consent row', async () => {
-    const token = await signUp('minor-consented@example.test');
+    const grandfathered = await createPendingOAuthSession('minor-consented@example.test');
+    await makeGrandfathered(grandfathered.userId);
 
-    const response = await putIntake(token, intakeBody(14, { guardianConsent: true }));
+    const response = await putIntake(
+      grandfathered.token,
+      intakeBody(14, { guardianConsent: true })
+    );
 
     const body = await response.text();
     expect(response.status, body).toBe(200);
@@ -611,7 +1160,7 @@ describe('guardian consent (13–17 intake) — captain ruling 2026-09-19', () =
       .bind('minor-consented@example.test')
       .first<{ id: string }>();
     const row = await consentRow(user!.id);
-    expect(row?.policy_version).toBe('2026-09-19');
+    expect(row?.policy_version).toBe(PRIVACY_POLICY_VERSION);
     expect(row?.granted_at).toBeTruthy();
   });
 
@@ -629,6 +1178,70 @@ describe('guardian consent (13–17 intake) — captain ruling 2026-09-19', () =
       .first<{ id: string }>();
     const row = await consentRow(user!.id);
     expect(row).toBeNull();
+  });
+
+  it('accepts a recorded minor intake without asking for or rewriting guardian consent', async () => {
+    const email = 'recorded-minor-intake@example.test';
+    const token = await signUp(email, { ageBand: '13_17', guardianConsent: true });
+    const user = await env.DB.prepare('SELECT id FROM user WHERE email = ?')
+      .bind(email)
+      .first<{ id: string }>();
+    const before = await consentRow(user!.id);
+
+    const response = await putIntake(token, intakeBody(15));
+
+    expect(response.status).toBe(200);
+    expect(await consentRow(user!.id)).toEqual(before);
+  });
+
+  it('keeps the intake-time consent flow for a grandfathered minor', async () => {
+    const grandfathered = await createPendingOAuthSession('grandfathered-minor-intake@example.test');
+    await makeGrandfathered(grandfathered.userId);
+
+    const refused = await putIntake(grandfathered.token, intakeBody(16));
+    const accepted = await putIntake(
+      grandfathered.token,
+      intakeBody(16, { guardianConsent: true })
+    );
+
+    expect(refused.status).toBe(400);
+    expect(accepted.status).toBe(200);
+    expect(await consentRow(grandfathered.userId)).toMatchObject({
+      policy_version: PRIVACY_POLICY_VERSION,
+    });
+  });
+
+  it('refuses a minor exact age for a recorded adult account', async () => {
+    const token = await signUp('recorded-adult-minor-intake@example.test');
+
+    const refused = await putIntake(token, intakeBody(17, { guardianConsent: true }));
+    expect(refused.status).toBe(400);
+    expect(await refused.json()).toMatchObject({
+      code: 'invalid_request',
+      error: 'age must be at least 18 for this account.',
+    });
+
+    const accepted = await putIntake(token, intakeBody(18));
+    expect(accepted.status, await accepted.text()).toBe(200);
+  });
+
+  it('refuses an adult exact age for a recorded minor account', async () => {
+    const token = await signUp('recorded-minor-adult-intake@example.test', {
+      ageBand: '13_17',
+      guardianConsent: true,
+    });
+
+    for (const age of [18, 30]) {
+      const refused = await putIntake(token, intakeBody(age));
+      expect(refused.status).toBe(400);
+      expect(await refused.json()).toMatchObject({
+        code: 'invalid_request',
+        error: 'age must be 17 or under for this account.',
+      });
+    }
+
+    const accepted = await putIntake(token, intakeBody(17));
+    expect(accepted.status, await accepted.text()).toBe(200);
   });
 });
 
@@ -669,9 +1282,16 @@ describe('DELETE /api/delete-account password re-auth — captain ruling 2026-09
     expect(await userRow(email)).not.toBeNull();
   });
 
-  it('deletes the account on the correct password', async () => {
-    const email = 'right-password@example.test';
-    const token = await signUp(email);
+  it('deletes a recorded minor and cascades its guardian-consent evidence', async () => {
+    const email = 'right-password-minor@example.test';
+    const token = await signUp(email, { ageBand: '13_17', guardianConsent: true });
+    const user = await userRow(email);
+    const consentBefore = await env.DB.prepare(
+      'SELECT user_id FROM guardian_consent WHERE user_id = ?'
+    )
+      .bind(user!.id)
+      .first();
+    expect(consentBefore).not.toBeNull();
 
     const response = await deleteAccount(token, { password: PASSWORD });
 
@@ -679,6 +1299,12 @@ describe('DELETE /api/delete-account password re-auth — captain ruling 2026-09
     expect(response.status, body).toBe(200);
     expect(JSON.parse(body)).toEqual({ deleted: true });
     expect(await userRow(email)).toBeNull();
+    const consentAfter = await env.DB.prepare(
+      'SELECT user_id FROM guardian_consent WHERE user_id = ?'
+    )
+      .bind(user!.id)
+      .first();
+    expect(consentAfter).toBeNull();
   });
 
   describe('the per-route attempt budget (5 wrong passwords per 15 minutes)', () => {

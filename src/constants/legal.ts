@@ -13,6 +13,8 @@ export const PRIVACY_POLICY_URL =
  * `docs/privacy-policy.md`'s "Last updated" date, stamped onto every guardian-consent event
  * (`workers/migrations/0004_guardian_consent.sql`) so a recorded consent always says which
  * revision of the policy the guardian actually saw. Whenever that "Last updated" date changes,
- * this constant must be bumped in the same commit.
+ * this constant must be bumped in the same commit. Since 2026-10-01 (issue #95) it is also the
+ * `user.age_policy_version` stamped on every recorded age band (`workers/migrations/
+ * 0005_age_assurance.sql`), always by the Worker and never taken from the client.
  */
-export const PRIVACY_POLICY_VERSION = '2026-09-19';
+export const PRIVACY_POLICY_VERSION = '2026-10-01';

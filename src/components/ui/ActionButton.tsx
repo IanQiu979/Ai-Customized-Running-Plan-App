@@ -73,7 +73,7 @@ export function PrimaryAction({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
-      accessibilityState={{ disabled }}
+      accessibilityState={{ disabled, ...(busy ? { busy: true } : {}) }}
       accessibilityHint={accessibilityHint}
       disabled={disabled}
       onPress={onPress}
@@ -230,7 +230,7 @@ export function SecondaryAction({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
-      accessibilityState={{ disabled }}
+      accessibilityState={{ disabled, ...(busy ? { busy: true } : {}) }}
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [

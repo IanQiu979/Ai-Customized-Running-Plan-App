@@ -65,7 +65,11 @@ On a physical phone:
 3. If Google says the app is unavailable to this user, fix **Audience → Test users** or publish the
    consent screen. If the app reports that the server credential may be out of date, reset
    `GOOGLE_CLIENT_SECRET` as above and redeploy.
-4. Confirm the app returns from the browser and leaves the auth form.
+4. Confirm the app returns from the browser and leaves the auth form. Once issue #95's age
+   assurance is deployed (`workers/README.md` → "Age assurance"), a **new** Google account lands on
+   the first-use "Confirm your age" screen instead, and every app route answers
+   `403 age_assurance_required` until it chooses. An account that existed before migration 0005,
+   or has already answered, never sees it.
 5. Query D1 again:
 
 ```sh

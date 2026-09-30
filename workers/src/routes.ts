@@ -15,11 +15,66 @@
  */
 
 import type { GeneratePlanRequest, IntakeResponses, Tier } from '../../src/lib/planTypes';
+import { parseAgeBandChoice, requiresLegacyIntakeConsent } from '../../src/lib/ageAssurance';
 import type { Deps } from './deps';
 import { PRIVACY_POLICY_VERSION } from '../../src/constants/legal';
 import { fail, ok, readJson } from './http';
 import { generatePlan } from './lib/generate-plan-flow';
 import { isPurchasableTier, TIER_PLAN_LIMITS } from '../../src/lib/tierLimits';
+
+// ---------------------------------------------------------------------------------------------
+// POST /api/age-assurance
+// ---------------------------------------------------------------------------------------------
+
+export async function handleRecordAgeAssurance(
+  request: Request,
+  userId: string,
+  deps: Deps
+): Promise<Response> {
+  const body = await readJson<unknown>(request);
+  if (!body) {
+    return fail(400, 'invalid_request', 'Request body must be valid JSON.');
+  }
+
+  // The client names the account its gate was rendered for. A web tab left open across an account
+  // switch in another tab sends the *new* account's cookie, and this write is immutable, so a
+  // mismatch is refused instead of recording one person's answer onto someone else. The field is
+  // only a precondition — the write target is always the verified session's `userId`.
+  const expectedUserId = (body as { expectedUserId?: unknown }).expectedUserId;
+  if (typeof expectedUserId !== 'string' || expectedUserId.length === 0) {
+    return fail(400, 'invalid_request', 'expectedUserId is required.');
+  }
+  if (expectedUserId !== userId) {
+    return fail(
+      409,
+      'age_assurance_account_mismatch',
+      'You are signed in to a different account now. Reload and try again.'
+    );
+  }
+
+  const parsed = parseAgeBandChoice(body);
+  if (!parsed.ok) {
+    return fail(400, parsed.code, parsed.error);
+  }
+
+  const result = await deps.store.recordAgeAssurance(
+    userId,
+    parsed.choice.ageBand,
+    PRIVACY_POLICY_VERSION
+  );
+
+  if (result.outcome === 'not_found') {
+    return fail(404, 'not_found', 'No such account.');
+  }
+  if (result.outcome === 'conflict' || result.outcome === 'grandfathered') {
+    return fail(409, 'age_assurance_conflict', 'Your age range has already been set.');
+  }
+
+  return ok({
+    ageBand: result.assurance.ageBand,
+    guardianConsentRecorded: result.assurance.ageBand === '13_17',
+  });
+}
 
 // ---------------------------------------------------------------------------------------------
 // POST /api/generate-plan
@@ -275,7 +330,25 @@ export async function handlePutIntake(request: Request, userId: string, deps: De
     return fail(400, 'invalid_request', problem);
   }
 
-  const requiresGuardianConsent = body.age >= 13 && body.age <= 17;
+  const assurance = await deps.store.getAgeAssurance(userId);
+  if (!assurance) {
+    return fail(404, 'not_found', 'No such account.');
+  }
+  if (assurance.status === 'pending') {
+    return fail(
+      403,
+      'age_assurance_required',
+      'Choose your age range before using Pace Blueprint.'
+    );
+  }
+  if (assurance.status === 'recorded' && assurance.ageBand === '18_plus' && body.age < 18) {
+    return fail(400, 'invalid_request', 'age must be at least 18 for this account.');
+  }
+  if (assurance.status === 'recorded' && assurance.ageBand === '13_17' && body.age > 17) {
+    return fail(400, 'invalid_request', 'age must be 17 or under for this account.');
+  }
+
+  const requiresGuardianConsent = requiresLegacyIntakeConsent(assurance.status, body.age);
   if (requiresGuardianConsent && body.guardianConsent !== true) {
     return fail(400, 'invalid_request', 'Guardian consent is required for runners aged 13 to 17.');
   }

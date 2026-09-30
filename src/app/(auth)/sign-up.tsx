@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AgeBandChoice } from '@/components/auth/AgeBandChoice';
 import { AuthField } from '@/components/auth/AuthField';
 import {
   ActionDivider,
@@ -19,9 +20,15 @@ import {
 } from '@/components/ui/ActionButton';
 import { FontFamily, FontSize, MaxContentWidth, Spacing, Tracking } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { API_BASE_URL, authClient, describeError, signInWithGoogle } from '@/lib/apiClient';
+import {
+  API_BASE_URL,
+  describeError,
+  signInWithGoogle,
+  signUpWithAgeAssurance,
+} from '@/lib/apiClient';
+import { selectionOf, type AgeBand } from '@/lib/ageAssurance';
 import { createVerifyEmailURL, isVerificationPendingSignUp } from '@/lib/authEmail';
-import { markPostSignupRedirect } from '@/lib/postSignupRedirect';
+import { clearPostSignupRedirect, markPostSignupRedirect } from '@/lib/postSignupRedirect';
 
 /** Sign-up. Peer of `sign-in.tsx` — same wordmark, same page form, same single ink-filled
  * action, same link back to onboarding. See that file's header for the shared rationale. */
@@ -35,8 +42,10 @@ export default function SignUpScreen() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [ageBand, setAgeBand] = useState<AgeBand | null>(null);
+  const [guardianConsent, setGuardianConsent] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const [activeAction, setActiveAction] = useState<'email' | 'google' | null>(null);
   // Set when the Worker created the account but withheld the session because the deployment
   // requires email verification first (issue #94). `Stack.Protected` will not move a runner
   // without a session, so this screen has to tell them what happens next.
@@ -45,19 +54,30 @@ export default function SignUpScreen() {
   // See `sign-in.tsx` for why every `authClient` call needs a try/catch and not just an `error`
   // check — an unreachable backend rejects rather than resolving to `{ error }`.
   async function handleSignUp() {
+    if (activeAction) return;
     setError(null);
-    setSubmitting(true);
+    const ageChoice = selectionOf(ageBand, guardianConsent);
+    if (!ageChoice) {
+      setError(
+        ageBand === '13_17'
+          ? 'A parent or guardian must agree before you create this account.'
+          : 'Select your age range before you create this account.'
+      );
+      return;
+    }
+    setActiveAction('email');
     try {
       // `minPasswordLength: 8` (workers/src/auth.ts) is enforced server-side; this is not
       // duplicated here so the server's message stays the one source of truth for the copy.
       // `callbackURL` is where the verification mail's link sends the runner once the Worker has
       // consumed the token — the app's own `/verify-email` route. Safe on web, unlike sign-in: the
       // sign-up response carries no `redirect`, so the client's redirect plugin ignores it.
-      const { data, error: signUpError } = await authClient.signUp.email({
+      const { data, error: signUpError } = await signUpWithAgeAssurance({
         name,
         email,
         password,
         callbackURL: createVerifyEmailURL(),
+        ...ageChoice,
       });
       if (signUpError) {
         setError(signUpError.message ?? 'Sign-up failed. Try a different email or a longer password.');
@@ -79,29 +99,34 @@ export default function SignUpScreen() {
     } catch (signUpError) {
       setError(describeError(signUpError, 'Sign-up failed. Try again.', API_BASE_URL));
     } finally {
-      setSubmitting(false);
+      setActiveAction(null);
     }
   }
 
   async function handleGoogleSignIn() {
+    if (activeAction) return;
     setError(null);
-    setSubmitting(true);
+    setActiveAction('google');
     try {
       // Social auth is also account creation on this screen. Mark the one-shot redirect immediately
       // before the auth client notifies the session atom; doing it after success can lose the same
       // unmount race already fixed for email sign-up.
       const outcome = await signInWithGoogle({ onBeforeSessionNotify: markPostSignupRedirect });
       if (!outcome.ok) {
+        clearPostSignupRedirect();
         setError(outcome.message);
       }
     } catch (socialError) {
+      clearPostSignupRedirect();
       setError(describeError(socialError, 'Google sign-in failed.', API_BASE_URL));
     } finally {
-      setSubmitting(false);
+      setActiveAction(null);
     }
   }
 
-  const disabled = submitting || !name || !email || !password;
+  const ageChoice = selectionOf(ageBand, guardianConsent);
+  const submitting = activeAction !== null;
+  const disabled = submitting || !name || !email || !password || ageChoice === null;
 
   return (
     <View style={[styles.container, { backgroundColor: theme.surface.base }]}>
@@ -177,12 +202,30 @@ export default function SignUpScreen() {
                   secureTextEntry
                 />
 
-                {error && <Text style={[styles.error, { color: theme.status.error }]}>{error}</Text>}
+                <AgeBandChoice
+                  value={ageBand}
+                  onChange={setAgeBand}
+                  guardianConsent={guardianConsent}
+                  onToggleGuardianConsent={() => setGuardianConsent((checked) => !checked)}
+                  disabled={submitting}
+                  testIDPrefix="signup-age"
+                />
+
+                {error ? (
+                  <Text
+                    accessibilityRole="alert"
+                    accessibilityLiveRegion="assertive"
+                    selectable
+                    style={[styles.error, { color: theme.status.error }]}
+                  >
+                    {error}
+                  </Text>
+                ) : null}
 
                 <PrimaryAction
                   label="Sign up"
                   disabled={disabled}
-                  busy={submitting}
+                  busy={activeAction === 'email'}
                   onPress={handleSignUp}
                 />
 
@@ -191,6 +234,7 @@ export default function SignUpScreen() {
                 <SecondaryAction
                   label="Continue with Google"
                   disabled={submitting}
+                  busy={activeAction === 'google'}
                   onPress={handleGoogleSignIn}
                 />
 

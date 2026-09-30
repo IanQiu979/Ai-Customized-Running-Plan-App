@@ -15,15 +15,19 @@
   reviews this policy and the store privacy-label answers before public store submission.
 
   Under-18 posture (captain, 2026-09-19): 13–17 may use the app WITH a parent's or guardian's
-  consent. This policy states that posture; the in-app consent flow that records it has now
-  shipped — a required checkbox at intake plus a server-recorded consent event (timestamp +
-  policy version), written atomically with the intake row (`workers/migrations/
-  0004_guardian_consent.sql`, `workers/src/routes.ts`'s `handlePutIntake`).
+  consent. Since 2026-10-01 (issue #95) the consent is taken at account creation, ported from
+  V2.3's pattern: sign-up asks the age range (18+ or 13–17; nothing under 13 is offered), a 13–17
+  choice requires a guardian checkbox, and the Worker records the band, the policy version and
+  the consent event in the same SQLite statement as the account row
+  (`workers/migrations/0005_age_assurance.sql`, `workers/src/age-assurance.ts`). A new Google
+  account is held at a first-use gate until it answers (`POST /api/age-assurance`). Accounts that
+  existed before 0005 are grandfathered and keep the older intake-time checkbox
+  (`workers/migrations/0004_guardian_consent.sql`, `workers/src/routes.ts`'s `handlePutIntake`).
 -->
 
 # Pace Blueprint — Privacy Policy
 
-**Last updated: 2026-09-19**
+**Last updated: 2026-10-01**
 
 Pace Blueprint ("the app," "we," "us") is operated by **Ian Qiu**, a sole trader based in
 **Thailand**, who is the data controller for the personal data described here. This policy
@@ -48,6 +52,7 @@ pain to follow a plan.
 | Data | What it is | Why we collect it |
 |---|---|---|
 | Account details | Your name, your email address, and — if you sign up with a password — that password, stored only as a salted hash we cannot reverse | To create and secure your account and let you sign in |
+| Age range | Whether you told us, when your account was created, that you are 18 or older or 13 to 17, and which version of this policy was in force; if you are 13 to 17, the record of your parent's or guardian's consent (see "Age" below) | To apply the right rules to your account and to be able to show that a minor's data is processed with consent |
 | Google sign-in details | If you choose Sign in with Google: your Google account identifier, the name, email address and profile-picture link Google shares, and the tokens Google issues so the sign-in works | To let you sign in with Google instead of a password |
 | Sign-in sessions | A session token, when it was created, and the IP address and device/browser description of the request that created it | To keep you signed in and to let us detect misuse of an account |
 | Intake answers | Your training goal (in your own words), your age, your running experience, how many days a week you run, your typical weekly distance, your target race distance and date and goal time (if you have one), and a recent race time (if you give one) | To build a plan that fits you — for example, your age sets your estimated maximum heart rate, and your recent time sets your training paces |
@@ -210,19 +215,29 @@ the jurisdictions where the app is offered before public store submission.
 
 ## Age
 
-You must be **13 or older** to use Pace Blueprint. The intake asks for your age and refuses an
-age under 13; we do not knowingly hold an account for anyone younger, and if we learn that we
-do, we delete it.
+You must be **13 or older** to use Pace Blueprint. Creating an account asks which age range you
+are in — 18 or older, or 13 to 17 — and does not offer an option for anyone younger; the intake
+also asks your exact age, for your plan, and refuses an age under 13. We do not knowingly hold an
+account for anyone under 13, and if we learn that we do, we delete it.
 
 If you are **13 to 17**, you may use the app **only with the consent of a parent or guardian**,
-who agrees to this policy on your behalf. Before an account with an age in that range can save its
-intake answers, the app requires an explicit checkbox affirming that a parent or guardian has read
-this policy and agrees to it on the runner's behalf, and we record that consent — the time it was
-given and which version of this policy it covered — as a server-side event. This recorded consent
-is our stated legal basis for processing a minor's data under GDPR Article 9(2)(a) and Thai PDPA
-section 26. If you are a parent or guardian and believe your child is using the app without your
-consent, contact us at the address below and we will delete the account. Plans for runners under
-18 are also built differently: they never prescribe heart-rate zones, using effort levels instead.
+who agrees to this policy on your behalf. Before an account in that range can be created, the app
+requires an explicit checkbox affirming that a parent or guardian has read this policy and agrees
+to it on the runner's behalf, and we record that consent — the time it was given and which
+version of this policy it covered — as a server-side event, together with the account itself: if
+the consent cannot be recorded, the account is not created. An account created with Google
+sign-in is asked the same question the first time it is used, and cannot be used for anything
+else until it answers. Your age range is recorded once and cannot be changed in the app; if it is
+wrong, contact us. The checkbox records what you and your parent or guardian tell us — we do not
+verify a guardian's identity. Accounts created before 2026-10-01 were not asked the age range;
+for those, the app asks for the same parent or guardian consent before a 13-to-17 age can be saved
+in the intake.
+
+This recorded consent is our stated legal basis for processing a minor's data under GDPR Article
+9(2)(a) and Thai PDPA section 26. If you are a parent or guardian and believe your child is using
+the app without your consent, contact us at the address below and we will delete the account.
+Deleting an account deletes its age range and consent record with it. Plans for runners under 18
+are also built differently: they never prescribe heart-rate zones, using effort levels instead.
 
 ---
 

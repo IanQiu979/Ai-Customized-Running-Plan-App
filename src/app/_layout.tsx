@@ -21,10 +21,15 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useState } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { AgeAssuranceGate } from '@/components/auth/AgeAssuranceGate';
 import { NavigationThemes } from '@/constants/navigation-theme';
 import { useTheme } from '@/hooks/use-theme';
-import { authClient } from '@/lib/apiClient';
-import { consumePostSignupRedirect } from '@/lib/postSignupRedirect';
+import { authClient, useSessionUser } from '@/lib/apiClient';
+import {
+  claimPostSignupRedirect,
+  clearPostSignupRedirect,
+  consumePostSignupRedirect,
+} from '@/lib/postSignupRedirect';
 import { hasSessionSettled } from '@/lib/sessionGate';
 
 SplashScreen.preventAutoHideAsync();
@@ -33,6 +38,9 @@ export default function RootLayout() {
   const theme = useTheme();
   const router = useRouter();
   const { data: session, isPending: sessionPending } = authClient.useSession();
+  const sessionUser = useSessionUser();
+  const sessionUserId = sessionUser?.id;
+  const ageAssuranceStatus = sessionUser?.ageAssuranceStatus;
 
   // The eleven faces `FontFamily` (`src/constants/theme.ts`) names, and only those — the keys
   // here ARE the `fontFamily` strings the rest of the app writes, so the two lists cannot drift
@@ -86,16 +94,33 @@ export default function RootLayout() {
     }
   }, [ready]);
 
+  // Claim the durable OAuth/sign-up intent for the first authenticated identity that sees it.
+  // A direct account switch clears a previous owner's intent; a fully settled signed-out state
+  // clears failed/cancelled web OAuth without racing the callback page's initial session load.
+  useEffect(() => {
+    if (!sessionSettled) return;
+    if (sessionUserId) {
+      claimPostSignupRedirect(sessionUserId);
+    } else if (!session) {
+      clearPostSignupRedirect();
+    }
+  }, [session, sessionSettled, sessionUserId]);
+
   // This layout never unmounts, unlike `sign-up.tsx` — see `postSignupRedirect.ts`'s header for
   // why the redirect has to be consumed from here rather than from the sign-up screen itself.
   // A push, not a replace (2026-09-20): the intake ends by replacing itself with the new plan,
   // whose back arrow must land on Home — so `(tabs)` has to stay underneath. Home's own
   // first-entry gate covers every path that does not come through here.
   useEffect(() => {
-    if (session && consumePostSignupRedirect()) {
+    if (
+      session &&
+      sessionUserId &&
+      ageAssuranceStatus !== 'pending' &&
+      consumePostSignupRedirect(sessionUserId)
+    ) {
       router.push('/intake');
     }
-  }, [session, router]);
+  }, [ageAssuranceStatus, router, session, sessionUserId]);
 
   if (!ready) {
     // Keep the native splash screen up — nothing below can render its type-driven UI correctly
@@ -115,42 +140,44 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <ThemeProvider value={NavigationThemes[theme.scheme]}>
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: theme.surface.base },
-          }}
-        >
-          {/*
-            The whole app is behind a session, per the captain's explicit "no anonymous
-            browsing" decision — every `/api/*` route 403s anonymously anyway, so there is
-            nothing an anonymous user could do past sign-in/sign-up. `Stack.Protected`
-            (Expo Router's routing-guard primitive) redirects to whichever group's guard is
-            true; an authenticated user who lands on `(auth)` — or a signed-out user who lands
-            on `(tabs)` — is bounced automatically, including mid-session sign-out.
-          */}
-          <Stack.Protected guard={!!session}>
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="plan/[id]" />
-            <Stack.Screen name="plan/[id]/week/[week]" />
-            <Stack.Screen name="plan/[id]/week/[week]/day/[day]" />
-            <Stack.Screen name="intake" />
-            <Stack.Screen name="paywall" />
-          </Stack.Protected>
-          <Stack.Protected guard={!session}>
-            <Stack.Screen name="(auth)" />
-          </Stack.Protected>
-          {/*
-            Deliberately outside both guards. These two are where the password-reset and
-            email-verification links land (`paceblueprint://reset-password?token=…` and
-            `…/verify-email`, issue #94), and a link can open in either session state — see each
-            screen's header. Guarding them would bounce the runner and drop the token on the
-            floor. Nothing on them is sensitive to a session: the token in the URL is the only
-            credential, and the Worker is the only thing that can spend it.
-          */}
-          <Stack.Screen name="reset-password" />
-          <Stack.Screen name="verify-email" />
-        </Stack>
+        <AgeAssuranceGate>
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: theme.surface.base },
+            }}
+          >
+            {/*
+              The whole app is behind a session, per the captain's explicit "no anonymous
+              browsing" decision — every `/api/*` route 403s anonymously anyway, so there is
+              nothing an anonymous user could do past sign-in/sign-up. `Stack.Protected`
+              (Expo Router's routing-guard primitive) redirects to whichever group's guard is
+              true; an authenticated user who lands on `(auth)` — or a signed-out user who lands
+              on `(tabs)` — is bounced automatically, including mid-session sign-out.
+            */}
+            <Stack.Protected guard={!!session}>
+              <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="plan/[id]" />
+              <Stack.Screen name="plan/[id]/week/[week]" />
+              <Stack.Screen name="plan/[id]/week/[week]/day/[day]" />
+              <Stack.Screen name="intake" />
+              <Stack.Screen name="paywall" />
+            </Stack.Protected>
+            <Stack.Protected guard={!session}>
+              <Stack.Screen name="(auth)" />
+            </Stack.Protected>
+            {/*
+              Deliberately outside both guards. These two are where the password-reset and
+              email-verification links land (`paceblueprint://reset-password?token=…` and
+              `…/verify-email`, issue #94), and a link can open in either session state — see each
+              screen's header. Guarding them would bounce the runner and drop the token on the
+              floor. Nothing on them is sensitive to a session: the token in the URL is the only
+              credential, and the Worker is the only thing that can spend it.
+            */}
+            <Stack.Screen name="reset-password" />
+            <Stack.Screen name="verify-email" />
+          </Stack>
+        </AgeAssuranceGate>
       </ThemeProvider>
     </SafeAreaProvider>
   );

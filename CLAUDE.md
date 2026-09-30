@@ -125,8 +125,9 @@ clean `typecheck && lint && test`. Never force-push without explicit user approv
   back to a template. Over-tight content validation is a known Echo V1 mistake — detail in
   [`docs/reference/plan-generation.md`](docs/reference/plan-generation.md).
 - Shared types (`Plan`, `Week`, `Workout`, `Tier`) live in `src/lib/planTypes.ts`, shared
-  constants/logic in `src/lib/tierLimits.ts` and `src/lib/quotaPeriod.ts`, and the policy URL and
-  version in `src/constants/legal.ts`. All four are imported by both the app and `workers/` (and
+  constants/logic in `src/lib/tierLimits.ts`, `src/lib/quotaPeriod.ts` and `src/lib/ageAssurance.ts`
+  (the age-band wire values and parser), and the policy URL and version in
+  `src/constants/legal.ts`. All five are imported by both the app and `workers/` (and
   listed in `workers/tsconfig.json`'s `include`), so they must stay pure — no React, no Node, no
   Cloudflare globals.
 
@@ -161,7 +162,7 @@ clean `typecheck && lint && test`. Never force-push without explicit user approv
 ## Testing
 
 jest-expo is installed. New logic added to `src/lib/` gets a test alongside it (see
-`src/lib/__tests__/supabase.test.ts`). Screens are not unit-tested for now. Eight rendered-screen
+`src/lib/__tests__/supabase.test.ts`). Screens are not unit-tested for now. Nine rendered-screen
 suites are deliberate exceptions, each because the bug or behaviour under test lives in the
 screen's own render branches with no logic layer underneath to test instead: the two in
 `src/app/(auth)/__tests__/` (2026-09-04) — `onboarding.test.tsx` (the CTA gate and its bounded
@@ -174,11 +175,13 @@ issue #24), `src/app/__tests__/root-layout-font-gate.test.tsx` (2026-09-16, the 
 splash gate settling on a font-load *failure* as well as a success — issue #21),
 `src/app/__tests__/intake-guardian-consent.test.tsx` (2026-09-19, the 13–17 consent checkbox's
 render branch and save-time gate, issue #89), `src/app/(tabs)/__tests__/settings-privacy.test.tsx`
-(2026-09-19, the Settings privacy-policy link's role and its visible failure copy, issue #89) and
+(2026-09-19, the Settings privacy-policy link's role and its visible failure copy, issue #89),
 `src/app/__tests__/intake-flow.test.tsx` (2026-09-20, the captain's intake-flow rulings —
 unskippable first entry, blank re-entry, required target distance, one "Create plan" that saves
-then generates — which live in the screen's render branches and submit handler). Each file's
-header states the reason; add a ninth only on the same grounds.
+then generates — which live in the screen's render branches and submit handler) and
+`src/app/(auth)/__tests__/sign-up-age-assurance.test.tsx` (2026-10-01, sign-up's age-band gate on
+the button and the handler, and the request body it sends, issue #95). Each file's header states
+the reason; add a tenth only on the same grounds.
 
 ## Keep these docs updated — this is a standing rule, not a suggestion
 

@@ -27,17 +27,38 @@ jest.mock('expo-splash-screen', () => ({
   hideAsync: () => mockHideAsync(),
 }));
 
-// A settled, signed-out session — the session half of the gate is `sessionGate.ts`'s, already
-// pinned by its own suite, and is held open here so only the font half is under test.
+let mockSession: { user: { id: string } } | null = null;
+let mockAgeAssuranceStatus: 'pending' | 'recorded' | 'grandfathered' | undefined;
 jest.mock('@/lib/apiClient', () => ({
-  authClient: { useSession: () => ({ data: null, isPending: false }) },
+  authClient: { useSession: () => ({ data: mockSession, isPending: false }) },
+  useSessionUser: () =>
+    mockSession
+      ? {
+          id: mockSession.user.id,
+          email: 'runner@example.com',
+          emailVerified: true,
+          name: 'Runner',
+          ageBand: null,
+          ageAssuranceStatus: mockAgeAssuranceStatus,
+        }
+      : null,
 }));
 // Without native insets `SafeAreaProvider` renders nothing until measured; pass children through
 // so the marker below is reachable.
 jest.mock('react-native-safe-area-context', () => ({
   SafeAreaProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
-jest.mock('@/lib/postSignupRedirect', () => ({ consumePostSignupRedirect: () => false }));
+const mockConsumePostSignupRedirect = jest.fn((_userId: string) => false);
+const mockClaimPostSignupRedirect = jest.fn((_userId: string) => false);
+const mockClearPostSignupRedirect = jest.fn();
+jest.mock('@/lib/postSignupRedirect', () => ({
+  claimPostSignupRedirect: (userId: string) => mockClaimPostSignupRedirect(userId),
+  clearPostSignupRedirect: () => mockClearPostSignupRedirect(),
+  consumePostSignupRedirect: (userId: string) => mockConsumePostSignupRedirect(userId),
+}));
+jest.mock('@/components/auth/AgeAssuranceGate', () => ({
+  AgeAssuranceGate: ({ children }: { children: React.ReactNode }) => children,
+}));
 
 // The navigator is not what is under test; a marker view stands in for `<Stack>` so the suite can
 // tell "the tree rendered" from "the layout returned `null`".
@@ -77,6 +98,11 @@ function rendersStack(tree: ReactTestRenderer): boolean {
 
 beforeEach(() => {
   mockHideAsync.mockClear();
+  mockSession = null;
+  mockAgeAssuranceStatus = undefined;
+  mockConsumePostSignupRedirect.mockReset().mockReturnValue(false);
+  mockClaimPostSignupRedirect.mockReset().mockReturnValue(false);
+  mockClearPostSignupRedirect.mockReset();
   jest.spyOn(console, 'warn').mockImplementation(() => {});
 });
 
@@ -109,5 +135,44 @@ describe('RootLayout font gate', () => {
     // layout returned `null` forever and `hideAsync` never ran.
     expect(rendersStack(tree)).toBe(true);
     expect(mockHideAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not consume the post-signup intake redirect while age assurance is pending', () => {
+    mockFonts = [true, null];
+    mockSession = { user: { id: 'new-oauth-user' } };
+    mockAgeAssuranceStatus = 'pending';
+
+    const tree = mount();
+    expect(mockConsumePostSignupRedirect).not.toHaveBeenCalled();
+    expect(mockClaimPostSignupRedirect).toHaveBeenCalledWith('new-oauth-user');
+
+    mockAgeAssuranceStatus = 'recorded';
+    act(() => {
+      tree.update(<RootLayout />);
+    });
+
+    expect(mockConsumePostSignupRedirect).toHaveBeenCalledWith('new-oauth-user');
+  });
+
+  it('clears the redirect after a settled signed-out session', () => {
+    mockFonts = [true, null];
+    mount();
+
+    expect(mockClearPostSignupRedirect).toHaveBeenCalledTimes(1);
+  });
+
+  it('rechecks ownership when the authenticated account changes', () => {
+    mockFonts = [true, null];
+    mockSession = { user: { id: 'pending-a' } };
+    mockAgeAssuranceStatus = 'pending';
+    const tree = mount();
+
+    mockSession = { user: { id: 'pending-b' } };
+    act(() => {
+      tree.update(<RootLayout />);
+    });
+
+    expect(mockClaimPostSignupRedirect).toHaveBeenNthCalledWith(1, 'pending-a');
+    expect(mockClaimPostSignupRedirect).toHaveBeenNthCalledWith(2, 'pending-b');
   });
 });
