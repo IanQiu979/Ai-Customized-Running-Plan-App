@@ -16,6 +16,7 @@
  *   POST /api/generate-plan   the core call — 402 over quota, 403 anon
  *   GET  /api/quota-status    tier + quota/unlimited state
  *   POST /api/purchase-tier   v1 dummy purchase; real IAP lands on this same route later
+ *   POST /api/age-assurance   one write-once OAuth first-use age choice
  *   POST /api/delete-account  erases the account and everything it owns
  *   GET/PUT /api/intake       one authenticated runner's intake
  *   GET  /api/plans           My Plans summaries
@@ -50,6 +51,7 @@ import {
   handlePurchaseTier,
   handlePutIntake,
   handleQuotaStatus,
+  handleRecordAgeAssurance,
 } from './routes';
 
 export default {
@@ -117,6 +119,21 @@ async function dispatch(request: Request, env: Env, options: DispatchOptions = {
     return unauthenticated();
   }
   const userId = session.user.id;
+
+  if (session.user.ageAssuranceStatus === 'pending') {
+    if (request.method === 'POST' && path === '/api/age-assurance') {
+      return handleRecordAgeAssurance(request, userId, createDeps(env));
+    }
+    if (request.method === 'POST' && path === '/api/delete-account') {
+      return handleDeleteAccount(request, userId, createDeps(env));
+    }
+    return fail(
+      403,
+      'age_assurance_required',
+      'Choose your age range before using Pace Blueprint.'
+    );
+  }
+
   const deps = createDeps(env);
 
   switch (`${request.method} ${path}`) {
@@ -128,6 +145,8 @@ async function dispatch(request: Request, env: Env, options: DispatchOptions = {
       return handlePurchaseTier(request, userId, session.user.email, deps);
     case 'POST /api/delete-account':
       return handleDeleteAccount(request, userId, deps);
+    case 'POST /api/age-assurance':
+      return handleRecordAgeAssurance(request, userId, deps);
     case 'GET /api/intake':
       return handleGetIntake(userId, deps);
     case 'PUT /api/intake':

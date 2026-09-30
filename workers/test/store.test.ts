@@ -11,6 +11,7 @@
 import { env } from 'cloudflare:test';
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import { PRIVACY_POLICY_VERSION } from '../../src/constants/legal';
 import type { InjuryFlag, Plan } from '../../src/lib/planTypes';
 import { FALLBACK_EXEMPTION_CAP } from '../../src/lib/tierLimits';
 import { D1PlanStore, RESERVATION_TTL_MS } from '../src/lib/store';
@@ -449,6 +450,120 @@ describe('ownership', () => {
 
     const row = await s.getPlan(USER, planId);
     expect(row?.status).toBe('reserved');
+  });
+});
+
+describe('age assurance', () => {
+  it('reads only the authenticated user id it is given', async () => {
+    await seedUser('other-user');
+    const s = store();
+
+    await s.recordAgeAssurance(USER, '18_plus', PRIVACY_POLICY_VERSION);
+
+    expect(await s.getAgeAssurance(USER)).toEqual({
+      ageBand: '18_plus',
+      status: 'recorded',
+      policyVersion: PRIVACY_POLICY_VERSION,
+    });
+    expect(await s.getAgeAssurance('other-user')).toEqual({
+      ageBand: null,
+      status: 'pending',
+      policyVersion: null,
+    });
+    expect(await s.getAgeAssurance('missing-user')).toBeNull();
+  });
+
+  it('records an adult choice once with the server policy version', async () => {
+    const result = await store().recordAgeAssurance(USER, '18_plus', PRIVACY_POLICY_VERSION);
+
+    expect(result).toEqual({
+      outcome: 'recorded',
+      assurance: {
+        ageBand: '18_plus',
+        status: 'recorded',
+        policyVersion: PRIVACY_POLICY_VERSION,
+      },
+    });
+    const consent = await env.DB.prepare(
+      'SELECT user_id FROM guardian_consent WHERE user_id = ?'
+    )
+      .bind(USER)
+      .first();
+    expect(consent).toBeNull();
+  });
+
+  it('records a minor choice and lets the database trigger create its consent evidence', async () => {
+    const result = await store().recordAgeAssurance(USER, '13_17', PRIVACY_POLICY_VERSION);
+
+    expect(result).toMatchObject({
+      outcome: 'recorded',
+      assurance: { ageBand: '13_17', status: 'recorded' },
+    });
+    const consent = await env.DB.prepare(
+      'SELECT user_id, policy_version FROM guardian_consent WHERE user_id = ?'
+    )
+      .bind(USER)
+      .first<{ user_id: string; policy_version: string }>();
+    expect(consent).toEqual({ user_id: USER, policy_version: PRIVACY_POLICY_VERSION });
+  });
+
+  it('treats an identical retry as an idempotent replay and a different retry as a conflict', async () => {
+    const s = store();
+    await s.recordAgeAssurance(USER, '18_plus', PRIVACY_POLICY_VERSION);
+
+    await expect(
+      s.recordAgeAssurance(USER, '18_plus', PRIVACY_POLICY_VERSION)
+    ).resolves.toMatchObject({ outcome: 'replayed', assurance: { ageBand: '18_plus' } });
+    await expect(
+      s.recordAgeAssurance(USER, '13_17', PRIVACY_POLICY_VERSION)
+    ).resolves.toMatchObject({ outcome: 'conflict', assurance: { ageBand: '18_plus' } });
+  });
+
+  it('serializes concurrent conflicting choices so exactly one wins', async () => {
+    const s = store();
+
+    const results = await Promise.all([
+      s.recordAgeAssurance(USER, '18_plus', PRIVACY_POLICY_VERSION),
+      s.recordAgeAssurance(USER, '13_17', PRIVACY_POLICY_VERSION),
+    ]);
+
+    expect(results.filter((result) => result.outcome === 'recorded')).toHaveLength(1);
+    expect(results.filter((result) => result.outcome === 'conflict')).toHaveLength(1);
+    const winner = await s.getAgeAssurance(USER);
+    expect(
+      results.every(
+        (result) => result.outcome !== 'not_found' && result.assurance.ageBand === winner?.ageBand
+      )
+    ).toBe(true);
+  });
+
+  it('leaves the user pending when the minor consent trigger fails', async () => {
+    await env.DB.prepare(`
+      CREATE TRIGGER fail_store_age_assurance_consent
+      BEFORE INSERT ON guardian_consent
+      BEGIN
+        SELECT RAISE(ABORT, 'test store consent failure');
+      END;
+    `).run();
+
+    try {
+      await expect(
+        store().recordAgeAssurance(USER, '13_17', PRIVACY_POLICY_VERSION)
+      ).rejects.toThrow();
+      expect(await store().getAgeAssurance(USER)).toEqual({
+        ageBand: null,
+        status: 'pending',
+        policyVersion: null,
+      });
+      const consent = await env.DB.prepare(
+        'SELECT user_id FROM guardian_consent WHERE user_id = ?'
+      )
+        .bind(USER)
+        .first();
+      expect(consent).toBeNull();
+    } finally {
+      await env.DB.exec('DROP TRIGGER IF EXISTS fail_store_age_assurance_consent;');
+    }
   });
 });
 

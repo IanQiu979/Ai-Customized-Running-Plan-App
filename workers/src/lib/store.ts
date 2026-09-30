@@ -31,6 +31,7 @@ import type {
   RaceDistance,
   Tier,
 } from '../../../src/lib/planTypes';
+import type { AgeAssuranceStatus, AgeBand } from '../../../src/lib/ageAssurance';
 import { currentPeriod } from '../../../src/lib/quotaPeriod';
 import { UNLIMITED_ACCESS_TIER } from '../access';
 import {
@@ -83,6 +84,17 @@ export interface PlanRow {
   createdAt: string;
   quotaConsumed: boolean;
 }
+
+export interface AgeAssuranceRow {
+  ageBand: AgeBand | null;
+  status: AgeAssuranceStatus;
+  policyVersion: string | null;
+}
+
+export type RecordAgeAssuranceResult =
+  | { outcome: 'recorded' | 'replayed'; assurance: AgeAssuranceRow }
+  | { outcome: 'conflict' | 'grandfathered'; assurance: AgeAssuranceRow }
+  | { outcome: 'not_found' };
 
 export interface ReserveInput {
   userId: string;
@@ -493,6 +505,70 @@ export class D1PlanStore implements PlanStore {
   // Reads and account lifecycle — not part of `PlanStore`, because the generation flow has no
   // business calling them.
   // -------------------------------------------------------------------------------------------
+
+  /** The authenticated caller's server-owned age-assurance tuple. */
+  async getAgeAssurance(userId: string): Promise<AgeAssuranceRow | null> {
+    const row = await this.db
+      .prepare(
+        `SELECT age_band, age_assurance_status, age_policy_version
+           FROM user WHERE id = ?`
+      )
+      .bind(userId)
+      .first<{
+        age_band: AgeBand | null;
+        age_assurance_status: AgeAssuranceStatus;
+        age_policy_version: string | null;
+      }>();
+
+    return row
+      ? {
+          ageBand: row.age_band,
+          status: row.age_assurance_status,
+          policyVersion: row.age_policy_version,
+        }
+      : null;
+  }
+
+  /**
+   * Record one authenticated user's age choice exactly once.
+   *
+   * D1 serializes the conditional update, so concurrent choices have one winner. The database
+   * trigger inserts minor consent in the same statement; this method must not duplicate it.
+   */
+  async recordAgeAssurance(
+    userId: string,
+    ageBand: AgeBand,
+    policyVersion: string
+  ): Promise<RecordAgeAssuranceResult> {
+    const result = await this.db
+      .prepare(
+        `UPDATE user
+            SET age_band = ?, age_assurance_status = 'recorded', age_policy_version = ?
+          WHERE id = ? AND age_assurance_status = 'pending'`
+      )
+      .bind(ageBand, policyVersion, userId)
+      .run();
+
+    const assurance = await this.getAgeAssurance(userId);
+    if ((result.meta?.changes ?? 0) > 0) {
+      if (!assurance) {
+        throw new Error('age-assurance: user vanished immediately after update');
+      }
+      return { outcome: 'recorded', assurance };
+    }
+
+    if (!assurance) return { outcome: 'not_found' };
+    if (assurance.status === 'recorded') {
+      return assurance.ageBand === ageBand
+        ? { outcome: 'replayed', assurance }
+        : { outcome: 'conflict', assurance };
+    }
+    if (assurance.status === 'grandfathered') {
+      return { outcome: 'grandfathered', assurance };
+    }
+
+    throw new Error('age-assurance: conditional update made no change for a pending user');
+  }
 
   /** One plan, by id, **owned by this user**. A foreign id returns null, never someone's plan. */
   async getPlan(userId: string, planId: string): Promise<PlanRow | null> {

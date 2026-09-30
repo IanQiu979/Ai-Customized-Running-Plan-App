@@ -22,6 +22,7 @@
     "../src/lib/planTypes.ts",
     "../src/lib/tierLimits.ts",
     "../src/lib/quotaPeriod.ts",
+    "../src/lib/ageAssurance.ts",
     "../src/constants/legal.ts"
   ]
 }

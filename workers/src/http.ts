@@ -14,6 +14,11 @@ export type ErrorCode =
   | 'not_found'
   | 'method_not_allowed'
   | 'invalid_request'
+  | 'age_band_required'
+  | 'guardian_consent_required'
+  | 'age_assurance_required'
+  | 'age_assurance_conflict'
+  | 'age_assurance_account_mismatch'
   | 'over_quota'
   /** Delete-account's password confirmation didn't match the stored credential — see `routes.ts`. */
   | 'invalid_password'

@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { SurveyIntro } from '@/components/build/SurveyIntro';
 import { useBuildClock } from '@/components/build/useBuildClock';
+import { useAgeAssuranceStatus } from '@/components/auth/AgeAssuranceGate';
 import { ClockField } from '@/components/inputs/ClockField';
 import { DateField } from '@/components/inputs/DateField';
 import { NumberField } from '@/components/inputs/NumberField';
@@ -39,6 +40,7 @@ import {
   getIntake,
   putIntake,
 } from '@/lib/apiClient';
+import { requiresLegacyIntakeConsent } from '@/lib/ageAssurance';
 import { CUE_DELAY, SURVEY_TIMELINE } from '@/lib/buildMotion';
 import {
   clockFieldError,
@@ -153,6 +155,7 @@ export default function IntakeScreen() {
   const theme = useTheme();
   const router = useRouter();
   const navigation = useNavigation();
+  const ageAssuranceStatus = useAgeAssuranceStatus();
 
   // 'first' = no intake on file (a brand-new account); 'repeat' = one exists, so this is
   // "Create a new plan". A failed lookup settles on 'repeat': the Cancel it adds is harmless, and
@@ -188,13 +191,15 @@ export default function IntakeScreen() {
   const [injuries, setInjuries] = useState<InjuryFlag[]>(['none']);
   const [injuryNotes, setInjuryNotes] = useState('');
 
-  // Captain's ruling (2026-09-19): 13–17 requires a parent/guardian's affirmed consent, recorded
-  // server-side. This is a one-time-per-save affirmation, never persisted or reloaded — it always
-  // starts unchecked and must be re-affirmed on every save while the runner is a minor.
+  // Grandfathered 13–17 runners keep the legacy intake-time attestation. A recorded minor already
+  // supplied it atomically with their account age band, so intake neither asks nor sends it again.
+  // Missing metadata is deliberately legacy-safe rather than treated as recorded.
   const [guardianConsent, setGuardianConsent] = useState(false);
   const ageNumForMinorCheck = Number(age);
-  const isMinor =
-    Number.isInteger(ageNumForMinorCheck) && ageNumForMinorCheck >= 13 && ageNumForMinorCheck <= 17;
+  const requiresGuardianConsent = requiresLegacyIntakeConsent(
+    ageAssuranceStatus,
+    ageNumForMinorCheck
+  );
 
   // Held across retries of the SAME attempt (a dropped connection, a re-press before the first
   // reply lands) so the backend's idempotency replay returns that attempt's own result rather than
@@ -286,7 +291,7 @@ export default function IntakeScreen() {
         error: { field: 'age', message: 'Age must be a whole number between 13 and 100.' },
       };
     }
-    if (isMinor && !guardianConsent) {
+    if (requiresGuardianConsent && !guardianConsent) {
       return {
         ok: false,
         error: {
@@ -393,7 +398,7 @@ export default function IntakeScreen() {
           : {}),
         injuries,
         ...(injuryNotes.trim() ? { injuryNotes: injuryNotes.trim() } : {}),
-        ...(isMinor ? { guardianConsent: true } : {}),
+        ...(requiresGuardianConsent ? { guardianConsent: true } : {}),
       },
     };
   }
@@ -537,7 +542,7 @@ export default function IntakeScreen() {
               {fieldMessage('age')}
             </Field>
 
-            {isMinor ? (
+            {requiresGuardianConsent ? (
               <>
                 <GuardianConsentRow
                   checked={guardianConsent}

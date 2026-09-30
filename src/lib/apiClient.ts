@@ -30,6 +30,7 @@ import { Platform } from 'react-native';
 import { ApiError, NetworkError, isNetworkFailure } from './apiErrors';
 import { describeAuthSessionResult } from './socialAuth';
 import type { ApiErrorBody } from './apiErrors';
+import type { AgeAssuranceStatus, AgeBand, AgeBandChoice } from './ageAssurance';
 import type {
   GeneratePlanRequest,
   GeneratePlanResponse,
@@ -248,6 +249,8 @@ export interface SessionUser {
   email: string;
   emailVerified: boolean;
   name: string;
+  ageBand: AgeBand | null;
+  ageAssuranceStatus: AgeAssuranceStatus;
 }
 
 export function useSessionUser(): SessionUser | null {
@@ -259,6 +262,9 @@ export async function signInWithGoogle(options?: {
   onBeforeSessionNotify?: () => void;
 }): Promise<GoogleAuthOutcome> {
   if (Platform.OS === 'web') {
+    // better-auth's web client may assign `window.location` before this promise settles. Persist
+    // the caller's one-shot redirect intent first so the callback page can recover it.
+    options?.onBeforeSessionNotify?.();
     const result = await authClient.signIn.social({ provider: 'google', callbackURL: '/' });
     if (result.error) {
       return {
@@ -272,6 +278,20 @@ export async function signInWithGoogle(options?: {
     return { ok: true };
   }
   return openNativeGoogleAuth(options?.onBeforeSessionNotify);
+}
+
+export interface SignUpWithAgeAssuranceInput extends AgeBandChoice {
+  name: string;
+  email: string;
+  password: string;
+  callbackURL?: string;
+}
+
+/** The only client entry point for email signup, with the age choice required by its type. */
+export function signUpWithAgeAssurance(input: SignUpWithAgeAssuranceInput) {
+  return authClient.signUp.email(
+    input as Parameters<typeof authClient.signUp.email>[0]
+  );
 }
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
@@ -329,6 +349,42 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 export interface EmailStatus {
   mailConfigured: boolean;
   verificationRequired: boolean;
+}
+
+export interface RecordAgeAssuranceResponse {
+  ageBand: AgeBand;
+  guardianConsentRecorded: boolean;
+}
+
+/**
+ * Records the OAuth first-use choice, then proves the session exposes its new immutable status
+ * before notifying the reactive session store. The gate therefore cannot lift on the write alone.
+ *
+ * `expectedUserId` is the account the gate was rendered for. The Worker refuses the write when the
+ * cookie now belongs to someone else (an account switch in another web tab), and the refresh below
+ * must name the same account before the gate lifts.
+ */
+export async function recordAgeAssurance(
+  choice: AgeBandChoice,
+  expectedUserId: string
+): Promise<RecordAgeAssuranceResponse> {
+  const result = await apiFetch<RecordAgeAssuranceResponse>('/api/age-assurance', {
+    method: 'POST',
+    body: JSON.stringify({ ...choice, expectedUserId }),
+  });
+  const refreshed = await baseAuthClient.getSession({ query: { disableCookieCache: true } });
+  const refreshedUser = (refreshed.data as unknown as { user?: SessionUser } | null)?.user;
+  if (
+    refreshed.error ||
+    !refreshedUser ||
+    refreshedUser.id !== expectedUserId ||
+    refreshedUser.ageAssuranceStatus !== 'recorded' ||
+    refreshedUser.ageBand !== result.ageBand
+  ) {
+    throw refreshed.error ?? new Error('The updated session did not confirm the saved age choice.');
+  }
+  authClient.$store.notify('$sessionSignal');
+  return result;
 }
 
 /** Public capability read. Never reuse a stale answer after server mail config changes. */

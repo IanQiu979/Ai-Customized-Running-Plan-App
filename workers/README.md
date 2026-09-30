@@ -42,9 +42,12 @@ workers/
     0003_*.sql           # the 13+ intake age floor
     0004_guardian_consent.sql # guardian_consent — one consent event per 13–17 user, written in the
                          #  same batch as the intake row (issue #89; docs/architecture.md has the schema)
+    0005_age_assurance.sql # user.age_band / age_assurance_status / age_policy_version, write-once,
+                         #  with the 13–17 consent row inserted by trigger (issue #95)
   src/
     index.ts             # entry: authenticate once, then dispatch. The route table lives here.
     auth.ts              # better-auth wired to D1
+    age-assurance.ts     # the sign-up age-band check and the server-owned assurance stamp
     routes.ts            # the app's handlers, each taking an already-verified userId
     deps.ts              # THE ONLY FILE THAT READS A SECRET, and the only one that binds seams
     env.ts               # the bindings/env contract
@@ -87,6 +90,25 @@ closed. Every purchase admitted through the allowlist (rather than the enabled-f
 switch) logs `dummy purchase granted via allowlist` with the `userId` only, so the Worker's logs
 show which grants relied on it.
 
+## Age assurance
+
+Since 2026-10-01 (issue #95) every account carries a write-once age band on `user`
+(`migrations/0005_age_assurance.sql`). Email sign-up must send `ageBand` (`18_plus` or `13_17`,
+and `guardianConsent: true` for `13_17`) or better-auth refuses it; `src/age-assurance.ts` then
+stamps it `recorded` with `PRIVACY_POLICY_VERSION`. Every other creation path — a new Google
+account — is stamped `pending`, and `src/index.ts` answers a `pending` session
+`403 age_assurance_required` on every app route except `POST /api/age-assurance` (its one-time
+answer) and `POST /api/delete-account`; `/api/auth/*`, sign-out included, still works. Accounts
+that existed before 0005 are `grandfathered` and keep the intake-time consent from 0004. A 13–17
+account's `guardian_consent` row is written by trigger in the same statement as the `user` write,
+so if it fails there is no account.
+
+**Rollout order matters, and it is the captain's.** The deployed Worker predates `pending`, so a
+production D1 with 0005 applied but the old Worker still serving would create ungated new accounts.
+Hold production traffic at Cloudflare, run `npm --prefix workers run db:migrate:remote`, run
+`wrangler deploy --env production` from this directory, probe that a `pending` account is refused
+`403 age_assurance_required`, reopen traffic, then release the client.
+
 ## What works today, and what does not
 
 Working end to end, verified against `wrangler dev` and the Worker test suite:
@@ -97,6 +119,7 @@ Working end to end, verified against `wrangler dev` and the Worker test suite:
   until the captain configures Resend, see `docs/email-setup.md`
 - the quota ledger: reserve → settle/release, atomic gate, idempotency replay, fallback exemption
 - `quota-status`, `purchase-tier`, `delete-account`, intake read/write, plan reads
+- account-level age assurance (issue #95, above) — tested locally, not yet migrated or deployed
 - `generate-plan` — Free tier (and, as a template fallback, Pro/Elite) returns a real generated
   plan, as of the 2026-08-04 `createTemplateSkeletonBuilder()` binding in `src/deps.ts`
 

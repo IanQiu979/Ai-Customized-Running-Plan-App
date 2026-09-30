@@ -15,14 +15,21 @@
  * that detection branch still exists before assuming this still holds.
  *
  * TABLE OWNERSHIP: better-auth owns `user`, `session`, `account`, and `verification`
- * (`migrations/0001_better_auth.sql`). Application data lives in its own tables keyed to
- * `user.id`, never as extra columns on `user` — see `migrations/0002_app_schema.sql`.
+ * (`migrations/0001_better_auth.sql`). Application data normally lives in tables keyed to
+ * `user.id` (see `migrations/0002_app_schema.sql`); the three age-assurance columns are the narrow
+ * exception because the account's authorization state must be available on the session user and
+ * atomically coupled to the `user` insert by `migrations/0005_age_assurance.sql`.
  */
 
 import { expo } from '@better-auth/expo';
 import { betterAuth } from 'better-auth';
 import { bearer } from 'better-auth/plugins';
 
+import {
+  ageAssuranceValidationPlugin,
+  rejectAgeAssuranceUpdate,
+  resolveAgeAssuranceForCreate,
+} from './age-assurance';
 import {
   resolveAuthMailRuntime,
   sendPasswordResetMail,
@@ -65,6 +72,49 @@ export function createAuth(env: Env, options: CreateAuthOptions = {}) {
     secret: env.BETTER_AUTH_SECRET,
     baseURL: env.BETTER_AUTH_URL,
     basePath: AUTH_BASE_PATH,
+
+    user: {
+      additionalFields: {
+        ageBand: {
+          type: 'string',
+          required: false,
+          fieldName: 'age_band',
+        },
+        ageAssuranceStatus: {
+          type: 'string',
+          required: true,
+          defaultValue: 'pending',
+          input: false,
+          fieldName: 'age_assurance_status',
+        },
+        agePolicyVersion: {
+          type: 'string',
+          required: false,
+          input: false,
+          returned: false,
+          fieldName: 'age_policy_version',
+        },
+      },
+    },
+
+    databaseHooks: {
+      user: {
+        create: {
+          before: async (candidate, context) => ({
+            data: resolveAgeAssuranceForCreate(
+              context?.path,
+              context?.body,
+              candidate
+            ),
+          }),
+        },
+        update: {
+          before: async (update, context) => {
+            rejectAgeAssuranceUpdate(update, context?.body);
+          },
+        },
+      },
+    },
 
     /**
      * The Expo app returns from an OAuth round trip through its own deep-link scheme, which is not
@@ -112,6 +162,18 @@ export function createAuth(env: Env, options: CreateAuthOptions = {}) {
       enabled: true,
       requireEmailVerification: mail.verificationRequired,
       minPasswordLength: 8,
+      customSyntheticUser: ({ coreFields, additionalFields, id }) =>
+        resolveAgeAssuranceForCreate(
+          '/sign-up/email',
+          {
+            ageBand: additionalFields.ageBand,
+            // The exact request already passed the before-hook's shared parser. better-auth's
+            // synthetic callback receives processed additional fields, not the raw request-only
+            // guardian flag, so reconstruct the already-proven complete choice from its band.
+            guardianConsent: additionalFields.ageBand === '13_17',
+          },
+          { ...coreFields, ...additionalFields, id }
+        ),
       sendResetPassword: ({ user, url }) =>
         sendPasswordResetMail(mail.sendMail, { to: user.email, url }),
       revokeSessionsOnPasswordReset: true,
@@ -167,7 +229,7 @@ export function createAuth(env: Env, options: CreateAuthOptions = {}) {
      * for the email/password path; required for Google OAuth, which as of 2026-08-09 is still
      * pending the captain's `wrangler secret put --env production` (see `buildSocialProviders`).
      */
-    plugins: [bearer(), expo()],
+    plugins: [ageAssuranceValidationPlugin(), bearer(), expo()],
 
     advanced: {
       // Secure cookies only over https, so `wrangler dev` on plain http still works. Cross-domain

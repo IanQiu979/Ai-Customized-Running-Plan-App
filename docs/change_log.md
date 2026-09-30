@@ -5,6 +5,53 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-10-01 — Age assurance moves to the account: age band and guardian consent at sign-up (issue #95, `fm/v22-age-assurance-95`)
+
+Issue #95, ported from V2.3's pattern. The 2026-09-19 guardian-consent flow asked at intake time,
+so an account for a 13–17 runner existed before anyone had consented. The age range, and for 13–17
+the guardian's consent, are now taken when the account is created. **Implemented and tested, not
+live** — the migration, the Worker deploy and the client release are captain-only and must happen
+in a fixed order (`mvp-progress.md` → "Blocked"). Tests: 1117 root (71 suites) / 253 Workers,
+green.
+
+- **Migration `0005_age_assurance.sql` adds three columns to `user`:** `age_band`
+  (`'18_plus'` / `'13_17'` / `NULL`), `age_assurance_status` (`'pending'` / `'recorded'` /
+  `'grandfathered'`, default `'pending'`) and `age_policy_version`. Every row that exists when it
+  runs is backfilled to `grandfathered`. Triggers hold the tuple valid on insert (a new row is
+  `pending` or `recorded`, never `grandfathered`) and update, make it write-once (the only allowed
+  change is `pending` → `recorded`), and insert the `guardian_consent` row for a recorded `13_17`
+  from an `AFTER INSERT` / `AFTER UPDATE` trigger — so a failed consent write aborts the user
+  insert or update itself and no account is left without its consent evidence.
+- **Email sign-up requires the choice.** `workers/src/age-assurance.ts` registers a better-auth
+  before-hook on `/sign-up/email` that refuses a missing or unknown band (`AGE_BAND_REQUIRED`) or
+  `13_17` without `guardianConsent: true` (`GUARDIAN_CONSENT_REQUIRED`) *before* better-auth's
+  duplicate-email handling. The user-create database hook stamps `recorded` +
+  `PRIVACY_POLICY_VERSION` for email sign-up and `pending` for every other creation path (Google).
+  The update-user endpoint cannot change any assurance field. Under 13 is never offered or accepted.
+- **A `pending` account is held at a gate.** `workers/src/index.ts` answers every app route with
+  `403 age_assurance_required` for a `pending` session except `POST /api/age-assurance` and
+  `POST /api/delete-account`; `/api/auth/*`, sign-out included, still works. The new
+  `POST /api/age-assurance` takes `{ ageBand, guardianConsent, expectedUserId }`, refuses
+  `409 age_assurance_account_mismatch` when `expectedUserId` is not the session's user (a stale web
+  tab after an account switch elsewhere — the write target is always the session's id), and is
+  write-once: an identical retry is `200`, a conflicting choice or a grandfathered account is
+  `409 age_assurance_conflict`. It returns `{ ageBand, guardianConsentRecorded }`.
+- **Intake follows the account.** `PUT /api/intake` no longer asks a recorded `13_17` account for
+  consent again, refuses an intake age under 18 from a recorded `18_plus` account, and keeps the
+  2026-09-19 intake-time checkbox for grandfathered accounts only.
+- **Client.** New `src/components/auth/AgeBandChoice.tsx` (the shared "18 or older" / "13–17 — my
+  parent or guardian agrees" choice plus the guardian checkbox and policy link); `sign-up.tsx`
+  cannot submit without it. New `src/components/auth/AgeAssuranceGate.tsx` wraps the whole stack in
+  `_layout.tsx` and shows a pending (new Google) account a "Confirm your age" screen with Continue /
+  Sign out; the gate lifts only after a refreshed session confirms the recorded choice.
+  `postSignupRedirect.ts` now binds the sign-up → intake redirect to one account and holds it until
+  the gate clears. The intake shows its guardian checkbox only for grandfathered accounts.
+- **Policy.** `PRIVACY_POLICY_VERSION` is `2026-10-01`, matching the policy's rewritten Age section
+  and new "Age range" data row. The published page is not updated until `Publish legal pages`
+  succeeds after merge.
+- **Still open:** the age/consent checkbox copy needs the captain's/legal's certification, as the
+  2026-09-19 copy did.
+
 ## 2026-09-21 — The published privacy policy renders in the app's own Blueprint theme (change-list item 11)
 
 Captain's decision, change-list item 11, approved 2026-09-20 14:40 +07 after he saw the generic

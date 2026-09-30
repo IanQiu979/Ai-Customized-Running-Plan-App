@@ -1,6 +1,9 @@
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { AgeAssuranceStatusContext } from '@/components/auth/AgeAssuranceGate';
+import type { AgeAssuranceStatus } from '@/lib/ageAssurance';
+
 import IntakeScreen from '../intake';
 
 /**
@@ -19,6 +22,14 @@ jest.mock('expo-router', () => ({
 const mockPutIntake = jest.fn().mockResolvedValue({ saved: true });
 const mockGeneratePlan = jest.fn().mockResolvedValue({ planId: 'plan-1' });
 const mockOpenPrivacyPolicy = jest.fn().mockResolvedValue(null);
+let mockSessionUser: Record<string, unknown> | null = {
+  id: 'legacy-user',
+  email: 'runner@example.com',
+  emailVerified: true,
+  name: 'Runner',
+  ageBand: null,
+  ageAssuranceStatus: 'grandfathered',
+};
 
 jest.mock('@/lib/openPrivacyPolicy', () => ({
   openPrivacyPolicy: () => mockOpenPrivacyPolicy(),
@@ -57,7 +68,11 @@ function render(): ReactTestRenderer {
           insets: { top: 59, left: 0, right: 0, bottom: 34 },
         }}
       >
-        <IntakeScreen />
+        <AgeAssuranceStatusContext.Provider
+          value={mockSessionUser?.ageAssuranceStatus as AgeAssuranceStatus | undefined}
+        >
+          <IntakeScreen />
+        </AgeAssuranceStatusContext.Provider>
       </SafeAreaProvider>
     );
   });
@@ -187,6 +202,14 @@ describe('IntakeScreen guardian consent (captain\'s 2026-09-19 ruling)', () => {
     mockPutIntake.mockClear();
     mockGeneratePlan.mockClear();
     mockOpenPrivacyPolicy.mockReset().mockResolvedValue(null);
+    mockSessionUser = {
+      id: 'legacy-user',
+      email: 'runner@example.com',
+      emailVerified: true,
+      name: 'Runner',
+      ageBand: null,
+      ageAssuranceStatus: 'grandfathered',
+    };
   });
 
   it('does not render a consent checkbox for an adult age', async () => {
@@ -238,6 +261,44 @@ describe('IntakeScreen guardian consent (captain\'s 2026-09-19 ruling)', () => {
 
     expect(mockPutIntake).toHaveBeenCalledTimes(1);
     expect(mockPutIntake.mock.calls[0][0]).toMatchObject({ guardianConsent: true, age: 15 });
+  });
+
+  it('does not render or send intake consent again for a recorded minor', async () => {
+    mockSessionUser = {
+      id: 'minor-user',
+      email: 'minor@example.com',
+      emailVerified: true,
+      name: 'Minor',
+      ageBand: '13_17',
+      ageAssuranceStatus: 'recorded',
+    };
+    const tree = await renderLoaded();
+    await fillRequired(tree);
+    await setAge(tree, '15');
+
+    expect(findCheckbox(tree)).toBeUndefined();
+    const createButton = findByAccessibilityLabel(tree, 'Create plan');
+    await act(async () => {
+      (createButton?.props.onClick as () => void)();
+    });
+
+    expect(mockPutIntake).toHaveBeenCalledTimes(1);
+    expect(mockPutIntake.mock.calls[0][0]).toEqual(
+      expect.not.objectContaining({ guardianConsent: expect.anything() })
+    );
+  });
+
+  it('uses the grandfathered consent path when session assurance metadata is missing', async () => {
+    mockSessionUser = {
+      id: 'legacy-user',
+      email: 'legacy@example.com',
+      emailVerified: true,
+      name: 'Legacy',
+    };
+    const tree = await renderLoaded();
+    await setAge(tree, '16');
+
+    expect(findCheckbox(tree)?.props.accessibilityState).toEqual({ checked: false });
   });
 
   it('opens the policy from the consent row and shows the failure instead of swallowing it', async () => {

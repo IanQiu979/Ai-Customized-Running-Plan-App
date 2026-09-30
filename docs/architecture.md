@@ -29,7 +29,9 @@ src/
                           #                gates the whole Stack behind Stack.Protected on
                           #                authClient.useSession() (no anonymous browsing) —
                           #                except reset-password and verify-email, registered
-                          #                outside both guards (issue #94, see below)
+                          #                outside both guards (issue #94, see below). Since
+                          #                2026-10-01 the whole Stack sits inside
+                          #                components/auth/AgeAssuranceGate (issue #95)
     (auth)/
       _layout.tsx          # stack layout for the signed-out route group
       index.tsx             # redirect anchor -> onboarding (2026-08-08; was sign-up). Note this is
@@ -67,7 +69,9 @@ src/
       sign-up.tsx            # email/password sign-up + the same Google button, same treatment and
                               #   the same link back. Passes callbackURL: createVerifyEmailURL();
                               #   when the Worker withholds the session (token: null — verification
-                              #   required) it shows "Check your inbox" instead of navigating
+                              #   required) it shows "Check your inbox" instead of navigating.
+                              #   Since 2026-10-01 (issue #95) email sign-up cannot submit without
+                              #   components/auth/AgeBandChoice's age range (signUpWithAgeAssurance)
       forgot-password.tsx    # issue #94 (2026-09-20) — reads GET /api/email-status on mount and,
                               #   when the Worker cannot send mail, says so in place of the form;
                               #   otherwise requestPasswordReset with the app's /reset-password
@@ -127,10 +131,12 @@ src/
                               # race date and goal time optional; PLAN LENGTH (WEEKS) only while
                               # the date is blank — needsPlanLength, live), RECENT RESULT, HEALTH.
                               # Numeric answers use src/components/inputs/ (segmented YYYY-MM-DD
-                              # and H:MM:SS boxes, digit-filtered). An age of 13–17 reveals a
-                              # required guardian-consent checkbox (issue #89, 2026-09-19) whose
-                              # policy link goes through lib/openPrivacyPolicy.ts; the server
-                              # refuses without guardianConsent: true. The one bottom "Create
+                              # and H:MM:SS boxes, digit-filtered). For a grandfathered
+                              # (pre-0005) account only, an age of 13–17 reveals a required
+                              # guardian-consent checkbox (issue #89, 2026-09-19) whose policy link
+                              # goes through lib/openPrivacyPolicy.ts; the server refuses without
+                              # guardianConsent: true. Accounts created since 2026-10-01 consent
+                              # at sign-up instead (issue #95). The one bottom "Create
                               # plan" runs PUT /api/intake then POST /api/generate-plan (notes
                               # empty; over_quota → /paywall with the quota; a terminal
                               # invalid_request re-mints the idempotency key) and replaces itself
@@ -164,7 +170,12 @@ src/
     auth/                   # AuthField — the labelled text input every auth screen uses;
                              #  VerifyEmailBanner (issue #94) — Home's "verify your email" card,
                              #  self-contained: reads the session and GET /api/email-status and
-                             #  renders only for an unverified account on a mail-capable Worker
+                             #  renders only for an unverified account on a mail-capable Worker;
+                             #  AgeBandChoice (issue #95, 2026-10-01) — the "18 or older" / "13–17"
+                             #  choice plus guardian checkbox and policy link, shared by sign-up
+                             #  and AgeAssuranceGate — the root wrapper that swaps the whole stack
+                             #  for a "Confirm your age" screen (Continue / Sign out) while the
+                             #  session's account is `pending`, i.e. a new Google account
     build/                  # the build animations (new 2026-09-14) — "the plan builds itself".
                              # WeekStrip (the animated strip every build is made of), CountUp (the
                              # ticking Number), FadeIn, DesignCanvas (the 393×852 page canvas,
@@ -231,7 +242,10 @@ src/
                               #  getEmailStatus(), resendVerificationEmail(email) (the one caller
                               #  of send-verification-email) and useSessionUser(), the typed door
                               #  onto user.email / user.emailVerified — the expoClient cast types
-                              #  useSession().data as `never`
+                              #  useSession().data as `never`. Since 2026-10-01 (issue #95):
+                              #  signUpWithAgeAssurance() (email sign-up, age choice required by
+                              #  its type) and recordAgeAssurance(choice, expectedUserId), which
+                              #  lifts the gate only once a refreshed session confirms the write
     authEmail.ts             # pure (new 2026-09-20, issue #94) — the client half of password
                               #  recovery and email verification: the two callback URLs via
                               #  expo-linking, each landing screen's entry state from its
@@ -243,8 +257,12 @@ src/
                                #  `describeError()` for the user-facing message. Split out so it
                                #  has no React/expo-secure-store/@better-auth dependency and can be
                                #  unit-tested directly (2026-08-07, `Network request failed` fix)
-    postSignupRedirect.ts    # one-shot module-level flag so a fresh signup lands on Intake — see
+    postSignupRedirect.ts    # one-shot, per-account intent so a fresh signup lands on Intake — see
                               #  "Sign-up → Intake redirect" below
+    ageAssurance.ts          # pure, shared with workers/ (issue #95, 2026-10-01) — the AgeBand /
+                              #  AgeAssuranceStatus vocabulary, parseAgeBandChoice() (the one
+                              #  refusal logic for sign-up and POST /api/age-assurance) and
+                              #  requiresLegacyIntakeConsent() (the grandfathered intake rule)
     confirmDestructive.ts    # one confirmation step for a destructive action on every platform
                               #  (new 2026-09-16, issue #96): the OS Alert.alert on native, the
                               #  browser's window.confirm on web — react-native-web's Alert.alert
@@ -339,10 +357,15 @@ before real users arrive.
 [`docs/privacy-policy.md`](privacy-policy.md) is the sole policy source. It identifies Ian Qiu, a
 sole trader based in Thailand, as data controller and documents the current observable contract,
 including the account-deletion control already shipped through PR #117. It states that users must
-be at least 13 and that ages 13–17 require a parent or guardian's consent. As of 2026-09-19 that
-consent is also recorded, not just stated: `PUT /api/intake` requires an explicit
-`guardianConsent: true` for a 13–17 runner and writes a `guardian_consent` event (timestamp +
-policy version) atomically with the intake row — see the schema and API table above. It treats
+be at least 13 and that ages 13–17 require a parent or guardian's consent. That consent is
+recorded, not just stated. Since 2026-10-01 (issue #95) it is taken with the account: sign-up
+requires an age range, and a 13–17 account's `guardian_consent` event (timestamp + policy version)
+is written by migration 0005's trigger in the same statement as the `user` row; a new Google
+account is held `pending` until it answers through `POST /api/age-assurance`. Accounts that existed
+before 0005 are `grandfathered` and keep the 2026-09-19 path, where `PUT /api/intake` requires
+`guardianConsent: true` for a 13–17 age and writes the event atomically with the intake row — see
+the schema and API table below. `PRIVACY_POLICY_VERSION` (`src/constants/legal.ts`) is the
+`age_policy_version` stamped on every recorded band. It treats
 account-linked intake answers and plans conservatively as health/fitness data
 without claiming that the injury picker records a GDPR Article 9 consent event; saving Intake
 overwrites the one stored response but does not rewrite existing plans. Its provider disclosures
@@ -381,12 +404,16 @@ workers/                    # a SEPARATE npm project; Metro is told to skip it (
     0002_app_schema.sql     # profiles, intake_responses, subscriptions, plans
     0003_intake_age_floor.sql / 0003_raise_intake_age_floor.sql   # the 13+ age floor
     0004_guardian_consent.sql # guardian_consent — one row per 13–17 user, consent event
+    0005_age_assurance.sql  # user.age_band / age_assurance_status / age_policy_version (issue #95)
   src/
     index.ts                # authenticate once, then dispatch — the route table (plus the one
                             # public app route, GET /api/email-status)
     auth.ts                 # better-auth on D1, email/password + Bearer sessions; since 2026-09-20
                             # also password reset + email verification (issue #94) and a
-                            # reset-token-redacting error logger
+                            # reset-token-redacting error logger; since 2026-10-01 the three
+                            # age-assurance user fields (issue #95)
+    age-assurance.ts        # the /sign-up/email age-band check, the create-time assurance stamp,
+                            # and the refusal to change it through update-user
     auth-email.ts           # resolveAuthMailRuntime(env) → { sendMail, mailConfigured,
                             # verificationRequired }, and the two mail templates
     routes.ts               # handlers, each taking an already-verified userId
@@ -409,7 +436,8 @@ it is — lives in [`workers/README.md`](../workers/README.md).
 **Working today**, verified against `wrangler dev` and by the test suite: email/password auth with
 Bearer sessions, password reset and email verification (below), the quota ledger (reserve →
 settle/release, atomic gate, idempotency replay, fallback exemption), `quota-status`,
-`purchase-tier`, `delete-account`, intake read/write, and plan reads. **`generate-plan` now returns a real plan**, as of the 2026-08-04 skeleton binding — Free
+`purchase-tier`, `delete-account`, intake read/write, plan reads, and account-level age assurance
+(issue #95 — built and tested 2026-10-01, not yet migrated or deployed). **`generate-plan` now returns a real plan**, as of the 2026-08-04 skeleton binding — Free
 and, as a template fallback, Pro/Elite. **As of 2026-08-10 the Pro/Elite personalization prompt is
 bound too** (`workers/src/lib/planPersonalizationPrompt.ts`) — see "generate-plan" below. The one
 remaining gap is `ANTHROPIC_API_KEY`, unset everywhere, so Pro/Elite generation still serves the
@@ -485,7 +513,7 @@ OAuth state cookie), observes the deep-link result, turns callback errors into u
 returned session cookie, verifies `getSession()`, and explicitly notifies the reactive session atom.
 That last step prevents a successful return from leaving the runner on the auth form. Social sign-up
 also marks `postSignupRedirect`, so first-time Google users follow the same Intake route as email
-users. The production Worker has `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` bound and its live URL
+users — after the age gate below, since a new Google account arrives `pending`. The production Worker has `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` bound and its live URL
 uses the accepted deployed HTTPS callback, but token exchange and consent audience still require a
 real human Google login; the exact proof and console contract are in
 [`google-oauth-runbook.md`](google-oauth-runbook.md). Worker callback errors use a redacting logger
@@ -501,9 +529,13 @@ spend it.
 nowhere. `sign-up.tsx` unmounts as soon as `_layout.tsx`'s `Stack.Protected` swaps the signed-in
 user into `(tabs)`/`intake`, in the same commit that its session becomes truthy — so a redirect
 driven by `sign-up.tsx`'s own `useEffect` can lose that unmount race. The fix is
-`src/lib/postSignupRedirect.ts`: a one-shot module-level flag (`markPostSignupRedirect()` /
-`consumePostSignupRedirect()`), set by `sign-up.tsx` on a successful signup and consumed by
-`_layout.tsx` — which never unmounts — in its own `useEffect` watching `session`, followed by
+`src/lib/postSignupRedirect.ts`: a one-shot intent (`markPostSignupRedirect()` /
+`consumePostSignupRedirect(userId)`), set by `sign-up.tsx` on a successful signup and consumed by
+`_layout.tsx` — which never unmounts — in its own `useEffect` watching `session`. Since 2026-10-01
+(issue #95) the intent is bound to the first account that claims it (a different account signing
+in afterwards cannot inherit it), is kept in same-tab `sessionStorage` on web so it survives the
+Google redirect, is cleared on a settled sign-out, and is not consumed while the account is
+`pending` — the intake opens only after the age gate lifts. Consumption is followed by
 `router.push('/intake')` (a push, not a replace, since 2026-09-20: the intake ends by replacing
 itself with the new plan, whose back arrow must land on Home, so `(tabs)` has to stay
 underneath). Any future post-signup routing decision belongs in `_layout.tsx` for the same
@@ -565,7 +597,8 @@ src/app/
                            # since 2026-08-09. Gated in by root Stack.Protected when there is no
                            # session. Sign-in links to forgot-password and offers a verification
                            # resend on EMAIL_NOT_VERIFIED; sign-up shows "Check your inbox" when
-                           # the Worker withholds the session (issue #94, 2026-09-20)
+                           # the Worker withholds the session (issue #94, 2026-09-20); sign-up
+                           # requires an age range (issue #95, 2026-10-01)
   (auth)/forgot-password   # exists today (2026-09-20) — email → requestPasswordReset, or the honest
                            # "can't send email" message when GET /api/email-status says so
   reset-password           # exists today (2026-09-20) — the reset link's landing; ROOT level,
@@ -958,15 +991,23 @@ it `getSession()` ignores the header and every route 403s a user who just signed
 
 | Method / Route | Auth | Body | Returns | Notes |
 |---|---|---|---|---|
-| `ANY /api/auth/*` | — | better-auth's own | better-auth's own | Sign-up, sign-in, sign-out, session, OAuth callbacks. Email/password and Google both work in production (Google since 2026-08-09 — see `docs/change_log.md`). Since 2026-09-20 (issue #94) also `request-password-reset`, `reset-password`, `send-verification-email` and the two mailed-link endpoints (`GET reset-password/:token`, `GET verify-email`) that spend the token and `302` to the app's `callbackURL`; a reset revokes every session; an unknown address gets the same `200` as a known one; an untrusted `callbackURL` is `403`. Sign-in answers `EMAIL_NOT_VERIFIED` only when `verificationRequired` is true (below). |
+| `ANY /api/auth/*` | — | better-auth's own | better-auth's own | Sign-up, sign-in, sign-out, session, OAuth callbacks. Email/password and Google both work in production (Google since 2026-08-09 — see `docs/change_log.md`). Since 2026-09-20 (issue #94) also `request-password-reset`, `reset-password`, `send-verification-email` and the two mailed-link endpoints (`GET reset-password/:token`, `GET verify-email`) that spend the token and `302` to the app's `callbackURL`; a reset revokes every session; an unknown address gets the same `200` as a known one; an untrusted `callbackURL` is `403`. Sign-in answers `EMAIL_NOT_VERIFIED` only when `verificationRequired` is true (below). Since 2026-10-01 (issue #95) `sign-up/email` also requires `ageBand` (`"18_plus"` \| `"13_17"`) and, for `13_17`, `guardianConsent: true`, refusing `AGE_BAND_REQUIRED` / `GUARDIAN_CONSENT_REQUIRED` before its duplicate-email handling; the assurance fields cannot be set through `update-user`. Sign-out works for a `pending` session. |
 | `GET /health` | none | — | `{ ok: true }` | Liveness. Touches no database. |
 | `GET /api/email-status` | none | — | `{ mailConfigured: boolean, verificationRequired: boolean }` | The only unauthenticated app route besides `/health` (issue #94, 2026-09-20). Booleans only — never which provider or credential is set — with `cache-control: no-store`. `mailConfigured` is true when `RESEND_API_KEY` and `MAIL_FROM` are both bound; `verificationRequired` is `mailConfigured && MAIL_VERIFICATION_REQUIRED === "true"`. Read by `(auth)/forgot-password` (form vs. honest "can't send email" message) and Home's `VerifyEmailBanner` (shown only when true and the account is unverified). |
 | `POST /api/generate-plan` | session | `{ goalType: "race"\|"duration", raceDistance?, raceDate?, durationWeeks?, notes?, idempotencyKey }` | `{ plan, planId, isFallback, quotaConsumed }`, or `402` over-quota / `403` anon / `409` intake-required | Enforces tier + quota server-side, branches by tier, validates, persists. `raceDistance` is validated whenever it is present, on either goal type — a `duration` request legitimately carries one for a runner with a target distance and no date. A duplicate `idempotencyKey` returns the existing plan instead of generating twice. Free gets the template plan (since 2026-08-04). Pro/Elite call the personalization prompt (bound since 2026-08-10) but, with no `ANTHROPIC_API_KEY` configured anywhere yet, still fall back to the same template today (`isFallback: true`, quota-exempt) — see "Current — `generate-plan`" above. `quotaConsumed` tells the client whether this fallback counted against the tier limit, so `FallbackNotice` can pick `counted` vs `exempt`. |
 | `GET /api/quota-status` | session | — | `{ tier, used, limit, periodEnd, unlimited, purchasesAvailable }` | Drives Home's and Settings' "N of M plans used" line (`src/lib/quotaDisplay.ts`'s `formatQuotaLine()`, consumed by both since 2026-08-05). `used` counts **non-fallback** plans in the current purchase-anchored period, server-side, never a client counter. `periodEnd` is `null` for Free (lifetime allowance) and also `null` while the temporary `ALL_USERS_UNLIMITED_ACCESS` override is on (see below) — the UI must not render a countdown for either. `purchasesAvailable` (2026-09-20) is whether the v1 dummy purchase is open to *this* account, decided by `workers/src/dummyPurchase.ts` from `DUMMY_PURCHASE_ENABLED` / `DUMMY_PURCHASE_ALLOWLIST`; the paywall renders it (`src/lib/purchaseAvailability.ts`) and never computes it. |
 | `POST /api/purchase-tier` | session | `{ tier: "pro"\|"elite", source: "dummy" }` | `{ tier, periodStart: string \| null, periodEnd: string \| null }`, or `403 purchases_unavailable` | v1 dummy flow, called from `src/app/paywall.tsx` (new 2026-08-05) with honest "test upgrade, no payment required" copy. Since 2026-09-20 gated server-side to trusted testers: refused `403 purchases_unavailable` unless `DUMMY_PURCHASE_ENABLED === "true"` (local/dev only) or the session's email is on `DUMMY_PURCHASE_ALLOWLIST` (exact, case-insensitive) — `workers/README.md` → "The v1 dummy purchase gate". Production ships with it off and the allowlist empty. v2 swaps `source` to `"revenuecat"` and verifies the receipt — same route, same table write. `source: "revenuecat"` is refused in v1 rather than trusted. |
 | `POST /api/delete-account` | session | `{ password?: string }` | `{ deleted: true }`, `401 invalid_password`, or `429 rate_limited` | Really deletes; no soft-delete flag, because the app's own copy promises erasure. The only route that deletes a plan. Since 2026-09-20 (change-list item 10, matching V2.3) it re-checks identity server-side: if the account has a `providerId = 'credential'` row (`store.getCredentialPassword`), `password` is required and must verify against the stored hash (`deps.verifyPassword`, the same function sign-in uses) or the request is `401 invalid_password` and nothing is deleted — five wrong passwords per user or per connecting IP inside 15 minutes make the route answer `429 rate_limited` before it verifies anything (`lib/attemptThrottle.ts`, in-memory, route-scoped), so nothing is deleted while throttled; a Google/OAuth-only account (no credential row) keeps the pre-existing confirm-only behavior, with no `password` needed. Called from Settings' Delete Account flow — `<DeleteAccountDialog>` for a credential account, the existing `confirmDestructive` native alert / web `confirm()` (2026-09-16, issue #96) for an OAuth-only one — followed client-side by `authClient.signOut()` to invalidate the local session store. |
+| `POST /api/age-assurance` | session | `{ ageBand: "18_plus"\|"13_17", guardianConsent: boolean, expectedUserId: string }` | `{ ageBand, guardianConsentRecorded }`, or `400 age_band_required` / `guardian_consent_required` / `invalid_request`, `409 age_assurance_account_mismatch` / `age_assurance_conflict` | Issue #95, 2026-10-01. The one-time answer of a `pending` (new Google) account, from `AgeAssuranceGate`. `expectedUserId` must equal the verified session's user id — a stale web tab after an account switch elsewhere is refused `409 age_assurance_account_mismatch`; the write target is always the session's id. Write-once (`store.recordAgeAssurance`): an identical retry is `200`, a conflicting choice or a `grandfathered` account is `409 age_assurance_conflict`. A `13_17` answer writes the `guardian_consent` row in the same statement. |
 | `GET /api/intake` | session | — | `{ intake }` or `{ intake: null }` | Was a direct client read under Supabase. Since 2026-09-20 it is read for a boolean only: Home's first-entry gate (`null` → push `/intake`; a failed fetch never redirects) and the intake's first/repeat decision. Nothing prefills from it — the stored row is the record of what the last plan was built from. |
-| `PUT /api/intake` | session | `IntakeResponses & { guardianConsent?: boolean }` | `{ saved: true }` or `400 invalid_request` | Was a direct client upsert under Supabase. Since 2026-09-20 the intake's one "Create plan" calls it and then `POST /api/generate-plan` in the same press; a refused save never generates. Since 2026-09-19, an `age` of 13–17 requires `guardianConsent: true`; without it the request is refused before anything is persisted. With it, the intake row and a `guardian_consent` event (timestamp + policy version) are written atomically in the same D1 batch (`workers/src/lib/store.ts`'s `upsertIntake`). 18+ requests are unaffected. |
+| `PUT /api/intake` | session | `IntakeResponses & { guardianConsent?: boolean }` | `{ saved: true }` or `400 invalid_request` | Was a direct client upsert under Supabase. Since 2026-09-20 the intake's one "Create plan" calls it and then `POST /api/generate-plan` in the same press; a refused save never generates. Since 2026-09-19, an `age` of 13–17 requires `guardianConsent: true`; without it the request is refused before anything is persisted. With it, the intake row and a `guardian_consent` event (timestamp + policy version) are written atomically in the same D1 batch (`workers/src/lib/store.ts`'s `upsertIntake`). 18+ requests are unaffected. Since 2026-10-01 (issue #95) that checkbox applies to `grandfathered` accounts only: a recorded `13_17` account is not asked again, and a recorded `18_plus` account is refused `400 invalid_request` for an `age` under 18. |
+
+**The age-assurance gate (2026-10-01, issue #95).** Right after authentication, `workers/src/index.ts`
+checks the session user's `ageAssuranceStatus`. A `pending` account — only ever a new Google
+account, since email sign-up arrives `recorded` — gets `403 age_assurance_required` on every app
+route except `POST /api/age-assurance` and `POST /api/delete-account`, so it can answer or leave
+but do nothing else. `/api/auth/*` is untouched by the gate. `recorded` and `grandfathered` accounts
+pass straight through.
 | `GET /api/plans` | session | — | `{ plans: [summary] }` | Drives My Plans and Home's CURRENT PLAN summary row. My Plans keeps the permanent static example outside this response, links its most-recent stat to `max(createdAt)`, and has no empty-library state. Home shows the newest plan by `createdAt` (title, `N WEEKS · WEEK k` once `GET /api/plans/:id` supplies the length) and renders no summary before one exists; a failed refresh keeps the last-known plan. Summaries only — full documents would be megabytes for a heavy user. |
 | `GET /api/plans/:id` | session | — | `{ plan, planId, isFallback, quotaConsumed }` or `404` | Someone else's plan id is a `404`, not a `403`: it does not exist to you. |
 
@@ -1028,10 +1069,22 @@ plans             (id, user_id, tier_at_generation, engine template|hybrid|ai,
 
 -- 0004 — guardian consent for a 13–17 runner
 guardian_consent  (user_id -> user.id PK, granted_at, policy_version)
-  -- One row per user (INSERT OR REPLACE) — the most recent consent event, not a history.
-  -- Written by `upsertIntake` in the same db.batch() as the intake_responses upsert, so an
-  -- intake row for a 13–17 user can never exist without a matching consent row. policy_version
+  -- One row per user — the most recent consent event, not a history. For a grandfathered
+  -- account, written by `upsertIntake` (INSERT OR REPLACE) in the same db.batch() as the
+  -- intake_responses upsert, so its 13–17 intake row can never exist without a consent row.
+  -- For an account recorded as '13_17' since 0005, written by 0005's triggers (below). policy_version
   -- is `src/constants/legal.ts`'s PRIVACY_POLICY_VERSION.
+
+-- 0005 — account-level age assurance (issue #95, 2026-10-01)
+user.age_band              '18_plus' | '13_17' | NULL
+user.age_assurance_status  'pending' | 'recorded' | 'grandfathered'   DEFAULT 'pending'
+user.age_policy_version    PRIVACY_POLICY_VERSION at the time of recording, or NULL
+  -- Every row present when 0005 runs is backfilled to 'grandfathered'. Triggers keep the tuple
+  -- valid: pending and grandfathered carry no band or version, recorded carries both, and a new
+  -- row may be pending or recorded but never grandfathered. The tuple is write-once — the only
+  -- permitted change is pending -> recorded. AFTER INSERT / AFTER UPDATE triggers insert the
+  -- guardian_consent row for a recorded '13_17' with a plain INSERT, so a failed consent write
+  -- aborts the user insert or update that caused it: no account without its consent evidence.
 ```
 
 Two intentional departures from the Postgres draft, both because the draft contradicted a rule
