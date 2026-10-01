@@ -20,7 +20,7 @@ jest.mock('expo-web-browser', () => ({ openAuthSessionAsync: jest.fn() }));
 process.env.EXPO_PUBLIC_API_BASE_URL = 'https://api.example.test';
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { recordAgeAssurance, signInWithGoogle } = require('../apiClient') as typeof import('../apiClient');
+const { recordAgeAssurance, signInWithGoogle, transitionToAdult } = require('../apiClient') as typeof import('../apiClient');
 
 function successfulRoute(ageBand: '18_plus' | '13_17' = '18_plus') {
   jest.spyOn(global, 'fetch').mockResolvedValue({
@@ -108,6 +108,88 @@ describe('recordAgeAssurance', () => {
     await expect(
       recordAgeAssurance({ ageBand: '18_plus', guardianConsent: false }, 'user-1')
     ).rejects.toThrow('Session refresh did not answer.');
+    expect(mockNotify).not.toHaveBeenCalled();
+  });
+});
+
+describe('transitionToAdult', () => {
+  const ARCHIVED_AT = '2026-10-01T12:00:00.000Z';
+
+  function transitionRoute() {
+    jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ ageBand: '18_plus', guardianConsentArchivedAt: ARCHIVED_AT }),
+    } as Response);
+  }
+
+  beforeEach(() => {
+    jest.restoreAllMocks();
+    mockGetSession.mockReset();
+    mockNotify.mockReset();
+  });
+
+  it('posts the declared date for the rendered account and notifies after an uncached adult refresh', async () => {
+    transitionRoute();
+    mockGetSession.mockResolvedValue({
+      data: { user: { id: 'user-1', ageBand: '18_plus', ageAssuranceStatus: 'recorded' } },
+      error: null,
+    });
+
+    await expect(transitionToAdult('2008-01-15', 'user-1')).resolves.toEqual({
+      ageBand: '18_plus',
+      guardianConsentArchivedAt: ARCHIVED_AT,
+    });
+
+    const [url, init] = (global.fetch as jest.Mock).mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://api.example.test/api/age-transition');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body as string)).toEqual({
+      birthDate: '2008-01-15',
+      expectedUserId: 'user-1',
+    });
+    expect(mockGetSession).toHaveBeenCalledWith({ query: { disableCookieCache: true } });
+    expect(mockNotify).toHaveBeenCalledWith('$sessionSignal');
+  });
+
+  it.each([
+    ['missing user', { data: null, error: null }],
+    [
+      'still-minor band',
+      {
+        data: { user: { id: 'user-1', ageBand: '13_17', ageAssuranceStatus: 'recorded' } },
+        error: null,
+      },
+    ],
+    [
+      'different account',
+      {
+        data: { user: { id: 'user-2', ageBand: '18_plus', ageAssuranceStatus: 'recorded' } },
+        error: null,
+      },
+    ],
+  ])('rejects a %s refresh without notifying the session store', async (_label, refresh) => {
+    transitionRoute();
+    mockGetSession.mockResolvedValue(refresh);
+
+    await expect(transitionToAdult('2008-01-15', 'user-1')).rejects.toThrow('updated session');
+    expect(mockNotify).not.toHaveBeenCalled();
+  });
+
+  it('surfaces a server refusal and never refreshes the session', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: async () => ({
+        code: 'age_transition_too_young',
+        error: 'That date of birth is under 18, so this account stays 13 to 17.',
+      }),
+    } as Response);
+
+    await expect(transitionToAdult('2015-01-15', 'user-1')).rejects.toMatchObject({
+      status: 400,
+      body: { code: 'age_transition_too_young' },
+    });
+    expect(mockGetSession).not.toHaveBeenCalled();
     expect(mockNotify).not.toHaveBeenCalled();
   });
 });

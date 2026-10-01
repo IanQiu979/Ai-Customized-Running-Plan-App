@@ -387,6 +387,39 @@ export async function recordAgeAssurance(
   return result;
 }
 
+export interface AgeTransitionResponse {
+  ageBand: '18_plus';
+  guardianConsentArchivedAt: string;
+}
+
+/**
+ * The one-way aging transition: a recorded 13–17 account declares a date of birth (`YYYY-MM-DD`)
+ * and the Worker — the only authority — moves it to 18+ and archives its guardian consent. Same
+ * shape as `recordAgeAssurance`: the write names the account the screen rendered for, and the
+ * reactive session is notified only after an uncached read confirms the new band on that account.
+ */
+export async function transitionToAdult(
+  birthDate: string,
+  expectedUserId: string
+): Promise<AgeTransitionResponse> {
+  const result = await apiFetch<AgeTransitionResponse>('/api/age-transition', {
+    method: 'POST',
+    body: JSON.stringify({ birthDate, expectedUserId }),
+  });
+  const refreshed = await baseAuthClient.getSession({ query: { disableCookieCache: true } });
+  const refreshedUser = (refreshed.data as unknown as { user?: SessionUser } | null)?.user;
+  if (
+    refreshed.error ||
+    !refreshedUser ||
+    refreshedUser.id !== expectedUserId ||
+    refreshedUser.ageBand !== '18_plus'
+  ) {
+    throw refreshed.error ?? new Error('The updated session did not confirm the new age range.');
+  }
+  authClient.$store.notify('$sessionSignal');
+  return result;
+}
+
 /** Public capability read. Never reuse a stale answer after server mail config changes. */
 export function getEmailStatus(): Promise<EmailStatus> {
   return apiFetch('/api/email-status', { cache: 'no-store' });

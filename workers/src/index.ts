@@ -17,6 +17,7 @@
  *   GET  /api/quota-status    tier + quota/unlimited state
  *   POST /api/purchase-tier   v1 dummy purchase; real IAP lands on this same route later
  *   POST /api/age-assurance   one write-once OAuth first-use age choice
+ *   POST /api/age-transition  one-way 13_17 -> 18_plus on a self-declared 18+ birthday
  *   POST /api/delete-account  erases the account and everything it owns
  *   GET/PUT /api/intake       one authenticated runner's intake
  *   GET  /api/plans           My Plans summaries
@@ -51,6 +52,7 @@ import {
   handlePurchaseTier,
   handlePutIntake,
   handleQuotaStatus,
+  handleAgeTransition,
   handleRecordAgeAssurance,
 } from './routes';
 
@@ -147,6 +149,8 @@ async function dispatch(request: Request, env: Env, options: DispatchOptions = {
       return handleDeleteAccount(request, userId, deps);
     case 'POST /api/age-assurance':
       return handleRecordAgeAssurance(request, userId, deps);
+    case 'POST /api/age-transition':
+      return handleAgeTransition(request, userId, deps);
     case 'GET /api/intake':
       return handleGetIntake(userId, deps);
     case 'PUT /api/intake':

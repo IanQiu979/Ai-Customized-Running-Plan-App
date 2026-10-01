@@ -19,6 +19,12 @@ export type ErrorCode =
   | 'age_assurance_required'
   | 'age_assurance_conflict'
   | 'age_assurance_account_mismatch'
+  /** Aging transition: the declared date of birth is not a real date — see `routes.ts`. */
+  | 'invalid_birth_date'
+  /** Aging transition: the declared date of birth is under 18. */
+  | 'age_transition_too_young'
+  /** Aging transition: the account is not a recorded 13–17 one (incl. already transitioned). */
+  | 'age_transition_not_eligible'
   | 'over_quota'
   /** Delete-account's password confirmation didn't match the stored credential — see `routes.ts`. */
   | 'invalid_password'
