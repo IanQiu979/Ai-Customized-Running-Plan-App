@@ -123,6 +123,10 @@ const styles = StyleSheet.create({
   },
   segmentInput: {
     flex: 1,
+    // react-native-web renders this as an `<input size=20>`, whose default `min-width: auto` stops
+    // `flex` shrinking it below ~20 characters, so at phone width the last box spilled out past
+    // the border. Yoga's default is already 0, so this is a no-op on native.
+    minWidth: 0,
     minHeight: Spacing.six,
     paddingHorizontal: Spacing.one,
     // Centred so each box reads as one component of the value rather than as a left-aligned
