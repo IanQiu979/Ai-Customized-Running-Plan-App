@@ -100,7 +100,10 @@ src/
                               #  Home), a Free-tier "Upgrade" entry point to /paywall, a Legal ->
                               #  Privacy policy row (issue #89; opens through
                               #  src/lib/openPrivacyPolicy.ts, with a visible accessible error
-                              #  if opening fails), and Delete Account — since 2026-09-20 a
+                              #  if opening fails), a "Turned 18?" row shown only to a recorded
+                              #  13–17 session (2026-10-01, canOfferAgeTransition; opens
+                              #  <AgeTransitionDialog> -> transitionToAdult(); contract: the
+                              #  POST /api/age-transition row below), and Delete Account — since 2026-09-20 a
                               #  credential account re-enters its password in
                               #  <DeleteAccountDialog>, a Google-only one keeps
                               #  confirmDestructive() (the OS alert on native, the browser's
@@ -188,6 +191,10 @@ src/
                              # RunnerFigure (the stick runner above Get started) was deleted
                              # 2026-09-20 — captain's ruling, stale asset. Timings and cue tables
                              # live in lib/buildMotion.ts, never here
+    settings/               # DeleteAccountDialog (the credential account's password re-entry,
+                             #  2026-09-20) and AgeTransitionDialog (2026-10-01 — date of birth +
+                             #  Confirm for the one-way 13–17 -> 18+ move; decides nothing, shows
+                             #  the Worker's refusal)
     intake/                 # IntakeExitAction — the questionnaire's "Cancel", rendered on a
                              #  re-entry only (a first entry has no exit, 2026-09-20)
     layout/                 # ScreenHeader (eyebrow / title / supporting, plus an optional
@@ -245,7 +252,10 @@ src/
                               #  useSession().data as `never`. Since 2026-10-01 (issue #95):
                               #  signUpWithAgeAssurance() (email sign-up, age choice required by
                               #  its type) and recordAgeAssurance(choice, expectedUserId), which
-                              #  lifts the gate only once a refreshed session confirms the write
+                              #  lifts the gate only once a refreshed session confirms the write;
+                              #  since 2026-10-01 (later) transitionToAdult(birthDate,
+                              #  expectedUserId), which likewise notifies the session store only
+                              #  after an uncached read shows 18_plus on the same account
     authEmail.ts             # pure (new 2026-09-20, issue #94) — the client half of password
                               #  recovery and email verification: the two callback URLs via
                               #  expo-linking, each landing screen's entry state from its
@@ -262,7 +272,11 @@ src/
     ageAssurance.ts          # pure, shared with workers/ (issue #95, 2026-10-01) — the AgeBand /
                               #  AgeAssuranceStatus vocabulary, parseAgeBandChoice() (the one
                               #  refusal logic for sign-up and POST /api/age-assurance) and
-                              #  requiresLegacyIntakeConsent() (the grandfathered intake rule)
+                              #  requiresLegacyIntakeConsent() (the grandfathered intake rule);
+                              #  since 2026-10-01 (later) the aging transition's
+                              #  canOfferAgeTransition() (display only) and
+                              #  checkAgeTransitionBirthDate() (the Worker's 18+ birthday check,
+                              #  "today" read at UTC−12)
     confirmDestructive.ts    # one confirmation step for a destructive action on every platform
                               #  (new 2026-09-16, issue #96): the OS Alert.alert on native, the
                               #  browser's window.confirm on web — react-native-web's Alert.alert
@@ -364,8 +378,11 @@ is written by migration 0005's trigger in the same statement as the `user` row; 
 account is held `pending` until it answers through `POST /api/age-assurance`. Accounts that existed
 before 0005 are `grandfathered` and keep the 2026-09-19 path, where `PUT /api/intake` requires
 `guardianConsent: true` for a 13–17 age and writes the event atomically with the intake row — see
-the schema and API table below. `PRIVACY_POLICY_VERSION` (`src/constants/legal.ts`) is the
-`age_policy_version` stamped on every recorded band. It treats
+the schema and API table below. A recorded 13–17 account can later move itself to 18+ once,
+irreversibly, on a self-declared date of birth (`POST /api/age-transition`, captain's decision
+2026-10-01); migration 0006 then archives its consent row in the same statement rather than
+deleting it, and no guardian is notified. `PRIVACY_POLICY_VERSION` (`src/constants/legal.ts`) is the
+`age_policy_version` stamped on every recorded band, including the restamp at that transition. It treats
 account-linked intake answers and plans conservatively as health/fitness data
 without claiming that the injury picker records a GDPR Article 9 consent event; saving Intake
 overwrites the one stored response but does not rewrite existing plans. Its provider disclosures
@@ -405,6 +422,7 @@ workers/                    # a SEPARATE npm project; Metro is told to skip it (
     0003_intake_age_floor.sql / 0003_raise_intake_age_floor.sql   # the 13+ age floor
     0004_guardian_consent.sql # guardian_consent — one row per 13–17 user, consent event
     0005_age_assurance.sql  # user.age_band / age_assurance_status / age_policy_version (issue #95)
+    0006_age_transition.sql # the one-way 13_17 -> 18_plus move; guardian_consent archive columns
   src/
     index.ts                # authenticate once, then dispatch — the route table (plus the one
                             # public app route, GET /api/email-status)
@@ -999,8 +1017,9 @@ it `getSession()` ignores the header and every route 403s a user who just signed
 | `POST /api/purchase-tier` | session | `{ tier: "pro"\|"elite", source: "dummy" }` | `{ tier, periodStart: string \| null, periodEnd: string \| null }`, or `403 purchases_unavailable` | v1 dummy flow, called from `src/app/paywall.tsx` (new 2026-08-05) with honest "test upgrade, no payment required" copy. Since 2026-09-20 gated server-side to trusted testers: refused `403 purchases_unavailable` unless `DUMMY_PURCHASE_ENABLED === "true"` (local/dev only) or the session's email is on `DUMMY_PURCHASE_ALLOWLIST` (exact, case-insensitive) — `workers/README.md` → "The v1 dummy purchase gate". Production ships with it off and the allowlist empty. v2 swaps `source` to `"revenuecat"` and verifies the receipt — same route, same table write. `source: "revenuecat"` is refused in v1 rather than trusted. |
 | `POST /api/delete-account` | session | `{ password?: string }` | `{ deleted: true }`, `401 invalid_password`, or `429 rate_limited` | Really deletes; no soft-delete flag, because the app's own copy promises erasure. The only route that deletes a plan. Since 2026-09-20 (change-list item 10, matching V2.3) it re-checks identity server-side: if the account has a `providerId = 'credential'` row (`store.getCredentialPassword`), `password` is required and must verify against the stored hash (`deps.verifyPassword`, the same function sign-in uses) or the request is `401 invalid_password` and nothing is deleted — five wrong passwords per user or per connecting IP inside 15 minutes make the route answer `429 rate_limited` before it verifies anything (`lib/attemptThrottle.ts`, in-memory, route-scoped), so nothing is deleted while throttled; a Google/OAuth-only account (no credential row) keeps the pre-existing confirm-only behavior, with no `password` needed. Called from Settings' Delete Account flow — `<DeleteAccountDialog>` for a credential account, the existing `confirmDestructive` native alert / web `confirm()` (2026-09-16, issue #96) for an OAuth-only one — followed client-side by `authClient.signOut()` to invalidate the local session store. |
 | `POST /api/age-assurance` | session | `{ ageBand: "18_plus"\|"13_17", guardianConsent: boolean, expectedUserId: string }` | `{ ageBand, guardianConsentRecorded }`, or `400 age_band_required` / `guardian_consent_required` / `invalid_request`, `409 age_assurance_account_mismatch` / `age_assurance_conflict` | Issue #95, 2026-10-01. The one-time answer of a `pending` (new Google) account, from `AgeAssuranceGate`. `expectedUserId` must equal the verified session's user id — a stale web tab after an account switch elsewhere is refused `409 age_assurance_account_mismatch`; the write target is always the session's id. Write-once (`store.recordAgeAssurance`): an identical retry is `200`, a conflicting choice or a `grandfathered` account is `409 age_assurance_conflict`. A `13_17` answer writes the `guardian_consent` row in the same statement. |
+| `POST /api/age-transition` | session | `{ birthDate: "YYYY-MM-DD", expectedUserId: string }` | `{ ageBand: "18_plus", guardianConsentArchivedAt }`, or `400 invalid_request` / `invalid_birth_date` / `age_transition_too_young` / `age_transition_inconsistent`, `409 age_assurance_account_mismatch` / `age_transition_not_eligible` | The one-way aging transition (captain's decision, 2026-10-01), from Settings' "Turned 18?" row. Moves a recorded `13_17` account to recorded `18_plus` once, irreversibly, and restamps `age_policy_version`; migration 0006's trigger archives the `guardian_consent` row in the same statement (below). `birthDate` is checked by `checkAgeTransitionBirthDate` on the Worker's clock — "today" read at UTC−12, so never before the birthday has arrived everywhere; a 29 February birthday is reached on 1 March; not a real date, before 1900 or in the future is `invalid_birth_date`. A date whose 18th birthday falls before the day the guardian consent was granted (`granted_at`'s date, read at UTC−12) contradicts the account's own 13–17 record and is `400 age_transition_inconsistent`, checked atomically in the same conditional `UPDATE`. It is a self-declaration — it proves only that the typed date is 18+ years ago and consistent with that record, so a lie told consistently from sign-up onward passes — and the date is not stored. The stored intake is not touched: a pre-transition row (age ≤ 17) still yields an under-18 plan until the runner takes the intake again (see `PUT /api/intake`). `expectedUserId` works as on `/api/age-assurance`. Any account that is not recorded `13_17` — already transitioned, recorded adult, grandfathered — is `409 age_transition_not_eligible`; a `pending` account never reaches it (`403 age_assurance_required`, below). No guardian is notified. |
 | `GET /api/intake` | session | — | `{ intake }` or `{ intake: null }` | Was a direct client read under Supabase. Since 2026-09-20 it is read for a boolean only: Home's first-entry gate (`null` → push `/intake`; a failed fetch never redirects) and the intake's first/repeat decision. Nothing prefills from it — the stored row is the record of what the last plan was built from. |
-| `PUT /api/intake` | session | `IntakeResponses & { guardianConsent?: boolean }` | `{ saved: true }` or `400 invalid_request` | Was a direct client upsert under Supabase. Since 2026-09-20 the intake's one "Create plan" calls it and then `POST /api/generate-plan` in the same press; a refused save never generates. Since 2026-09-19, an `age` of 13–17 requires `guardianConsent: true`; without it the request is refused before anything is persisted. With it, the intake row and a `guardian_consent` event (timestamp + policy version) are written atomically in the same D1 batch (`workers/src/lib/store.ts`'s `upsertIntake`). 18+ requests are unaffected. Since 2026-10-01 (issue #95) that checkbox applies to `grandfathered` accounts only: a recorded `13_17` account is not asked again, and the `age` must match the recorded band in both directions — a recorded `18_plus` account is refused `400 invalid_request` for an `age` under 18, a recorded `13_17` account for an `age` over 17. Deliberate: a runner who turns 18 on a `13_17` account stays in the minor regime (cannot enter 18 or over) until a separately approved aging policy exists. |
+| `PUT /api/intake` | session | `IntakeResponses & { guardianConsent?: boolean }` | `{ saved: true }` or `400 invalid_request` | Was a direct client upsert under Supabase. Since 2026-09-20 the intake's one "Create plan" calls it and then `POST /api/generate-plan` in the same press; a refused save never generates. Since 2026-09-19, an `age` of 13–17 requires `guardianConsent: true`; without it the request is refused before anything is persisted. With it, the intake row and a `guardian_consent` event (timestamp + policy version) are written atomically in the same D1 batch (`workers/src/lib/store.ts`'s `upsertIntake`). 18+ requests are unaffected. Since 2026-10-01 (issue #95) that checkbox applies to `grandfathered` accounts only: a recorded `13_17` account is not asked again, and the `age` must match the recorded band in both directions — a recorded `18_plus` account is refused `400 invalid_request` for an `age` under 18, a recorded `13_17` account for an `age` over 17. A runner who turns 18 on a `13_17` account stays in the minor regime (cannot enter 18 or over) until they move the account with `POST /api/age-transition`; from then it is a recorded `18_plus` account and the adult floor applies. The transition leaves the stored row as it was, so until the next save `generate-plan` still reads its age ≤ 17 and builds an under-18 plan — RPE in place of HR zones on the paid skeleton, the under-18 notice on both engines (plan generation was deliberately not changed); the intake's "Create plan" always saves first, so a plan created in the app uses the newly entered age. |
 
 **The age-assurance gate (2026-10-01, issue #95).** Right after authentication, `workers/src/index.ts`
 checks the session user's `ageAssuranceStatus`. A `pending` account — only ever a new Google
@@ -1068,7 +1087,8 @@ plans             (id, user_id, tier_at_generation, engine template|hybrid|ai,
   --                                     return the existing plan instead of generating twice.
 
 -- 0004 — guardian consent for a 13–17 runner
-guardian_consent  (user_id -> user.id PK, granted_at, policy_version)
+guardian_consent  (user_id -> user.id PK, granted_at, policy_version,
+                   archived_at, archived_reason)     -- the last two since 0006 (below)
   -- One row per user — the most recent consent event, not a history. For a grandfathered
   -- account, written by `upsertIntake` (INSERT OR REPLACE) in the same db.batch() as the
   -- intake_responses upsert, so its 13–17 intake row can never exist without a consent row.
@@ -1082,9 +1102,22 @@ user.age_policy_version    PRIVACY_POLICY_VERSION at the time of recording, or N
   -- Every row present when 0005 runs is backfilled to 'grandfathered'. Triggers keep the tuple
   -- valid: pending and grandfathered carry no band or version, recorded carries both, and a new
   -- row may be pending or recorded but never grandfathered. The tuple is write-once — the only
-  -- permitted change is pending -> recorded. AFTER INSERT / AFTER UPDATE triggers insert the
+  -- permitted changes are pending -> recorded and, since 0006, recorded '13_17' -> recorded
+  -- '18_plus'. AFTER INSERT / AFTER UPDATE triggers insert the
   -- guardian_consent row for a recorded '13_17' with a plain INSERT, so a failed consent write
   -- aborts the user insert or update that caused it: no account without its consent evidence.
+
+-- 0006 — the one-way aging transition (captain's decision, 2026-10-01)
+guardian_consent.archived_at      NULL = consent in force; else when it stopped being in force
+guardian_consent.archived_reason  NULL | 'aged_out_self_declared'
+  -- 0006 replaces age_assurance_is_write_once to allow exactly one more change, recorded '13_17'
+  -- -> recorded '18_plus' (nothing back, nothing out of grandfathered). The AFTER UPDATE trigger
+  -- age_assurance_minor_aged_out archives the user's consent row in the SAME statement and aborts
+  -- the statement if there is none to archive, so an adult account always carries its archived
+  -- evidence and a failed archive leaves it a minor. Consent is only ever inserted in force; an
+  -- archived row is immutable and cannot be replaced by INSERT OR REPLACE. The guardian's policy
+  -- version stays on the row; user.age_policy_version is restamped by the Worker. The declared
+  -- date of birth is not stored. Account deletion still cascades the archived row away.
 ```
 
 Two intentional departures from the Postgres draft, both because the draft contradicted a rule

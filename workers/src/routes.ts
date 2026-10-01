@@ -94,8 +94,11 @@ export async function handleRecordAgeAssurance(
  * (today read in UTC−12, so never a day early anywhere) on the Worker's own clock. It is a
  * self-declaration: a 15-year-old who types a false date is not stopped, exactly as at sign-up. It
  * does stop a runner who enters their real birthday before turning 18, and it means the client is
- * never the authority — the date is re-checked here whatever the app showed. The date itself is
- * not stored.
+ * never the authority — the date is re-checked here whatever the app showed. It also refuses a date
+ * that contradicts the account's own record — an 18th birthday before the day guardian consent was
+ * granted (`store.ts`'s `transitionMinorToAdult`) — so "13–17 yesterday, born 1990 today" fails;
+ * a date that was false consistently since sign-up cannot be caught. The date itself is not
+ * stored.
  *
  * Like `/api/age-assurance`, the client names the account it rendered for (`expectedUserId`): the
  * write is irreversible, so a stale web tab must not apply it to whoever is signed in now.
@@ -128,7 +131,11 @@ export async function handleAgeTransition(
     return fail(400, check.code, check.error);
   }
 
-  const result = await deps.store.transitionMinorToAdult(userId, PRIVACY_POLICY_VERSION);
+  const result = await deps.store.transitionMinorToAdult(
+    userId,
+    check.eighteenthBirthday,
+    PRIVACY_POLICY_VERSION
+  );
   if (result.outcome === 'not_found') {
     return fail(404, 'not_found', 'No such account.');
   }
@@ -137,6 +144,13 @@ export async function handleAgeTransition(
       409,
       'age_transition_not_eligible',
       'Only an account set to 13 to 17 can move to 18 or older, and only once.'
+    );
+  }
+  if (result.outcome === 'inconsistent') {
+    return fail(
+      400,
+      'age_transition_inconsistent',
+      'That date of birth means you were already 18 when this account was set to 13 to 17. Contact us to correct it.'
     );
   }
 

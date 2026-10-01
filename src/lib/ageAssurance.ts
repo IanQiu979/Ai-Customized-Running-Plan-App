@@ -92,7 +92,7 @@ export interface CalendarDate {
 export type AgeTransitionRefusalCode = 'invalid_birth_date' | 'age_transition_too_young';
 
 export type AgeTransitionCheck =
-  | { ok: true }
+  | { ok: true; eighteenthBirthday: string }
   | { ok: false; code: AgeTransitionRefusalCode; error: string };
 
 /**
@@ -122,6 +122,21 @@ export function ageOnDate(birth: CalendarDate, on: CalendarDate): number {
   const beforeBirthday =
     on.month < birth.month || (on.month === birth.month && on.day < birth.day);
   return on.year - birth.year - (beforeBirthday ? 1 : 0);
+}
+
+/**
+ * The `YYYY-MM-DD` date of the 18th birthday — the first day `ageOnDate` reports 18, so a 29
+ * February birth gives 1 March in a common year. The Worker compares it with the date guardian
+ * consent was granted: a date of birth whose 18th birthday came before that contradicts the
+ * account's own 13–17 record (`workers/src/lib/store.ts`'s `transitionMinorToAdult`).
+ */
+export function eighteenthBirthday(birth: CalendarDate): string {
+  const year = birth.year + AGE_TRANSITION_MIN_AGE;
+  const exists = parseCalendarDate(
+    `${year}-${String(birth.month).padStart(2, '0')}-${String(birth.day).padStart(2, '0')}`
+  );
+  const date = exists ?? { year, month: 3, day: 1 };
+  return `${date.year}-${String(date.month).padStart(2, '0')}-${String(date.day).padStart(2, '0')}`;
 }
 
 /** A strict `YYYY-MM-DD` real calendar date, or `null`. 31 February is refused, not rolled over. */
@@ -171,5 +186,5 @@ export function checkAgeTransitionBirthDate(raw: unknown, now: Date): AgeTransit
       error: 'That date of birth is under 18, so this account stays 13 to 17.',
     };
   }
-  return { ok: true };
+  return { ok: true, eighteenthBirthday: eighteenthBirthday(birth) };
 }

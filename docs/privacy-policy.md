@@ -27,7 +27,8 @@
   years ago and moves to 18+ once, irreversibly; its consent row is archived in the same SQLite
   statement (`archived_at` + `archived_reason = 'aged_out_self_declared'`), never deleted, and no
   guardian is notified (`workers/migrations/0006_age_transition.sql`, `POST /api/age-transition`).
-  The declared date of birth is checked and discarded, never stored.
+  The declared date of birth is checked (18+ years ago, and its 18th birthday not before the
+  consent's grant date) and discarded, never stored.
 -->
 
 # Pace Blueprint — Privacy Policy
@@ -57,7 +58,7 @@ pain to follow a plan.
 | Data | What it is | Why we collect it |
 |---|---|---|
 | Account details | Your name, your email address, and — if you sign up with a password — that password, stored only as a salted hash we cannot reverse | To create and secure your account and let you sign in |
-| Age range | Whether you told us, when your account was created, that you are 18 or older or 13 to 17, and which version of this policy was in force; if you are 13 to 17, the record of your parent's or guardian's consent — kept, marked no longer in force, if your account later moves to 18 or older (see "Age" below) | To apply the right rules to your account and to be able to show that a minor's data is processed with consent |
+| Age range | Whether you told us, when your account was created, that you are 18 or older or 13 to 17, and which version of this policy was in force (if a 13-to-17 account later moves to 18 or older, the range and version recorded at that time); if you are 13 to 17, the record of your parent's or guardian's consent — kept, marked no longer in force, if your account later moves to 18 or older (see "Age" below) | To apply the right rules to your account and to be able to show that a minor's data is processed with consent |
 | Google sign-in details | If you choose Sign in with Google: your Google account identifier, the name, email address and profile-picture link Google shares, and the tokens Google issues so the sign-in works | To let you sign in with Google instead of a password |
 | Sign-in sessions | A session token, when it was created, and the IP address and device/browser description of the request that created it | To keep you signed in and to let us detect misuse of an account |
 | Intake answers | Your training goal (in your own words), your age, your running experience, how many days a week you run, your typical weekly distance, your target race distance and date and goal time (if you have one), and a recent race time (if you give one) | To build a plan that fits you — for example, your age sets your estimated maximum heart rate, and your recent time sets your training paces |
@@ -225,36 +226,38 @@ are in — 18 or older, or 13 to 17 — and does not offer an option for anyone 
 also asks your exact age, for your plan, and refuses an age under 13. We do not knowingly hold an
 account for anyone under 13, and if we learn that we do, we delete it.
 
-If you are **13 to 17**, you may use the app **only with the consent of a parent or guardian**,
-who agrees to this policy on your behalf. Before an account in that range can be created, the app
-requires an explicit checkbox affirming that a parent or guardian has read this policy and agrees
-to it on the runner's behalf, and we record that consent — the time it was given and which
-version of this policy it covered — as a server-side event, together with the account itself: if
-the consent cannot be recorded, the account is not created. An account created with Google
-sign-in is asked the same question the first time it is used, and cannot be used for anything
-else until it answers. Your age range is recorded once. The only change the app allows is the
-one described under "When you turn 18" below; otherwise, if it is wrong, contact us. The checkbox records what you and your parent or guardian tell us — we do not
-verify a guardian's identity. Accounts created before 2026-10-01 were not asked the age range;
-for those, the app asks for the same parent or guardian consent before a 13-to-17 age can be saved
-in the intake.
+If you are **13 to 17**, you may use the app **only with the consent of a parent or guardian**, who
+agrees to this policy on your behalf. Before an account in that range can be created, the app
+requires an explicit checkbox affirming that a parent or guardian has read this policy and agrees to
+it on the runner's behalf, and we record that consent — the time it was given and which version of
+this policy it covered — as a server-side event, together with the account itself: if the consent
+cannot be recorded, the account is not created. An account created with Google sign-in is asked the
+same question the first time it is used, and cannot be used for anything else until it answers. Your
+age range is recorded once. The only change the app allows is the one described under "When you turn
+18" below; otherwise, if it is wrong, contact us. The checkbox records what you and your parent or
+guardian tell us — we do not verify a guardian's identity. Accounts created before 2026-10-01 were
+not asked the age range; for those, the app asks for the same parent or guardian consent before a
+13-to-17 age can be saved in the intake.
 
 This recorded consent is our stated legal basis for processing a minor's data under GDPR Article
 9(2)(a) and Thai PDPA section 26. If you are a parent or guardian and believe your child is using
 the app without your consent, contact us at the address below and we will delete the account.
 Deleting an account deletes its age range and consent record with it, including a consent record
-that is no longer in force. Plans for runners under 18
-are also built differently: they never prescribe heart-rate zones, using effort levels instead.
+that is no longer in force. Plans for runners under 18 are also built differently: they never
+prescribe heart-rate zones, using effort levels instead.
 
 **When you turn 18.** A 13-to-17 account can move itself to 18 or older, once, from Settings: you
 enter your date of birth, and if it is at least 18 years ago the account becomes an adult account.
-This cannot be undone. We check only that the date you enter is at least 18 years ago — like the
-age range itself, it is your own statement, and we do not verify it. We use the date for that check
-and do not store it. Your parent's or guardian's consent is **not deleted** when this happens: we
-keep the record of when it was given and which version of this policy it covered, and mark it as
-no longer in force, with the time it stopped and the reason (you told us you had turned 18). We
-keep it because it shows that consent was in place while you were under 18, and it is deleted only
-when the account is. We do not notify your parent or guardian. From then on the account is treated
-like any account created as 18 or older: the age you enter in the intake must be 18 or more.
+This cannot be undone. We check only that the date you enter is at least 18 years ago and does not
+contradict the account's own record (a date that would have made you 18 before your parent or
+guardian consented is refused) — like the age range itself, it is your own statement, and we do not
+verify it. We use the date for that check and do not store it. Your parent's or guardian's consent
+is **not deleted** when this happens: we keep the record of when it was given and which version of
+this policy it covered, and mark it as no longer in force, with the time it stopped and the reason
+(you told us you had turned 18). We keep it because it shows that consent was in place while you
+were under 18, and it is deleted only when the account is. We do not notify your parent or guardian.
+From then on, the age you enter in the intake must be 18 or more. Plans already created are not
+changed.
 
 ---
 

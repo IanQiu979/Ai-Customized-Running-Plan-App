@@ -39,7 +39,33 @@ async function signUp(email: string, ageBand: '18_plus' | '13_17'): Promise<Acco
   const body = await response.text();
   expect(response.status, body).toBe(200);
   const parsed = JSON.parse(body) as { token: string; user: { id: string } };
-  return { token: parsed.token, userId: parsed.user.id };
+  const account = { token: parsed.token, userId: parsed.user.id };
+  // A realistic aging account: consent was granted at 15, three years before the runner turned 18.
+  // A minor who consented today and declares an 18+ birthday today contradicts their own record.
+  if (ageBand === '13_17') await backdateConsent(account.userId, CONSENT_YEARS_AGO);
+  return account;
+}
+
+const CONSENT_YEARS_AGO = 3;
+
+/**
+ * Moves an in-force consent row's `granted_at` back in time. `0006` forbids rewriting `granted_at`
+ * on any update, so the archive-shape trigger is dropped and restored verbatim around the write.
+ */
+async function backdateConsent(userId: string, years: number): Promise<void> {
+  const trigger = await env.DB.prepare(
+    "SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = 'guardian_consent_archive_valid'"
+  ).first<{ sql: string }>();
+  await env.DB.exec('DROP TRIGGER guardian_consent_archive_valid;');
+  try {
+    await env.DB.prepare(
+      "UPDATE guardian_consent SET granted_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', ?) WHERE user_id = ?"
+    )
+      .bind(`-${years} years`, userId)
+      .run();
+  } finally {
+    await env.DB.prepare(trigger!.sql).run();
+  }
 }
 
 async function createPendingOAuthSession(email: string): Promise<Account> {
@@ -125,7 +151,8 @@ async function consentCount(): Promise<number> {
   return row?.n ?? -1;
 }
 
-const ADULT_BIRTH_DATE = birthDateYearsAgo(20);
+/** Turned 18 a month ago — consistent with consent granted three years ago, at 15. */
+const ADULT_BIRTH_DATE = birthDateYearsAgo(18, 30);
 
 beforeEach(async () => {
   await env.DB.batch(
@@ -196,6 +223,31 @@ describe('POST /api/age-transition', () => {
     expect(await response.json()).toMatchObject({ code: 'age_transition_too_young' });
     expect(await assuranceRow(minor.userId)).toMatchObject({ age_band: '13_17' });
     expect(await consentRow(minor.userId)).toEqual(consentBefore);
+  });
+
+  it('refuses a birthday that contradicts the account\'s own 13–17 record', async () => {
+    const minor = await signUp('aging-inconsistent@example.test', '13_17');
+    const consentBefore = await consentRow(minor.userId);
+
+    // 18th birthday ~12 years ago, but consent for a 13–17 runner was granted 3 years ago.
+    const response = await transition(minor, { birthDate: birthDateYearsAgo(30) });
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ code: 'age_transition_inconsistent' });
+    expect(await assuranceRow(minor.userId)).toMatchObject({ age_band: '13_17' });
+    expect(await consentRow(minor.userId)).toEqual(consentBefore);
+  });
+
+  it('refuses "consented today, adult today" but accepts an 18th birthday that is today', async () => {
+    const minor = await signUp('aging-same-day@example.test', '13_17');
+    await backdateConsent(minor.userId, 0);
+
+    const contradicted = await transition(minor, { birthDate: birthDateYearsAgo(18, 1) });
+    expect(contradicted.status).toBe(400);
+    expect(await contradicted.json()).toMatchObject({ code: 'age_transition_inconsistent' });
+
+    const turnedToday = await transition(minor, { birthDate: birthDateYearsAgo(18) });
+    expect(turnedToday.status, await turnedToday.text()).toBe(200);
   });
 
   it.each([
@@ -429,10 +481,29 @@ describe('the aging-transition schema (0006)', () => {
     const minor = await signUp('aging-schema-no-consent@example.test', '13_17');
     await env.DB.prepare('DELETE FROM guardian_consent WHERE user_id = ?').bind(minor.userId).run();
 
+    // The route fails closed (the store treats a consentless minor as an invariant failure)...
     const response = await transition(minor, { birthDate: ADULT_BIRTH_DATE });
-
     expect(response.status).toBe(500);
+
+    // ...and a statement that skips the route's precondition is aborted by the archive trigger.
+    await expect(
+      env.DB.prepare("UPDATE user SET age_band = '18_plus' WHERE id = ?").bind(minor.userId).run()
+    ).rejects.toThrow();
     expect(await assuranceRow(minor.userId)).toMatchObject({ age_band: '13_17' });
+  });
+
+  it('refuses the transition through better-auth\'s update-user, which the trigger alone would allow', async () => {
+    const minor = await signUp('aging-update-user@example.test', '13_17');
+
+    const response = await SELF.fetch('https://example.test/api/auth/update-user', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${minor.token}` },
+      body: JSON.stringify({ ageBand: '18_plus' }),
+    });
+
+    expect(response.status).toBe(400);
+    expect(await assuranceRow(minor.userId)).toMatchObject({ age_band: '13_17' });
+    expect(await consentRow(minor.userId)).toMatchObject({ archived_at: null });
   });
 
   it('still lets a transitioned account delete itself, archive included', async () => {

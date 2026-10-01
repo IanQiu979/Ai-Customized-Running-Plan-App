@@ -1,6 +1,7 @@
 import {
   ageOnDate,
   canOfferAgeTransition,
+  eighteenthBirthday,
   checkAgeTransitionBirthDate,
   latestCalendarDate,
   parseAgeBandChoice,
@@ -104,7 +105,10 @@ describe('the aging transition birthday check', () => {
   });
 
   it('accepts an 18th birthday that is today, and refuses one that is tomorrow', () => {
-    expect(checkAgeTransitionBirthDate('2008-10-01', MIDDAY)).toEqual({ ok: true });
+    expect(checkAgeTransitionBirthDate('2008-10-01', MIDDAY)).toEqual({
+      ok: true,
+      eighteenthBirthday: '2026-10-01',
+    });
     expect(checkAgeTransitionBirthDate('2008-10-02', MIDDAY)).toMatchObject({
       ok: false,
       code: 'age_transition_too_young',
@@ -136,6 +140,13 @@ describe('the aging transition birthday check', () => {
         code: 'invalid_birth_date',
       });
     }
+  });
+
+  it('dates the 18th birthday, moving 29 February to 1 March in a common year', () => {
+    expect(eighteenthBirthday({ year: 2008, month: 1, day: 5 })).toBe('2026-01-05');
+    expect(eighteenthBirthday({ year: 2008, month: 2, day: 29 })).toBe('2026-03-01');
+    expect(eighteenthBirthday({ year: 2012, month: 2, day: 29 })).toBe('2030-03-01');
+    expect(eighteenthBirthday({ year: 2014, month: 2, day: 28 })).toBe('2032-02-28');
   });
 
   it('parses only strict, real calendar dates', () => {

@@ -175,6 +175,42 @@ describe('transitionToAdult', () => {
     expect(mockNotify).not.toHaveBeenCalled();
   });
 
+  it('treats a not-eligible refusal as success when the session shows the transition already happened', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: false,
+      status: 409,
+      json: async () => ({ code: 'age_transition_not_eligible', error: 'Only once.' }),
+    } as Response);
+    mockGetSession.mockResolvedValue({
+      data: { user: { id: 'user-1', ageBand: '18_plus', ageAssuranceStatus: 'recorded' } },
+      error: null,
+    });
+
+    await expect(transitionToAdult('2008-01-15', 'user-1')).resolves.toEqual({
+      ageBand: '18_plus',
+      guardianConsentArchivedAt: null,
+    });
+    expect(mockNotify).toHaveBeenCalledWith('$sessionSignal');
+  });
+
+  it('keeps a not-eligible refusal when the session is not adult', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: false,
+      status: 409,
+      json: async () => ({ code: 'age_transition_not_eligible', error: 'Only once.' }),
+    } as Response);
+    mockGetSession.mockResolvedValue({
+      data: { user: { id: 'user-1', ageBand: null, ageAssuranceStatus: 'grandfathered' } },
+      error: null,
+    });
+
+    await expect(transitionToAdult('2008-01-15', 'user-1')).rejects.toMatchObject({
+      status: 409,
+      body: { code: 'age_transition_not_eligible' },
+    });
+    expect(mockNotify).not.toHaveBeenCalled();
+  });
+
   it('surfaces a server refusal and never refreshes the session', async () => {
     jest.spyOn(global, 'fetch').mockResolvedValue({
       ok: false,

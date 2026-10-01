@@ -36,6 +36,9 @@ best-effort compensating delete.
    rendered (`expectedUserId` in the JSON body); the Worker compares it with the newly verified
    session before writing (`409 age_assurance_account_mismatch`), preventing a stale web tab from
    recording immutable evidence onto an account selected in another tab.
+   *[Later, 2026-10-01: one exception now exists — a recorded `13_17` account may move to
+   `18_plus` once, irreversibly (`workers/migrations/0006_age_transition.sql`,
+   `POST /api/age-transition`). See `docs/change_log.md`, 2026-10-01 (later).]*
 7. Every user row that exists when the migration runs becomes `grandfathered`. Missing age data on
    those accounts never locks them out.
 8. Recorded minors are not asked for guardian consent again in intake. Grandfathered minors retain
@@ -72,7 +75,9 @@ Worker; the rollout must never describe that interval as automatically fail-clos
 Database triggers enforce tuple validity and immutability. Although `grandfathered / NULL / NULL`
 is a valid persisted tuple after the migration backfill, the insert trigger rejects it: every new
 row must begin pending or arrive already recorded through validated email signup. The only state
-transition is `pending -> recorded`. Separate `AFTER INSERT` and `AFTER UPDATE` triggers insert a
+transition is `pending -> recorded` *[later, 2026-10-01: `0006_age_transition.sql` adds a
+second, recorded `13_17` -> recorded `18_plus`, which archives the consent row in the same
+statement]*. Separate `AFTER INSERT` and `AFTER UPDATE` triggers insert a
 `guardian_consent` row for `13_17`, using `NEW.age_policy_version`. A plain `INSERT` is used:
 an unexpected existing consent row is an invariant failure and must roll the outer statement back.
 
@@ -130,7 +135,9 @@ intake.
 The exact intake age remains a separate coaching input.
 
 - `recorded / 13_17`: no second guardian checkbox and no second consent write. The account remains
-  in the minor regime until a separately approved one-way aging policy exists.
+  in the minor regime until a separately approved one-way aging policy exists. *[Later,
+  2026-10-01: that policy was approved and ships as `0006_age_transition.sql` /
+  `POST /api/age-transition`; a transitioned account is a recorded `18_plus` account.]*
 - `recorded / 18_plus`: exact intake age must be at least 18.
 - `grandfathered`: preserve today's behavior; exact age 13-17 requires `guardianConsent: true`,
   and intake plus consent are written in one D1 batch.
