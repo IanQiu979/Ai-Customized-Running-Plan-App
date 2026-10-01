@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { DateField } from '@/components/inputs/DateField';
-import { FontFamily, FontSize, Radius, Spacing, Stroke } from '@/constants/theme';
+import { FontFamily, FontSize, MaxContentWidth, Radius, Spacing, Stroke } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { datePartsToIso, dateFieldError, EMPTY_DATE, type DateParts } from '@/lib/fieldInput';
 
@@ -129,7 +129,12 @@ const styles = StyleSheet.create({
   },
   card: {
     width: '100%',
-    maxWidth: 360,
+    // On web, react-native-web renders each `DateField` box as an `<input size=20>` whose
+    // `min-width: auto` stops `flex` shrinking it below ~20 characters, so the three boxes need
+    // ~770 wide and the day box spilled out past its border in a 360 card. Native `TextInput` has
+    // no such floor, so phones keep `DeleteAccountDialog`'s 360; web gives the card a content box
+    // of `MaxContentWidth` (the card's own padding added back), which holds all three boxes.
+    maxWidth: Platform.OS === 'web' ? MaxContentWidth + 2 * Spacing.four : 360,
     borderRadius: Radius.card,
     padding: Spacing.four,
     gap: Spacing.three,
