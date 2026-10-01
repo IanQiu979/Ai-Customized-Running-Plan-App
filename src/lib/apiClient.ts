@@ -387,6 +387,59 @@ export async function recordAgeAssurance(
   return result;
 }
 
+export interface AgeTransitionResponse {
+  ageBand: '18_plus';
+  /** `null` only when recovering a transition an earlier, unconfirmed attempt already made. */
+  guardianConsentArchivedAt: string | null;
+}
+
+/**
+ * The one-way aging transition: a recorded 13–17 account declares a date of birth (`YYYY-MM-DD`)
+ * and the Worker — the only authority — moves it to 18+ and archives its guardian consent. Same
+ * shape as `recordAgeAssurance`: the write names the account the screen rendered for, and the
+ * reactive session is notified only after an uncached read confirms the new band on that account.
+ *
+ * The write is irreversible, so a retry can meet its own earlier success: the first attempt
+ * transitioned but its session read failed, and the second gets `409 age_transition_not_eligible`.
+ * That refusal triggers the same uncached read, and an adult session on the same account is
+ * success, not an error — otherwise the runner would see a refusal for something that worked.
+ */
+export async function transitionToAdult(
+  birthDate: string,
+  expectedUserId: string
+): Promise<AgeTransitionResponse> {
+  let result: AgeTransitionResponse;
+  let refusal: unknown = null;
+  try {
+    result = await apiFetch<AgeTransitionResponse>('/api/age-transition', {
+      method: 'POST',
+      body: JSON.stringify({ birthDate, expectedUserId }),
+    });
+  } catch (error) {
+    if (!(error instanceof ApiError) || error.body.code !== 'age_transition_not_eligible') {
+      throw error;
+    }
+    refusal = error;
+    result = { ageBand: '18_plus', guardianConsentArchivedAt: null };
+  }
+  const refreshed = await baseAuthClient.getSession({ query: { disableCookieCache: true } });
+  const refreshedUser = (refreshed.data as unknown as { user?: SessionUser } | null)?.user;
+  if (
+    refreshed.error ||
+    !refreshedUser ||
+    refreshedUser.id !== expectedUserId ||
+    refreshedUser.ageBand !== '18_plus'
+  ) {
+    throw (
+      refusal ??
+      refreshed.error ??
+      new Error('The updated session did not confirm the new age range.')
+    );
+  }
+  authClient.$store.notify('$sessionSignal');
+  return result;
+}
+
 /** Public capability read. Never reuse a stale answer after server mail config changes. */
 export function getEmailStatus(): Promise<EmailStatus> {
   return apiFetch('/api/email-status', { cache: 'no-store' });

@@ -26,6 +26,8 @@ jest.mock('@/lib/apiClient', () => ({
   deleteAccount: jest.fn(),
   describeError: (_error: unknown, fallback: string) => fallback,
   getQuotaStatus: jest.fn(),
+  transitionToAdult: jest.fn(),
+  useSessionUser: () => null,
 }));
 
 jest.mock('@/lib/confirmDestructive', () => ({

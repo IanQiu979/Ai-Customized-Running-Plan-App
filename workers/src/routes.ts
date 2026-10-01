@@ -15,7 +15,11 @@
  */
 
 import type { GeneratePlanRequest, IntakeResponses, Tier } from '../../src/lib/planTypes';
-import { parseAgeBandChoice, requiresLegacyIntakeConsent } from '../../src/lib/ageAssurance';
+import {
+  checkAgeTransitionBirthDate,
+  parseAgeBandChoice,
+  requiresLegacyIntakeConsent,
+} from '../../src/lib/ageAssurance';
 import type { Deps } from './deps';
 import { PRIVACY_POLICY_VERSION } from '../../src/constants/legal';
 import { fail, ok, readJson } from './http';
@@ -73,6 +77,86 @@ export async function handleRecordAgeAssurance(
   return ok({
     ageBand: result.assurance.ageBand,
     guardianConsentRecorded: result.assurance.ageBand === '13_17',
+  });
+}
+
+// ---------------------------------------------------------------------------------------------
+// POST /api/age-transition
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * The one-way aging transition (captain's decision, 2026-10-01): a recorded `13_17` account
+ * declares a date of birth at least 18 years old and becomes `18_plus`, once, irreversibly. Its
+ * guardian consent row is archived — kept, marked no longer in force — in the same SQLite statement
+ * (`0006_age_transition.sql`). No guardian is notified.
+ *
+ * WHAT THE BIRTHDAY CHECK PROVES. Only that the date the runner typed is 18+ years before today
+ * (today read in UTC−12, so never a day early anywhere) on the Worker's own clock. It is a
+ * self-declaration: a 15-year-old who types a false date is not stopped, exactly as at sign-up. It
+ * does stop a runner who enters their real birthday before turning 18, and it means the client is
+ * never the authority — the date is re-checked here whatever the app showed. It also refuses a date
+ * that contradicts the account's own record — an 18th birthday before the day guardian consent was
+ * granted (`store.ts`'s `transitionMinorToAdult`) — so "13–17 yesterday, born 1990 today" fails;
+ * a date that was false consistently since sign-up cannot be caught. The date itself is not
+ * stored.
+ *
+ * Like `/api/age-assurance`, the client names the account it rendered for (`expectedUserId`): the
+ * write is irreversible, so a stale web tab must not apply it to whoever is signed in now.
+ */
+export async function handleAgeTransition(
+  request: Request,
+  userId: string,
+  deps: Deps,
+  now: Date = new Date()
+): Promise<Response> {
+  const body = await readJson<unknown>(request);
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return fail(400, 'invalid_request', 'Request body must be a JSON object.');
+  }
+
+  const { expectedUserId, birthDate } = body as { expectedUserId?: unknown; birthDate?: unknown };
+  if (typeof expectedUserId !== 'string' || expectedUserId.length === 0) {
+    return fail(400, 'invalid_request', 'expectedUserId is required.');
+  }
+  if (expectedUserId !== userId) {
+    return fail(
+      409,
+      'age_assurance_account_mismatch',
+      'You are signed in to a different account now. Reload and try again.'
+    );
+  }
+
+  const check = checkAgeTransitionBirthDate(birthDate, now);
+  if (!check.ok) {
+    return fail(400, check.code, check.error);
+  }
+
+  const result = await deps.store.transitionMinorToAdult(
+    userId,
+    check.eighteenthBirthday,
+    PRIVACY_POLICY_VERSION
+  );
+  if (result.outcome === 'not_found') {
+    return fail(404, 'not_found', 'No such account.');
+  }
+  if (result.outcome === 'not_eligible') {
+    return fail(
+      409,
+      'age_transition_not_eligible',
+      'Only an account set to 13 to 17 can move to 18 or older, and only once.'
+    );
+  }
+  if (result.outcome === 'inconsistent') {
+    return fail(
+      400,
+      'age_transition_inconsistent',
+      'That date of birth means you were already 18 when this account was set to 13 to 17. Contact us to correct it.'
+    );
+  }
+
+  return ok({
+    ageBand: result.assurance.ageBand,
+    guardianConsentArchivedAt: result.consentArchivedAt,
   });
 }
 

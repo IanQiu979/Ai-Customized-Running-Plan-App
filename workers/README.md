@@ -44,6 +44,8 @@ workers/
                          #  same batch as the intake row (issue #89; docs/architecture.md has the schema)
     0005_age_assurance.sql # user.age_band / age_assurance_status / age_policy_version, write-once,
                          #  with the 13–17 consent row inserted by trigger (issue #95)
+    0006_age_transition.sql # the one-way 13_17 -> 18_plus move; archives (never deletes) the
+                         #  consent row by trigger in the same statement (2026-10-01)
   src/
     index.ts             # entry: authenticate once, then dispatch. The route table lives here.
     auth.ts              # better-auth wired to D1
@@ -103,11 +105,28 @@ that existed before 0005 are `grandfathered` and keep the intake-time consent fr
 account's `guardian_consent` row is written by trigger in the same statement as the `user` write,
 so if it fails there is no account.
 
+The band is write-once with one exception (captain's decision, 2026-10-01,
+`migrations/0006_age_transition.sql`): a recorded `13_17` account can move to `18_plus` once,
+irreversibly, through `POST /api/age-transition` (`{ birthDate, expectedUserId }`). The route checks
+that the self-declared date is 18+ years before today on the Worker's clock, with "today" read at
+UTC−12 (`checkAgeTransitionBirthDate`, `src/lib/ageAssurance.ts`), and does not store it. A trigger
+archives the `guardian_consent` row in the same `UPDATE user` statement — `archived_at` plus
+`archived_reason = 'aged_out_self_declared'`, never a delete — and aborts the statement if there is
+no row to archive. A date whose 18th birthday falls before the consent's `granted_at` date (read
+at UTC−12) contradicts the account's own 13–17 record and is `400 age_transition_inconsistent`,
+checked in the same conditional `UPDATE`; a lie told consistently from sign-up onward still passes.
+Any other account (already transitioned, recorded adult, grandfathered) is
+`409 age_transition_not_eligible`. No guardian is notified. The stored intake is not touched, so a
+pre-transition row (age ≤ 17) still produces an under-18 plan (no HR zones, with the under-18
+notice) until the runner re-takes the intake.
+
 **Rollout order matters, and it is the captain's.** The deployed Worker predates `pending`, so a
 production D1 with 0005 applied but the old Worker still serving would create ungated new accounts.
 Hold production traffic at Cloudflare, run `npm --prefix workers run db:migrate:remote`, run
 `wrangler deploy --env production` from this directory, probe that a `pending` account is refused
-`403 age_assurance_required`, reopen traffic, then release the client.
+`403 age_assurance_required`, reopen traffic, then release the client. `0006` needs `0005` applied
+first (the same `db:migrate:remote` applies both, in order), and it is additive for the Worker live
+today, which never writes the archive columns or moves a band; deploy after it.
 
 ## What works today, and what does not
 
@@ -119,7 +138,8 @@ Working end to end, verified against `wrangler dev` and the Worker test suite:
   until the captain configures Resend, see `docs/email-setup.md`
 - the quota ledger: reserve → settle/release, atomic gate, idempotency replay, fallback exemption
 - `quota-status`, `purchase-tier`, `delete-account`, intake read/write, plan reads
-- account-level age assurance (issue #95, above) — tested locally, not yet migrated or deployed
+- account-level age assurance (issue #95, above) and the one-way aging transition built on it —
+  tested locally, not yet migrated or deployed
 - `generate-plan` — Free tier (and, as a template fallback, Pro/Elite) returns a real generated
   plan, as of the 2026-08-04 `createTemplateSkeletonBuilder()` binding in `src/deps.ts`
 

@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActionRow, Group, Row } from '@/components/layout/GroupedRows';
 import { ScreenHeader } from '@/components/layout/ScreenHeader';
+import { AgeTransitionDialog } from '@/components/settings/AgeTransitionDialog';
 import { DeleteAccountDialog } from '@/components/settings/DeleteAccountDialog';
 import { FontFamily, FontSize, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -15,7 +16,10 @@ import {
   deleteAccount,
   describeError,
   getQuotaStatus,
+  transitionToAdult,
+  useSessionUser,
 } from '@/lib/apiClient';
+import { canOfferAgeTransition } from '@/lib/ageAssurance';
 import { openPrivacyPolicy } from '@/lib/openPrivacyPolicy';
 import { confirmDestructive } from '@/lib/confirmDestructive';
 import { formatQuotaLine } from '@/lib/quotaDisplay';
@@ -42,6 +46,13 @@ import type { QuotaStatus } from '@/lib/planTypes';
  * `authClient.signOut()` to invalidate the local session store so `src/app/_layout.tsx`'s
  * `Stack.Protected` guard bounces to `(auth)`.
  *
+ * **The one-way aging transition** (captain's decision, 2026-10-01). Only a recorded 13–17 account
+ * (`canOfferAgeTransition`, read from the session) sees the
+ * "Turned 18?" row; it opens `<AgeTransitionDialog>`, which sends a date of birth to
+ * `transitionToAdult` (`apiClient.ts`). The Worker decides — whether the date is 18+ and whether the
+ * account may move at all — and on success the refreshed session hides the row for good. Its copy
+ * is not yet captain/legal-certified.
+ *
  * **Zero accent, no exception** (`docs/design/instrument-visual-system.md` §1). This screen is flat
  * grouped rows and hairlines. The "Upgrade" row is deliberately not a signal-marked button: the offer
  * lives on the Paywall, and this is a door to it. `status.error` on Delete Account is a status
@@ -62,6 +73,12 @@ export default function SettingsScreen() {
   // know otherwise — see the header.
   const [hasPassword, setHasPassword] = useState<boolean | null>(null);
   const [dialogVisible, setDialogVisible] = useState(false);
+
+  const user = useSessionUser();
+  const canTransitionToAdult = canOfferAgeTransition(user?.ageAssuranceStatus, user?.ageBand);
+  const [transitionVisible, setTransitionVisible] = useState(false);
+  const [transitioning, setTransitioning] = useState(false);
+  const [transitionError, setTransitionError] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -166,6 +183,22 @@ export default function SettingsScreen() {
     }
   }
 
+  async function handleTransitionToAdult(birthDate: string) {
+    if (!user) return;
+    setTransitionError(null);
+    setTransitioning(true);
+    try {
+      await transitionToAdult(birthDate, user.id);
+      setTransitionVisible(false);
+    } catch (transitionFailure) {
+      setTransitionError(
+        describeError(transitionFailure, 'Something went wrong. Try again.', API_BASE_URL)
+      );
+    } finally {
+      setTransitioning(false);
+    }
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: theme.surface.base }]}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -189,6 +222,16 @@ export default function SettingsScreen() {
                   label="Upgrade"
                   hint="Pace targets, HR zones and a coach's note on every week"
                   onPress={() => router.push('/paywall')}
+                />
+              ) : null}
+              {canTransitionToAdult ? (
+                <ActionRow
+                  label="Turned 18?"
+                  hint="Move this account to 18 or older"
+                  onPress={() => {
+                    setTransitionError(null);
+                    setTransitionVisible(true);
+                  }}
                 />
               ) : null}
             </Group>
@@ -245,6 +288,17 @@ export default function SettingsScreen() {
           setDeleteError(null);
         }}
         onConfirm={handleDeleteAccount}
+      />
+
+      <AgeTransitionDialog
+        visible={transitionVisible && canTransitionToAdult}
+        busy={transitioning}
+        error={transitionError}
+        onCancel={() => {
+          setTransitionVisible(false);
+          setTransitionError(null);
+        }}
+        onConfirm={handleTransitionToAdult}
       />
     </View>
   );

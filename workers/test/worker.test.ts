@@ -23,6 +23,7 @@ const APP_ROUTES: [string, string][] = [
   ['POST', '/api/purchase-tier'],
   ['POST', '/api/delete-account'],
   ['POST', '/api/age-assurance'],
+  ['POST', '/api/age-transition'],
   ['GET', '/api/intake'],
   ['PUT', '/api/intake'],
   ['GET', '/api/plans'],
@@ -67,7 +68,16 @@ async function createPendingOAuthSession(email: string): Promise<{ token: string
   return { token: session.token, userId: user.id };
 }
 
+/**
+ * Puts a user into the pre-0005 `grandfathered` state, which no live code path can produce. The
+ * write-once trigger is read back from `sqlite_master` and restored verbatim rather than retyped
+ * here, so this helper keeps restoring whatever the latest migration defines (`0006` widened it).
+ */
 async function makeGrandfathered(userId: string): Promise<void> {
+  const trigger = await env.DB.prepare(
+    "SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = 'age_assurance_is_write_once'"
+  ).first<{ sql: string }>();
+  expect(trigger?.sql).toBeTruthy();
   await env.DB.exec('DROP TRIGGER age_assurance_is_write_once;');
   try {
     await env.DB.prepare(
@@ -76,27 +86,7 @@ async function makeGrandfathered(userId: string): Promise<void> {
       .bind(userId)
       .run();
   } finally {
-    await env.DB.prepare(`
-      CREATE TRIGGER age_assurance_is_write_once
-      BEFORE UPDATE ON user
-      FOR EACH ROW
-      WHEN (
-        NEW.age_band IS NOT OLD.age_band
-        OR NEW.age_assurance_status IS NOT OLD.age_assurance_status
-        OR NEW.age_policy_version IS NOT OLD.age_policy_version
-      )
-      AND NOT (
-        OLD.age_assurance_status = 'pending'
-        AND OLD.age_band IS NULL
-        AND OLD.age_policy_version IS NULL
-        AND NEW.age_assurance_status = 'recorded'
-        AND NEW.age_band IN ('18_plus', '13_17')
-        AND length(trim(NEW.age_policy_version)) > 0
-      )
-      BEGIN
-        SELECT RAISE(ABORT, 'age assurance is write-once');
-      END;
-    `).run();
+    await env.DB.prepare(trigger!.sql).run();
   }
 }
 
@@ -328,6 +318,7 @@ describe('POST /api/age-assurance and the pending-session gate', () => {
   it.each([
     ['GET', '/api/quota-status'],
     ['POST', '/api/purchase-tier'],
+    ['POST', '/api/age-transition'],
     ['GET', '/api/intake'],
     ['PUT', '/api/intake'],
     ['GET', '/api/plans'],

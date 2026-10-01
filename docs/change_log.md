@@ -5,6 +5,75 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-10-01 (later) — The one-way aging transition: a 13–17 account can become 18+, once (`fm/v22-aging-policy-ship`)
+
+Captain's decision, 2026-10-01. The entry below shipped issue #95 with a recorded `13_17` account
+held in the minor regime "until a separately approved aging policy exists"; this is that policy.
+A recorded `13_17` account self-declares a date of birth at least 18 years ago and becomes a
+recorded `18_plus` account — once, irreversibly. **Implemented and tested, not live:** migration
+`0006` and the deploy are captain-only (`mvp-progress.md` → "Blocked"). Tests: 1138 root
+(72 suites) / 282 Workers, green; also exercised end to end against `wrangler dev` with a local D1.
+
+- **Migration `0006_age_transition.sql`.** `guardian_consent` gains `archived_at` and
+  `archived_reason` (one allowed value, `aged_out_self_declared`; `archived_at IS NULL` means the
+  consent is in force). `age_assurance_is_write_once` is replaced so it allows exactly one more
+  change — recorded `13_17` → recorded `18_plus` — and nothing else (not back to `13_17`, not out
+  of `grandfathered`). A new `AFTER UPDATE` trigger, `age_assurance_minor_aged_out`, archives the
+  consent row **in the same statement** as the `user` update and aborts that statement if there
+  is no consent row to archive, so an account is never adult without its archived evidence and a
+  failed archive leaves it a minor. Archived rows are immutable and cannot be replaced by
+  `INSERT OR REPLACE`; consent can only ever be inserted in force. The Worker restamps
+  `user.age_policy_version` to the current `PRIVACY_POLICY_VERSION`; the policy the guardian
+  agreed to stays on the consent row's `policy_version`. The declared date of birth is not stored.
+- **`POST /api/age-transition`** takes `{ birthDate: 'YYYY-MM-DD', expectedUserId }` and returns
+  `{ ageBand: '18_plus', guardianConsentArchivedAt }`. Refusals: `400 invalid_request` (body or
+  `expectedUserId` missing), `400 invalid_birth_date` (not a real `YYYY-MM-DD` date, before 1900,
+  or in the future), `400 age_transition_too_young`, `400 age_transition_inconsistent` (below),
+  `409 age_assurance_account_mismatch` (a stale
+  tab rendered for another account, as on `/api/age-assurance`), and `409
+  age_transition_not_eligible` for any account that is not recorded `13_17` — an already
+  transitioned one, a recorded adult, or a grandfathered account. A `pending` account is refused
+  `403 age_assurance_required` by the central gate, like every other app route.
+- **The birthday check is a self-declaration, on the Worker's clock.**
+  `checkAgeTransitionBirthDate` (`src/lib/ageAssurance.ts`, shared with the Worker) reads "today"
+  at UTC−12, so nobody transitions before their birthday has arrived everywhere (a runner far
+  east of UTC may wait up to a day), and a 29 February birthday is reached on 1 March. It proves
+  only that the typed date is 18+ years ago; nothing verifies a birthday.
+- **A date that contradicts the account's own 13–17 record is refused**
+  (`400 age_transition_inconsistent`): if the declared 18th birthday falls before the day the
+  guardian consent was granted (`granted_at`'s date, read at UTC−12), the runner would already
+  have been 18 when the account recorded them as 13–17. The check runs atomically inside the same
+  conditional `UPDATE`, and the date is still not stored. It cannot catch a lie told consistently
+  from sign-up onward.
+- **No guardian is notified** (captain declined; there is no email path for it). Plan generation
+  and coaching are untouched.
+- **Intake: no code change.** A transitioned account is a recorded adult, so issue #95's `13_17`
+  intake-age ceiling no longer applies to it and the ≥18 floor does. A minor who has not
+  transitioned is unchanged. The transition does not touch the stored intake: a pre-transition
+  row (age ≤ 17) stays on file until the runner takes the intake again, and a plan generated from
+  it is still planned as an under-18 runner's (RPE instead of HR zones on the paid engine, the
+  under-18 notice on both) — plan generation was deliberately left alone. In the
+  app this lasts only until the next plan, since "Create plan" always saves a fresh intake first;
+  plans already generated are not rewritten.
+- **Client.** Settings shows a "Turned 18?" row only for a recorded `13_17` session
+  (`canOfferAgeTransition`); it opens the new `src/components/settings/AgeTransitionDialog.tsx`
+  (a date-of-birth `DateField` and Confirm). `transitionToAdult` in `src/lib/apiClient.ts` posts,
+  then notifies the session store only after an uncached session read shows `18_plus` on the same
+  account, which hides the row for good. The dialog decides nothing — the Worker rules on the date.
+- **Policy.** `docs/privacy-policy.md` gains "When you turn 18" and describes the archived consent
+  record. `PRIVACY_POLICY_VERSION` becomes `2026-10-01-r2` and the published line reads
+  "Last updated: 2026-10-01 (revision 2)": a second same-day text under the bare date would leave a
+  consent row unable to say which revision was agreed to. Format rule in `src/constants/legal.ts`;
+  `legal.test.ts` derives the version from the published line. Safe as a plain bump: production
+  held 0 consent rows under `2026-10-01` (read-only count, 2026-10-01 — 1 row, under `2026-09-19`;
+  `0005` not yet applied there).
+- **Still open:** the new copy ("Turned 18?", "Move this account to 18 or older", the dialog body
+  and the Worker's refusal messages, `age_transition_inconsistent`'s included) is not
+  captain/legal-certified.
+- Tests: new `workers/test/age-transition.test.ts` (26 cases, real workerd + D1), additions to
+  `src/lib/__tests__/ageAssurance.test.ts` and `src/lib/__tests__/apiClient.ageAssurance.test.ts`,
+  and a new `src/components/settings/__tests__/AgeTransitionDialog.test.tsx`.
+
 ## 2026-10-01 — Age assurance moves to the account: age band and guardian consent at sign-up (issue #95, `fm/v22-age-assurance-95`)
 
 Issue #95, ported from V2.3's pattern. The 2026-09-19 guardian-consent flow asked at intake time,

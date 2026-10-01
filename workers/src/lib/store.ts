@@ -96,6 +96,12 @@ export type RecordAgeAssuranceResult =
   | { outcome: 'conflict' | 'grandfathered'; assurance: AgeAssuranceRow }
   | { outcome: 'not_found' };
 
+export type AgeTransitionResult =
+  | { outcome: 'transitioned'; assurance: AgeAssuranceRow; consentArchivedAt: string }
+  | { outcome: 'not_eligible'; assurance: AgeAssuranceRow }
+  | { outcome: 'inconsistent'; assurance: AgeAssuranceRow }
+  | { outcome: 'not_found' };
+
 export interface ReserveInput {
   userId: string;
   tier: Tier;
@@ -568,6 +574,71 @@ export class D1PlanStore implements PlanStore {
     }
 
     throw new Error('age-assurance: conditional update made no change for a pending user');
+  }
+
+  /**
+   * Move one recorded `13_17` account to `18_plus`, once (the one-way aging transition, captain's
+   * decision 2026-10-01). The caller has already checked that the declared birthday is 18+ years
+   * ago, and passes its 18th-birthday date (`YYYY-MM-DD`) — never the birthday itself, which is not
+   * stored anywhere.
+   *
+   * The conditional update is the whole eligibility rule, in one statement:
+   *   - only `recorded / 13_17` matches, so an account that already transitioned — or was recorded
+   *     adult, or is grandfathered — changes zero rows and reads back as `not_eligible`;
+   *   - the declared 18th birthday must not fall before the day guardian consent was granted (read
+   *     at UTC−12, the same lenient-to-the-runner calendar as the age check). A date of birth that
+   *     made the runner an adult before they declared 13–17 contradicts the account's own record,
+   *     so it reads back as `inconsistent`. This stops "consented yesterday, 1990 today"; it cannot
+   *     stop a date that was false consistently from sign-up on. `0006_age_transition.sql`'s trigger archives the guardian
+   * consent row in the SAME statement and aborts it if there is none to archive; this method must
+   * not touch `guardian_consent` itself.
+   */
+  async transitionMinorToAdult(
+    userId: string,
+    eighteenthBirthday: string,
+    policyVersion: string
+  ): Promise<AgeTransitionResult> {
+    const result = await this.db
+      .prepare(
+        `UPDATE user
+            SET age_band = '18_plus', age_policy_version = ?
+          WHERE id = ? AND age_assurance_status = 'recorded' AND age_band = '13_17'
+            AND EXISTS (
+              SELECT 1 FROM guardian_consent
+               WHERE user_id = ? AND archived_at IS NULL
+                 AND date(granted_at, '-12 hours') <= ?
+            )`
+      )
+      .bind(policyVersion, userId, userId, eighteenthBirthday)
+      .run();
+
+    const assurance = await this.getAgeAssurance(userId);
+    if (!assurance) return { outcome: 'not_found' };
+    if ((result.meta?.changes ?? 0) === 0) {
+      if (assurance.status !== 'recorded' || assurance.ageBand !== '13_17') {
+        return { outcome: 'not_eligible', assurance };
+      }
+      const inForce = await this.db
+        .prepare('SELECT 1 AS present FROM guardian_consent WHERE user_id = ? AND archived_at IS NULL')
+        .bind(userId)
+        .first<{ present: number }>();
+      if (!inForce) {
+        throw new Error('age-transition: recorded minor has no in-force guardian consent');
+      }
+      return { outcome: 'inconsistent', assurance };
+    }
+
+    const consent = await this.db
+      .prepare(
+        `SELECT archived_at FROM guardian_consent
+          WHERE user_id = ? AND archived_reason = 'aged_out_self_declared'`
+      )
+      .bind(userId)
+      .first<{ archived_at: string }>();
+    if (!consent) {
+      throw new Error('age-transition: transitioned without an archived consent row');
+    }
+    return { outcome: 'transitioned', assurance, consentArchivedAt: consent.archived_at };
   }
 
   /** One plan, by id, **owned by this user**. A foreign id returns null, never someone's plan. */

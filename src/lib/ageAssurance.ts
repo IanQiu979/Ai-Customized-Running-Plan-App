@@ -62,3 +62,129 @@ export function requiresLegacyIntakeConsent(
   const usesLegacyFlow = status !== 'recorded' && status !== 'pending';
   return usesLegacyFlow && age >= 13 && age < 18;
 }
+
+// ---------------------------------------------------------------------------------------------
+// The one-way aging transition (captain's decision, 2026-10-01)
+// ---------------------------------------------------------------------------------------------
+
+/** The age a `13_17` account must declare to move to `18_plus`. */
+export const AGE_TRANSITION_MIN_AGE = 18;
+
+/**
+ * The oldest birth year the transition accepts. Not a coaching or legal number — only a bound that
+ * rejects an obviously mistyped year instead of storing nothing and saying "adult".
+ */
+const AGE_TRANSITION_MIN_BIRTH_YEAR = 1900;
+
+/**
+ * Hours behind UTC of the last time zone on Earth to reach a given calendar date (UTC−12). Reading
+ * "today" there means a runner is never treated as 18 before their birthday has arrived in every
+ * time zone; the cost is that a runner far east of UTC may wait up to a day longer.
+ */
+const LATEST_TIME_ZONE_OFFSET_HOURS = 12;
+
+export interface CalendarDate {
+  year: number;
+  month: number;
+  day: number;
+}
+
+export type AgeTransitionRefusalCode = 'invalid_birth_date' | 'age_transition_too_young';
+
+export type AgeTransitionCheck =
+  | { ok: true; eighteenthBirthday: string }
+  | { ok: false; code: AgeTransitionRefusalCode; error: string };
+
+/**
+ * Whether an account may offer the transition at all: only a recorded `13_17` one. Display only —
+ * the Worker's conditional update is the rule (`workers/src/lib/store.ts`'s
+ * `transitionMinorToAdult`); this just keeps the app from offering a control that would be refused.
+ */
+export function canOfferAgeTransition(status: unknown, ageBand: unknown): boolean {
+  return status === 'recorded' && ageBand === '13_17';
+}
+
+/** The calendar date it is right now in UTC−12 — see `LATEST_TIME_ZONE_OFFSET_HOURS`. */
+export function latestCalendarDate(now: Date): CalendarDate {
+  const shifted = new Date(now.getTime() - LATEST_TIME_ZONE_OFFSET_HOURS * 60 * 60 * 1000);
+  return {
+    year: shifted.getUTCFullYear(),
+    month: shifted.getUTCMonth() + 1,
+    day: shifted.getUTCDate(),
+  };
+}
+
+/**
+ * Whole years between `birth` and `on`. A birthday counts only once its exact month and day are
+ * reached, so a 29 February birthday is reached on 1 March in a common year — never a day early.
+ */
+export function ageOnDate(birth: CalendarDate, on: CalendarDate): number {
+  const beforeBirthday =
+    on.month < birth.month || (on.month === birth.month && on.day < birth.day);
+  return on.year - birth.year - (beforeBirthday ? 1 : 0);
+}
+
+/**
+ * The `YYYY-MM-DD` date of the 18th birthday — the first day `ageOnDate` reports 18, so a 29
+ * February birth gives 1 March in a common year. The Worker compares it with the date guardian
+ * consent was granted: a date of birth whose 18th birthday came before that contradicts the
+ * account's own 13–17 record (`workers/src/lib/store.ts`'s `transitionMinorToAdult`).
+ */
+export function eighteenthBirthday(birth: CalendarDate): string {
+  const year = birth.year + AGE_TRANSITION_MIN_AGE;
+  const exists = parseCalendarDate(
+    `${year}-${String(birth.month).padStart(2, '0')}-${String(birth.day).padStart(2, '0')}`
+  );
+  const date = exists ?? { year, month: 3, day: 1 };
+  return `${date.year}-${String(date.month).padStart(2, '0')}-${String(date.day).padStart(2, '0')}`;
+}
+
+/** A strict `YYYY-MM-DD` real calendar date, or `null`. 31 February is refused, not rolled over. */
+export function parseCalendarDate(raw: unknown): CalendarDate | null {
+  if (typeof raw !== 'string') return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (
+    parsed.getUTCFullYear() !== year ||
+    parsed.getUTCMonth() !== month - 1 ||
+    parsed.getUTCDate() !== day
+  ) {
+    return null;
+  }
+  return { year, month, day };
+}
+
+/**
+ * Whether a declared date of birth lets a `13_17` account become `18_plus` at `now`.
+ *
+ * This proves only that the date the runner typed is at least 18 years old. It is a
+ * self-declaration: nothing here — or anywhere in Pace Blueprint — verifies a birthday. The Worker
+ * runs it against its own clock; the client may run it only to decide what to show.
+ */
+export function checkAgeTransitionBirthDate(raw: unknown, now: Date): AgeTransitionCheck {
+  const birth = parseCalendarDate(raw);
+  const today = latestCalendarDate(now);
+  if (
+    !birth ||
+    birth.year < AGE_TRANSITION_MIN_BIRTH_YEAR ||
+    ageOnDate(birth, today) < 0
+  ) {
+    return {
+      ok: false,
+      code: 'invalid_birth_date',
+      error: 'Enter your date of birth as a real date (YYYY-MM-DD).',
+    };
+  }
+  if (ageOnDate(birth, today) < AGE_TRANSITION_MIN_AGE) {
+    return {
+      ok: false,
+      code: 'age_transition_too_young',
+      error: 'That date of birth is under 18, so this account stays 13 to 17.',
+    };
+  }
+  return { ok: true, eighteenthBirthday: eighteenthBirthday(birth) };
+}

@@ -121,14 +121,17 @@ describe('the privacy policy the app links to', () => {
     expect(published).not.toMatch(/TBC|TBD|DO NOT PUBLISH|\[DATA CONTROLLER|\[CONTACT EMAIL/);
   });
 
-  it('carries a Last updated date in ISO form, and that date is the recorded consent version', () => {
-    const lastUpdated = published.match(/\*\*Last updated: (\d{4}-\d{2}-\d{2})\*\*/g);
+  it('carries a Last updated date in ISO form, and that stamp is the recorded consent version', () => {
+    const lastUpdated = published.match(
+      /\*\*Last updated: (\d{4}-\d{2}-\d{2})(?: \(revision ([2-9]|[1-9]\d+)\))?\*\*/g
+    );
     expect(lastUpdated).toHaveLength(1);
-    const date = /(\d{4}-\d{2}-\d{2})/.exec(lastUpdated![0])![1];
+    const [, date, revision] = /(\d{4}-\d{2}-\d{2})(?: \(revision (\d+)\))?/.exec(lastUpdated![0])!;
     expect(new Date(date).toISOString().slice(0, 10)).toBe(date);
     // Every guardian-consent row is stamped with `PRIVACY_POLICY_VERSION`; a policy revision the
-    // constant did not follow would record consent against text the guardian never saw.
-    expect(PRIVACY_POLICY_VERSION).toBe(date);
+    // constant did not follow would record consent against text the guardian never saw — and a
+    // second same-day revision under the bare date would be indistinguishable from the first.
+    expect(PRIVACY_POLICY_VERSION).toBe(revision ? `${date}-r${revision}` : date);
   });
 
   it('states the under-18 posture: 13 and over, 13–17 with guardian consent', () => {
