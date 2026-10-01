@@ -168,7 +168,9 @@
   transitioned account is held to the adult intake floor like any recorded adult; plan generation
   is untouched, so a stored pre-transition intake (age ≤ 17) still yields an under-18 plan (no HR
   zones, with the under-18 notice) until the runner takes the intake again (the app's "Create
-  plan" always does). **Not live:**
+  plan" always does). The policy revision is `PRIVACY_POLICY_VERSION = 2026-10-01-r2` ("Last
+  updated: 2026-10-01 (revision 2)"), distinguishable from #95's same-day text; production held
+  0 consent rows under `2026-10-01` when it was bumped. **Not live:**
   0006 needs applying to production D1 after 0005, then a deploy, and the new copy is
   uncertified — both in "Blocked". Tests: 1138 root / 282 Workers, green. Detail:
   `change_log.md`, 2026-10-01 (later).

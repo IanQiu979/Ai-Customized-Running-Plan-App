@@ -33,7 +33,7 @@
 
 # Pace Blueprint — Privacy Policy
 
-**Last updated: 2026-10-01**
+**Last updated: 2026-10-01 (revision 2)**
 
 Pace Blueprint ("the app," "we," "us") is operated by **Ian Qiu**, a sole trader based in
 **Thailand**, who is the data controller for the personal data described here. This policy

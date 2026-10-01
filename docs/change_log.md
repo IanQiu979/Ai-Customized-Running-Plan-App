@@ -61,7 +61,12 @@ recorded `18_plus` account — once, irreversibly. **Implemented and tested, not
   then notifies the session store only after an uncached session read shows `18_plus` on the same
   account, which hides the row for good. The dialog decides nothing — the Worker rules on the date.
 - **Policy.** `docs/privacy-policy.md` gains "When you turn 18" and describes the archived consent
-  record; `PRIVACY_POLICY_VERSION` is unchanged.
+  record. `PRIVACY_POLICY_VERSION` becomes `2026-10-01-r2` and the published line reads
+  "Last updated: 2026-10-01 (revision 2)": a second same-day text under the bare date would leave a
+  consent row unable to say which revision was agreed to. Format rule in `src/constants/legal.ts`;
+  `legal.test.ts` derives the version from the published line. Safe as a plain bump: production
+  held 0 consent rows under `2026-10-01` (read-only count, 2026-10-01 — 1 row, under `2026-09-19`;
+  `0005` not yet applied there).
 - **Still open:** the new copy ("Turned 18?", "Move this account to 18 or older", the dialog body
   and the Worker's refusal messages, `age_transition_inconsistent`'s included) is not
   captain/legal-certified.
