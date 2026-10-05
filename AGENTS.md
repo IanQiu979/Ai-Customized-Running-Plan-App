@@ -257,7 +257,8 @@ Built-ins also available: `Explore`, `Plan`, `general-purpose`. Plugin agents ar
   prefilled from the stored row), asks the plan length itself — only while the race date is blank
   (`needsPlanLength`) — requires a target race distance, and ends in one "Create plan" that runs
   `putIntake` then `generatePlan` and replaces itself with the plan. Home's "Create a new plan"
-  only opens that blank intake. Adding a target, race-date, plan-length or Notes control anywhere
+  only opens that blank intake (or, once `quota-status` shows a Free runner's plan used, becomes
+  an upgrade action to `/paywall` — `docs/architecture.md`). Adding a target, race-date, plan-length or Notes control anywhere
   outside `/intake` recreates the "take the survey twice" bug the captain reported on 2026-08-15.
   The rule is code, not convention: `src/lib/planRequest.ts`.
 - **The plan engine splits by tier, and the split is one line in `planEngine.ts`.** Captain's
