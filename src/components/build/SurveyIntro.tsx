@@ -156,8 +156,6 @@ export function SurveyIntro({
   );
 }
 
-SurveyIntro.stripGeometry = BuildIllustration.strip;
-
 function FaintWeek({
   T,
   week,

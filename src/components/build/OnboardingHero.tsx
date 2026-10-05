@@ -160,8 +160,6 @@ export function OnboardingHero({
   );
 }
 
-OnboardingHero.stripGeometry = BuildIllustration.strip;
-
 /** One of the three faint copies of the week, sliding down into place under the real one. */
 function FaintWeek({
   T,

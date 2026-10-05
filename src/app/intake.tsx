@@ -11,7 +11,7 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SurveyIntro } from '@/components/build/SurveyIntro';
 import { useBuildClock } from '@/components/build/useBuildClock';
@@ -163,6 +163,8 @@ export default function IntakeScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<FormError | null>(null);
   const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const [formTop, setFormTop] = useState<number | null>(null);
   const { T: introClock } = useBuildClock({
     total: SURVEY_TIMELINE.total,
     play: entry === 'first',
@@ -525,262 +527,269 @@ export default function IntakeScreen() {
   return (
     <View style={[styles.container, { backgroundColor: theme.surface.base }]}>
       <Stack.Screen options={screenOptions} />
-      <ScrollView
-        testID="intake-scroll"
-        contentInsetAdjustmentBehavior="automatic"
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
-        snapToOffsets={entry === 'first' ? [0, viewportHeight] : undefined}
-        snapToEnd={false}
-        decelerationRate={entry === 'first' ? 'fast' : 'normal'}
-      >
-        {entry === 'first' ? (
-          <View style={{ height: viewportHeight }}>
-            <SurveyIntro T={introClock} width={viewportWidth} height={viewportHeight} />
-          </View>
-        ) : null}
-        <SafeAreaView edges={['top', 'left', 'right', 'bottom']}>
-          <View style={styles.content}>
-            <ScreenHeader
-              eyebrow="Intake"
-              title="About your running"
-              supporting="Every plan is built from these answers. Two minutes."
-              action={
-                entry === 'repeat' ? (
-                  <IntakeExitAction
-                    color={theme.text.primary}
-                    onPress={handleCancel}
-                    label="Cancel"
+      <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
+        <ScrollView
+          testID="intake-scroll"
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          snapToOffsets={entry === 'first' ? [0, formTop ?? viewportHeight] : undefined}
+          snapToEnd={false}
+          decelerationRate={entry === 'first' ? 'fast' : 'normal'}
+        >
+          {entry === 'first' ? (
+            <View style={{ height: viewportHeight }}>
+              <SurveyIntro T={introClock} width={viewportWidth} height={viewportHeight} />
+            </View>
+          ) : null}
+          <View
+            testID="intake-form"
+            onLayout={(event) => setFormTop(event.nativeEvent.layout.y)}
+            style={{ paddingTop: insets.top }}
+          >
+            <View style={styles.content}>
+              <ScreenHeader
+                eyebrow="Intake"
+                title="About your running"
+                supporting="Every plan is built from these answers. Two minutes."
+                action={
+                  entry === 'repeat' ? (
+                    <IntakeExitAction
+                      color={theme.text.primary}
+                      onPress={handleCancel}
+                      label="Cancel"
+                    />
+                  ) : undefined
+                }
+              />
+
+              <Section title="You" theme={theme}>
+                <Field label="Goal" theme={theme}>
+                  <TextInput
+                    accessibilityLabel="Goal"
+                    value={goal}
+                    onChangeText={setGoal}
+                    maxLength={500}
+                    placeholder="e.g. Finish my first 10K"
+                    placeholderTextColor={theme.text.secondary}
+                    style={[styles.input, inputThemeStyle(theme, invalid('goal'))]}
                   />
-                ) : undefined
-              }
-            />
+                  {fieldMessage('goal')}
+                </Field>
 
-            <Section title="You" theme={theme}>
-              <Field label="Goal" theme={theme}>
-                <TextInput
-                  accessibilityLabel="Goal"
-                  value={goal}
-                  onChangeText={setGoal}
-                  maxLength={500}
-                  placeholder="e.g. Finish my first 10K"
-                  placeholderTextColor={theme.text.secondary}
-                  style={[styles.input, inputThemeStyle(theme, invalid('goal'))]}
-                />
-                {fieldMessage('goal')}
-              </Field>
-
-              <Field label="Age" theme={theme}>
-                <NumberField
-                  accessibilityLabel="Age"
-                  value={age}
-                  onChangeValue={setAge}
-                  maxIntegerDigits={3}
-                  placeholder="e.g. 34"
-                  invalid={invalid('age')}
-                />
-                {fieldMessage('age')}
-              </Field>
-
-              {requiresGuardianConsent ? (
-                <>
-                  <GuardianConsentRow
-                    checked={guardianConsent}
-                    onToggle={() => setGuardianConsent((current) => !current)}
-                    theme={theme}
+                <Field label="Age" theme={theme}>
+                  <NumberField
+                    accessibilityLabel="Age"
+                    value={age}
+                    onChangeValue={setAge}
+                    maxIntegerDigits={3}
+                    placeholder="e.g. 34"
+                    invalid={invalid('age')}
                   />
-                  {fieldMessage('consent')}
-                </>
-              ) : null}
+                  {fieldMessage('age')}
+                </Field>
 
-              <Field label="Experience" theme={theme}>
-                <View style={styles.optionColumn}>
-                  {EXPERIENCE_OPTIONS.map((option) => (
-                    <OptionRow
-                      key={option.value}
-                      label={option.label}
-                      selected={experience === option.value}
-                      onPress={() => setExperience(option.value)}
+                {requiresGuardianConsent ? (
+                  <>
+                    <GuardianConsentRow
+                      checked={guardianConsent}
+                      onToggle={() => setGuardianConsent((current) => !current)}
                       theme={theme}
                     />
-                  ))}
-                </View>
-                {fieldMessage('experience')}
-              </Field>
-            </Section>
+                    {fieldMessage('consent')}
+                  </>
+                ) : null}
 
-            <Section title="Training" theme={theme}>
-              <Field label="Days per week" theme={theme}>
-                <View style={styles.chipRow}>
-                  {DAY_OPTIONS.map((day) => (
-                    <Chip
-                      key={day}
-                      label={String(day)}
-                      selected={daysPerWeek === day}
-                      onPress={() => setDaysPerWeek(day)}
-                      theme={theme}
+                <Field label="Experience" theme={theme}>
+                  <View style={styles.optionColumn}>
+                    {EXPERIENCE_OPTIONS.map((option) => (
+                      <OptionRow
+                        key={option.value}
+                        label={option.label}
+                        selected={experience === option.value}
+                        onPress={() => setExperience(option.value)}
+                        theme={theme}
+                      />
+                    ))}
+                  </View>
+                  {fieldMessage('experience')}
+                </Field>
+              </Section>
+
+              <Section title="Training" theme={theme}>
+                <Field label="Days per week" theme={theme}>
+                  <View style={styles.chipRow}>
+                    {DAY_OPTIONS.map((day) => (
+                      <Chip
+                        key={day}
+                        label={String(day)}
+                        selected={daysPerWeek === day}
+                        onPress={() => setDaysPerWeek(day)}
+                        theme={theme}
+                      />
+                    ))}
+                  </View>
+                  {fieldMessage('daysPerWeek')}
+                </Field>
+
+                <Field label="Weekly distance (km)" theme={theme}>
+                  <NumberField
+                    accessibilityLabel="Weekly distance in kilometres"
+                    value={weeklyKm}
+                    onChangeValue={setWeeklyKm}
+                    mode="decimal"
+                    maxIntegerDigits={3}
+                    placeholder="e.g. 35"
+                    invalid={invalid('weeklyKm')}
+                  />
+                  {fieldMessage('weeklyKm')}
+                </Field>
+              </Section>
+
+              <Section title="Target" theme={theme}>
+                <Field label="Target race" theme={theme}>
+                  <View style={styles.chipRow}>
+                    {RACE_DISTANCE_OPTIONS.map((option) => (
+                      <Chip
+                        key={option.value}
+                        label={option.label}
+                        selected={raceDistance === option.value}
+                        onPress={() => setRaceDistance(option.value)}
+                        theme={theme}
+                      />
+                    ))}
+                  </View>
+                  {fieldMessage('raceDistance')}
+                </Field>
+
+                <Field label="Race date" optional theme={theme}>
+                  <DateField
+                    accessibilityLabel="Race date"
+                    parts={raceDate}
+                    onChange={setRaceDate}
+                    invalid={raceDateError !== null || invalid('raceDate')}
+                  />
+                  {raceDateError ? <FieldMessage message={raceDateError} theme={theme} /> : null}
+                  {fieldMessage('raceDate')}
+                </Field>
+
+                <Field label="Goal time" optional theme={theme}>
+                  <ClockField
+                    accessibilityLabel="Goal time"
+                    parts={goalTime}
+                    onChange={setGoalTime}
+                    invalid={goalTimeError !== null || invalid('goalTime')}
+                  />
+                  {goalTimeError ? <FieldMessage message={goalTimeError} theme={theme} /> : null}
+                  {fieldMessage('goalTime')}
+                  {!goalTimeError && goalRealismCopy ? (
+                    <Text style={[styles.fieldMessage, { color: theme.text.secondary }]}>
+                      {goalRealismCopy}
+                    </Text>
+                  ) : null}
+                </Field>
+
+                {/* Only while no race date fixes the length — a runner who gave a date is never
+                  asked how long their plan should be (`needsPlanLength`). */}
+                {askPlanLength ? (
+                  <Field label="Plan length (weeks)" theme={theme}>
+                    <NumberField
+                      accessibilityLabel="Plan length in weeks"
+                      value={planLengthWeeks}
+                      onChangeValue={setPlanLengthWeeks}
+                      maxIntegerDigits={3}
+                      placeholder={String(DEFAULT_PLAN_WEEKS)}
+                      invalid={invalid('planLength')}
                     />
-                  ))}
-                </View>
-                {fieldMessage('daysPerWeek')}
-              </Field>
+                    {fieldMessage('planLength')}
+                  </Field>
+                ) : null}
+              </Section>
 
-              <Field label="Weekly distance (km)" theme={theme}>
-                <NumberField
-                  accessibilityLabel="Weekly distance in kilometres"
-                  value={weeklyKm}
-                  onChangeValue={setWeeklyKm}
-                  mode="decimal"
-                  maxIntegerDigits={3}
-                  placeholder="e.g. 35"
-                  invalid={invalid('weeklyKm')}
-                />
-                {fieldMessage('weeklyKm')}
-              </Field>
-            </Section>
-
-            <Section title="Target" theme={theme}>
-              <Field label="Target race" theme={theme}>
-                <View style={styles.chipRow}>
-                  {RACE_DISTANCE_OPTIONS.map((option) => (
-                    <Chip
-                      key={option.value}
-                      label={option.label}
-                      selected={raceDistance === option.value}
-                      onPress={() => setRaceDistance(option.value)}
-                      theme={theme}
+              {/* After the target on purpose: the goal-time realism note above needs both, and a
+                runner reads their target before their evidence for it. */}
+              <Section title="Recent result" theme={theme}>
+                <Field label="Recent performance" optional theme={theme}>
+                  <View style={styles.chipRow}>
+                    {RACE_DISTANCE_OPTIONS.map((option) => (
+                      <Chip
+                        key={option.value}
+                        label={option.label}
+                        selected={recentDistance === option.value}
+                        onPress={() =>
+                          setRecentDistance((current) =>
+                            current === option.value ? undefined : option.value
+                          )
+                        }
+                        theme={theme}
+                      />
+                    ))}
+                  </View>
+                  <View style={styles.recentTimeInput}>
+                    <ClockField
+                      accessibilityLabel="Recent performance time"
+                      parts={recentTime}
+                      onChange={setRecentTime}
+                      invalid={recentTimeError !== null || invalid('recent')}
                     />
-                  ))}
-                </View>
-                {fieldMessage('raceDistance')}
-              </Field>
+                  </View>
+                  {recentTimeError ? (
+                    <FieldMessage message={recentTimeError} theme={theme} />
+                  ) : null}
+                  {fieldMessage('recent')}
+                </Field>
+              </Section>
 
-              <Field label="Race date" optional theme={theme}>
-                <DateField
-                  accessibilityLabel="Race date"
-                  parts={raceDate}
-                  onChange={setRaceDate}
-                  invalid={raceDateError !== null || invalid('raceDate')}
-                />
-                {raceDateError ? <FieldMessage message={raceDateError} theme={theme} /> : null}
-                {fieldMessage('raceDate')}
-              </Field>
+              <Section title="Health" theme={theme}>
+                <Field label="Injuries" theme={theme}>
+                  <View style={styles.chipRow}>
+                    {INJURY_OPTIONS.map((option) => (
+                      <Chip
+                        key={option.value}
+                        label={option.label}
+                        selected={injuries.includes(option.value)}
+                        onPress={() => toggleInjury(option.value)}
+                        theme={theme}
+                      />
+                    ))}
+                  </View>
+                </Field>
 
-              <Field label="Goal time" optional theme={theme}>
-                <ClockField
-                  accessibilityLabel="Goal time"
-                  parts={goalTime}
-                  onChange={setGoalTime}
-                  invalid={goalTimeError !== null || invalid('goalTime')}
-                />
-                {goalTimeError ? <FieldMessage message={goalTimeError} theme={theme} /> : null}
-                {fieldMessage('goalTime')}
-                {!goalTimeError && goalRealismCopy ? (
-                  <Text style={[styles.fieldMessage, { color: theme.text.secondary }]}>
-                    {goalRealismCopy}
+                <Field label="Injury notes" optional theme={theme}>
+                  <TextInput
+                    accessibilityLabel="Injury notes"
+                    value={injuryNotes}
+                    onChangeText={setInjuryNotes}
+                    maxLength={2000}
+                    placeholder="Anything else worth knowing"
+                    placeholderTextColor={theme.text.secondary}
+                    multiline
+                    style={[styles.input, inputThemeStyle(theme, false), styles.notesInput]}
+                  />
+                </Field>
+              </Section>
+
+              <View style={styles.footer}>
+                {error ? (
+                  <Text
+                    accessibilityRole="alert"
+                    accessibilityLiveRegion="assertive"
+                    style={[styles.error, { color: theme.status.error }]}
+                  >
+                    {error.message}
                   </Text>
                 ) : null}
-              </Field>
 
-              {/* Only while no race date fixes the length — a runner who gave a date is never asked
-                how long their plan should be (`needsPlanLength`). */}
-              {askPlanLength ? (
-                <Field label="Plan length (weeks)" theme={theme}>
-                  <NumberField
-                    accessibilityLabel="Plan length in weeks"
-                    value={planLengthWeeks}
-                    onChangeValue={setPlanLengthWeeks}
-                    maxIntegerDigits={3}
-                    placeholder={String(DEFAULT_PLAN_WEEKS)}
-                    invalid={invalid('planLength')}
-                  />
-                  {fieldMessage('planLength')}
-                </Field>
-              ) : null}
-            </Section>
-
-            {/* After the target on purpose: the goal-time realism note above needs both, and a
-              runner reads their target before their evidence for it. */}
-            <Section title="Recent result" theme={theme}>
-              <Field label="Recent performance" optional theme={theme}>
-                <View style={styles.chipRow}>
-                  {RACE_DISTANCE_OPTIONS.map((option) => (
-                    <Chip
-                      key={option.value}
-                      label={option.label}
-                      selected={recentDistance === option.value}
-                      onPress={() =>
-                        setRecentDistance((current) =>
-                          current === option.value ? undefined : option.value
-                        )
-                      }
-                      theme={theme}
-                    />
-                  ))}
-                </View>
-                <View style={styles.recentTimeInput}>
-                  <ClockField
-                    accessibilityLabel="Recent performance time"
-                    parts={recentTime}
-                    onChange={setRecentTime}
-                    invalid={recentTimeError !== null || invalid('recent')}
-                  />
-                </View>
-                {recentTimeError ? <FieldMessage message={recentTimeError} theme={theme} /> : null}
-                {fieldMessage('recent')}
-              </Field>
-            </Section>
-
-            <Section title="Health" theme={theme}>
-              <Field label="Injuries" theme={theme}>
-                <View style={styles.chipRow}>
-                  {INJURY_OPTIONS.map((option) => (
-                    <Chip
-                      key={option.value}
-                      label={option.label}
-                      selected={injuries.includes(option.value)}
-                      onPress={() => toggleInjury(option.value)}
-                      theme={theme}
-                    />
-                  ))}
-                </View>
-              </Field>
-
-              <Field label="Injury notes" optional theme={theme}>
-                <TextInput
-                  accessibilityLabel="Injury notes"
-                  value={injuryNotes}
-                  onChangeText={setInjuryNotes}
-                  maxLength={2000}
-                  placeholder="Anything else worth knowing"
-                  placeholderTextColor={theme.text.secondary}
-                  multiline
-                  style={[styles.input, inputThemeStyle(theme, false), styles.notesInput]}
+                <PrimaryAction
+                  label="Create plan"
+                  disabled={submitting}
+                  busy={submitting}
+                  onPress={handleCreate}
                 />
-              </Field>
-            </Section>
-
-            <View style={styles.footer}>
-              {error ? (
-                <Text
-                  accessibilityRole="alert"
-                  accessibilityLiveRegion="assertive"
-                  style={[styles.error, { color: theme.status.error }]}
-                >
-                  {error.message}
-                </Text>
-              ) : null}
-
-              <PrimaryAction
-                label="Create plan"
-                disabled={submitting}
-                busy={submitting}
-                onPress={handleCreate}
-              />
+              </View>
             </View>
           </View>
-        </SafeAreaView>
-      </ScrollView>
+        </ScrollView>
+      </SafeAreaView>
     </View>
   );
 }
@@ -978,6 +987,9 @@ function Chip({
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+  },
+  safeArea: {
     flex: 1,
   },
   loadingContainer: {

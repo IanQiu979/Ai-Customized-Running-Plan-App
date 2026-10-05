@@ -1,4 +1,5 @@
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
+import { StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ApiError } from '@/lib/apiErrors';
@@ -297,6 +298,24 @@ describe('first entry cannot be skipped (ruling 1)', () => {
     const preventDefault = jest.fn();
     handler({ preventDefault });
     expect(preventDefault).toHaveBeenCalledTimes(1);
+  });
+
+  it('snaps onto the measured form top and pads the form below the status bar', async () => {
+    const tree = await renderLoaded();
+    const scroll = () => tree.root.find((node) => node.props.testID === 'intake-scroll');
+    const form = tree.root.find(
+      (node) => typeof node.type === 'string' && node.props.testID === 'intake-form'
+    );
+
+    expect(StyleSheet.flatten(form.props.style).paddingTop).toBe(59);
+
+    act(() => {
+      form.props.onLayout({
+        nativeEvent: { layout: { x: 0, y: 898, width: 430, height: 2400 } },
+      });
+    });
+    expect(scroll().props.snapToOffsets).toEqual([0, 898]);
+    expect(scroll().props.contentInsetAdjustmentBehavior).toBeUndefined();
   });
 
   it('lets its own replace to the new plan through once the plan exists', async () => {

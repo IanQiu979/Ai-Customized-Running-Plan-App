@@ -109,8 +109,8 @@ export function WeekStrip({
   }));
 
   return (
-    <View style={{ width }}>
-      <View style={[styles.track, { height: geometry.trackHeight }]}>
+    <View testID="week-strip" style={{ width }}>
+      <View testID="week-strip-track" style={[styles.track, { height: geometry.trackHeight }]}>
         {week.map((block, index) => {
           const left = index * (geometry.slotWidth + geometry.gap);
           if (!block) {

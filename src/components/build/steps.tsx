@@ -334,8 +334,6 @@ export function StepMiniPlan({ t }: { t: SharedValue<number> }) {
   );
 }
 
-StepMiniPlan.stripGeometry = MINI;
-
 const styles = StyleSheet.create({
   piece: {
     width: STEP_PIECE_WIDTH,

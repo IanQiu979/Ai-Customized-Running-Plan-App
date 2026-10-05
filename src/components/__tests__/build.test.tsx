@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { Text } from 'react-native';
+import { StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
 import {
@@ -21,7 +21,7 @@ import { OnboardingHero } from '../build/OnboardingHero';
 import { PlanHero } from '../build/PlanHero';
 import { StaticWeekStrip } from '../build/StaticWeekStrip';
 import { SurveyIntro } from '../build/SurveyIntro';
-import { WeekStrip } from '../build/WeekStrip';
+import { WeekStrip, stripWidth, type StripGeometry } from '../build/WeekStrip';
 import { StepEngine, StepIntake, StepMiniPlan } from '../build/steps';
 import { SETTLE_SLACK_MS, useBuildClock } from '../build/useBuildClock';
 import { RevealPrimaryAction } from '../ui/ActionButton';
@@ -80,6 +80,24 @@ const text = (tree: ReactTestRenderer) =>
         .join('');
     })
     .join(' | ');
+
+const flatStyle = (style: unknown): ViewStyle =>
+  StyleSheet.flatten(style as StyleProp<ViewStyle>) ?? {};
+
+const hostNodes = (root: ReactTestRenderer['root'], testID: string) =>
+  root.findAll((node) => typeof node.type === 'string' && node.props.testID === testID);
+
+/** The width and track height of every week strip a tree actually renders. */
+const renderedStrips = (tree: ReactTestRenderer) =>
+  hostNodes(tree.root, 'week-strip').map((strip) => ({
+    width: flatStyle(strip.props.style).width,
+    trackHeight: flatStyle(hostNodes(strip, 'week-strip-track')[0].props.style).height,
+  }));
+
+const drawnAs = (geometry: StripGeometry) => ({
+  width: stripWidth(geometry),
+  trackHeight: geometry.trackHeight,
+});
 
 /** A host that owns a clock the way a screen does, so a composition can be mounted alone. */
 function Clocked({
@@ -232,11 +250,38 @@ describe('CountUp', () => {
 });
 
 describe('OnboardingHero — V22-01 end frame', () => {
-  it('shares one canonical strip geometry with the survey and plan heroes', () => {
-    const strip = BuildIllustration.strip;
-    expect(OnboardingHero.stripGeometry).toBe(strip);
-    expect(SurveyIntro.stripGeometry).toBe(strip);
-    expect(PlanHero.stripGeometry).toBe(strip);
+  it('draws every strip at the canonical geometry, as do the survey and plan heroes', () => {
+    const canonical = drawnAs(BuildIllustration.strip);
+    const trees = [
+      render(
+        <Clocked total={HERO_TIMELINE.total}>
+          {({ T }) => <OnboardingHero T={T} width={393} height={852} />}
+        </Clocked>,
+      ),
+      render(
+        <Clocked total={SURVEY_TIMELINE.total}>
+          {({ T }) => <SurveyIntro T={T} width={393} height={852} />}
+        </Clocked>,
+      ),
+      render(
+        <Clocked total={PLAN_HERO_TIMELINE.total}>
+          {({ T }) => (
+            <PlanHero
+              T={T}
+              week={stripFromWeek(examplePlan.weeks[0])}
+              eyebrow="EXAMPLE"
+              title={examplePlan.title}
+              weekCount={examplePlan.durationWeeks}
+            />
+          )}
+        </Clocked>,
+      ),
+    ];
+    for (const tree of trees) {
+      const strips = renderedStrips(tree);
+      expect(strips.length).toBeGreaterThan(0);
+      for (const strip of strips) expect(strip).toEqual(canonical);
+    }
   });
 
   it('carries the wordmark, the 25 km total, the legend and the scroll-down cue', () => {
@@ -268,10 +313,30 @@ describe('OnboardingHero — V22-01 end frame', () => {
 });
 
 describe('step pieces — V22-02', () => {
-  it('derives compact strip geometry from the canonical hero by named ratios', () => {
-    const scaled = scaledBuildStripGeometry;
-    expect(StepMiniPlan.stripGeometry).toEqual(scaled(BuildIllustration.compact.step));
-    expect(HeaderMark.cellGeometry).toEqual(scaled(BuildIllustration.compact.header));
+  it('draws compact strips at geometry derived from the canonical hero by named ratios', () => {
+    const step = scaledBuildStripGeometry(BuildIllustration.compact.step);
+    const mini = render(<Clocked total={2.4}>{({ T }) => <StepMiniPlan t={T} />}</Clocked>);
+    expect(renderedStrips(mini)).toEqual([drawnAs(step)]);
+
+    const header = scaledBuildStripGeometry(BuildIllustration.compact.header);
+    const scale = 2;
+    const mark = render(
+      <Clocked total={2.6}>
+        {({ T }) => <HeaderMark T={T} completedDays={3} scale={scale} />}
+      </Clocked>,
+    );
+    expect(flatStyle(hostNodes(mark.root, 'header-mark')[0].props.style).gap).toBe(
+      header.gap * scale,
+    );
+    const cells = hostNodes(mark.root, 'header-mark-cell');
+    expect(cells).toHaveLength(7);
+    for (const cell of cells) {
+      expect(flatStyle(cell.props.style)).toMatchObject({
+        width: header.slotWidth * scale,
+        height: header.trackHeight * scale,
+        borderRadius: header.barRadius * scale,
+      });
+    }
   });
 
   it('01 Intake counts to 10 km and 51 min', () => {

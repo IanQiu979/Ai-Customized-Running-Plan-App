@@ -155,8 +155,6 @@ export function PlanHero({
   );
 }
 
-PlanHero.stripGeometry = BuildIllustration.strip;
-
 const styles = StyleSheet.create({
   eyebrow: {
     fontFamily: FontFamily.mono.regular,

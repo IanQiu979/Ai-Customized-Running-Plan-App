@@ -5,6 +5,8 @@ import { BuildIllustration, scaledBuildStripGeometry } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { MARK_CELL_RISE, MARK_CELL_STAGGER, enter } from '@/lib/buildMotion';
 
+const CELL = scaledBuildStripGeometry(BuildIllustration.compact.header);
+
 /**
  * The Home header mark (V22-04): a tiny 7-slot week strip beside the tier / plans-used counter.
  * 6 × 10 pt cells, 4 pt gap, 2 pt radius, slots at the slot colour; the completed days fill
@@ -28,18 +30,23 @@ export function HeaderMark({
 }) {
   const theme = useTheme();
   const cell = {
-    width: HeaderMark.cellGeometry.slotWidth * scale,
-    height: HeaderMark.cellGeometry.trackHeight * scale,
-    borderRadius: HeaderMark.cellGeometry.barRadius * scale,
+    width: CELL.slotWidth * scale,
+    height: CELL.trackHeight * scale,
+    borderRadius: CELL.barRadius * scale,
   };
   return (
     <View
-      style={[styles.row, { gap: HeaderMark.cellGeometry.gap * scale }]}
+      testID="header-mark"
+      style={[styles.row, { gap: CELL.gap * scale }]}
       accessible
       accessibilityLabel={`${completedDays} of 7 days into this week`}
     >
       {[0, 1, 2, 3, 4, 5, 6].map((index) => (
-        <View key={index} style={[styles.cell, cell, { backgroundColor: theme.grid.slot }]}>
+        <View
+          key={index}
+          testID="header-mark-cell"
+          style={[styles.cell, cell, { backgroundColor: theme.grid.slot }]}
+        >
           {index < completedDays ? (
             <Fill T={T} at={fillAt + index * MARK_CELL_STAGGER} color={theme.text.primary} />
           ) : null}
@@ -48,8 +55,6 @@ export function HeaderMark({
     </View>
   );
 }
-
-HeaderMark.cellGeometry = scaledBuildStripGeometry(BuildIllustration.compact.header);
 
 function Fill({ T, at, color }: { T: SharedValue<number>; at: number; color: string }) {
   const style = useAnimatedStyle(() => ({
