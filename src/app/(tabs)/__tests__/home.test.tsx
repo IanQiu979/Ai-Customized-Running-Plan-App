@@ -314,6 +314,54 @@ describe('Home controls after the 2026-09-20 rework', () => {
  * plan-view link. These cases exist so the claim cannot come back and so every pressable Home
  * renders keeps announcing a role.
  */
+describe('Home once the Free plan is used (captain, 2026-10-05)', () => {
+  beforeEach(resetMocks);
+  afterEach(unmountAll);
+
+  const usedFreeQuota = { ...freeQuota, used: 1 };
+
+  it('turns "Create a new plan" into an upgrade that opens the paywall, not the intake', async () => {
+    mockGetQuotaStatus.mockResolvedValue(usedFreeQuota);
+    const tree = await renderScreen(<HomeScreen />);
+
+    expect(controls(tree, 'Create a new plan')).toHaveLength(0);
+    const upgrade = controls(tree, 'Upgrade to create more plans');
+    expect(upgrade).toHaveLength(1);
+    if (upgrade.length !== 1) return;
+
+    act(() => {
+      (upgrade[0].props.onPress as () => void)();
+    });
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/paywall',
+      params: { quota: JSON.stringify(usedFreeQuota) },
+    });
+    expect(mockPush).not.toHaveBeenCalledWith('/intake');
+    expect(mockGeneratePlan).not.toHaveBeenCalled();
+  });
+
+  it('keeps "Create a new plan" while the Free plan is unused', async () => {
+    const tree = await renderScreen(<HomeScreen />);
+    expect(controls(tree, 'Create a new plan')).toHaveLength(1);
+    expect(controls(tree, 'Upgrade to create more plans')).toHaveLength(0);
+  });
+
+  it('keeps "Create a new plan" for a paid tier, even at its period limit', async () => {
+    mockGetQuotaStatus.mockResolvedValue({ ...freeQuota, tier: 'pro', used: 3, limit: 3, periodEnd: '2026-11-01' });
+    const tree = await renderScreen(<HomeScreen />);
+    expect(controls(tree, 'Create a new plan')).toHaveLength(1);
+    expect(controls(tree, 'Upgrade to create more plans')).toHaveLength(0);
+  });
+
+  it('keeps "Create a new plan" when the quota could not be read — unknown is not used up', async () => {
+    mockGetQuotaStatus.mockRejectedValue(new Error('offline'));
+    const tree = await renderScreen(<HomeScreen />);
+    expect(controls(tree, 'Create a new plan')).toHaveLength(1);
+    expect(controls(tree, 'Upgrade to create more plans')).toHaveLength(0);
+  });
+});
+
 describe('Home copy matches what the app does (issue #25)', () => {
   beforeEach(() => {
     resetMocks();

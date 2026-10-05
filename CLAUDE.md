@@ -166,7 +166,8 @@ jest-expo is installed. New logic added to `src/lib/` gets a test alongside it (
 suites are deliberate exceptions, each because the bug or behaviour under test lives in the
 screen's own render branches with no logic layer underneath to test instead: the two in
 `src/app/(auth)/__tests__/` (2026-09-04) — `onboarding.test.tsx` (the CTA gate and its bounded
-ceiling, and since 2026-09-20 the first-launch scroll lock and its content-box latch) and
+ceiling, the scroll lock — first launch only from 2026-09-20, every visit since 2026-10-03 — with its
+content-box latch, and the "SKIP" that is the only way past it) and
 `auth-back-link.test.tsx` (the four pre-auth links' navigation action) —
 `src/app/(tabs)/__tests__/tab-cache-first.test.tsx` (2026-09-12, the cache-first-on-refocus
 regression proof cited in `docs/change_log.md`'s same-dated entry),
@@ -180,7 +181,8 @@ render branch and save-time gate, issue #89), `src/app/(tabs)/__tests__/settings
 unskippable first entry, blank re-entry, required target distance, one "Create plan" that saves
 then generates — which live in the screen's render branches and submit handler) and
 `src/app/(auth)/__tests__/sign-up-age-assurance.test.tsx` (2026-10-01, sign-up's age-band gate on
-the button and the handler, and the request body it sends, issue #95). Each file's header states
+the button and the handler, and the request body it sends, issue #95; since 2026-10-05 also the
+choice's reveal on first credential focus or input). Each file's header states
 the reason; add a tenth only on the same grounds.
 
 ## Keep these docs updated — this is a standing rule, not a suggestion

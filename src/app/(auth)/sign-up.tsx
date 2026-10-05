@@ -44,6 +44,16 @@ export default function SignUpScreen() {
   const [password, setPassword] = useState('');
   const [ageBand, setAgeBand] = useState<AgeBand | null>(null);
   const [guardianConsent, setGuardianConsent] = useState(false);
+  // The empty form shows only the credentials and the actions (captain, 2026-10-05); the age
+  // choice joins it the first time the runner engages with a credential field — focus, or text
+  // arriving without one (autofill) — and then stays. It hides nothing from the rules: "Sign up"
+  // is disabled until every credential is filled, and filling one reveals this.
+  const [showAgeChoice, setShowAgeChoice] = useState(false);
+  const revealAgeChoice = () => setShowAgeChoice(true);
+  const onCredentialChange = (set: (value: string) => void) => (value: string) => {
+    set(value);
+    revealAgeChoice();
+  };
   const [error, setError] = useState<string | null>(null);
   const [activeAction, setActiveAction] = useState<'email' | 'google' | null>(null);
   // Set when the Worker created the account but withheld the session because the deployment
@@ -178,7 +188,8 @@ export default function SignUpScreen() {
                 <AuthField
                   label="Name"
                   value={name}
-                  onChangeText={setName}
+                  onChangeText={onCredentialChange(setName)}
+                  onFocus={revealAgeChoice}
                   placeholder="Your name"
                   autoCapitalize="words"
                   autoComplete="name"
@@ -186,7 +197,8 @@ export default function SignUpScreen() {
                 <AuthField
                   label="Email"
                   value={email}
-                  onChangeText={setEmail}
+                  onChangeText={onCredentialChange(setEmail)}
+                  onFocus={revealAgeChoice}
                   placeholder="you@example.com"
                   autoCapitalize="none"
                   autoComplete="email"
@@ -195,21 +207,24 @@ export default function SignUpScreen() {
                 <AuthField
                   label="Password"
                   value={password}
-                  onChangeText={setPassword}
+                  onChangeText={onCredentialChange(setPassword)}
+                  onFocus={revealAgeChoice}
                   placeholder="At least 8 characters"
                   autoCapitalize="none"
                   autoComplete="password-new"
                   secureTextEntry
                 />
 
-                <AgeBandChoice
-                  value={ageBand}
-                  onChange={setAgeBand}
-                  guardianConsent={guardianConsent}
-                  onToggleGuardianConsent={() => setGuardianConsent((checked) => !checked)}
-                  disabled={submitting}
-                  testIDPrefix="signup-age"
-                />
+                {showAgeChoice ? (
+                  <AgeBandChoice
+                    value={ageBand}
+                    onChange={setAgeBand}
+                    guardianConsent={guardianConsent}
+                    onToggleGuardianConsent={() => setGuardianConsent((checked) => !checked)}
+                    disabled={submitting}
+                    testIDPrefix="signup-age"
+                  />
+                ) : null}
 
                 {error ? (
                   <Text

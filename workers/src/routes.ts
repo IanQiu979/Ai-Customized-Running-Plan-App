@@ -341,7 +341,7 @@ export async function handleDeleteAccount(request: Request, userId: string, deps
 
   if (credentialHash !== null) {
     const throttleKeys = [`user:${userId}`, ipThrottleKey(request)];
-    if (deps.deleteAccountThrottle.isThrottled(throttleKeys)) {
+    if (await deps.deleteAccountThrottle.isThrottled(throttleKeys)) {
       return fail(429, 'rate_limited', 'Too many attempts. Try again in 15 minutes.');
     }
     const body = await readJson<DeleteAccountBody>(request);
@@ -351,13 +351,16 @@ export async function handleDeleteAccount(request: Request, userId: string, deps
     }
     const valid = await deps.verifyPassword({ hash: credentialHash, password });
     if (!valid) {
-      deps.deleteAccountThrottle.recordFailure(throttleKeys);
-      if (deps.deleteAccountThrottle.isThrottled(throttleKeys)) {
+      await deps.deleteAccountThrottle.recordFailure(throttleKeys);
+      if (await deps.deleteAccountThrottle.isThrottled(throttleKeys)) {
         return fail(429, 'rate_limited', 'Too many attempts. Try again in 15 minutes.');
       }
       return fail(401, 'invalid_password', 'That password is incorrect.');
     }
-    deps.deleteAccountThrottle.reset(throttleKeys);
+    // Only the account's own key. The IP key is the cross-account bound: clearing it on a success
+    // would let one IP spend four guesses on a stolen session, delete a throwaway account of its
+    // own with the right password, and start again on the next victim with a fresh budget.
+    await deps.deleteAccountThrottle.reset([`user:${userId}`]);
   }
 
   await deps.store.deleteAccount(userId);

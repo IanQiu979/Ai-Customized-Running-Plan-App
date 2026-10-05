@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -10,15 +11,21 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useReducedMotion, type SharedValue } from 'react-native-reanimated';
 
 import { OnboardingHero } from '@/components/build/OnboardingHero';
 import { StepEngine, StepIntake, StepMiniPlan } from '@/components/build/steps';
 import { SETTLE_SLACK_MS, useBuildClock } from '@/components/build/useBuildClock';
 import { LinkAction, RevealPrimaryAction } from '@/components/ui/ActionButton';
-import { FontFamily, FontSize, MaxContentWidth, Spacing } from '@/constants/theme';
-import { useFirstOnboardingVisit } from '@/hooks/use-first-onboarding-visit';
+import {
+  FontFamily,
+  FontSize,
+  MaxContentWidth,
+  PressedOpacity,
+  Spacing,
+  Tracking,
+} from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { HERO_TIMELINE, STEP_SECONDS } from '@/lib/buildMotion';
 import { isContentFullyOnScreen, lockScrollOffset, type ContentBox } from '@/lib/onboardingReveal';
@@ -32,24 +39,27 @@ import { isContentFullyOnScreen, lockScrollOffset, type ContentBox } from '@/lib
  *
  * **The mechanic is the scroll, not a carousel.** The steps stack vertically under the hero,
  * each a full-viewport beat, so one animation ever fills the screen at a time. There is nothing
- * to swipe, no "next" button, and no state to restore if they leave halfway. That is deliberate:
- * this screen is the anchor for EVERY signed-out session, not just a first install
- * (`(auth)/index.tsx` redirects here), so a returning user must be able to reach the actions
- * without being walked through a tour. The sign-in link is a peer of the CTA at the bottom rather
- * than fine print under it, for exactly that reason — it is the skip.
+ * to swipe, no "next" button, and no state to restore if they leave halfway. This screen is the
+ * anchor for EVERY signed-out session, not just a first install (`(auth)/index.tsx` redirects
+ * here), and the sign-in link stays a peer of the CTA at the end of the story.
  *
- * **First launch is locked to one animation at a time (captain's ruling, 2026-09-20).** The very
- * first time onboarding renders on a device (`useFirstOnboardingVisit`), the `ScrollView` snaps
- * section to section — `snapToOffsets` at every section's top with `disableIntervalMomentum`, so a
- * fling can only ever land on the next section, never carry past it — and is disabled while the
- * section currently in view is still animating, so scrolling past a build in progress is
- * impossible; each section's own build clock unlatches the lock once it settles, and the hero's
- * "Scroll down" hint is what tells the runner to move on. When the lock engages on a section the
- * scroll is settled onto it (`lockScrollOffset`), so the one animation playing fills the screen.
- * Every visit after the first — the flag persists via `lib/onboardingVisit.ts` — scrolls freely
- * with no snapping, exactly as before, and so does a first visit under reduced motion
- * (`useReducedMotion`): there is nothing to wait out when every clock starts already settled. This
- * closes `docs/mvp-progress.md`'s long-standing "replays on every signed-out session" note.
+ * **Every visit is locked to one animation at a time (captain's rulings, 2026-09-20, made
+ * permanent 2026-10-03).** The `ScrollView` snaps section to section — `snapToOffsets` at every
+ * section's top with `disableIntervalMomentum`, so a fling can only ever land on the next section,
+ * never carry past it — and is disabled while the section currently in view is still animating, so
+ * scrolling past a build in progress is impossible; each section's own build clock unlatches the
+ * lock once it settles, and the hero's "Scroll down" hint is what tells the runner to move on. When
+ * the lock engages on a section the scroll is settled onto it (`lockScrollOffset`), so the one
+ * animation playing fills the screen. Until 2026-10-03 this applied to a device's first launch
+ * only, behind an AsyncStorage "seen onboarding" flag that was set the instant the screen rendered
+ * — so the captain spent his own first view without ever watching it; the flag is gone.
+ *
+ * **The skip is the only way past.** A returning signed-out runner must never be walked through
+ * every animation, so a small "Skip" sits in the top corner over every section until the end is
+ * reached; it jumps straight to the end — "Create your first plan" and "Already have an account?
+ * Sign in" — and releases the lock for the rest of the visit. Ordinary scrolling never does.
+ * Reduced motion (`useReducedMotion`) still scrolls freely with no snapping: there is nothing to
+ * wait out when every clock starts already settled.
  *
  * Each step's piece plays once, when the step's CONTENT — piece and copy, centred in a
  * full-viewport section — is fully on screen (spec §V22-02; the latch is
@@ -102,6 +112,7 @@ export default function OnboardingScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
 
   /**
@@ -171,7 +182,7 @@ export default function OnboardingScreen() {
   );
   // The step sections are laid out inside a wrapper below the hero, so their `y` is offset by
   // the hero's height (one viewport) to land in scroll-content coordinates. The tops double as
-  // the first-launch snap points, so they are mirrored into state for the `ScrollView`.
+  // the lock's snap points, so they are mirrored into state for the `ScrollView`.
   const [snapOffsets, setSnapOffsets] = useState<number[]>([0]);
   const sectionLayout = useCallback(
     (index: number) => (event: LayoutChangeEvent) => {
@@ -198,14 +209,13 @@ export default function OnboardingScreen() {
   );
 
   /**
-   * One animation at a time, first launch only (captain's ruling, 2026-09-20). `null` while the
-   * flag is still loading — `useFirstOnboardingVisit` treats that the same as a first visit, so
-   * the scroll starts locked and only opens up once we positively know this is a repeat visit or
-   * once reduced motion makes the lock meaningless (every clock is already settled).
+   * One animation at a time, on every visit (captain's ruling, 2026-10-03), until the runner
+   * skips. Reduced motion makes the lock meaningless — every clock is already settled — so it
+   * never engages there.
    */
-  const firstVisit = useFirstOnboardingVisit();
   const reduceMotion = useReducedMotion();
-  const lockEnabled = firstVisit !== false && !reduceMotion;
+  const [skipped, setSkipped] = useState(false);
+  const lockEnabled = !reduceMotion && !skipped;
 
   // Whether each of the STEPS + Get started sections has finished its own build clock, keyed the
   // same as `seen`. A section that is `seen` but not yet `sectionReady` is the one animation
@@ -236,10 +246,45 @@ export default function OnboardingScreen() {
     scrollRef.current?.scrollTo({ y: lockScrollOffset({ viewportHeight, ...box }), animated: true });
   }, [lockedSectionIndex, contentBox, viewportHeight]);
 
+  // The skip: straight to the last section, whose own draw-in then plays, with the lock released
+  // for the rest of this visit so the runner can scroll back up freely if they want the story. A
+  // jump, not an animated scroll — passing through the steps would start their pieces on the way.
+  const endIndex = STEPS.length;
+  const atEnd = Boolean(seen[endIndex]);
+  const skipToEnd = useCallback(() => {
+    seenRef.current[endIndex] = true;
+    setSeen({ ...seenRef.current });
+    setSkipped(true);
+  }, [endIndex]);
+  useEffect(() => {
+    if (skipped) scrollRef.current?.scrollToEnd({ animated: false });
+  }, [skipped]);
+
   const stepMinHeight = viewportHeight;
 
   return (
     <View style={[styles.container, { backgroundColor: theme.surface.base }]}>
+      {/* Over the scroll, not in it, so it is there on every section until the end is reached.
+          Deliberately quiet — mono, dim, no fill: the story is the screen, this is the way out.
+          First in the tree so a screen reader reaches it before the whole story, not after;
+          `zIndex`/`elevation` keep it drawn above the scroll that follows. */}
+      {atEnd ? null : (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Skip to sign in"
+          accessibilityHint="Jumps to the end, where you can sign in or create an account."
+          hitSlop={Spacing.three}
+          onPress={skipToEnd}
+          style={({ pressed }) => [
+            styles.skip,
+            { top: insets.top + Spacing.two, right: insets.right + Spacing.four },
+            pressed && styles.pressed,
+          ]}
+        >
+          <Text style={[styles.skipText, { color: theme.text.secondary }]}>SKIP</Text>
+        </Pressable>
+      )}
+
       {/* The hero owns the top inset inside its 852-pt canvas; the scroll below takes the side
           and bottom insets. */}
       <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
@@ -250,8 +295,8 @@ export default function OnboardingScreen() {
           onScroll={handleScroll}
           scrollEventThrottle={16}
           scrollEnabled={!scrollLocked}
-          // First launch only: section-to-section snapping, one section per gesture. A repeat
-          // visit and reduced motion keep plain free scroll — there is nothing to lock there.
+          // Section-to-section snapping, one section per gesture, until the runner skips. Reduced
+          // motion keeps plain free scroll — there is nothing to lock there.
           snapToOffsets={lockEnabled ? snapOffsets : undefined}
           disableIntervalMomentum={lockEnabled}
           decelerationRate={lockEnabled ? 'fast' : undefined}
@@ -312,13 +357,14 @@ export default function OnboardingScreen() {
           </View>
         </ScrollView>
       </SafeAreaView>
+
     </View>
   );
 }
 
 /** One numbered step: its piece, then its copy. The piece gets its own clock, started the first
- * time the step is on screen. `onReady` fires once, when that clock latches — the first-launch
- * scroll lock's per-section unlatch. */
+ * time the step is on screen. `onReady` fires once, when that clock latches — the scroll lock's
+ * per-section unlatch. */
 function Step({
   index,
   heading,
@@ -443,5 +489,20 @@ const styles = StyleSheet.create({
   getStarted: {
     alignItems: 'center',
     gap: Spacing.five,
+  },
+  skip: {
+    position: 'absolute',
+    zIndex: 1,
+    elevation: 1,
+    paddingVertical: Spacing.one,
+    paddingHorizontal: Spacing.two,
+  },
+  skipText: {
+    fontFamily: FontFamily.mono.regular,
+    fontSize: FontSize.xxs,
+    letterSpacing: Tracking.label,
+  },
+  pressed: {
+    opacity: PressedOpacity,
   },
 });

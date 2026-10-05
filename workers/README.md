@@ -46,6 +46,7 @@ workers/
                          #  with the 13–17 consent row inserted by trigger (issue #95)
     0006_age_transition.sql # the one-way 13_17 -> 18_plus move; archives (never deletes) the
                          #  consent row by trigger in the same statement (2026-10-01)
+    0007_attempt_throttle.sql # attempt_throttle — the delete-account wrong-password budget (2026-10-05)
   src/
     index.ts             # entry: authenticate once, then dispatch. The route table lives here.
     auth.ts              # better-auth wired to D1
@@ -55,7 +56,8 @@ workers/
     env.ts               # the bindings/env contract
     http.ts              # { error, code } envelope
     lib/
-      store.ts               # every D1 statement. Authorization lives here — read its header.
+      store.ts               # every user-owned D1 statement. Authorization lives here — read its header.
+      attemptThrottle.ts     # the D1-backed failed-password budget for delete-account (not user-owned)
       generate-plan-flow.ts  # the eleven pipeline steps, pure, all deps injected
       planEngine.ts          # skeleton + personalizer seams (bound 2026-08-04 and 2026-08-10)
       planValidation.ts      # structural validation, shape only
@@ -127,6 +129,26 @@ Hold production traffic at Cloudflare, run `npm --prefix workers run db:migrate:
 `403 age_assurance_required`, reopen traffic, then release the client. `0006` needs `0005` applied
 first (the same `db:migrate:remote` applies both, in order), and it is additive for the Worker live
 today, which never writes the archive columns or moves a band; deploy after it.
+
+## The delete-account attempt budget
+
+`POST /api/delete-account` checks a credential account's password outside better-auth's handler,
+so better-auth's rate limit never sees it. `src/lib/attemptThrottle.ts` bounds it instead: five
+wrong passwords per 15 minutes, per user id and per connecting IP, independently, and the route
+answers `429 rate_limited` before verifying anything once either is spent. Since 2026-10-05 the
+count lives in D1 (`migrations/0007_attempt_throttle.sql`), one row per failed attempt, so it
+survives isolate restarts and is shared by every isolate — the earlier in-memory count was per
+isolate and reset on restart. Keys are stored only as HMAC-SHA-256 digests keyed with
+`BETTER_AUTH_SECRET` (rotating that secret starts every budget afresh), and each write prunes rows
+older than the window. A correct password clears only the account's own `user:` key, never the
+IP's: the IP budget is the cross-account bound, and clearing it on success would let one IP reset
+itself by deleting a throwaway account between guesses on stolen sessions. No new binding: it uses the `DB` already bound in both environments.
+
+**Rollout order, again the captain's:** run `npm --prefix workers run db:migrate:remote` first,
+**then** `wrangler deploy --env production`. 0007 is additive for the Worker live today, which
+never touches the table; the new Worker without it fails every password-checked delete-account
+request. That command applies every pending migration in order, so if 0005 is still unapplied it
+goes too — follow the age-assurance order above (traffic held) in that case.
 
 ## What works today, and what does not
 

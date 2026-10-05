@@ -5,6 +5,64 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-10-05 — Five behaviour fixes from the captain's iPhone test pass (`fm/v22-behaviour-r1`)
+
+Captain's iPhone test pass; approach approved by him on 2026-10-05 (the onboarding ruling on
+2026-10-03). Four client fixes and one Worker fix. The Worker half is **implemented and tested, not
+live**: migration `0007` and the deploy are captain-only and ordered (`mvp-progress.md` →
+"Blocked").
+
+- **Onboarding's one-animation-at-a-time lock applies on every signed-out visit (captain,
+  2026-10-03).** The 2026-09-20 lock (PR #127) was gated on an AsyncStorage "seen onboarding" flag
+  that was set the instant the screen rendered, so the captain spent his own first view without
+  ever watching it, and every later visit scrolled freely. The flag is gone —
+  `src/lib/onboardingVisit.ts`, `src/hooks/use-first-onboarding-visit.ts` and their test are
+  deleted — and the snap-and-hold lock now engages on every visit. Ordinary scrolling cannot get
+  past a build in progress; the only way past is a new quiet "SKIP" in the top-right corner (mono,
+  dim, no fill; accessibility label "Skip to sign in"), which jumps straight to the end beat ("Create
+  your first plan" / "Already have an account? Sign in"), releases the lock for the rest of that
+  visit, and disappears once the end is reached. It is first in screen-reader order, so a
+  VoiceOver user reaches it before the story. Reduced motion still scrolls freely and still shows
+  the skip.
+- **Sign-up shows less until the runner starts.** The empty form is now name, email, password and
+  the actions. `AgeBandChoice` (with the 13–17 guardian consent) appears the first time any
+  credential field is focused, or text arrives in one without focus (autofill), and stays from
+  then on. Nothing it guards moved: "Sign up" still needs every credential filled, the age choice
+  is still required before submit, and the server checks, legal/consent wording and the Google path
+  are unchanged.
+- **Home sends a Free runner whose plan is used to the paywall, not the intake.** Before this, the
+  runner answered the whole intake only to be refused `over_quota` at the end. When the
+  server-reported `quota-status` shows a Free runner's one lifetime plan used (new pure helper
+  `isFreeAllowanceUsed` in `src/lib/quotaDisplay.ts`), Home's "Create a new plan" becomes "Upgrade
+  to create more plans" and pushes `/paywall` with the quota as the `quota` param — the same shape
+  the intake's `over_quota` branch passes. Display only: `generate-plan` still enforces the quota,
+  and Pro/Elite, an unknown quota (fetch failed) and the unlimited test override keep "Create a new
+  plan". Home is the only place in the app that starts a new plan; the post-signup redirect serves
+  brand-new accounts only.
+- **The plan footer's disclaimers fold to one line.** The captain found the full stack at the foot
+  of every plan "too much and messy". `DisclaimerFooter` now shows "Disclaimers & safety notes · N"
+  with a chevron; a tap expands every disclaimer and a second tap folds them. Folded is not
+  dismissed: the line is on every plan, the wording is unchanged, and the state is announced
+  through `accessibilityState.expanded`. The drawn chevron moved out of `glossary.tsx` into the
+  shared `src/components/ui/DisclosureArrow.tsx`, used by both. New
+  `src/components/plan/__tests__/DisclaimerFooter.test.tsx`.
+- **The delete-account password budget survives a Worker restart.** Five wrong passwords per
+  15 minutes, per user id and per connecting IP (`workers/src/lib/attemptThrottle.ts`), used to be
+  counted in Worker module memory: an isolate restart, or a request landing on another isolate,
+  handed an attacker holding a stolen session a fresh budget. The count now lives in D1 — new
+  migration `0007_attempt_throttle.sql`, table `attempt_throttle (scope, key_digest,
+  attempted_at)`, one row per failed attempt, shared by every isolate. Keys are stored only as
+  HMAC-SHA-256 digests keyed with `BETTER_AUTH_SECRET` (no IP address or user id in the clear), and
+  each write prunes the scope's rows older than the window. A successful password clears only the
+  account's own `user:` key, never the connecting IP's — otherwise one IP could spend four guesses
+  on a stolen session, delete a throwaway account of its own, and start the next victim on a fresh
+  budget. No new binding: `DB` is already bound in both environments. The route's contract (`401 invalid_password`, `429 rate_limited`) is
+  unchanged. **Rollout order:** apply `0007` to production D1 first, then deploy — the new Worker
+  without the table fails every password-checked delete-account request; the table is additive for
+  the Worker live today. **Open for the captain:** the table holds pseudonymised IP/user keys for up
+  to 15 minutes for abuse prevention; whether `docs/privacy-policy.md`'s existing "detect misuse"
+  language covers it is his call, and the policy was not edited.
+
 ## 2026-10-01 (later) — The one-way aging transition: a 13–17 account can become 18+, once (`fm/v22-aging-policy-ship`)
 
 Captain's decision, 2026-10-01. The entry below shipped issue #95 with a recorded `13_17` account

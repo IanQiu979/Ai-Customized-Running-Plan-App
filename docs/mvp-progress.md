@@ -30,6 +30,26 @@
 
 ### How it is now
 
+- **Five behaviour fixes from the captain's iPhone test pass (2026-10-05, `fm/v22-behaviour-r1`;
+  approach approved by him that day).** (1) Onboarding's one-animation-at-a-time lock now applies
+  on **every** signed-out visit (captain, 2026-10-03), not only a device's first launch — the
+  AsyncStorage "seen onboarding" flag that gated it is deleted — and a quiet top-right "SKIP"
+  (a11y "Skip to sign in") is the only way past: it jumps to "Create your first plan" / "Already
+  have an account? Sign in", releases the lock for that visit, and disappears at the end. Reduced
+  motion still scrolls freely and still shows the skip. (2) Sign-up's empty form shows only name,
+  email, password and the actions; `AgeBandChoice` (with 13–17 consent) appears on first focus of a
+  credential field, or autofilled text, and stays. Rules, server checks and copy unchanged.
+  (3) Home's "Create a new plan" becomes "Upgrade to create more plans" → `/paywall` (with the
+  quota param) once `quota-status` shows a Free runner's one plan used (`isFreeAllowanceUsed`,
+  `src/lib/quotaDisplay.ts`); display only, server enforcement unchanged; paid tiers, an unknown
+  quota and the unlimited test override keep "Create a new plan". (4) The plan footer folds to
+  "Disclaimers & safety notes · N" with a chevron (shared `src/components/ui/DisclosureArrow.tsx`,
+  also the glossary's); tap to expand, wording unchanged, on every plan. (5) The delete-account
+  password budget moved from Worker memory to D1 (`attempt_throttle`, migration `0007`, keys stored
+  as HMAC digests) so it survives isolate restarts, and a success now clears only the account's own
+  key, never the IP's — **implemented and tested, not live** until the
+  captain migrates then deploys ("Blocked", which also carries the privacy-policy question it
+  raises). Tests: 1156 root / 287 Workers, green. Detail: `change_log.md`, 2026-10-05.
 - **"The plan builds itself" — the V22 build animations are in, the theme is Blueprint, and the
   heartbeat/graph motif is gone from the whole app (2026-09-14, `fm/v22-animations-lane3`).** The
   six captain-approved Claude Design pages (`V22-01` … `V22-06`, 2026-09-13) are rebuilt natively
@@ -82,7 +102,8 @@
   correct `password`, verified with the same `verifyPassword` (`better-auth/crypto`) sign-in itself
   uses, or the call is `401 invalid_password` and nothing is deleted — and five wrong passwords in
   15 minutes (per user or per connecting IP, `workers/src/lib/attemptThrottle.ts`) make it
-  `429 rate_limited` before anything is verified; a Google/OAuth-only account keeps the
+  `429 rate_limited` before anything is verified — counted in D1 since 2026-10-05 (migration
+  `0007`, not yet applied in production; first bullet), in Worker memory before that; a Google/OAuth-only account keeps the
   pre-existing confirm-only behavior unchanged. Settings decides which confirmation UI to
   show via `accountHasPassword()` (reads better-auth's `/list-accounts`, fails closed to "assume a
   password is required" on any read error) — a credential account gets the new
@@ -289,7 +310,8 @@
   terminal `invalid_request` re-mints the idempotency key — exactly as Home used to. Home now
   shows the tier · quota header, the **subscription box first** (header mark, tier, plans used,
   "See plans →"), a CURRENT PLAN summary row for the newest plan (`N WEEKS · WEEK k`, opens it),
-  the one "Create a new plan" CTA, and the My Plans row. Gone from Home: the "YOUR TARGET" card
+  the one "Create a new plan" CTA (since 2026-10-05 "Upgrade to create more plans" → `/paywall`
+  once a Free runner's plan is used — first bullet), and the My Plans row. Gone from Home: the "YOUR TARGET" card
   and "Change" link, the plan-length field, the Notes field and its Free-tier `LockedPanel`, the
   "ON PRO & ELITE" `PlanContentTeaser` (both components deleted), the goal-realism preview and
   every generate branch; gone from the intake: "Skip for now" / "Done" and prefilling. The
@@ -359,10 +381,11 @@
   `[vars]` of `workers/wrangler.toml` (the committed `[env.production.vars]` value is `"false"`),
   so the captain's test pass runs with every account Elite and the quota gate bypassed. Set the
   top-level value to `"false"` before real users arrive. Recorded in "Latest — 2026-08-09".
-- **Test counts:** 1067 root tests across 66 suites and 195 `workers/` tests across 11 files on
-  `fm/v22-delete-account-password`, verified by running both gates there on 2026-09-20 after the
-  same-day review follow-up (which added `workers/test/attemptThrottle.test.ts`). Earlier
-  figures, for the record: 1017 root tests across 62 suites on `fm/v22-intake-flow-rework`
+- **Test counts:** 1156 root tests across 72 suites and 287 `workers/` tests across 13 files on
+  `fm/v22-behaviour-r1`, verified by running both test suites there on 2026-10-05. Earlier
+  figures, for the record: 1067 root tests across 66 suites and 195 `workers/` tests across 11
+  files on `fm/v22-delete-account-password`, verified by running both gates there on 2026-09-20
+  after the same-day review follow-up (which added `workers/test/attemptThrottle.test.ts`); 1017 root tests across 62 suites on `fm/v22-intake-flow-rework`
   (verified by running the root gate there on 2026-09-20) and 174 `workers/` tests across 10 files
   on `fm/v22-password-recovery-94`, verified by running the Workers gate there the same day; 999
   root tests across 60 suites on `fm/v22-password-recovery-94`
@@ -900,6 +923,22 @@ from 82. Issue #22 remains open.)
   captain — provisioned and verified in local dev 2026-08-05 (see that entry below).
 
 ### Code
+- [x] **Five behaviour fixes from the captain's iPhone test pass (2026-10-05,
+      `fm/v22-behaviour-r1`; client fixes done, Worker fix implemented and tested, not live).**
+      Onboarding: `src/app/(auth)/onboarding.tsx` locks every visit and adds the "SKIP" control;
+      `src/lib/onboardingVisit.ts`, `src/hooks/use-first-onboarding-visit.ts` and
+      `onboardingVisit.test.ts` deleted. Sign-up: `sign-up.tsx` reveals `AgeBandChoice` on first
+      credential focus/input. Home: `isFreeAllowanceUsed` in `src/lib/quotaDisplay.ts` swaps the CTA
+      to "Upgrade to create more plans" → `/paywall`. Plan footer: `DisclaimerFooter` folds by
+      default; the chevron moved to `src/components/ui/DisclosureArrow.tsx` (shared with
+      `glossary.tsx`). Worker: `workers/migrations/0007_attempt_throttle.sql`, the D1-backed
+      `AttemptThrottle` (`createDeleteAccountThrottle`, HMAC-keyed with `BETTER_AUTH_SECRET`) bound
+      per request in `deps.ts` and awaited in `routes.ts`. New/updated tests:
+      `DisclaimerFooter.test.tsx`, `onboarding.test.tsx` (lock on every visit, the skip),
+      `sign-up-age-assurance.test.tsx` (reveal), `home.test.tsx` and `quotaDisplay.test.ts`
+      (upgrade swap), `workers/test/attemptThrottle.test.ts` (real D1: survives a new instance,
+      prunes, scopes, digests only). Tests: 1156 root / 287 Workers, green. Rollout: "Blocked".
+      Detail: `docs/change_log.md`, 2026-10-05.
 - [x] **The one-way aging transition, 13–17 → 18+ (2026-10-01, `fm/v22-aging-policy-ship`;
       implemented and tested, not live).** Worker: `workers/migrations/0006_age_transition.sql`
       (`guardian_consent.archived_at` / `archived_reason`, the widened write-once trigger, the
@@ -1436,7 +1475,10 @@ provider, the verification flag, the copy certification — "Blocked"). Issue #9
 age assurance) is merged as PR #131; what remains is the captain's ordered rollout and the copy
 certification ("Blocked"). The one-way aging transition is complete on `fm/v22-aging-policy-ship`
 and awaiting its PR; what remains after merge is applying `0006` to production, the deploy and the
-copy certification ("Blocked"). Nothing else is in flight. The one remaining critical-path item — `ANTHROPIC_API_KEY`, without which
+copy certification ("Blocked"). The 2026-10-05 behaviour fixes are complete on
+`fm/v22-behaviour-r1` and awaiting their PR; what remains after merge is applying `0007` to
+production, then the deploy, and the captain's privacy-policy call on the throttle table
+("Blocked"). Nothing else is in flight. The one remaining critical-path item — `ANTHROPIC_API_KEY`, without which
 paid-tier requests serve the quota-exempt template fallback — is a captain-only action, not work
 in progress; see "Current state" above and "Blocked" below. The 2026-07-11 coaching cycles 1 and 2 are
 recorded under "Done" → "Domain" above, not here.
@@ -1564,6 +1606,8 @@ to "Decided" below.
 | **Roll out account-level age assurance (issue #95, 2026-10-01), in this order:** (1) hold production traffic at Cloudflare — the live Worker does not understand `pending`, so any account created between the migration and the deploy would be ungated; (2) apply `0005_age_assurance.sql` to production D1 (`npm --prefix workers run db:migrate:remote`); (3) `wrangler deploy --env production` from `workers/`; (4) probe that a `pending` account is refused `403 age_assurance_required`, then reopen traffic; (5) release the client. The updated privacy policy is not live until `Publish legal pages` succeeds after merge — `workers/README.md` → "Age assurance" | any of #95 in production: sign-up still asks nothing, a new Google account is ungated, and minors still consent at intake | **Ian.** Traffic hold, remote migration and deploy are all his account (`AGENTS.md` → never run `wrangler deploy`) |
 | **Copy certification for the age/consent choice (issue #95).** Uncertified, like the 2026-09-19 intake checkbox copy it replaces for new accounts. `AgeBandChoice.tsx`: "YOUR AGE", "18 or older", "13–17 — my parent or guardian agrees", "I am 13–17, and a parent or guardian has read the privacy policy and agrees to it on my behalf.", "Read the privacy policy", "Pace Blueprint is for ages 13 and up."; `AgeAssuranceGate.tsx`: "Confirm your age", "Select your age range to continue. This is recorded once, with your account.", "Continue", "Sign out"; `sign-up.tsx`: "Select your age range before you create this account.", "A parent or guardian must agree before you create this account."; `workers/src/age-assurance.ts` / `src/lib/ageAssurance.ts` refusals: "Select an age range: 18 or older, or 13 to 17 with a parent or guardian who agrees.", "A parent or guardian must agree to the Privacy Policy on behalf of a runner aged 13 to 17." | nothing functionally. It blocks calling the copy final before ship | **Ian / legal.** Copy only |
 | **Roll out the one-way aging transition (2026-10-01, `fm/v22-aging-policy-ship`):** after merge, apply `0006_age_transition.sql` to production D1 — it requires `0005` (its triggers read `user.age_band`), and D1 applies migrations in order, so it goes with or after the #95 row above (`npm --prefix workers run db:migrate:remote`) — then `wrangler deploy --env production` from `workers/`. 0006 is additive for the Worker live today: that Worker never writes the archive columns or moves an age band, so applying it ahead of the deploy changes nothing it does | `POST /api/age-transition` in production; until then a recorded 13–17 account has no way to become 18+ | **Ian.** Remote migration and deploy are his account (`AGENTS.md` → never run `wrangler deploy`) |
+| **Roll out the durable delete-account throttle (2026-10-05, `fm/v22-behaviour-r1`), in this order:** after merge, (1) apply `0007_attempt_throttle.sql` to production D1 (`npm --prefix workers run db:migrate:remote`; it applies every pending migration in order, so if 0005 is still unapplied this IS the #95 rollout — do it in that row's order, traffic held), **then** (2) `wrangler deploy --env production` from `workers/`. 0007 is additive for the Worker live today, which never touches the table; the new Worker without it fails every password-checked delete-account request. No new binding or secret — `DB` and `BETTER_AUTH_SECRET` already exist in production | a restart-proof wrong-password budget on `POST /api/delete-account` in production (the 2026-09-20 password re-check itself is also not yet deployed — "How it is now") | **Ian.** Remote migration and deploy are his account (`AGENTS.md` → never run `wrangler deploy`) |
+| **Does the privacy policy cover the throttle table? (2026-10-05)** `attempt_throttle` holds, for up to 15 minutes, one row per failed delete-account password: an HMAC-SHA-256 digest of the user id or connecting IP (keyed with `BETTER_AUTH_SECRET`, so neither is stored in the clear) and a timestamp, for abuse prevention. `docs/privacy-policy.md`'s nearest language is the "Sign-in sessions" row's "to let us detect misuse of an account", which describes session-creation metadata, not failed-attempt records. Not edited | calling the policy accurate for this processing; nothing functional | **Ian / legal.** Either judge the existing language sufficient or add a line (and bump `PRIVACY_POLICY_VERSION` per `src/constants/legal.ts`'s rule) |
 | **Copy certification for the aging transition (2026-10-01).** Uncertified: Settings' row "Turned 18?" / "Move this account to 18 or older"; `AgeTransitionDialog.tsx`: "Turned 18?", "Enter your date of birth to move this account to 18 or older. This cannot be undone.", "Confirm", "Cancel"; refusals from `src/lib/ageAssurance.ts` / `workers/src/routes.ts`: "Enter your date of birth as a real date (YYYY-MM-DD).", "That date of birth is under 18, so this account stays 13 to 17.", "Only an account set to 13 to 17 can move to 18 or older, and only once.", "You are signed in to a different account now. Reload and try again.", "That date of birth means you were already 18 when this account was set to 13 to 17. Contact us to correct it." | nothing functionally. It blocks calling the copy final before ship | **Ian / legal.** Copy only |
 | ~~**Beginner three-day 5K plans collapse to the tempo floor (issue #103 residual, 320 sweep plans).**~~ With one quality session at the 5K tempo's 8 km nominal (≈23% of the week), the beginner three-run share ceiling (`LONG_RUN_SHARE_MARGIN.beginner` 1.1 → 36.7%) and the no-easy-run-outgrows-the-long-run rule cap a week at ~86% of its target, so the growth base decays week on week to the tempo's 3 km floor: a 30 km/week beginner's 8-week 5K plan renders 25, 22, 17, 14*, 14, 11, **11**, 18. Options: raise the beginner share margin to ≥1.157 (1.2 gives 40% at 3 runs, 30% at 4 — a safety-ceiling loosening #103's own acceptance criteria reserve to the captain); give the generic 5K tempo the 10 km nominal the other distances use (a coaching dose); or accept and disclose | — | **Ruled 2026-09-20 (remedy A1):** `LONG_RUN_SHARE_MARGIN.beginner` is 1.2 — 40% at three runs, 30% at four, the flat 25% floor unchanged at ≥5. The family is gone from the sweep; `load-rules.md` carries the ruling |
 | ~~**The golden 12-week/4-day 5K path at 50–110 km/week renders its peak under its base (issue #103 residual, 28 sweep plans).**~~ Authored at 35 km/week; scaled past ~50 km its two-easy-run base/build weeks and its one-easy-run, two-quality peak weeks both pin to the flat intermediate share cap, at 54 km and 48 km. Options: route declared volumes above the point where the caps bind off the golden path onto the generic curve (the same class of decision as `golden-cadence3-route`), or accept | — | **Ruled 2026-09-20 (remedy B1):** a declared `weeklyKm >= 50` (`GOLDEN_FIVE_K_MAX_WEEKLY_KM`) is served by `buildGenericWeek`; under 50 km the byte-pinned fixture is untouched. With A1, the 22,000-plan base-high mask is all-clear (348 → 0) |
@@ -1860,16 +1904,16 @@ intact underneath.
   is closed. **Not open for the signed-out hero:** the captain ruled 2026-08-08 that its shimmer is
   dark-mode-only and final, with the contrast floor untouched; that hero has since been replaced
   twice over regardless.
-- ✅ **Onboarding still replays on every signed-out session, not just first install — deliberately —
-  and now persists a "has seen onboarding" flag for a narrower purpose (captain's 2026-09-20
-  ruling).** `(auth)/index.tsx` is still the anchor for every signed-out session, and a returning
-  user who signed out still sees the hero again; the sign-in link on that screen remains the skip.
-  What changed: `lib/onboardingVisit.ts` (AsyncStorage) now records whether onboarding has ever
-  rendered on the device, and the screen reads it (`useFirstOnboardingVisit`) to decide whether
-  scrolling is locked to one animation at a time. First-ever launch locks the `ScrollView` to
-  whichever section is currently animating (the hero, then each step in turn) until that
-  section's own build clock settles; every later visit, and any first visit under reduced motion,
-  scrolls freely exactly as before. The flag never skips onboarding itself, only the lock.
+- ✅ **Onboarding replays, locked, on every signed-out session — deliberately — and "SKIP" is the
+  way past (captain's rulings 2026-09-20, made permanent 2026-10-03).** `(auth)/index.tsx` is
+  still the anchor for every signed-out session, and a returning user who signed out sees the hero
+  again. Every visit locks the `ScrollView` to whichever section is currently animating (the hero,
+  then each step in turn) until that section's own build clock settles; a returning runner skips
+  it with the top-right "SKIP", which jumps to the sign-in / create-plan end beat and releases the
+  lock for that visit. Reduced motion scrolls freely. Nothing is persisted: the 2026-09-20
+  first-launch-only AsyncStorage flag (`lib/onboardingVisit.ts`) was set the instant the screen
+  rendered, so the captain's own first view was spent before he watched it; it was deleted on
+  2026-10-05.
 
 ### Standing
 

@@ -45,18 +45,22 @@ src/
                             #   stick-runner figure above it was deleted 2026-09-20). No form; the
                             #   CTA is disabled until the hero settles, bounded by a 4s ceiling so a
                             #   clock that never completes cannot strand the only forward action.
-                            #   2026-09-20: the very first time the screen ever renders on a device
-                            #   (lib/onboardingVisit.ts + hooks/use-first-onboarding-visit.ts,
-                            #   AsyncStorage), the ScrollView is disabled while the section in view
-                            #   is still animating and re-enabled once that section's build clock
-                            #   settles — one animation at a time. On that first launch the scroll
-                            #   also snaps section to section (snapToOffsets at every section top +
-                            #   disableIntervalMomentum), so a fling lands on exactly one section,
-                            #   and the lock settles the scroll onto the section it engages on. A
-                            #   section is "seen" only once its CONTENT (piece + copy, centred in
-                            #   the full-viewport section) is fully on screen — the geometry is
-                            #   lib/onboardingReveal.ts. Every later visit, and any first visit
-                            #   under reduced motion, scrolls freely with no snapping, as before.
+                            #   On EVERY visit (2026-09-20 ruling, first launch only until the
+                            #   captain's 2026-10-03 ruling; that AsyncStorage flag is deleted) the
+                            #   ScrollView is disabled while the section in view is still animating
+                            #   and re-enabled once that section's build clock settles — one
+                            #   animation at a time. The scroll also snaps section to section
+                            #   (snapToOffsets at every section top + disableIntervalMomentum), so a
+                            #   fling lands on exactly one section, and the lock settles the scroll
+                            #   onto the section it engages on. A small mono "SKIP" (top-right,
+                            #   a11y "Skip to sign in", first in screen-reader order) is the only
+                            #   way past: it jumps to the end
+                            #   beat (Create your first plan / Sign in), releases the lock for the
+                            #   rest of the visit, and hides once the end is reached. A section is
+                            #   "seen" only once its CONTENT (piece + copy, centred in the
+                            #   full-viewport section) is fully on screen — the geometry is
+                            #   lib/onboardingReveal.ts. Reduced motion scrolls freely with no
+                            #   snapping (the skip still shows).
                             #   The hero's cue is no longer a tap target; it now reads "Scroll down"
       sign-in.tsx            # email/password sign-in + a "Continue with Google" button; Google
                               #   provider live in production since 2026-08-09. Minimal since
@@ -71,7 +75,10 @@ src/
                               #   when the Worker withholds the session (token: null — verification
                               #   required) it shows "Check your inbox" instead of navigating.
                               #   Since 2026-10-01 (issue #95) email sign-up cannot submit without
-                              #   components/auth/AgeBandChoice's age range (signUpWithAgeAssurance)
+                              #   components/auth/AgeBandChoice's age range (signUpWithAgeAssurance);
+                              #   since 2026-10-05 that choice is hidden on the empty form and
+                              #   appears, for good, on the first focus of (or autofilled text in)
+                              #   any credential field
       forgot-password.tsx    # issue #94 (2026-09-20) — reads GET /api/email-status on mount and,
                               #   when the Worker cannot send mail, says so in place of the form;
                               #   otherwise requestPasswordReset with the app's /reset-password
@@ -93,7 +100,10 @@ src/
                              #  "See plans →" to /paywall), a CURRENT PLAN summary row for the
                              #  newest plan by createdAt (title, "N WEEKS · WEEK k", opens
                              #  /plan/[id]) when one exists, the one CTA "Create a new plan"
-                             #  (always opens the intake, blank), and the My Plans row. No
+                             #  (opens the intake, blank — or, since 2026-10-05, "Upgrade to
+                             #  create more plans" -> /paywall with the quota param once
+                             #  quota-status shows a Free runner's plan used; display only,
+                             #  lib/quotaDisplay.ts's isFreeAllowanceUsed), and the My Plans row. No
                              #  target card, plan-length field, Notes, locked panel or teaser
       settings.tsx           # Settings tab (new 2026-08-05) — tier + quota (GET
                               #  /api/quota-status, src/lib/quotaDisplay.ts), sign-out (moved off
@@ -112,7 +122,8 @@ src/
                               #  POST /api/delete-account row below. Quota refreshes
                               #  cache-first on every focus.
       glossary.tsx           # compact accessible disclosure rows, collapsed by default; terms and
-                              #  expanded definitions are sourced from notation.ts, nothing hardcoded
+                              #  expanded definitions are sourced from notation.ts, nothing hardcoded.
+                              #  Its chevron is the shared components/ui/DisclosureArrow
       my-plans.tsx           # My Plans — the permanent Example Plan is always present; generated
                               #  plans come from GET /api/plans and refetch on every tab focus, with
                               #  the last-known list visible during the background request. There is
@@ -158,8 +169,9 @@ src/
                               #   headline, stats (km / HR zone or RPE / pace when present), then
                               #   STRUCTURE, EFFORT and WHY as they exist on the Workout
     paywall.tsx              # dummy paywall (new 2026-08-05) — a Stack route, reached from
-                              #  Settings, Home's subscription box, or the intake's Create-plan
-                              #  402 over_quota catch (Home's until 2026-09-20);
+                              #  Settings, Home's subscription box, Home's "Upgrade to create
+                              #  more plans" (2026-10-05, with the quota param), or the intake's
+                              #  Create-plan 402 over_quota catch (Home's until 2026-09-20);
                               #  calls POST /api/purchase-tier, honest "test upgrade" copy
     reset-password.tsx       # issue #94 (2026-09-20) — where the mailed reset link lands, at the
                               #  ROOT and outside both Stack.Protected groups (a deep link opens in
@@ -206,14 +218,19 @@ src/
                              # screens' shared derivations: current week/day, week tag, day label),
                              # PlanPlaceholder (a detail screen's loading / nothing-to-show state,
                              # with its own PlanTopBar so the runner always has a way back),
-                             # EffortChip, ReadoutBracket, DisclaimerFooter, FallbackNotice,
+                             # EffortChip, ReadoutBracket, DisclaimerFooter (Rule 10 — on every
+                             # plan; since 2026-10-05 folded by default to one "Disclaimers &
+                             # safety notes · N" line with a chevron, tap to expand/fold, wording
+                             # unchanged, accessibilityState.expanded), FallbackNotice,
                              # GoalRealismNotice, format.ts. WeekAccordion / WorkoutRow /
                              # PlanNameplate were deleted 2026-09-14 with the ribbon view
     ui/                     # ActionButton (new 2026-09-03) — PrimaryAction / RevealPrimaryAction
                              # (the same slab drawing itself in on a build clock, V22-02 "Get
                              # started") / SecondaryAction / ActionDivider / LinkAction.
                              # PrimaryAction IS the accent, so "one accent per screen" is a
-                             # question about imports, not about review
+                             # question about imports, not about review. DisclosureArrow
+                             # (2026-10-05, out of glossary.tsx) — the drawn, decorative chevron
+                             # shared by the glossary rows and DisclaimerFooter
     __tests__/              # render smoke tests: render, and build (the build components render
                              # at their end frame under reduced motion)
     inputs/                 # NumberField, SegmentedField, DateField, ClockField (new 2026-08-15) —
@@ -236,9 +253,9 @@ src/
                              #  app.json's splash/adaptive-icon hexes to Colors.dark.surface.base
   hooks/                    # use-theme (resolves to the dark scheme only, see below),
                              #  use-color-scheme, use-plan (one plan by id: real via
-                             #  GET /api/plans/:id or the golden fixture), use-first-onboarding-visit
-                             #  (2026-09-20 — wraps lib/onboardingVisit.ts's AsyncStorage flag for
-                             #  onboarding's first-launch scroll lock)
+                             #  GET /api/plans/:id or the golden fixture). use-first-onboarding-visit
+                             #  and lib/onboardingVisit.ts were deleted 2026-10-05 — onboarding's
+                             #  scroll lock no longer remembers a first visit
   lib/
     supabase.ts             # LEGACY, unused — see below
     apiClient.ts             # the one module that talks to `workers/`: better-auth's Expo client
@@ -330,7 +347,9 @@ src/
                               #  stay in paceDerivation.ts
     quotaDisplay.ts          # pure, app-only display helper (new 2026-08-05) — `formatQuotaLine()`
                               #  phrases a `QuotaStatus` for Settings/Home/the paywall; the numbers
-                              #  themselves stay server-computed, this only formats them
+                              #  themselves stay server-computed, this only formats them. Since
+                              #  2026-10-05 also `isFreeAllowanceUsed()` — Home's upgrade swap,
+                              #  read off the server's used/limit, never a client count
     fixtures/examplePlan.ts  # hand-built 5K screen fixture; `plan/[id]/` still renders it
     __tests__/               # supabase, loadRules, notation, examplePlan.fixture, tierLimits,
                               # quotaPeriod, planTemplates (golden + general + noRace),
@@ -423,6 +442,7 @@ workers/                    # a SEPARATE npm project; Metro is told to skip it (
     0004_guardian_consent.sql # guardian_consent — one row per 13–17 user, consent event
     0005_age_assurance.sql  # user.age_band / age_assurance_status / age_policy_version (issue #95)
     0006_age_transition.sql # the one-way 13_17 -> 18_plus move; guardian_consent archive columns
+    0007_attempt_throttle.sql # attempt_throttle — the delete-account wrong-password budget (2026-10-05)
   src/
     index.ts                # authenticate once, then dispatch — the route table (plus the one
                             # public app route, GET /api/email-status)
@@ -438,7 +458,9 @@ workers/                    # a SEPARATE npm project; Metro is told to skip it (
     deps.ts                 # binds every plan-engine seam and reads ANTHROPIC_API_KEY
     lib/mail.ts             # provider-agnostic sendMail — ResendAdapter (RESEND_API_KEY +
                             # MAIL_FROM) or ConsoleAdapter (logs one redacted line, sends nothing)
-    lib/store.ts            # every D1 statement — authorization lives here
+    lib/store.ts            # every user-owned D1 statement — authorization lives here
+    lib/attemptThrottle.ts  # the D1-backed failed-attempt budget (attempt_throttle); not
+                            # user-owned data, so outside store.ts's userId rule
     lib/generate-plan-flow.ts  # the eleven pipeline steps, pure, deps injected
     lib/planEngine.ts       # skeleton + personalizer seams (bound 2026-08-04 and 2026-08-10);
                             # also the tier split — Free -> planLibrary, paid -> planTemplates
@@ -626,8 +648,10 @@ src/app/
                            # exp://…/--/…, or the web origin), never by in-app navigation
   (tabs)/index          # Home — gates first entry (no intake on file → push /intake), then the
                          # subscription box, the newest plan's summary row, "Create a new plan"
-                         # (opens the intake, blank) and the My Plans row. Asks nothing, generates
-                         # nothing (2026-09-20). Carries VerifyEmailBanner under the header (issue
+                         # (opens the intake, blank; "Upgrade to create more plans" -> /paywall
+                         # once a Free runner's plan is used, 2026-10-05) and the My Plans row.
+                         # Asks nothing, generates nothing (2026-09-20). Carries
+                         # VerifyEmailBanner under the header (issue
                          # #94), which renders only for an unverified account on a mail-capable
                          # Worker
   (tabs)/glossary       # compact, collapsed-by-default abbreviation disclosures; not in the
@@ -647,8 +671,8 @@ src/app/
   plan/[id]/week/[week]  # week (V22-06 B, 2026-09-14) — the static strip and the seven day rows
   plan/[id]/week/[week]/day/[day]  # session or rest day (V22-06 C/D, 2026-09-14)
   paywall                # exists today (2026-08-05) — dummy purchase-tier UI, a Stack route
-                         #  reached from Settings, Home's subscription box, or the intake's 402
-                         #  over_quota catch
+                         #  reached from Settings, Home's subscription box, Home's "Upgrade to
+                         #  create more plans" (2026-10-05), or the intake's 402 over_quota catch
 ```
 
 **Decision 1 (2026-07-10):** the paywall and a settings-lite screen (sign out, tier display,
@@ -660,7 +684,9 @@ restore.
 
 **Decision 5 (2026-07-10), as revised by the captain's 2026-09-20 rulings:** Home leads with
 quota state (the tier · quota eyebrow and the subscription box), then the newest plan's summary
-row, then "Create a new plan" — which only opens the intake. Home shows no intake target, asks
+row, then "Create a new plan" — which only opens the intake (or, once `quota-status` shows a Free
+runner's one plan used, becomes "Upgrade to create more plans" and opens the paywall — 2026-10-05,
+display only; `generate-plan` still enforces the quota). Home shows no intake target, asks
 for no plan length and has no Notes or subscription disclosures; every question and the create
 press live on `/intake`. The original decision's "no next workout card" stands in spirit: the
 summary row prints `N WEEKS · WEEK k` from `planProgress.ts`'s elapsed-days arithmetic (there
@@ -830,7 +856,9 @@ src/lib/
                             #          nothing, so this is what "completed days" can honestly mean
                             #          until a real day-marking flow exists. Pure.
   quotaDisplay.ts          # exists (2026-08-05) — `formatQuotaLine()`, pure display phrasing for
-                            #          `QuotaStatus`. There is no separate `subscription.ts`; the
+                            #          `QuotaStatus`, and (2026-10-05) `isFreeAllowanceUsed()`, the
+                            #          display-only test behind Home's "Upgrade to create more
+                            #          plans". There is no separate `subscription.ts`; the
                             #          tier-read/dummy-purchase ground it would have covered is
                             #          `apiClient.ts`'s `getQuotaStatus()`/`purchaseTier()`.
 ```
@@ -1015,7 +1043,7 @@ it `getSession()` ignores the header and every route 403s a user who just signed
 | `POST /api/generate-plan` | session | `{ goalType: "race"\|"duration", raceDistance?, raceDate?, durationWeeks?, notes?, idempotencyKey }` | `{ plan, planId, isFallback, quotaConsumed }`, or `402` over-quota / `403` anon / `409` intake-required | Enforces tier + quota server-side, branches by tier, validates, persists. `raceDistance` is validated whenever it is present, on either goal type — a `duration` request legitimately carries one for a runner with a target distance and no date. A duplicate `idempotencyKey` returns the existing plan instead of generating twice. Free gets the template plan (since 2026-08-04). Pro/Elite call the personalization prompt (bound since 2026-08-10) but, with no `ANTHROPIC_API_KEY` configured anywhere yet, still fall back to the same template today (`isFallback: true`, quota-exempt) — see "Current — `generate-plan`" above. `quotaConsumed` tells the client whether this fallback counted against the tier limit, so `FallbackNotice` can pick `counted` vs `exempt`. |
 | `GET /api/quota-status` | session | — | `{ tier, used, limit, periodEnd, unlimited, purchasesAvailable }` | Drives Home's and Settings' "N of M plans used" line (`src/lib/quotaDisplay.ts`'s `formatQuotaLine()`, consumed by both since 2026-08-05). `used` counts **non-fallback** plans in the current purchase-anchored period, server-side, never a client counter. `periodEnd` is `null` for Free (lifetime allowance) and also `null` while the temporary `ALL_USERS_UNLIMITED_ACCESS` override is on (see below) — the UI must not render a countdown for either. `purchasesAvailable` (2026-09-20) is whether the v1 dummy purchase is open to *this* account, decided by `workers/src/dummyPurchase.ts` from `DUMMY_PURCHASE_ENABLED` / `DUMMY_PURCHASE_ALLOWLIST`; the paywall renders it (`src/lib/purchaseAvailability.ts`) and never computes it. |
 | `POST /api/purchase-tier` | session | `{ tier: "pro"\|"elite", source: "dummy" }` | `{ tier, periodStart: string \| null, periodEnd: string \| null }`, or `403 purchases_unavailable` | v1 dummy flow, called from `src/app/paywall.tsx` (new 2026-08-05) with honest "test upgrade, no payment required" copy. Since 2026-09-20 gated server-side to trusted testers: refused `403 purchases_unavailable` unless `DUMMY_PURCHASE_ENABLED === "true"` (local/dev only) or the session's email is on `DUMMY_PURCHASE_ALLOWLIST` (exact, case-insensitive) — `workers/README.md` → "The v1 dummy purchase gate". Production ships with it off and the allowlist empty. v2 swaps `source` to `"revenuecat"` and verifies the receipt — same route, same table write. `source: "revenuecat"` is refused in v1 rather than trusted. |
-| `POST /api/delete-account` | session | `{ password?: string }` | `{ deleted: true }`, `401 invalid_password`, or `429 rate_limited` | Really deletes; no soft-delete flag, because the app's own copy promises erasure. The only route that deletes a plan. Since 2026-09-20 (change-list item 10, matching V2.3) it re-checks identity server-side: if the account has a `providerId = 'credential'` row (`store.getCredentialPassword`), `password` is required and must verify against the stored hash (`deps.verifyPassword`, the same function sign-in uses) or the request is `401 invalid_password` and nothing is deleted — five wrong passwords per user or per connecting IP inside 15 minutes make the route answer `429 rate_limited` before it verifies anything (`lib/attemptThrottle.ts`, in-memory, route-scoped), so nothing is deleted while throttled; a Google/OAuth-only account (no credential row) keeps the pre-existing confirm-only behavior, with no `password` needed. Called from Settings' Delete Account flow — `<DeleteAccountDialog>` for a credential account, the existing `confirmDestructive` native alert / web `confirm()` (2026-09-16, issue #96) for an OAuth-only one — followed client-side by `authClient.signOut()` to invalidate the local session store. |
+| `POST /api/delete-account` | session | `{ password?: string }` | `{ deleted: true }`, `401 invalid_password`, or `429 rate_limited` | Really deletes; no soft-delete flag, because the app's own copy promises erasure. The only route that deletes a plan. Since 2026-09-20 (change-list item 10, matching V2.3) it re-checks identity server-side: if the account has a `providerId = 'credential'` row (`store.getCredentialPassword`), `password` is required and must verify against the stored hash (`deps.verifyPassword`, the same function sign-in uses) or the request is `401 invalid_password` and nothing is deleted — five wrong passwords per user or per connecting IP inside 15 minutes make the route answer `429 rate_limited` before it verifies anything (`lib/attemptThrottle.ts`, route-scoped; since 2026-10-05 counted in D1's `attempt_throttle` table, migration 0007 — shared by every isolate and surviving restarts, where the earlier in-memory count was per isolate; a correct password clears only the account's own `user:` key, never the IP's, so deleting a throwaway account cannot refresh an IP's budget), so nothing is deleted while throttled; a Google/OAuth-only account (no credential row) keeps the pre-existing confirm-only behavior, with no `password` needed. Called from Settings' Delete Account flow — `<DeleteAccountDialog>` for a credential account, the existing `confirmDestructive` native alert / web `confirm()` (2026-09-16, issue #96) for an OAuth-only one — followed client-side by `authClient.signOut()` to invalidate the local session store. |
 | `POST /api/age-assurance` | session | `{ ageBand: "18_plus"\|"13_17", guardianConsent: boolean, expectedUserId: string }` | `{ ageBand, guardianConsentRecorded }`, or `400 age_band_required` / `guardian_consent_required` / `invalid_request`, `409 age_assurance_account_mismatch` / `age_assurance_conflict` | Issue #95, 2026-10-01. The one-time answer of a `pending` (new Google) account, from `AgeAssuranceGate`. `expectedUserId` must equal the verified session's user id — a stale web tab after an account switch elsewhere is refused `409 age_assurance_account_mismatch`; the write target is always the session's id. Write-once (`store.recordAgeAssurance`): an identical retry is `200`, a conflicting choice or a `grandfathered` account is `409 age_assurance_conflict`. A `13_17` answer writes the `guardian_consent` row in the same statement. |
 | `POST /api/age-transition` | session | `{ birthDate: "YYYY-MM-DD", expectedUserId: string }` | `{ ageBand: "18_plus", guardianConsentArchivedAt }`, or `400 invalid_request` / `invalid_birth_date` / `age_transition_too_young` / `age_transition_inconsistent`, `409 age_assurance_account_mismatch` / `age_transition_not_eligible` | The one-way aging transition (captain's decision, 2026-10-01), from Settings' "Turned 18?" row. Moves a recorded `13_17` account to recorded `18_plus` once, irreversibly, and restamps `age_policy_version`; migration 0006's trigger archives the `guardian_consent` row in the same statement (below). `birthDate` is checked by `checkAgeTransitionBirthDate` on the Worker's clock — "today" read at UTC−12, so never before the birthday has arrived everywhere; a 29 February birthday is reached on 1 March; not a real date, before 1900 or in the future is `invalid_birth_date`. A date whose 18th birthday falls before the day the guardian consent was granted (`granted_at`'s date, read at UTC−12) contradicts the account's own 13–17 record and is `400 age_transition_inconsistent`, checked atomically in the same conditional `UPDATE`. It is a self-declaration — it proves only that the typed date is 18+ years ago and consistent with that record, so a lie told consistently from sign-up onward passes — and the date is not stored. The stored intake is not touched: a pre-transition row (age ≤ 17) still yields an under-18 plan until the runner takes the intake again (see `PUT /api/intake`). `expectedUserId` works as on `/api/age-assurance`. Any account that is not recorded `13_17` — already transitioned, recorded adult, grandfathered — is `409 age_transition_not_eligible`; a `pending` account never reaches it (`403 age_assurance_required`, below). No guardian is notified. |
 | `GET /api/intake` | session | — | `{ intake }` or `{ intake: null }` | Was a direct client read under Supabase. Since 2026-09-20 it is read for a boolean only: Home's first-entry gate (`null` → push `/intake`; a failed fetch never redirects) and the intake's first/repeat decision. Nothing prefills from it — the stored row is the record of what the last plan was built from. |
@@ -1118,6 +1146,18 @@ guardian_consent.archived_reason  NULL | 'aged_out_self_declared'
   -- archived row is immutable and cannot be replaced by INSERT OR REPLACE. The guardian's policy
   -- version stays on the row; user.age_policy_version is restamped by the Worker. The declared
   -- date of birth is not stored. Account deletion still cascades the archived row away.
+
+-- 0007 — the delete-account wrong-password budget, made durable (2026-10-05)
+attempt_throttle  (scope, key_digest, attempted_at)  -- attempted_at in epoch ms; no PK, no FK
+  -- One row per failed password on POST /api/delete-account (scope 'delete-account'), keyed
+  -- separately by user id and by connecting IP. key_digest is an HMAC-SHA-256 hex digest keyed
+  -- with BETTER_AUTH_SECRET, so neither an address nor a user id is stored in the clear (rotating
+  -- the secret simply starts every budget afresh). Each write prunes the scope's rows older than
+  -- the 15-minute window. A success deletes only the user: key's rows, never the IP's. NOT
+  -- user-owned data — an IP key belongs to no user — so store.ts's userId-predicate rule does
+  -- not apply; lib/attemptThrottle.ts owns every statement. Indexed on
+  -- (scope, key_digest, attempted_at) for the count and (scope, attempted_at) for the prune.
+  -- Additive: the Worker before 0007 never reads it; the Worker after it needs it — migrate first.
 ```
 
 Two intentional departures from the Postgres draft, both because the draft contradicted a rule
