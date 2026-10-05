@@ -36,8 +36,8 @@ jest.mock('@/lib/openPrivacyPolicy', () => ({
 }));
 
 // An existing saved intake, so this is a re-entry and the screen renders the form directly
-// rather than the first-time survey intro (which otherwise replaces the whole screen until its
-// own "PRESS TO CONTINUE" is tapped). Since 2026-09-20 the answers are NOT prefilled from it —
+// rather than opening on the first-time survey intro (the first viewport of the intake's scroll,
+// the form beneath it). Since 2026-09-20 the answers are NOT prefilled from it —
 // the form starts blank — so each case fills the required fields itself (`fillRequired`).
 jest.mock('@/lib/apiClient', () => ({
   API_BASE_URL: 'http://localhost:8787',
