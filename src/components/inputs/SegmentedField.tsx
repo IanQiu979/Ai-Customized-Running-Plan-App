@@ -118,7 +118,7 @@ const styles = StyleSheet.create({
   },
   separator: {
     fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.sm,
+    fontSize: FontSize.body,
     paddingHorizontal: Spacing.one,
   },
   segmentInput: {
@@ -133,6 +133,6 @@ const styles = StyleSheet.create({
     // field with the separator stranded in the gap after it.
     textAlign: 'center',
     fontFamily: FontFamily.body.regular,
-    fontSize: FontSize.sm,
+    fontSize: FontSize.body,
   },
 });

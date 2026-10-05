@@ -1,10 +1,9 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { DesignWidth } from '@/constants/theme';
+import { DesignHeight, DesignWidth, buildCanvasScale } from '@/constants/theme';
 
-/** The V22 pages' canvas: iPhone 15/16 class portrait, 393 × 852 pt (spec §0). */
-export const DesignHeight = 852;
+export { DesignHeight };
 
 /**
  * A 393 × 852 composition, scaled to fit the box it is given and centred in it — never
@@ -25,7 +24,7 @@ export function DesignCanvas({
   height: number;
   children: ReactNode;
 }) {
-  const scale = Math.min(1, width / DesignWidth, height / DesignHeight);
+  const scale = buildCanvasScale(width, height);
   return (
     <View style={[styles.box, { width, height }]}>
       <View

@@ -1,6 +1,13 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FadeIn } from '@/components/build/FadeIn';
@@ -9,7 +16,7 @@ import { useBuildClock } from '@/components/build/useBuildClock';
 import { ScreenHeader } from '@/components/layout/ScreenHeader';
 import { PlanListRow } from '@/components/plan/PlanListRow';
 import { PrimaryAction } from '@/components/ui/ActionButton';
-import { FontFamily, FontSize, Spacing } from '@/constants/theme';
+import { FontFamily, FontSize, Spacing, buildCanvasScale } from '@/constants/theme';
 import { loadPlan, type LoadedPlan } from '@/hooks/use-plan';
 import { useTheme } from '@/hooks/use-theme';
 import { API_BASE_URL, describeError, listPlans } from '@/lib/apiClient';
@@ -41,6 +48,9 @@ const DETAIL_LIMIT = 12;
 export default function MyPlansScreen() {
   const theme = useTheme();
   const router = useRouter();
+  const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
+  const heroAvailableWidth = viewportWidth - Spacing.four * 2;
+  const heroMaxScale = buildCanvasScale(viewportWidth, viewportHeight);
 
   const [loading, setLoading] = useState(true);
   const [hasLoadedPlans, setHasLoadedPlans] = useState(false);
@@ -93,7 +103,11 @@ export default function MyPlansScreen() {
         })
         .catch(() => {
           // One miniature stays empty; the row is still a working link to the plan.
-          if (!cancelled) setDetailFailed((current) => ({ ...current, [summary.planId]: true }));
+          if (!cancelled)
+            setDetailFailed((current) => ({
+              ...current,
+              [summary.planId]: true,
+            }));
         });
     }
     return () => {
@@ -120,10 +134,14 @@ export default function MyPlansScreen() {
   }
   // The plan's creation date rides along so the overview can tell which week is current; the
   // example plan has none and legitimately omits it.
-  const heroCreatedAt = heroId !== null && heroId !== EXAMPLE_PLAN_ID ? mostRecentPlan?.createdAt : undefined;
+  const heroCreatedAt =
+    heroId !== null && heroId !== EXAMPLE_PLAN_ID ? mostRecentPlan?.createdAt : undefined;
   const heroReady = heroPlan !== null;
 
-  const { T, restart } = useBuildClock({ total: PLAN_HERO_TIMELINE.total, play: heroReady });
+  const { T, restart } = useBuildClock({
+    total: PLAN_HERO_TIMELINE.total,
+    play: heroReady,
+  });
   // Plays once per screen open, and again only when the plan the hero shows changes.
   const playedFor = useRef<string | null>(null);
   useEffect(() => {
@@ -149,8 +167,16 @@ export default function MyPlansScreen() {
                 eyebrow={heroId === EXAMPLE_PLAN_ID ? 'EXAMPLE' : 'MOST RECENT'}
                 title={heroPlan.title}
                 weekCount={heroPlan.durationWeeks}
+                availableWidth={heroAvailableWidth}
+                maxScale={heroMaxScale}
               />
-              <FadeIn T={T} at={PLAN_HERO_TIMELINE.cues.Hold} duration={0.5} lift={8} style={styles.afterHero}>
+              <FadeIn
+                T={T}
+                at={PLAN_HERO_TIMELINE.cues.Hold}
+                duration={0.5}
+                lift={8}
+                style={styles.afterHero}
+              >
                 <PrimaryAction
                   label="Open plan"
                   onPress={() =>
@@ -169,12 +195,20 @@ export default function MyPlansScreen() {
             <ActivityIndicator color={theme.text.primary} style={styles.spinner} />
           ) : null}
 
-          <FadeIn T={T} at={PLAN_HERO_TIMELINE.cues.Hold} duration={0.5} lift={8} style={styles.list}>
+          <FadeIn
+            T={T}
+            at={PLAN_HERO_TIMELINE.cues.Hold}
+            duration={0.5}
+            lift={8}
+            style={styles.list}
+          >
             <Text style={[styles.listLabel, { color: theme.text.secondary }]}>
               ALL PLANS · {listed.length + 1}
             </Text>
 
-            {error ? <Text style={[styles.error, { color: theme.status.error }]}>{error}</Text> : null}
+            {error ? (
+              <Text style={[styles.error, { color: theme.status.error }]}>{error}</Text>
+            ) : null}
 
             <PlanListRow
               planId={EXAMPLE_PLAN_ID}
@@ -200,7 +234,9 @@ export default function MyPlansScreen() {
                   createdAt={plan.createdAt}
                   title={plan.title ?? 'Untitled plan'}
                   meta={meta}
-                  week={detail?.plan.weeks[0] ? stripFromWeek(detail.plan.weeks[0]) : EMPTY_STRIP_WEEK}
+                  week={
+                    detail?.plan.weeks[0] ? stripFromWeek(detail.plan.weeks[0]) : EMPTY_STRIP_WEEK
+                  }
                 />
               );
             })}
@@ -241,13 +277,13 @@ const styles = StyleSheet.create({
   },
   listLabel: {
     fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.tiny,
+    fontSize: FontSize.label,
     letterSpacing: 2,
     marginBottom: Spacing.half,
   },
   error: {
     fontFamily: FontFamily.body.medium,
-    fontSize: FontSize.xs,
+    fontSize: FontSize.label,
   },
   spinner: {
     marginTop: Spacing.four,

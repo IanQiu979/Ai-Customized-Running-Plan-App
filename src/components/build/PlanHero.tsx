@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
 
-import { FontFamily, FontSize } from '@/constants/theme';
+import { BuildIllustration, FontFamily, FontSize, fitBuildIllustration } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { PLAN_HERO_BLOCK_STAGGER, PLAN_HERO_TIMELINE, enter } from '@/lib/buildMotion';
 import type { StripWeek } from '@/lib/weekStrip';
@@ -21,7 +21,7 @@ import { WeekStrip, stripWidth } from './WeekStrip';
 const { cues } = PLAN_HERO_TIMELINE;
 
 const G = {
-  strip: { slotWidth: 34, gap: 10, trackHeight: 96 },
+  strip: BuildIllustration.strip,
   /** From the header block's bottom to the strip's top. */
   stripGap: 22,
   numeralGap: 8,
@@ -39,6 +39,8 @@ export function PlanHero({
   eyebrow,
   title,
   weekCount,
+  availableWidth,
+  maxScale,
 }: {
   T: SharedValue<number>;
   week: StripWeek;
@@ -46,13 +48,20 @@ export function PlanHero({
   eyebrow: string;
   title: string;
   weekCount: number;
+  /** The screen's content width. The canonical drawing scales down only when this is narrower. */
+  availableWidth?: number;
+  /** `buildCanvasScale` for the viewport, so the strip matches the full-screen builds' size. */
+  maxScale?: number;
 }) {
   const theme = useTheme();
 
   const landings: Landing[] = [];
   week.forEach((block, index) => {
     if (block && block.unit === 'km') {
-      landings.push({ at: cues.Blocks + PLAN_HERO_BLOCK_STAGGER * index + 0.25, km: block.value });
+      landings.push({
+        at: cues.Blocks + PLAN_HERO_BLOCK_STAGGER * index + 0.25,
+        km: block.value,
+      });
     }
   });
 
@@ -69,6 +78,7 @@ export function PlanHero({
   });
 
   const width = stripWidth(G.strip);
+  const fit = fitBuildIllustration(width, availableWidth ?? width, maxScale);
 
   return (
     <View>
@@ -89,51 +99,74 @@ export function PlanHero({
         </View>
       </Animated.View>
 
-      <View style={[styles.stripBlock, { height: G.stripBlockHeight, marginTop: G.stripGap }]}>
-        <Animated.View style={[styles.faint, { width }, faint]}>
-          <WeekStrip
-            T={T}
-            week={week}
-            geometry={G.strip}
-            outlineAt={-10}
-            blockAt={-10}
-            blockStagger={0}
-            scale={G.faintScale}
-          />
-        </Animated.View>
-        <View style={{ width }}>
-          <WeekStrip
-            T={T}
-            week={week}
-            geometry={G.strip}
-            outlineAt={cues.Outline}
-            blockAt={cues.Blocks}
-            blockStagger={PLAN_HERO_BLOCK_STAGGER}
-            labels="both"
-            labelDelay={0.21}
-            valueSize={17}
-            codeSize={8}
-            labelGap={5}
-            numerals
-            numeralSize={FontSize.tiny}
-            numeralGap={G.numeralGap}
-          />
+      <View
+        style={[
+          styles.stripFit,
+          {
+            width: fit.width,
+            height: G.stripBlockHeight * fit.scale,
+            marginTop: G.stripGap,
+          },
+        ]}
+      >
+        <View
+          style={[
+            styles.stripBlock,
+            {
+              width,
+              height: G.stripBlockHeight,
+              transform: [{ scale: fit.scale }],
+              transformOrigin: 'top left',
+            },
+          ]}
+        >
+          <Animated.View style={[styles.faint, { width }, faint]}>
+            <WeekStrip
+              T={T}
+              week={week}
+              geometry={G.strip}
+              outlineAt={-10}
+              blockAt={-10}
+              blockStagger={0}
+              scale={G.faintScale}
+            />
+          </Animated.View>
+          <View style={{ width }}>
+            <WeekStrip
+              T={T}
+              week={week}
+              geometry={G.strip}
+              outlineAt={cues.Outline}
+              blockAt={cues.Blocks}
+              blockStagger={PLAN_HERO_BLOCK_STAGGER}
+              labels="both"
+              labelDelay={0.21}
+              valueSize={FontSize.title}
+              codeSize={FontSize.micro}
+              labelGap={5}
+              numerals
+              numeralSize={FontSize.label}
+              numeralGap={G.numeralGap}
+            />
+          </View>
         </View>
       </View>
     </View>
   );
 }
 
+PlanHero.stripGeometry = BuildIllustration.strip;
+
 const styles = StyleSheet.create({
   eyebrow: {
     fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.tiny,
+    fontSize: FontSize.label,
     letterSpacing: 2,
   },
   title: {
     fontFamily: FontFamily.display.semiBold,
-    fontSize: 28,
-    lineHeight: 28 * 1.05,
+    fontSize: FontSize.display,
+    lineHeight: FontSize.display * 1.05,
     marginTop: 6,
   },
   totalRow: {
@@ -144,16 +177,19 @@ const styles = StyleSheet.create({
   },
   total: {
     fontFamily: FontFamily.display.semiBold,
-    fontSize: FontSize.numeral,
-    lineHeight: FontSize.numeral,
+    fontSize: FontSize.display,
+    lineHeight: FontSize.display,
   },
   totalUnit: {
     fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.xxs,
+    fontSize: FontSize.label,
     letterSpacing: 1.5,
   },
   stripBlock: {
     alignItems: 'center',
+  },
+  stripFit: {
+    alignSelf: 'center',
   },
   faint: {
     position: 'absolute',

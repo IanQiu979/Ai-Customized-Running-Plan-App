@@ -269,21 +269,21 @@ const styles = StyleSheet.create({
   header: { gap: Spacing.one },
   eyebrow: {
     fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.xs,
+    fontSize: FontSize.label,
     letterSpacing: Tracking.label,
   },
   title: {
     fontFamily: FontFamily.display.extraBold,
-    fontSize: FontSize.xxl,
+    fontSize: FontSize.display,
     letterSpacing: Tracking.display,
   },
   body: {
     fontFamily: FontFamily.body.regular,
-    fontSize: FontSize.sm,
+    fontSize: FontSize.body,
   },
   error: {
     fontFamily: FontFamily.body.medium,
-    fontSize: FontSize.xs,
+    fontSize: FontSize.label,
   },
   actions: { gap: Spacing.two },
   action: { width: '100%' },

@@ -52,15 +52,28 @@ V22-05 was drawn to), and the pages' own fixed weeks (`HERO_WEEK`, `SURVEY_WEEKS
 **Page coordinates.** The two full-screen builds (hero, survey intro) are authored in absolute
 points on the pages' 393 × 852 canvas and mounted on `DesignCanvas`, which scales the composition
 *down* to fit the viewport and centres it — never up, never stretched (spec §0: an iPad centres the
-composition). `DesignWidth` in `theme.ts` is that width.
+composition). `DesignWidth` / `DesignHeight` in `theme.ts` are that canvas, and
+`buildCanvasScale(viewportW, viewportH)` — min(1, w / 393, h / 852) — is the scale it applies.
+
+**One strip size (2026-10-05).** The captain's iPhone pass found the hero, the survey intro and My
+Plans drawing their strips at three different sizes. All three now take their geometry from
+`BuildIllustration.strip` in `theme.ts` (slot 36, gap 10, track 88 — the onboarding hero's own),
+and all three render at `buildCanvasScale` for the viewport: the two full-screen builds through
+`DesignCanvas`, and My Plans' `PlanHero` — which is not on a canvas — by passing it as the
+`maxScale` ceiling to `fitBuildIllustration`. So the strip is the same size on screen in all three
+on every phone (an iPhone SE, 375 × 667, gets 0.78), scaled down only. The two genuinely compact
+drawings derive from the same strip through named ratios rather than their own numbers:
+`BuildIllustration.compact.step` (the step mini-plan) and `.compact.header` (the Home header mark),
+each turned into geometry by `scaledBuildStripGeometry`. A new build takes its size from these, not
+from a literal.
 
 ## The compositions
 
 | Page | Component | Mounted by | Clock | What plays |
 |---|---|---|---|---|
-| V22-01 Main onboarding animation | `OnboardingHero` | `(auth)/onboarding.tsx` | 3.0 s build + 2.2 s hold; the screen owns it and gates the CTA (and, on every visit until the runner skips, the scroll lock) on `settled` | Baseline draws (0.4 s) → blocks snap in 220 ms apart, the 96pt Number ticks with each landing → three faint weeks slide down (0.28 / 0.18 / 0.10) → legend on hold → "Scroll down" at hold + 0.8 s (a hint, not a tap target since 2026-09-20) |
+| V22-01 Main onboarding animation | `OnboardingHero` | `(auth)/onboarding.tsx` | 3.0 s build + 2.2 s hold; the screen owns it and gates the CTA (and, on every visit until the runner skips, the scroll lock) on `settled` | Baseline draws (0.4 s) → blocks snap in 220 ms apart, the Number (`FontSize.display`) ticks with each landing → three faint weeks slide down (0.28 / 0.18 / 0.10) → legend on hold → "Scroll down" at hold + 0.8 s (a hint, not a tap target since 2026-09-20) |
 | V22-02 Step animations | `StepIntake`, `StepEngine`, `StepMiniPlan` (`steps.tsx`), `RevealPrimaryAction` (`ui/ActionButton.tsx`) | `(auth)/onboarding.tsx`, one clock per step, started when the step's content (piece + copy) is fully on screen (`lib/onboardingReveal.ts`) | 2.4 s each, motion ≤ 1.5 s | Rows arrive, a segmented control is pressed 3 → 4 → 5, fields count to 10 km / 51 min · three tiles arrive, the middle one grows into a session card while the others fade · the plan-detail week in miniature builds in 1.0 s · the button's outline draws (0.6 s), the ink fill sweeps in (0.65 s →), the label fades up (0.85 s →) |
-| V22-03 Survey intro | `SurveyIntro` | `intake.tsx`, only when `getIntake()` returns nothing | 2.3 s build + 2.2 s hold | Week 1 builds (blocks 200 ms apart), weeks 2–6 stack beneath fading toward the bottom, PRESS TO CONTINUE at hold + 0.8 s; a tap reveals the questions |
+| V22-03 Survey intro | `SurveyIntro` | `intake.tsx`, only when `getIntake()` returns nothing — as the first viewport of the intake's own `ScrollView`, the questions directly beneath | 2.3 s build + 2.2 s hold | Week 1 builds (blocks 200 ms apart), weeks 2–6 stack beneath fading toward the bottom, "Scroll down" at hold + 0.8 s in the onboarding hero's cue style — a hint, not a tap target; the runner scrolls into the questions, the scroll snapping between the intro and the form (no press to continue since 2026-10-05) |
 | V22-04 Home header mark | `HeaderMark` | `(tabs)/index.tsx`, in the tier row | 0.6 s fill + 2.0 s hold; re-runs only when `completedDays` changes | The current week's elapsed days fill bottom-up in ink, 300 ms each, 70 ms apart |
 | V22-05 My Plans hero | `PlanHero` | `(tabs)/my-plans.tsx` | 2.0 s build + 2.0 s hold; the screen fades "Open plan" and the list in on the hold | The runner's real first week — real distances, real codes, the real total — snaps in 180 ms apart; one faint copy beneath; the example plan when no generated plan exists |
 | V22-06 Plan detail strip | `StaticWeekStrip`, `MiniWeekStrip` | `plan/[id]/`, `PlanListRow`, Home's no-plan preview | none — static | The end frame only: the overview's 120 × 22 row miniatures, the week screen's full strip, the list rows' 60 × 28 thumbnails |
@@ -76,7 +89,8 @@ logs nothing, so that is the only honest derivation until a real day-marking flo
    `data-om-seek-to-time-frame` event (`detail: { time, sync: true }`), which is how the
    2026-09-14 visual-match pass captured reference frames at exact times.
 2. Put timings in `buildMotion.ts` as a cue table, never in a component; put data shapes in
-   `weekStrip.ts`.
+   `weekStrip.ts`; take strip geometry from `BuildIllustration` and type sizes from `FontSize`'s
+   roles, never a literal.
 3. Derive from `T` in `useAnimatedStyle` / `useAnimatedProps`; do not chain `withTiming`s.
 4. Give it an end frame that stands alone as a still, and let `useBuildClock` handle reduced
    motion — do not branch on it in the component.

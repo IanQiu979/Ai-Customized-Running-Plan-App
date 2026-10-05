@@ -30,6 +30,19 @@
 
 ### How it is now
 
+- **Design consistency from the same iPhone pass (2026-10-05, `fm/v22-design-consistency-r2`;
+  approach approved by the captain that day).** (1) One type scale: `FontSize` is five roles from
+  the approved V22-03 page — `micro` 8, `label` 12, `body` 14, `title` 21, `display` 34 — replacing
+  eleven steps; every screen and shared component uses a role, so the old 64/96 hero numerals are
+  now 34. `theme.typography.test.ts` pins the five and fails on any raw numeric size in `src/app` or
+  `src/components`. (2) One strip size: the onboarding hero, the survey intro and the My Plans hero
+  all draw `BuildIllustration.strip` at `buildCanvasScale` for the viewport (scale-down only), so
+  they match on every phone; the step mini-plan and the Home header mark derive from it by named
+  ratios. (3) The survey intro is no longer pressed through: on first entry it is the first
+  viewport of the intake's `ScrollView`, cue "Scroll down", the questions beneath on the same field
+  and palette. Repeat entry, the first-entry back lock and save → generate are unchanged. Client
+  only. Rendered on Expo web at 393×852 and 375×667, not yet on a device. Tests: 1161 root (73
+  suites), green. Detail: `change_log.md`, 2026-10-05 (later).
 - **Five behaviour fixes from the captain's iPhone test pass (2026-10-05, `fm/v22-behaviour-r1`;
   approach approved by him that day).** (1) Onboarding's one-animation-at-a-time lock now applies
   on **every** signed-out visit (captain, 2026-10-03), not only a device's first launch — the
@@ -923,6 +936,17 @@ from 82. Issue #22 remains open.)
   captain — provisioned and verified in local dev 2026-08-05 (see that entry below).
 
 ### Code
+- [x] **Design consistency: one type scale, one strip size, a scrolled survey intro (2026-10-05,
+      `fm/v22-design-consistency-r2`).** `src/constants/theme.ts`: `FontSize` cut to the five
+      roles (`micro` / `label` / `body` / `title` / `display`), plus `BuildIllustration`,
+      `scaledBuildStripGeometry`, `fitBuildIllustration`, `buildCanvasScale` and `DesignHeight`
+      (re-exported from `DesignCanvas`). Every screen and shared component migrated to the roles;
+      `OnboardingHero`, `SurveyIntro`, `PlanHero`, `steps.tsx`'s mini-plan and `HeaderMark` read
+      their geometry from `BuildIllustration`; My Plans passes `buildCanvasScale` to `PlanHero`.
+      `src/app/intake.tsx`: first entry is one `ScrollView` with `SurveyIntro` as its first
+      viewport (no `Pressable`, cue "Scroll down"). New `theme.typography.test.ts`; updated
+      `intake-flow.test.tsx` and `build.test.tsx`. Tests: 1161 root (73 suites), green. Detail:
+      `docs/change_log.md`, 2026-10-05 (later).
 - [x] **Five behaviour fixes from the captain's iPhone test pass (2026-10-05,
       `fm/v22-behaviour-r1`; client fixes done, Worker fix implemented and tested, not live).**
       Onboarding: `src/app/(auth)/onboarding.tsx` locks every visit and adds the "SKIP" control;
@@ -1478,7 +1502,9 @@ and awaiting its PR; what remains after merge is applying `0006` to production, 
 copy certification ("Blocked"). The 2026-10-05 behaviour fixes are complete on
 `fm/v22-behaviour-r1` and awaiting their PR; what remains after merge is applying `0007` to
 production, then the deploy, and the captain's privacy-policy call on the throttle table
-("Blocked"). Nothing else is in flight. The one remaining critical-path item — `ANTHROPIC_API_KEY`, without which
+("Blocked"). The 2026-10-05 design-consistency pass (type scale, strip size, scrolled survey
+intro) is complete on `fm/v22-design-consistency-r2` and awaiting its PR, with before/after web
+screenshots; nothing captain-only rides on it. Nothing else is in flight. The one remaining critical-path item — `ANTHROPIC_API_KEY`, without which
 paid-tier requests serve the quota-exempt template fallback — is a captain-only action, not work
 in progress; see "Current state" above and "Blocked" below. The 2026-07-11 coaching cycles 1 and 2 are
 recorded under "Done" → "Domain" above, not here.

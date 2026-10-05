@@ -261,7 +261,7 @@ const styles = StyleSheet.create({
   group: { gap: Spacing.two },
   legend: {
     fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.xs,
+    fontSize: FontSize.label,
     letterSpacing: Tracking.label,
   },
   row: {
@@ -297,17 +297,17 @@ const styles = StyleSheet.create({
   },
   checkMark: {
     fontFamily: FontFamily.body.bold,
-    fontSize: FontSize.xs,
+    fontSize: FontSize.label,
   },
   rowText: {
     flex: 1,
     fontFamily: FontFamily.body.regular,
-    fontSize: FontSize.sm,
+    fontSize: FontSize.body,
   },
   guardianText: {
     flex: 1,
     fontFamily: FontFamily.body.regular,
-    fontSize: FontSize.xs,
+    fontSize: FontSize.label,
   },
   link: {
     fontFamily: FontFamily.body.semiBold,
@@ -315,11 +315,11 @@ const styles = StyleSheet.create({
   },
   eligibility: {
     fontFamily: FontFamily.body.regular,
-    fontSize: FontSize.xs,
+    fontSize: FontSize.label,
   },
   error: {
     fontFamily: FontFamily.body.medium,
-    fontSize: FontSize.xs,
+    fontSize: FontSize.label,
   },
   pressed: { opacity: PressedOpacity },
 });

@@ -2,7 +2,14 @@ import type { ReactElement } from 'react';
 import { Text } from 'react-native';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 
-import { Colors, Session } from '@/constants/theme';
+import {
+  BuildIllustration,
+  Colors,
+  Session,
+  buildCanvasScale,
+  fitBuildIllustration,
+  scaledBuildStripGeometry,
+} from '@/constants/theme';
 import { CUE_DELAY, HERO_TIMELINE, PLAN_HERO_TIMELINE, SURVEY_TIMELINE } from '@/lib/buildMotion';
 import { EMPTY_STRIP_WEEK, HERO_WEEK, stripFromWeek } from '@/lib/weekStrip';
 import { examplePlan } from '@/lib/fixtures/examplePlan';
@@ -35,9 +42,8 @@ import { RevealPrimaryAction } from '../ui/ActionButton';
 let mockReduceMotion = true;
 
 jest.mock('react-native-reanimated', () => {
-  const actual = jest.requireActual<typeof import('react-native-reanimated')>(
-    'react-native-reanimated'
-  );
+  const actual =
+    jest.requireActual<typeof import('react-native-reanimated')>('react-native-reanimated');
   return {
     __esModule: true,
     ...actual,
@@ -48,7 +54,9 @@ jest.mock('react-native-reanimated', () => {
 });
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { cancelAnimation } = require('react-native-reanimated') as { cancelAnimation: jest.Mock };
+const { cancelAnimation } = require('react-native-reanimated') as {
+  cancelAnimation: jest.Mock;
+};
 
 function render(element: ReactElement): ReactTestRenderer {
   let tree!: ReactTestRenderer;
@@ -64,13 +72,27 @@ const text = (tree: ReactTestRenderer) =>
   tree.root
     .findAllByType(Text)
     .map((node) => {
-      const children = Array.isArray(node.props.children) ? node.props.children : [node.props.children];
-      return children.filter((child: unknown) => typeof child === 'string' || typeof child === 'number').join('');
+      const children = Array.isArray(node.props.children)
+        ? node.props.children
+        : [node.props.children];
+      return children
+        .filter((child: unknown) => typeof child === 'string' || typeof child === 'number')
+        .join('');
     })
     .join(' | ');
 
 /** A host that owns a clock the way a screen does, so a composition can be mounted alone. */
-function Clocked({ total, play = true, readyAt, children }: { total: number; play?: boolean; readyAt?: number; children: (clock: ReturnType<typeof useBuildClock>) => ReactElement }) {
+function Clocked({
+  total,
+  play = true,
+  readyAt,
+  children,
+}: {
+  total: number;
+  play?: boolean;
+  readyAt?: number;
+  children: (clock: ReturnType<typeof useBuildClock>) => ReactElement;
+}) {
   const clock = useBuildClock({ total, play, readyAt });
   return children(clock);
 }
@@ -89,7 +111,7 @@ describe('useBuildClock', () => {
           seen = clock;
           return <Text>ok</Text>;
         }}
-      </Clocked>
+      </Clocked>,
     );
     expect(seen?.settled).toBe(true);
     expect(seen?.T.value).toBe(5.2);
@@ -104,7 +126,7 @@ describe('useBuildClock', () => {
           seen = clock;
           return <Text>ok</Text>;
         }}
-      </Clocked>
+      </Clocked>,
     );
     expect(seen?.settled).toBe(false);
     act(() => tree.unmount());
@@ -122,7 +144,7 @@ describe('useBuildClock', () => {
             seen = clock;
             return <Text>ok</Text>;
           }}
-        </Clocked>
+        </Clocked>,
       );
       expect(seen?.ready).toBe(false);
       expect(seen?.settled).toBe(false);
@@ -150,7 +172,7 @@ describe('useBuildClock', () => {
           seen = clock;
           return <Text>ok</Text>;
         }}
-      </Clocked>
+      </Clocked>,
     );
     expect(seen?.T.value).toBe(0);
     expect(seen?.settled).toBe(false);
@@ -173,7 +195,7 @@ describe('WeekStrip', () => {
             numerals
           />
         )}
-      </Clocked>
+      </Clocked>,
     );
     const json = JSON.stringify(tree.toJSON());
     expect(json).toContain(Session.easy);
@@ -193,19 +215,35 @@ describe('CountUp', () => {
   it('shows the landed total at the end frame', () => {
     const tree = render(
       <Clocked total={3}>
-        {({ T }) => <CountUp T={T} landings={[{ at: 0.5, km: 8 }, { at: 1, km: 7 }, { at: 1.5, km: 10 }]} />}
-      </Clocked>
+        {({ T }) => (
+          <CountUp
+            T={T}
+            landings={[
+              { at: 0.5, km: 8 },
+              { at: 1, km: 7 },
+              { at: 1.5, km: 10 },
+            ]}
+          />
+        )}
+      </Clocked>,
     );
     expect(text(tree)).toBe('25');
   });
 });
 
 describe('OnboardingHero — V22-01 end frame', () => {
+  it('shares one canonical strip geometry with the survey and plan heroes', () => {
+    const strip = BuildIllustration.strip;
+    expect(OnboardingHero.stripGeometry).toBe(strip);
+    expect(SurveyIntro.stripGeometry).toBe(strip);
+    expect(PlanHero.stripGeometry).toBe(strip);
+  });
+
   it('carries the wordmark, the 25 km total, the legend and the scroll-down cue', () => {
     const tree = render(
       <Clocked total={HERO_TIMELINE.total}>
         {({ T }) => <OnboardingHero T={T} width={393} height={852} />}
-      </Clocked>
+      </Clocked>,
     );
     const copy = text(tree);
     expect(copy).toContain('Pace Blueprint');
@@ -221,7 +259,7 @@ describe('OnboardingHero — V22-01 end frame', () => {
     const tree = render(
       <Clocked total={HERO_TIMELINE.total}>
         {({ T }) => <OnboardingHero T={T} width={393} height={852} />}
-      </Clocked>
+      </Clocked>,
     );
     const json = JSON.stringify(tree.toJSON());
     expect(json).toContain(Colors.dark.surface.base);
@@ -230,6 +268,12 @@ describe('OnboardingHero — V22-01 end frame', () => {
 });
 
 describe('step pieces — V22-02', () => {
+  it('derives compact strip geometry from the canonical hero by named ratios', () => {
+    const scaled = scaledBuildStripGeometry;
+    expect(StepMiniPlan.stripGeometry).toEqual(scaled(BuildIllustration.compact.step));
+    expect(HeaderMark.cellGeometry).toEqual(scaled(BuildIllustration.compact.header));
+  });
+
   it('01 Intake counts to 10 km and 51 min', () => {
     const tree = render(<Clocked total={2.4}>{({ T }) => <StepIntake t={T} />}</Clocked>);
     const copy = text(tree);
@@ -259,7 +303,7 @@ describe('step pieces — V22-02', () => {
     const tree = render(
       <Clocked total={2.4}>
         {({ T }) => <RevealPrimaryAction T={T} label="Create your first plan" onPress={onPress} />}
-      </Clocked>
+      </Clocked>,
     );
     expect(text(tree)).toContain('Create your first plan');
     act(() => {
@@ -270,58 +314,75 @@ describe('step pieces — V22-02', () => {
 });
 
 describe('SurveyIntro — V22-03', () => {
-  it('holds on the heading, W1–W6 and PRESS TO CONTINUE, and continues once the cue is shown', () => {
-    const onContinue = jest.fn();
+  it('holds on the heading, W1–W6 and a non-interactive scroll cue', () => {
     const tree = render(
-      <Clocked total={SURVEY_TIMELINE.total} readyAt={SURVEY_TIMELINE.cues.Hold + CUE_DELAY}>
-        {({ T, ready }) => (
-          <SurveyIntro T={T} width={393} height={852} onContinue={onContinue} cueShown={ready} />
-        )}
-      </Clocked>
+      <Clocked total={SURVEY_TIMELINE.total}>
+        {({ T }) => <SurveyIntro T={T} width={393} height={852} />}
+      </Clocked>,
     );
     const copy = text(tree);
     expect(copy).toContain('A few questions first');
-    expect(copy).toContain('PRESS TO CONTINUE');
+    expect(copy).toContain('Scroll down');
     for (const label of ['W1', 'W2', 'W3', 'W4', 'W5', 'W6']) expect(copy).toContain(label);
-    act(() => {
-      tree.root.findByProps({ accessibilityLabel: 'Press to continue' }).props.onPress();
-    });
-    expect(onContinue).toHaveBeenCalledTimes(1);
-  });
-
-  it('ignores a tap before the cue is shown', () => {
-    const onContinue = jest.fn();
-    const tree = render(
-      <Clocked total={SURVEY_TIMELINE.total}>
-        {({ T }) => <SurveyIntro T={T} width={393} height={852} onContinue={onContinue} cueShown={false} />}
-      </Clocked>
-    );
-    const press = tree.root.findByProps({ accessibilityLabel: 'Press to continue' }).props.onPress;
-    expect(press).toBeUndefined();
-    expect(onContinue).not.toHaveBeenCalled();
+    expect(tree.root.findAllByProps({ accessibilityLabel: 'Press to continue' })).toHaveLength(0);
   });
 });
 
 describe('HeaderMark — V22-04', () => {
   it('fills exactly the completed days and announces them', () => {
     const tree = render(
-      <Clocked total={2.6}>{({ T }) => <HeaderMark T={T} completedDays={3} />}</Clocked>
+      <Clocked total={2.6}>{({ T }) => <HeaderMark T={T} completedDays={3} />}</Clocked>,
     );
     // Three ink fills inside seven slots.
-    expect(tree.root.findAllByProps({ testID: 'header-mark-fill' }).filter((n) => typeof n.type === 'string')).toHaveLength(3);
+    expect(
+      tree.root
+        .findAllByProps({ testID: 'header-mark-fill' })
+        .filter((n) => typeof n.type === 'string'),
+    ).toHaveLength(3);
     expect(JSON.stringify(tree.toJSON())).toContain('3 of 7 days into this week');
   });
 });
 
 describe('PlanHero — V22-05', () => {
+  it('fits the canonical strip inside a narrow content width without scaling up', () => {
+    const strip = BuildIllustration.strip;
+    const fit = fitBuildIllustration;
+    const canonicalWidth = strip.slotWidth * 7 + strip.gap * 6;
+    expect(fit(canonicalWidth, 280)).toEqual({
+      scale: 280 / canonicalWidth,
+      width: 280,
+    });
+    expect(fit(canonicalWidth, canonicalWidth + 80)).toEqual({
+      scale: 1,
+      width: canonicalWidth,
+    });
+  });
+
+  it("draws at the full-screen builds' scale on a small phone, so all three match on screen", () => {
+    const strip = BuildIllustration.strip;
+    const canonicalWidth = strip.slotWidth * 7 + strip.gap * 6;
+    // iPhone SE (2nd/3rd gen): the onboarding hero and survey intro canvases fit by height.
+    const seScale = buildCanvasScale(375, 667);
+    expect(seScale).toBeCloseTo(667 / 852);
+    expect(fitBuildIllustration(canonicalWidth, 375 - 48, seScale).scale).toBe(seScale);
+    // The design canvas itself renders 1:1.
+    expect(buildCanvasScale(393, 852)).toBe(1);
+  });
+
   it('builds the real first week with its real total', () => {
     const week = stripFromWeek(examplePlan.weeks[0]);
     const tree = render(
       <Clocked total={PLAN_HERO_TIMELINE.total}>
         {({ T }) => (
-          <PlanHero T={T} week={week} eyebrow="EXAMPLE" title={examplePlan.title} weekCount={examplePlan.durationWeeks} />
+          <PlanHero
+            T={T}
+            week={week}
+            eyebrow="EXAMPLE"
+            title={examplePlan.title}
+            weekCount={examplePlan.durationWeeks}
+          />
         )}
-      </Clocked>
+      </Clocked>,
     );
     const copy = text(tree);
     expect(copy).toContain('EXAMPLE');
@@ -346,5 +407,4 @@ describe('static strips — V22-06', () => {
     const json = JSON.stringify(render(<MiniWeekStrip week={HERO_WEEK} dim />).toJSON());
     expect(json).toContain(Session.easy);
   });
-
 });

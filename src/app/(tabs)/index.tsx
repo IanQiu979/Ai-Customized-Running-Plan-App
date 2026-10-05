@@ -324,7 +324,7 @@ const styles = StyleSheet.create({
   },
   fieldLabel: {
     fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.xs,
+    fontSize: FontSize.label,
     letterSpacing: Tracking.label,
   },
   planCard: {
@@ -335,17 +335,17 @@ const styles = StyleSheet.create({
   },
   planTitle: {
     fontFamily: FontFamily.display.bold,
-    fontSize: FontSize.xl,
+    fontSize: FontSize.title,
     letterSpacing: Tracking.display,
   },
   planMeta: {
     fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.xs,
+    fontSize: FontSize.label,
     letterSpacing: Tracking.label,
   },
   error: {
     fontFamily: FontFamily.body.medium,
-    fontSize: FontSize.xs,
+    fontSize: FontSize.label,
   },
   navRow: {
     flexDirection: 'row',
@@ -359,11 +359,11 @@ const styles = StyleSheet.create({
   navRowText: {
     flexShrink: 1,
     fontFamily: FontFamily.body.medium,
-    fontSize: FontSize.sm,
+    fontSize: FontSize.body,
   },
   navRowHint: {
     fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.xs,
+    fontSize: FontSize.label,
     letterSpacing: Tracking.label,
   },
   tierRow: {
@@ -380,11 +380,11 @@ const styles = StyleSheet.create({
   },
   tierName: {
     fontFamily: FontFamily.body.semiBold,
-    fontSize: FontSize.xs,
+    fontSize: FontSize.label,
   },
   tierQuota: {
     fontFamily: FontFamily.mono.regular,
-    fontSize: 9,
+    fontSize: FontSize.micro,
     letterSpacing: 1,
   },
   pressed: {

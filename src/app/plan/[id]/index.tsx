@@ -167,18 +167,18 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: FontFamily.display.semiBold,
-    fontSize: 30,
-    lineHeight: 30 * 1.05,
+    fontSize: FontSize.display,
+    lineHeight: FontSize.display * 1.05,
   },
   meta: {
     fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.tiny,
+    fontSize: FontSize.label,
     letterSpacing: 1.5,
   },
   intro: {
     fontFamily: FontFamily.body.regular,
-    fontSize: FontSize.sm,
-    lineHeight: FontSize.sm * 1.5,
+    fontSize: FontSize.body,
+    lineHeight: FontSize.body * 1.5,
   },
   row: {
     flexDirection: 'row',
@@ -196,27 +196,27 @@ const styles = StyleSheet.create({
   weekNumber: {
     width: 26,
     fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.tiny,
+    fontSize: FontSize.label,
   },
   tag: {
     flex: 1,
     fontFamily: FontFamily.mono.regular,
-    fontSize: 9,
+    fontSize: FontSize.micro,
     letterSpacing: 1.5,
   },
   total: {
     fontFamily: FontFamily.display.semiBold,
-    fontSize: 16,
+    fontSize: FontSize.title,
   },
   unit: {
     fontFamily: FontFamily.mono.regular,
-    fontSize: 8,
+    fontSize: FontSize.micro,
   },
   chevron: {
     width: 10,
     textAlign: 'right',
     fontFamily: FontFamily.mono.regular,
-    fontSize: 12,
+    fontSize: FontSize.label,
   },
   pressed: {
     opacity: PressedOpacity,

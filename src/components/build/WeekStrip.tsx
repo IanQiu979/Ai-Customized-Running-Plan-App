@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
 
-import { FontFamily, Radius, Stroke, Tracking } from '@/constants/theme';
+import { FontFamily, FontSize, Radius, Stroke, Tracking } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
   NUMERAL_FADE,
@@ -59,14 +59,14 @@ export function WeekStrip({
   labels = 'none',
   labelDelay = SNAP_SECONDS * 0.6,
   labelLift = 0,
-  valueSize = 18,
-  codeSize = 9,
+  valueSize = FontSize.title,
+  codeSize = FontSize.micro,
   labelGap = 6,
   scale = 1,
   numerals = false,
   numeralsAt = outlineAt,
   numeralStagger = NUMERAL_STAGGER,
-  numeralSize = 11,
+  numeralSize = FontSize.label,
   numeralGap = 10,
   restDash = false,
 }: {

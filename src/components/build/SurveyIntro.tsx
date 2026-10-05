@@ -1,8 +1,8 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
-import { DesignWidth, FontFamily, FontSize, Tracking } from '@/constants/theme';
+import { BuildIllustration, DesignWidth, FontFamily, FontSize } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { CUE_DELAY, SURVEY_BLOCK_STAGGER, SURVEY_TIMELINE, enter } from '@/lib/buildMotion';
 import { HERO_WEEK, SURVEY_WEEKS, type StripWeek } from '@/lib/weekStrip';
@@ -14,18 +14,17 @@ import { WeekStrip, stripWidth } from './WeekStrip';
 /**
  * V22-03 · Survey / intake intro. Heading up top, then a small build (a 3-row-and-more version
  * of V22-01: week 1 builds in 1.4 s, weeks 2–6 stack beneath it fading toward the bottom), and
- * when it holds, PRESS TO CONTINUE fades in. A tap goes to the intake questions; the questions
- * themselves do not animate. Geometry and timings are `v22-03-scene.jsx`'s.
+ * when it holds, a non-interactive scroll cue fades in. The questionnaire follows directly below
+ * this first viewport in the intake route's ScrollView.
  */
 
 const { cues } = SURVEY_TIMELINE;
 
 const G = {
   wordmarkTop: 88,
-  wordmarkSize: 21,
   headingTop: 160,
   headingInset: 32,
-  strip: { slotWidth: 26, gap: 8, trackHeight: 64, barRadius: 4 },
+  strip: BuildIllustration.strip,
   stripTop: 300,
   /** The page nudges the strip 22pt right of centre to make room for the W1 … W6 labels. */
   stripNudge: 22,
@@ -49,8 +48,6 @@ export function SurveyIntro({
   T,
   width,
   height,
-  onContinue,
-  cueShown,
   heading = 'A few questions first',
   supporting = 'Two minutes. Your plan is built from the answers.',
   appName = 'Pace Blueprint',
@@ -58,10 +55,6 @@ export function SurveyIntro({
   T: SharedValue<number>;
   width: number;
   height: number;
-  onContinue: () => void;
-  /** The clock has reached the cue (`cues.Hold + CUE_DELAY`): PRESS TO CONTINUE is showing and a
-   * tap may continue — from the moment the cue appears, not the end of the hold. */
-  cueShown: boolean;
   heading?: string;
   supporting?: string;
   appName?: string;
@@ -74,34 +67,39 @@ export function SurveyIntro({
   }));
 
   return (
-    <Pressable
-      onPress={cueShown ? onContinue : undefined}
-      accessibilityRole="button"
-      accessibilityLabel="Press to continue"
-      accessibilityState={{ disabled: !cueShown }}
-      style={{ backgroundColor: theme.surface.base }}
-    >
+    <View style={{ backgroundColor: theme.surface.base }}>
       <DesignCanvas width={width} height={height}>
-        <Text
-          style={[
-            styles.wordmark,
-            { top: G.wordmarkTop, fontSize: G.wordmarkSize, color: theme.text.primary },
-          ]}
-        >
+        <Text style={[styles.wordmark, { top: G.wordmarkTop, color: theme.text.primary }]}>
           {appName}
         </Text>
-        <View style={[styles.heading, { top: G.headingTop, left: G.headingInset, right: G.headingInset }]}>
+        <View
+          style={[
+            styles.heading,
+            { top: G.headingTop, left: G.headingInset, right: G.headingInset },
+          ]}
+        >
           <Text style={[styles.headingText, { color: theme.text.primary }]}>{heading}</Text>
           <Text style={[styles.supporting, { color: theme.text.secondary }]}>{supporting}</Text>
         </View>
 
         {SURVEY_WEEKS.map((week, k) => (
-          <FaintWeek key={k} T={T} week={week} index={k} left={stripLeft} top={G.stripTop + G.faintTop} />
+          <FaintWeek
+            key={k}
+            T={T}
+            week={week}
+            index={k}
+            left={stripLeft}
+            top={G.stripTop + G.faintTop}
+          />
         ))}
 
         <View style={{ position: 'absolute', left: stripLeft, top: G.stripTop }}>
           <Animated.Text
-            style={[styles.weekLabel, { color: theme.text.secondary, top: WEEK_LABEL_TOP }, weekLabel]}
+            style={[
+              styles.weekLabel,
+              { color: theme.text.secondary, top: WEEK_LABEL_TOP },
+              weekLabel,
+            ]}
           >
             W1
           </Animated.Text>
@@ -114,16 +112,25 @@ export function SurveyIntro({
             blockStagger={SURVEY_BLOCK_STAGGER}
             labels="value"
             labelDelay={0.21}
-            valueSize={14}
+            valueSize={FontSize.body}
             labelGap={4}
             numerals
-            numeralSize={9}
+            numeralSize={FontSize.micro}
             numeralGap={8}
           />
         </View>
 
         {/* The lower weeks fade into the field before the cue. */}
-        <View style={{ position: 'absolute', left: 0, right: 0, top: G.fadeTop, height: G.fadeHeight }} pointerEvents="none">
+        <View
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            top: G.fadeTop,
+            height: G.fadeHeight,
+          }}
+          pointerEvents="none"
+        >
           <Svg width={DesignWidth} height={G.fadeHeight}>
             <Defs>
               <LinearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
@@ -135,13 +142,21 @@ export function SurveyIntro({
           </Svg>
         </View>
 
-        <FadeIn T={T} at={cues.Hold + CUE_DELAY} duration={0.9} lift={6} style={[styles.cue, { top: G.cueTop }]}>
-          <Text style={[styles.cueText, { color: theme.text.primary }]}>PRESS TO CONTINUE</Text>
+        <FadeIn
+          T={T}
+          at={cues.Hold + CUE_DELAY}
+          duration={0.9}
+          lift={6}
+          style={[styles.cue, { top: G.cueTop }]}
+        >
+          <Text style={[styles.cueText, { color: theme.text.primary }]}>Scroll down</Text>
         </FadeIn>
       </DesignCanvas>
-    </Pressable>
+    </View>
   );
 }
+
+SurveyIntro.stripGeometry = BuildIllustration.strip;
 
 function FaintWeek({
   T,
@@ -166,7 +181,9 @@ function FaintWeek({
   });
   return (
     <Animated.View style={[{ position: 'absolute', left, top }, style]}>
-      <Text style={[styles.weekLabel, { color: theme.text.secondary, top: WEEK_LABEL_TOP }]}>W{index + 2}</Text>
+      <Text style={[styles.weekLabel, { color: theme.text.secondary, top: WEEK_LABEL_TOP }]}>
+        W{index + 2}
+      </Text>
       <WeekStrip
         T={T}
         week={week}
@@ -187,6 +204,7 @@ const styles = StyleSheet.create({
     right: 0,
     textAlign: 'center',
     fontFamily: FontFamily.display.semiBold,
+    fontSize: FontSize.title,
     letterSpacing: 0.5,
   },
   heading: {
@@ -196,14 +214,14 @@ const styles = StyleSheet.create({
   },
   headingText: {
     fontFamily: FontFamily.display.semiBold,
-    fontSize: 34,
-    lineHeight: 34 * 1.05,
+    fontSize: FontSize.display,
+    lineHeight: FontSize.display * 1.05,
     textAlign: 'center',
   },
   supporting: {
     fontFamily: FontFamily.body.regular,
-    fontSize: 14,
-    lineHeight: 21,
+    fontSize: FontSize.body,
+    lineHeight: FontSize.title,
     textAlign: 'center',
   },
   weekLabel: {
@@ -211,7 +229,7 @@ const styles = StyleSheet.create({
     right: '100%',
     paddingRight: 10,
     fontFamily: FontFamily.mono.regular,
-    fontSize: 8,
+    fontSize: FontSize.micro,
     lineHeight: WEEK_LABEL_LINE,
     letterSpacing: 1.5,
   },
@@ -221,10 +239,11 @@ const styles = StyleSheet.create({
     right: 0,
     alignItems: 'center',
   },
+  // The onboarding hero's own cue, so the two "Scroll down"s read as one control.
   cueText: {
-    fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.xxs + 1,
-    letterSpacing: Tracking.wide,
+    fontFamily: FontFamily.body.medium,
+    fontSize: FontSize.body,
+    letterSpacing: 0.3,
     opacity: 0.55,
   },
 });

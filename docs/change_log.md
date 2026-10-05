@@ -5,6 +5,46 @@ heading followed by a bulleted list of what changed (and why, where it's not obv
 make a behavior-changing commit, add a bullet under today's date — create a new heading at the
 **top** of the file if there isn't one yet for today. Don't rewrite or delete past entries.
 
+## 2026-10-05 (later) — One type scale, one strip size, and a survey intro you scroll past (`fm/v22-design-consistency-r2`)
+
+Captain's iPhone test pass (findings of 2026-10-03 and 2026-10-05): font sizes were inconsistent
+app-wide; the survey intro "should not be pressed to continue — should scroll down"; the intro and
+the survey should share one colour scheme; and the onboarding hero, "A few questions first" and
+My Plans drew their animations at different sizes. He approved this approach on 2026-10-05.
+Client only: no Worker, dependency or schema change, and the sibling lane's onboarding lock/skip,
+sign-up age reveal, Home Free CTA and plan footer are untouched. Tests: 1161 root (73 suites),
+green.
+
+- **Five type sizes, named by role.** `FontSize` in `src/constants/theme.ts` is now exactly the
+  five steps the approved "A few questions first" page (V22-03) composes with: `micro` 8 (strip
+  week labels, tiny codes), `label` 12 (mono labels, eyebrows, messages), `body` 14 (body copy,
+  controls), `title` 21 (wordmark, card titles, strip values) and `display` 34 (screen headings
+  and hero numerals). The eleven-step scale (`tiny` 10, `xxs` 11, `xs` 13, `sm` 15, `md` 17, `lg`
+  20, `xl` 24, `xxl` 32, `hero` 44, `numeral` 64, `giant` 96) is deleted, and every screen and
+  shared component was moved onto a role. Visible consequence: the hero numerals that were 64 and
+  96 (onboarding's "25 KM/WEEK" total, the My Plans total) are now `display` 34. New guard,
+  `src/constants/__tests__/theme.typography.test.ts`: it pins the five values and fails on any raw
+  numeric `fontSize:` or numeric `*Size={N}` prop under `src/app` or `src/components`.
+- **One strip size for the three illustrative builds.** `BuildIllustration.strip` in `theme.ts`
+  (slot 36, gap 10, track 88, the onboarding hero's own geometry) is now the one source for the
+  onboarding hero, the survey intro (was 26 / 8 / 64) and the My Plans hero (was 34 / 10 / 96).
+  The step mini-plan and the Home header mark keep their compact sizes, now derived from that strip
+  through named ratios (`BuildIllustration.compact.step` / `.header`, via
+  `scaledBuildStripGeometry`) so they cannot drift. `buildCanvasScale(viewportW, viewportH)` =
+  min(1, w / 393, h / 852) is the one on-screen scale: `DesignCanvas` uses it for the full-screen
+  builds, and My Plans passes it to `PlanHero` as the ceiling for `fitBuildIllustration`, so all
+  three draw the strip at the same on-screen size on every phone (an iPhone SE, 375 × 667, gets
+  0.78). It scales down only; reduced motion still shows the end frame. `DesignHeight` moved into
+  `theme.ts` (still re-exported from `DesignCanvas`).
+- **The survey intro scrolls into the survey.** The intro is no longer a `Pressable` with "PRESS
+  TO CONTINUE". On first entry the intake route is one `ScrollView`: `SurveyIntro` fills the first
+  viewport, its cue now reads "Scroll down" in the onboarding hero's own cue style (non-interactive),
+  and the unchanged questionnaire follows beneath it, the scroll snapping between the intro page
+  and the form. Intro and questions sit on the same `surface.base` field and Blueprint palette, so
+  nothing changes colour between them. Repeat entry (Home's "Create a new plan") still opens on the
+  blank form with Cancel; the first-entry back lock, validation, save → generate → replace and quota
+  handling are unchanged. `intake-flow.test.tsx` and `build.test.tsx` updated to match.
+
 ## 2026-10-05 — Five behaviour fixes from the captain's iPhone test pass (`fm/v22-behaviour-r1`)
 
 Captain's iPhone test pass; approach approved by him on 2026-10-05 (the onboarding ruling on

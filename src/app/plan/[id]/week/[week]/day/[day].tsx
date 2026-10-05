@@ -171,13 +171,13 @@ const styles = StyleSheet.create({
   },
   kindLabel: {
     fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.tiny,
+    fontSize: FontSize.label,
     letterSpacing: 2,
   },
   headline: {
     fontFamily: FontFamily.display.semiBold,
-    fontSize: 40,
-    lineHeight: 40,
+    fontSize: FontSize.display,
+    lineHeight: FontSize.display,
   },
   stats: {
     flexDirection: 'row',
@@ -191,12 +191,12 @@ const styles = StyleSheet.create({
   },
   statValue: {
     fontFamily: FontFamily.display.semiBold,
-    fontSize: 28,
-    lineHeight: 28,
+    fontSize: FontSize.display,
+    lineHeight: FontSize.display,
   },
   statLabel: {
     fontFamily: FontFamily.mono.regular,
-    fontSize: 9,
+    fontSize: FontSize.micro,
     letterSpacing: 1.5,
   },
   rule: {
@@ -207,12 +207,12 @@ const styles = StyleSheet.create({
   },
   sectionLabel: {
     fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.tiny,
+    fontSize: FontSize.label,
     letterSpacing: 2,
   },
   sectionBody: {
     fontFamily: FontFamily.body.regular,
-    fontSize: 14,
-    lineHeight: 21,
+    fontSize: FontSize.body,
+    lineHeight: FontSize.title,
   },
 });

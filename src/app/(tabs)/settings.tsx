@@ -322,6 +322,6 @@ const styles = StyleSheet.create({
   },
   error: {
     fontFamily: FontFamily.body.medium,
-    fontSize: FontSize.xs,
+    fontSize: FontSize.label,
   },
 });

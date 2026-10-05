@@ -29,7 +29,6 @@ import { resolveVerifyEmailEntry } from '@/lib/authEmail';
  * signed-out runner (`sign-in.tsx`).
  */
 /** The wordmark's size on the V22 pages (`v22-0N-scene.jsx`: 21pt Barlow Condensed 600). */
-const WORDMARK_SIZE = 21;
 
 export default function VerifyEmailScreen() {
   const theme = useTheme();
@@ -152,7 +151,7 @@ const styles = StyleSheet.create({
   },
   wordmark: {
     fontFamily: FontFamily.display.semiBold,
-    fontSize: WORDMARK_SIZE,
+    fontSize: FontSize.title,
     letterSpacing: 0.5,
     textAlign: 'center',
     paddingBottom: Spacing.four,
@@ -162,12 +161,12 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: FontFamily.display.extraBold,
-    fontSize: FontSize.xxl,
+    fontSize: FontSize.display,
     letterSpacing: Tracking.display,
   },
   subtitle: {
     fontFamily: FontFamily.body.regular,
-    fontSize: FontSize.sm,
+    fontSize: FontSize.body,
   },
   form: {
     paddingHorizontal: Spacing.four,
@@ -177,7 +176,7 @@ const styles = StyleSheet.create({
   },
   error: {
     fontFamily: FontFamily.body.medium,
-    fontSize: FontSize.xs,
+    fontSize: FontSize.label,
   },
   links: {
     gap: Spacing.half,

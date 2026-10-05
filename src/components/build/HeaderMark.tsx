@@ -1,6 +1,7 @@
 import { StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
 
+import { BuildIllustration, scaledBuildStripGeometry } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { MARK_CELL_RISE, MARK_CELL_STAGGER, enter } from '@/lib/buildMotion';
 
@@ -26,10 +27,14 @@ export function HeaderMark({
   scale?: number;
 }) {
   const theme = useTheme();
-  const cell = { width: 6 * scale, height: 10 * scale, borderRadius: 2 * scale };
+  const cell = {
+    width: HeaderMark.cellGeometry.slotWidth * scale,
+    height: HeaderMark.cellGeometry.trackHeight * scale,
+    borderRadius: HeaderMark.cellGeometry.barRadius * scale,
+  };
   return (
     <View
-      style={[styles.row, { gap: 4 * scale }]}
+      style={[styles.row, { gap: HeaderMark.cellGeometry.gap * scale }]}
       accessible
       accessibilityLabel={`${completedDays} of 7 days into this week`}
     >
@@ -44,11 +49,18 @@ export function HeaderMark({
   );
 }
 
+HeaderMark.cellGeometry = scaledBuildStripGeometry(BuildIllustration.compact.header);
+
 function Fill({ T, at, color }: { T: SharedValue<number>; at: number; color: string }) {
   const style = useAnimatedStyle(() => ({
     height: `${enter(T.value, at, MARK_CELL_RISE) * 100}%`,
   }));
-  return <Animated.View testID="header-mark-fill" style={[styles.fill, { backgroundColor: color }, style]} />;
+  return (
+    <Animated.View
+      testID="header-mark-fill"
+      style={[styles.fill, { backgroundColor: color }, style]}
+    />
+  );
 }
 
 const styles = StyleSheet.create({

@@ -16,7 +16,12 @@ import IntakeScreen from '../intake';
 const mockReplace = jest.fn();
 const mockPush = jest.fn();
 const mockBack = jest.fn();
-const mockRouter = { replace: mockReplace, push: mockPush, back: mockBack, canGoBack: () => true };
+const mockRouter = {
+  replace: mockReplace,
+  push: mockPush,
+  back: mockBack,
+  canGoBack: () => true,
+};
 const mockAddListener = jest.fn();
 const mockRemoveListener = jest.fn();
 
@@ -31,16 +36,23 @@ jest.mock('expo-router', () => ({
   }),
 }));
 
-// The first-time survey intro is a reanimated build; it is not what is under test here, so it is
-// reduced to its one interaction — the continue press — to reach the questions underneath.
+// The first-time survey intro is a reanimated build; this suite only needs to prove that it shares
+// the route-level scroll with the questions, so the drawing is reduced to a labelled marker.
 jest.mock('@/components/build/SurveyIntro', () => {
   const RN = jest.requireActual<typeof import('react-native')>('react-native');
   return {
-    SurveyIntro: ({ onContinue }: { onContinue: () => void }) => (
-      <RN.Pressable accessibilityRole="button" accessibilityLabel="Press to continue" onPress={onContinue} />
-    ),
+    SurveyIntro: () => <RN.View accessibilityLabel="Survey introduction" />,
   };
 });
+
+jest.mock('@/components/build/useBuildClock', () => ({
+  useBuildClock: ({ total }: { total: number }) => ({
+    T: { value: total },
+    settled: true,
+    ready: true,
+    restart: jest.fn(),
+  }),
+}));
 
 const mockGetIntake = jest.fn();
 const mockPutIntake = jest.fn();
@@ -65,7 +77,9 @@ jest.mock('@/lib/apiClient', () => {
   };
 });
 
-jest.mock('@/lib/openPrivacyPolicy', () => ({ openPrivacyPolicy: async () => null }));
+jest.mock('@/lib/openPrivacyPolicy', () => ({
+  openPrivacyPolicy: async () => null,
+}));
 
 const savedIntake = {
   goal: 'Finish my first 10K',
@@ -81,7 +95,11 @@ const savedIntake = {
   injuryNotes: 'left knee',
 };
 
-type JsonNode = { type?: string; props?: Record<string, unknown>; children?: unknown[] };
+type JsonNode = {
+  type?: string;
+  props?: Record<string, unknown>;
+  children?: unknown[];
+};
 
 function render(): ReactTestRenderer {
   let tree!: ReactTestRenderer;
@@ -121,7 +139,11 @@ function nodeText(node: unknown): string {
   return '';
 }
 
-function findAll(node: unknown, predicate: (node: JsonNode) => boolean, out: JsonNode[] = []): JsonNode[] {
+function findAll(
+  node: unknown,
+  predicate: (node: JsonNode) => boolean,
+  out: JsonNode[] = []
+): JsonNode[] {
   if (!node || typeof node !== 'object') return out;
   if (Array.isArray(node)) {
     node.forEach((child) => findAll(child, predicate, out));
@@ -184,7 +206,11 @@ async function fillRequiredExceptRace(tree: ReactTestRenderer) {
 }
 
 /** The segmented date boxes: each box is labelled `${groupLabel} ${segment}` by `SegmentedField`. */
-async function typeParts(tree: ReactTestRenderer, groupLabel: string, parts: Record<string, string>) {
+async function typeParts(
+  tree: ReactTestRenderer,
+  groupLabel: string,
+  parts: Record<string, string>
+) {
   for (const [segment, value] of Object.entries(parts)) {
     await type(tree, `${groupLabel} ${segment}`, value);
   }
@@ -248,19 +274,26 @@ describe('first entry cannot be skipped (ruling 1)', () => {
     mockGetIntake.mockResolvedValue({ intake: null });
   });
 
-  it('plays the survey intro, then shows the questions with no Cancel and a refused removal', async () => {
+  it('puts the survey intro and questions in one scroll route with no continue press or Cancel', async () => {
     const tree = await renderLoaded();
 
-    expect(byLabel(tree, 'Press to continue')).toBeDefined();
-    expect(byLabel(tree, 'Cancel')).toBeUndefined();
-    await press(tree, 'Press to continue');
-
+    expect(byLabel(tree, 'Survey introduction')).toBeDefined();
+    expect(byLabel(tree, 'Goal')).toBeDefined();
     expect(byLabel(tree, 'Create plan')).toBeDefined();
+    expect(byLabel(tree, 'Press to continue')).toBeUndefined();
     expect(byLabel(tree, 'Cancel')).toBeUndefined();
     expect(screenText(tree)).not.toContain('Skip');
 
+    const routeScrollViews = findAll(
+      tree.toJSON(),
+      (node) => node.props?.testID === 'intake-scroll'
+    );
+    expect(routeScrollViews).toHaveLength(1);
+
     expect(mockAddListener).toHaveBeenCalledWith('beforeRemove', expect.any(Function));
-    const handler = mockAddListener.mock.calls[0][1] as (event: { preventDefault: () => void }) => void;
+    const handler = mockAddListener.mock.calls[0][1] as (event: {
+      preventDefault: () => void;
+    }) => void;
     const preventDefault = jest.fn();
     handler({ preventDefault });
     expect(preventDefault).toHaveBeenCalledTimes(1);
@@ -268,14 +301,18 @@ describe('first entry cannot be skipped (ruling 1)', () => {
 
   it('lets its own replace to the new plan through once the plan exists', async () => {
     const tree = await renderLoaded();
-    await press(tree, 'Press to continue');
     await fillRequiredExceptRace(tree);
     await pressOption(tree, '5K');
 
     await press(tree, 'Create plan');
 
-    expect(mockReplace).toHaveBeenCalledWith({ pathname: '/plan/[id]', params: { id: 'plan-new' } });
-    const handler = mockAddListener.mock.calls[0][1] as (event: { preventDefault: () => void }) => void;
+    expect(mockReplace).toHaveBeenCalledWith({
+      pathname: '/plan/[id]',
+      params: { id: 'plan-new' },
+    });
+    const handler = mockAddListener.mock.calls[0][1] as (event: {
+      preventDefault: () => void;
+    }) => void;
     const preventDefault = jest.fn();
     handler({ preventDefault });
     expect(preventDefault).not.toHaveBeenCalled();
@@ -308,11 +345,20 @@ describe('the target race is required; its date and the goal time are not (rulin
 
     expect(mockPutIntake).toHaveBeenCalledTimes(1);
     const payload = mockPutIntake.mock.calls[0][0] as Record<string, unknown>;
-    expect(payload).toMatchObject({ raceDistance: 'half', age: 34, daysPerWeek: 4, weeklyKm: 35 });
+    expect(payload).toMatchObject({
+      raceDistance: 'half',
+      age: 34,
+      daysPerWeek: 4,
+      weeklyKm: 35,
+    });
     expect(payload.raceDate).toBeUndefined();
     expect(payload.goalTimeSec).toBeUndefined();
     expect(mockGeneratePlan).toHaveBeenCalledWith(
-      expect.objectContaining({ goalType: 'duration', durationWeeks: 12, raceDistance: 'half' })
+      expect.objectContaining({
+        goalType: 'duration',
+        durationWeeks: 12,
+        raceDistance: 'half',
+      })
     );
   });
 
@@ -320,14 +366,25 @@ describe('the target race is required; its date and the goal time are not (rulin
     const tree = await renderLoaded();
     await fillRequiredExceptRace(tree);
     await pressOption(tree, '10K');
-    await typeParts(tree, 'Race date', { year: '2027', month: '03', day: '01' });
+    await typeParts(tree, 'Race date', {
+      year: '2027',
+      month: '03',
+      day: '01',
+    });
 
     expect(byLabel(tree, 'Plan length in weeks')).toBeUndefined();
     await press(tree, 'Create plan');
 
-    expect(mockPutIntake.mock.calls[0][0]).toMatchObject({ raceDistance: '10k', raceDate: '2027-03-01' });
+    expect(mockPutIntake.mock.calls[0][0]).toMatchObject({
+      raceDistance: '10k',
+      raceDate: '2027-03-01',
+    });
     expect(mockGeneratePlan).toHaveBeenCalledWith(
-      expect.objectContaining({ goalType: 'race', raceDistance: '10k', raceDate: '2027-03-01' })
+      expect.objectContaining({
+        goalType: 'race',
+        raceDistance: '10k',
+        raceDate: '2027-03-01',
+      })
     );
     expect(mockGeneratePlan.mock.calls[0][0].durationWeeks).toBeUndefined();
   });
@@ -342,14 +399,21 @@ describe('the bottom Create plan saves, then generates, then opens the plan (rul
     await press(tree, 'Create plan');
 
     expect(callOrder).toEqual(['putIntake', 'generatePlan']);
-    expect(mockReplace).toHaveBeenCalledWith({ pathname: '/plan/[id]', params: { id: 'plan-new' } });
+    expect(mockReplace).toHaveBeenCalledWith({
+      pathname: '/plan/[id]',
+      params: { id: 'plan-new' },
+    });
     expect(mockPush).not.toHaveBeenCalled();
   });
 
   it('sends the Free runner who has spent their one plan to the paywall with the quota, unchanged from Home', async () => {
     const quota = { tier: 'free' as const, used: 1, limit: 1, periodEnd: null };
     mockGeneratePlan.mockRejectedValue(
-      new ApiError(402, { error: 'You have used every plan in this period.', code: 'over_quota', quota })
+      new ApiError(402, {
+        error: 'You have used every plan in this period.',
+        code: 'over_quota',
+        quota,
+      })
     );
     const tree = await renderLoaded();
     await fillRequiredExceptRace(tree);
@@ -367,7 +431,10 @@ describe('the bottom Create plan saves, then generates, then opens the plan (rul
 
   it('shows a generation refusal as an assertive alert and stays on the form', async () => {
     mockGeneratePlan.mockRejectedValue(
-      new ApiError(400, { error: 'durationWeeks must be 104 or fewer.', code: 'invalid_request' })
+      new ApiError(400, {
+        error: 'durationWeeks must be 104 or fewer.',
+        code: 'invalid_request',
+      })
     );
     const tree = await renderLoaded();
     await fillRequiredExceptRace(tree);
@@ -384,7 +451,10 @@ describe('the bottom Create plan saves, then generates, then opens the plan (rul
 
   it('does not generate when the save itself is refused', async () => {
     mockPutIntake.mockRejectedValue(
-      new ApiError(400, { error: 'goal is required and must be 500 characters or fewer.', code: 'invalid_request' })
+      new ApiError(400, {
+        error: 'goal is required and must be 500 characters or fewer.',
+        code: 'invalid_request',
+      })
     );
     const tree = await renderLoaded();
     await fillRequiredExceptRace(tree);

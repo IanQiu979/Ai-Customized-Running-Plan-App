@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
 
-import { DesignWidth, FontFamily, FontSize } from '@/constants/theme';
+import { BuildIllustration, DesignWidth, FontFamily, FontSize } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
   CUE_DELAY,
@@ -40,10 +40,9 @@ const { cues } = HERO_TIMELINE;
 /** Page geometry, in points on the 393 × 852 canvas. */
 const G = {
   wordmarkTop: 88,
-  wordmarkSize: 21,
   totalTop: 240,
   unitGap: 8,
-  strip: { slotWidth: 36, gap: 10, trackHeight: 88 },
+  strip: BuildIllustration.strip,
   stripTop: 396,
   numeralGap: 10,
   faintTop: 36, // below the main strip's top
@@ -77,22 +76,25 @@ export function OnboardingHero({
   const landings: Landing[] = [];
   week.forEach((block, index) => {
     if (block) {
-      landings.push({ at: snapLandsAt(cues.Blocks + HERO_BLOCK_STAGGER * index), km: block.value });
+      landings.push({
+        at: snapLandsAt(cues.Blocks + HERO_BLOCK_STAGGER * index),
+        km: block.value,
+      });
     }
   });
 
-  const wordmark = useAnimatedStyle(() => ({ opacity: enter(T.value, 0, 0.5) }));
-  const total = useAnimatedStyle(() => ({ opacity: enter(T.value, cues.Outline + 0.2, 0.4) }));
+  const wordmark = useAnimatedStyle(() => ({
+    opacity: enter(T.value, 0, 0.5),
+  }));
+  const total = useAnimatedStyle(() => ({
+    opacity: enter(T.value, cues.Outline + 0.2, 0.4),
+  }));
 
   return (
     <View style={{ backgroundColor: theme.surface.base }}>
       <DesignCanvas width={width} height={height}>
         <Animated.Text
-          style={[
-            styles.wordmark,
-            { top: G.wordmarkTop, fontSize: G.wordmarkSize, color: theme.text.primary },
-            wordmark,
-          ]}
+          style={[styles.wordmark, { top: G.wordmarkTop, color: theme.text.primary }, wordmark]}
         >
           {appName}
         </Animated.Text>
@@ -130,11 +132,11 @@ export function OnboardingHero({
             blockStagger={HERO_BLOCK_STAGGER}
             labels="both"
             labelLift={4}
-            valueSize={18}
-            codeSize={9}
+            valueSize={FontSize.title}
+            codeSize={FontSize.micro}
             labelGap={6}
             numerals
-            numeralSize={FontSize.xxs}
+            numeralSize={FontSize.label}
             numeralGap={G.numeralGap}
           />
         </View>
@@ -157,6 +159,8 @@ export function OnboardingHero({
     </View>
   );
 }
+
+OnboardingHero.stripGeometry = BuildIllustration.strip;
 
 /** One of the three faint copies of the week, sliding down into place under the real one. */
 function FaintWeek({
@@ -213,6 +217,7 @@ const styles = StyleSheet.create({
     right: 0,
     textAlign: 'center',
     fontFamily: FontFamily.display.semiBold,
+    fontSize: FontSize.title,
     letterSpacing: 0.5,
   },
   total: {
@@ -223,14 +228,14 @@ const styles = StyleSheet.create({
   },
   totalNumber: {
     fontFamily: FontFamily.display.semiBold,
-    fontSize: FontSize.giant,
-    lineHeight: FontSize.giant,
+    fontSize: FontSize.display,
+    lineHeight: FontSize.display,
     letterSpacing: -1,
     textAlign: 'center',
   },
   totalUnit: {
     fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.xs,
+    fontSize: FontSize.label,
     letterSpacing: 3,
   },
   legend: {
@@ -253,7 +258,7 @@ const styles = StyleSheet.create({
   },
   legendLabel: {
     fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.xxs,
+    fontSize: FontSize.label,
   },
   cue: {
     position: 'absolute',
@@ -263,7 +268,7 @@ const styles = StyleSheet.create({
   },
   cueText: {
     fontFamily: FontFamily.body.medium,
-    fontSize: 14,
+    fontSize: FontSize.body,
     letterSpacing: 0.3,
     opacity: 0.55,
   },

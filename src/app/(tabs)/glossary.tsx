@@ -167,7 +167,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.xs,
+    fontSize: FontSize.label,
     letterSpacing: Tracking.label,
   },
   sectionBody: {
@@ -186,21 +186,21 @@ const styles = StyleSheet.create({
   },
   heading: {
     flexShrink: 1,
-    fontSize: FontSize.md,
+    fontSize: FontSize.title,
   },
   code: {
     fontFamily: FontFamily.mono.bold,
   },
   symbol: {
     fontFamily: FontFamily.mono.bold,
-    fontSize: FontSize.md,
+    fontSize: FontSize.title,
   },
   fullName: {
     fontFamily: FontFamily.body.semiBold,
   },
   description: {
     fontFamily: FontFamily.body.regular,
-    fontSize: FontSize.sm,
+    fontSize: FontSize.body,
   },
   expandedBody: {
     paddingBottom: Spacing.three,

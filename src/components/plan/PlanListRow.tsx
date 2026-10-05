@@ -84,16 +84,16 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: FontFamily.body.semiBold,
-    fontSize: 14,
+    fontSize: FontSize.body,
   },
   meta: {
     fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.tiny,
+    fontSize: FontSize.label,
     letterSpacing: 1,
   },
   arrow: {
     fontFamily: FontFamily.mono.regular,
-    fontSize: 14,
+    fontSize: FontSize.body,
   },
   pressed: {
     opacity: PressedOpacity,

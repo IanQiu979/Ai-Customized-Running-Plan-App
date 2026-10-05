@@ -209,11 +209,27 @@ export const EffortOrder: readonly EffortLevel[] = EFFORT_LEVELS;
 const barHeightFor = (level: EffortLevel): number => 0.4 + 0.15 * EFFORT_ORDINAL[level];
 
 export const Effort: Record<EffortLevel, { light: string; dark: string; barHeight: number }> = {
-  recovery: { light: '#2F6E8F', dark: '#5FA6C8', barHeight: barHeightFor('recovery') },
+  recovery: {
+    light: '#2F6E8F',
+    dark: '#5FA6C8',
+    barHeight: barHeightFor('recovery'),
+  },
   easy: { light: '#2C7562', dark: '#4DB58C', barHeight: barHeightFor('easy') }, // = Session.easy
-  steady: { light: '#6F6A2E', dark: '#B0A64C', barHeight: barHeightFor('steady') },
-  tempo: { light: '#9A4A22', dark: '#E0864E', barHeight: barHeightFor('tempo') }, // = Session.hard
-  interval: { light: '#96234C', dark: '#E2648F', barHeight: barHeightFor('interval') },
+  steady: {
+    light: '#6F6A2E',
+    dark: '#B0A64C',
+    barHeight: barHeightFor('steady'),
+  },
+  tempo: {
+    light: '#9A4A22',
+    dark: '#E0864E',
+    barHeight: barHeightFor('tempo'),
+  }, // = Session.hard
+  interval: {
+    light: '#96234C',
+    dark: '#E2648F',
+    barHeight: barHeightFor('interval'),
+  },
 };
 
 // ---------------------------------------------------------------------------------------------
@@ -253,31 +269,20 @@ export const FontFamily = {
   },
 } as const;
 
-/**
- * The type scale. The seven original steps (13 / 15 / 17 / 20 / 24 / 32 / 44) plus the steps
- * the V22 pages compose with: `tiny` (10) and `xxs` (11) for the mono labels and day numerals
- * that sit under a strip, `numeral` (64) and `giant` (96) for the one counting number a hero
- * carries. Display-only at the top, label-only at the bottom.
- */
+/** The V2.2 semantic type scale. Components choose a role, never a visual-size alias. */
 export const FontSize = {
-  tiny: 10,
-  xxs: 11,
-  xs: 13,
-  sm: 15,
-  md: 17,
-  lg: 20,
-  xl: 24,
-  xxl: 32,
-  hero: 44,
-  numeral: 64,
-  giant: 96,
+  micro: 8,
+  label: 12,
+  body: 14,
+  title: 21,
+  display: 34,
 } as const;
 
 /**
  * Letter-spacing. `display` counteracts a condensed face's tightness at large sizes; `label`
  * opens up the all-caps mono field labels that carry most of the app's structure, and `wide` is
- * the sheet's most tracked setting (the "KM / WEEK" unit under a hero number, the PRESS TO
- * CONTINUE cue). Body copy is never tracked.
+ * the sheet's most tracked setting (the "KM / WEEK" unit under a hero number). Body copy is
+ * never tracked.
  */
 export const Tracking = {
   display: -0.4,
@@ -317,6 +322,74 @@ export const Radius = {
   /** Tier badges and other true capsules. Never on anything that contains a paragraph. */
   pill: 999,
 } as const;
+
+// ---------------------------------------------------------------------------------------------
+// Build illustration geometry.
+// ---------------------------------------------------------------------------------------------
+
+export interface BuildStripGeometry {
+  slotWidth: number;
+  gap: number;
+  trackHeight: number;
+  barRadius: number;
+}
+
+export interface BuildStripRatios {
+  slotWidth: number;
+  gap: number;
+  trackHeight: number;
+  barRadius: number;
+}
+
+/**
+ * Every animated plan illustration starts from the onboarding hero's seven-slot strip. The two
+ * genuinely compact contexts derive their dimensions from named ratios so they cannot drift into
+ * unrelated drawings.
+ */
+export const BuildIllustration = {
+  strip: {
+    slotWidth: 36,
+    gap: 10,
+    trackHeight: 88,
+    barRadius: Radius.bar,
+  },
+  compact: {
+    step: {
+      slotWidth: 11 / 18,
+      gap: 4 / 5,
+      trackHeight: 31 / 44,
+      barRadius: 4 / 5,
+    },
+    header: {
+      slotWidth: 1 / 6,
+      gap: 2 / 5,
+      trackHeight: 5 / 44,
+      barRadius: 2 / 5,
+    },
+  },
+} as const;
+
+export function scaledBuildStripGeometry(ratios: BuildStripRatios): BuildStripGeometry {
+  return {
+    slotWidth: BuildIllustration.strip.slotWidth * ratios.slotWidth,
+    gap: BuildIllustration.strip.gap * ratios.gap,
+    trackHeight: BuildIllustration.strip.trackHeight * ratios.trackHeight,
+    barRadius: BuildIllustration.strip.barRadius * ratios.barRadius,
+  };
+}
+
+/**
+ * Fit a fixed-width illustration down into its available box, never above `maxScale` (pass
+ * `buildCanvasScale` for the viewport so it matches the full-screen builds). Never scales up.
+ */
+export function fitBuildIllustration(
+  contentWidth: number,
+  availableWidth: number,
+  maxScale = 1
+): { scale: number; width: number } {
+  const scale = Math.min(1, maxScale, availableWidth / contentWidth);
+  return { scale, width: contentWidth * scale };
+}
 
 // ---------------------------------------------------------------------------------------------
 // Stroke weights. This is a line-drawing system, so these are tokens rather than incidental
@@ -412,3 +485,17 @@ export const MaxContentWidth = 800;
  * composition rather than stretching it.
  */
 export const DesignWidth = 393;
+
+/** The V22 pages' canvas height: iPhone 15/16 class portrait, 393 × 852 pt (spec §0). */
+export const DesignHeight = 852;
+
+/**
+ * The one scale every illustrative build renders at on a given viewport: the full-screen
+ * composition's fit (`DesignCanvas`), scaled down and never up. An illustration outside a
+ * full-screen canvas (My Plans' hero) passes this as its ceiling, so the onboarding hero, the
+ * survey intro and My Plans draw `BuildIllustration.strip` at the same on-screen size on every
+ * phone, a small one included.
+ */
+export function buildCanvasScale(viewportWidth: number, viewportHeight: number): number {
+  return Math.min(1, viewportWidth / DesignWidth, viewportHeight / DesignHeight);
+}

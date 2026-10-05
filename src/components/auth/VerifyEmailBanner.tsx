@@ -108,14 +108,14 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: FontFamily.body.semiBold,
-    fontSize: FontSize.md,
+    fontSize: FontSize.title,
   },
   body: {
     fontFamily: FontFamily.body.regular,
-    fontSize: FontSize.sm,
+    fontSize: FontSize.body,
   },
   error: {
     fontFamily: FontFamily.body.medium,
-    fontSize: FontSize.xs,
+    fontSize: FontSize.label,
   },
 });
