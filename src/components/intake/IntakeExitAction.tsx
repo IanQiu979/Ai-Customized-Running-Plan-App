@@ -34,7 +34,7 @@ const styles = StyleSheet.create({
   },
   text: {
     fontFamily: FontFamily.body.semiBold,
-    fontSize: FontSize.sm,
+    fontSize: FontSize.body,
   },
   pressed: {
     opacity: PressedOpacity,

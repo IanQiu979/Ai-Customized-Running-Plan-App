@@ -136,15 +136,15 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: FontFamily.body.semiBold,
-    fontSize: FontSize.md,
+    fontSize: FontSize.title,
   },
   body: {
     fontFamily: FontFamily.body.regular,
-    fontSize: FontSize.sm,
+    fontSize: FontSize.body,
   },
   error: {
     fontFamily: FontFamily.body.medium,
-    fontSize: FontSize.xs,
+    fontSize: FontSize.label,
   },
   actions: {
     flexDirection: 'row',
@@ -160,7 +160,7 @@ const styles = StyleSheet.create({
   },
   cancelLabel: {
     fontFamily: FontFamily.body.medium,
-    fontSize: FontSize.sm,
+    fontSize: FontSize.body,
   },
   confirm: {
     minHeight: Spacing.six,
@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
   },
   confirmLabel: {
     fontFamily: FontFamily.body.semiBold,
-    fontSize: FontSize.sm,
+    fontSize: FontSize.body,
   },
   pressed: {
     opacity: 0.6,

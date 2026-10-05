@@ -11,7 +11,7 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SurveyIntro } from '@/components/build/SurveyIntro';
 import { useBuildClock } from '@/components/build/useBuildClock';
@@ -41,7 +41,7 @@ import {
   putIntake,
 } from '@/lib/apiClient';
 import { requiresLegacyIntakeConsent } from '@/lib/ageAssurance';
-import { CUE_DELAY, SURVEY_TIMELINE } from '@/lib/buildMotion';
+import { SURVEY_TIMELINE } from '@/lib/buildMotion';
 import {
   clockFieldError,
   clockPartsToSeconds,
@@ -127,10 +127,10 @@ const RACE_DISTANCE_REQUIRED_MESSAGE = 'Choose your target race distance.';
  * as the record of what the last plan was built from; the runner re-enters everything for the
  * next one (captain's ruling 4). Two things hang off that boolean:
  *
- *  - **First entry** (no intake on file): the survey intro (V22-03) plays first, there is no
- *    Cancel, the swipe-back gesture is off and `beforeRemove` is refused — the intake cannot be
- *    skipped (ruling 1). Home's own gate pushes the runner here, and would again if they somehow
- *    left.
+ *  - **First entry** (no intake on file): the survey intro (V22-03) is the first viewport of the
+ *    same ScrollView as the questions. There is no Cancel, the swipe-back gesture is off and
+ *    `beforeRemove` is refused — the intake cannot be skipped (ruling 1). Home's own gate pushes
+ *    the runner here, and would again if they somehow left.
  *  - **Re-entry** (Home's "Create a new plan"): straight to the questions, with a Cancel back to
  *    Home in the header row.
  *
@@ -148,8 +148,7 @@ const RACE_DISTANCE_REQUIRED_MESSAGE = 'Choose your target race distance.';
  * transport failure keeps it so a lost success replays safely (`generate-plan-flow.ts`).
  *
  * Blueprint re-cut (2026-09-20): `ScreenHeader` and grouped sections on hairlines, the same
- * tokens Home and Settings use; two body sizes (`FontSize.xs` labels and messages, `FontSize.sm`
- * controls) under the header's own.
+ * tokens Home and Settings use; semantic label and body sizes under the header's own.
  */
 export default function IntakeScreen() {
   const theme = useTheme();
@@ -163,15 +162,12 @@ export default function IntakeScreen() {
   const [entry, setEntry] = useState<'loading' | 'first' | 'repeat'>('loading');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<FormError | null>(null);
-  // The intro is dismissed by a tap once its PRESS TO CONTINUE cue is showing and never comes
-  // back this visit.
-  const [introDone, setIntroDone] = useState(false);
-  const showIntro = entry === 'first' && !introDone;
   const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
-  const { T: introClock, ready: introCueShown } = useBuildClock({
+  const insets = useSafeAreaInsets();
+  const [formTop, setFormTop] = useState<number | null>(null);
+  const { T: introClock } = useBuildClock({
     total: SURVEY_TIMELINE.total,
-    play: showIntro,
-    readyAt: SURVEY_TIMELINE.cues.Hold + CUE_DELAY,
+    play: entry === 'first',
   });
 
   const [goal, setGoal] = useState('');
@@ -222,11 +218,17 @@ export default function IntakeScreen() {
   const goalTimeSecForRealism = raceDistance ? clockPartsToSeconds(goalTime) : null;
   const recentTimeSecForRealism = recentDistance ? clockPartsToSeconds(recentTime) : null;
   const goalRealism =
-    raceDistance && goalTimeSecForRealism !== null && recentDistance && recentTimeSecForRealism !== null
+    raceDistance &&
+    goalTimeSecForRealism !== null &&
+    recentDistance &&
+    recentTimeSecForRealism !== null
       ? assessGoalRealism({
           goalTimeSec: goalTimeSecForRealism,
           raceDistance,
-          recent: { distance: recentDistance, timeSec: recentTimeSecForRealism },
+          recent: {
+            distance: recentDistance,
+            timeSec: recentTimeSecForRealism,
+          },
         })
       : undefined;
   const goalRealismCopy = getGoalRealismIntakeCopy(goalRealism);
@@ -282,13 +284,19 @@ export default function IntakeScreen() {
     | { ok: true; payload: IntakeResponses & { guardianConsent?: boolean } }
     | { ok: false; error: FormError } {
     if (!goal.trim()) {
-      return { ok: false, error: { field: 'goal', message: 'Goal is required.' } };
+      return {
+        ok: false,
+        error: { field: 'goal', message: 'Goal is required.' },
+      };
     }
     const ageNum = Number(age);
     if (!age.trim() || !Number.isInteger(ageNum) || ageNum < 13 || ageNum > 100) {
       return {
         ok: false,
-        error: { field: 'age', message: 'Age must be a whole number between 13 and 100.' },
+        error: {
+          field: 'age',
+          message: 'Age must be a whole number between 13 and 100.',
+        },
       };
     }
     if (requiresGuardianConsent && !guardianConsent) {
@@ -301,26 +309,44 @@ export default function IntakeScreen() {
       };
     }
     if (!experience) {
-      return { ok: false, error: { field: 'experience', message: 'Select your experience level.' } };
+      return {
+        ok: false,
+        error: {
+          field: 'experience',
+          message: 'Select your experience level.',
+        },
+      };
     }
     if (!daysPerWeek) {
       return {
         ok: false,
-        error: { field: 'daysPerWeek', message: 'Select how many days a week you run.' },
+        error: {
+          field: 'daysPerWeek',
+          message: 'Select how many days a week you run.',
+        },
       };
     }
     const weeklyKmNum = Number(weeklyKm);
     if (!weeklyKm.trim() || !Number.isFinite(weeklyKmNum) || weeklyKmNum < 0) {
       return {
         ok: false,
-        error: { field: 'weeklyKm', message: 'Weekly distance must be 0 km or more.' },
+        error: {
+          field: 'weeklyKm',
+          message: 'Weekly distance must be 0 km or more.',
+        },
       };
     }
 
     // Captain's ruling 5 (2026-09-20): the target race distance is required; its date and the
     // goal time stay optional.
     if (!raceDistance) {
-      return { ok: false, error: { field: 'raceDistance', message: RACE_DISTANCE_REQUIRED_MESSAGE } };
+      return {
+        ok: false,
+        error: {
+          field: 'raceDistance',
+          message: RACE_DISTANCE_REQUIRED_MESSAGE,
+        },
+      };
     }
 
     let raceDateIso: string | undefined;
@@ -339,7 +365,10 @@ export default function IntakeScreen() {
     }
     const staleRaceDateError = intakeRaceDateError(raceDateIso, new Date());
     if (staleRaceDateError) {
-      return { ok: false, error: { field: 'raceDate', message: staleRaceDateError } };
+      return {
+        ok: false,
+        error: { field: 'raceDate', message: staleRaceDateError },
+      };
     }
 
     let goalTimeSec: number | undefined;
@@ -377,7 +406,10 @@ export default function IntakeScreen() {
       if (recentTimeSec === null) {
         return {
           ok: false,
-          error: { field: 'recent', message: 'Enter your recent time as hours, minutes and seconds.' },
+          error: {
+            field: 'recent',
+            message: 'Enter your recent time as hours, minutes and seconds.',
+          },
         };
       }
     }
@@ -394,7 +426,12 @@ export default function IntakeScreen() {
         ...(raceDateIso ? { raceDate: raceDateIso } : {}),
         ...(goalTimeSec !== undefined ? { goalTimeSec } : {}),
         ...(recentDistance && recentTimeSec !== null
-          ? { recentPerformance: { distance: recentDistance, timeSec: recentTimeSec } }
+          ? {
+              recentPerformance: {
+                distance: recentDistance,
+                timeSec: recentTimeSec,
+              },
+            }
           : {}),
         injuries,
         ...(injuryNotes.trim() ? { injuryNotes: injuryNotes.trim() } : {}),
@@ -436,7 +473,10 @@ export default function IntakeScreen() {
       setIdempotencyKey(mintIdempotencyKey());
       // Replace, not push: the plan's back arrow should land on Home, not on a spent form.
       leaveAllowed.current = true;
-      router.replace({ pathname: '/plan/[id]', params: { id: response.planId } });
+      router.replace({
+        pathname: '/plan/[id]',
+        params: { id: response.planId },
+      });
     } catch (createError) {
       if (createError instanceof ApiError) {
         if (createError.body.code === 'over_quota') {
@@ -466,28 +506,16 @@ export default function IntakeScreen() {
     }
   }
 
-  const screenOptions = { headerShown: false, gestureEnabled: entry !== 'first' };
+  const screenOptions = {
+    headerShown: false,
+    gestureEnabled: entry !== 'first',
+  };
 
   if (entry === 'loading') {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: theme.surface.base }]}>
         <Stack.Screen options={screenOptions} />
         <ActivityIndicator color={theme.text.primary} />
-      </View>
-    );
-  }
-
-  if (showIntro) {
-    return (
-      <View style={[styles.container, { backgroundColor: theme.surface.base }]}>
-        <Stack.Screen options={screenOptions} />
-        <SurveyIntro
-          T={introClock}
-          width={viewportWidth}
-          height={viewportHeight}
-          cueShown={introCueShown}
-          onContinue={() => setIntroDone(true)}
-        />
       </View>
     );
   }
@@ -499,245 +527,266 @@ export default function IntakeScreen() {
   return (
     <View style={[styles.container, { backgroundColor: theme.surface.base }]}>
       <Stack.Screen options={screenOptions} />
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right', 'bottom']}>
+      <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
         <ScrollView
-          contentContainerStyle={styles.content}
+          testID="intake-scroll"
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
+          snapToOffsets={entry === 'first' ? [0, formTop ?? viewportHeight] : undefined}
+          snapToEnd={false}
+          decelerationRate={entry === 'first' ? 'fast' : 'normal'}
         >
-          <ScreenHeader
-            eyebrow="Intake"
-            title="About your running"
-            supporting="Every plan is built from these answers. Two minutes."
-            action={
-              entry === 'repeat' ? (
-                <IntakeExitAction color={theme.text.primary} onPress={handleCancel} label="Cancel" />
-              ) : undefined
-            }
-          />
-
-          <Section title="You" theme={theme}>
-            <Field label="Goal" theme={theme}>
-              <TextInput
-                accessibilityLabel="Goal"
-                value={goal}
-                onChangeText={setGoal}
-                maxLength={500}
-                placeholder="e.g. Finish my first 10K"
-                placeholderTextColor={theme.text.secondary}
-                style={[styles.input, inputThemeStyle(theme, invalid('goal'))]}
+          {entry === 'first' ? (
+            <View style={{ height: viewportHeight }}>
+              <SurveyIntro T={introClock} width={viewportWidth} height={viewportHeight} />
+            </View>
+          ) : null}
+          <View
+            testID="intake-form"
+            onLayout={(event) => setFormTop(event.nativeEvent.layout.y)}
+            style={{ paddingTop: insets.top }}
+          >
+            <View style={styles.content}>
+              <ScreenHeader
+                eyebrow="Intake"
+                title="About your running"
+                supporting="Every plan is built from these answers. Two minutes."
+                action={
+                  entry === 'repeat' ? (
+                    <IntakeExitAction
+                      color={theme.text.primary}
+                      onPress={handleCancel}
+                      label="Cancel"
+                    />
+                  ) : undefined
+                }
               />
-              {fieldMessage('goal')}
-            </Field>
 
-            <Field label="Age" theme={theme}>
-              <NumberField
-                accessibilityLabel="Age"
-                value={age}
-                onChangeValue={setAge}
-                maxIntegerDigits={3}
-                placeholder="e.g. 34"
-                invalid={invalid('age')}
-              />
-              {fieldMessage('age')}
-            </Field>
+              <Section title="You" theme={theme}>
+                <Field label="Goal" theme={theme}>
+                  <TextInput
+                    accessibilityLabel="Goal"
+                    value={goal}
+                    onChangeText={setGoal}
+                    maxLength={500}
+                    placeholder="e.g. Finish my first 10K"
+                    placeholderTextColor={theme.text.secondary}
+                    style={[styles.input, inputThemeStyle(theme, invalid('goal'))]}
+                  />
+                  {fieldMessage('goal')}
+                </Field>
 
-            {requiresGuardianConsent ? (
-              <>
-                <GuardianConsentRow
-                  checked={guardianConsent}
-                  onToggle={() => setGuardianConsent((current) => !current)}
-                  theme={theme}
+                <Field label="Age" theme={theme}>
+                  <NumberField
+                    accessibilityLabel="Age"
+                    value={age}
+                    onChangeValue={setAge}
+                    maxIntegerDigits={3}
+                    placeholder="e.g. 34"
+                    invalid={invalid('age')}
+                  />
+                  {fieldMessage('age')}
+                </Field>
+
+                {requiresGuardianConsent ? (
+                  <>
+                    <GuardianConsentRow
+                      checked={guardianConsent}
+                      onToggle={() => setGuardianConsent((current) => !current)}
+                      theme={theme}
+                    />
+                    {fieldMessage('consent')}
+                  </>
+                ) : null}
+
+                <Field label="Experience" theme={theme}>
+                  <View style={styles.optionColumn}>
+                    {EXPERIENCE_OPTIONS.map((option) => (
+                      <OptionRow
+                        key={option.value}
+                        label={option.label}
+                        selected={experience === option.value}
+                        onPress={() => setExperience(option.value)}
+                        theme={theme}
+                      />
+                    ))}
+                  </View>
+                  {fieldMessage('experience')}
+                </Field>
+              </Section>
+
+              <Section title="Training" theme={theme}>
+                <Field label="Days per week" theme={theme}>
+                  <View style={styles.chipRow}>
+                    {DAY_OPTIONS.map((day) => (
+                      <Chip
+                        key={day}
+                        label={String(day)}
+                        selected={daysPerWeek === day}
+                        onPress={() => setDaysPerWeek(day)}
+                        theme={theme}
+                      />
+                    ))}
+                  </View>
+                  {fieldMessage('daysPerWeek')}
+                </Field>
+
+                <Field label="Weekly distance (km)" theme={theme}>
+                  <NumberField
+                    accessibilityLabel="Weekly distance in kilometres"
+                    value={weeklyKm}
+                    onChangeValue={setWeeklyKm}
+                    mode="decimal"
+                    maxIntegerDigits={3}
+                    placeholder="e.g. 35"
+                    invalid={invalid('weeklyKm')}
+                  />
+                  {fieldMessage('weeklyKm')}
+                </Field>
+              </Section>
+
+              <Section title="Target" theme={theme}>
+                <Field label="Target race" theme={theme}>
+                  <View style={styles.chipRow}>
+                    {RACE_DISTANCE_OPTIONS.map((option) => (
+                      <Chip
+                        key={option.value}
+                        label={option.label}
+                        selected={raceDistance === option.value}
+                        onPress={() => setRaceDistance(option.value)}
+                        theme={theme}
+                      />
+                    ))}
+                  </View>
+                  {fieldMessage('raceDistance')}
+                </Field>
+
+                <Field label="Race date" optional theme={theme}>
+                  <DateField
+                    accessibilityLabel="Race date"
+                    parts={raceDate}
+                    onChange={setRaceDate}
+                    invalid={raceDateError !== null || invalid('raceDate')}
+                  />
+                  {raceDateError ? <FieldMessage message={raceDateError} theme={theme} /> : null}
+                  {fieldMessage('raceDate')}
+                </Field>
+
+                <Field label="Goal time" optional theme={theme}>
+                  <ClockField
+                    accessibilityLabel="Goal time"
+                    parts={goalTime}
+                    onChange={setGoalTime}
+                    invalid={goalTimeError !== null || invalid('goalTime')}
+                  />
+                  {goalTimeError ? <FieldMessage message={goalTimeError} theme={theme} /> : null}
+                  {fieldMessage('goalTime')}
+                  {!goalTimeError && goalRealismCopy ? (
+                    <Text style={[styles.fieldMessage, { color: theme.text.secondary }]}>
+                      {goalRealismCopy}
+                    </Text>
+                  ) : null}
+                </Field>
+
+                {/* Only while no race date fixes the length — a runner who gave a date is never
+                  asked how long their plan should be (`needsPlanLength`). */}
+                {askPlanLength ? (
+                  <Field label="Plan length (weeks)" theme={theme}>
+                    <NumberField
+                      accessibilityLabel="Plan length in weeks"
+                      value={planLengthWeeks}
+                      onChangeValue={setPlanLengthWeeks}
+                      maxIntegerDigits={3}
+                      placeholder={String(DEFAULT_PLAN_WEEKS)}
+                      invalid={invalid('planLength')}
+                    />
+                    {fieldMessage('planLength')}
+                  </Field>
+                ) : null}
+              </Section>
+
+              {/* After the target on purpose: the goal-time realism note above needs both, and a
+                runner reads their target before their evidence for it. */}
+              <Section title="Recent result" theme={theme}>
+                <Field label="Recent performance" optional theme={theme}>
+                  <View style={styles.chipRow}>
+                    {RACE_DISTANCE_OPTIONS.map((option) => (
+                      <Chip
+                        key={option.value}
+                        label={option.label}
+                        selected={recentDistance === option.value}
+                        onPress={() =>
+                          setRecentDistance((current) =>
+                            current === option.value ? undefined : option.value
+                          )
+                        }
+                        theme={theme}
+                      />
+                    ))}
+                  </View>
+                  <View style={styles.recentTimeInput}>
+                    <ClockField
+                      accessibilityLabel="Recent performance time"
+                      parts={recentTime}
+                      onChange={setRecentTime}
+                      invalid={recentTimeError !== null || invalid('recent')}
+                    />
+                  </View>
+                  {recentTimeError ? (
+                    <FieldMessage message={recentTimeError} theme={theme} />
+                  ) : null}
+                  {fieldMessage('recent')}
+                </Field>
+              </Section>
+
+              <Section title="Health" theme={theme}>
+                <Field label="Injuries" theme={theme}>
+                  <View style={styles.chipRow}>
+                    {INJURY_OPTIONS.map((option) => (
+                      <Chip
+                        key={option.value}
+                        label={option.label}
+                        selected={injuries.includes(option.value)}
+                        onPress={() => toggleInjury(option.value)}
+                        theme={theme}
+                      />
+                    ))}
+                  </View>
+                </Field>
+
+                <Field label="Injury notes" optional theme={theme}>
+                  <TextInput
+                    accessibilityLabel="Injury notes"
+                    value={injuryNotes}
+                    onChangeText={setInjuryNotes}
+                    maxLength={2000}
+                    placeholder="Anything else worth knowing"
+                    placeholderTextColor={theme.text.secondary}
+                    multiline
+                    style={[styles.input, inputThemeStyle(theme, false), styles.notesInput]}
+                  />
+                </Field>
+              </Section>
+
+              <View style={styles.footer}>
+                {error ? (
+                  <Text
+                    accessibilityRole="alert"
+                    accessibilityLiveRegion="assertive"
+                    style={[styles.error, { color: theme.status.error }]}
+                  >
+                    {error.message}
+                  </Text>
+                ) : null}
+
+                <PrimaryAction
+                  label="Create plan"
+                  disabled={submitting}
+                  busy={submitting}
+                  onPress={handleCreate}
                 />
-                {fieldMessage('consent')}
-              </>
-            ) : null}
-
-            <Field label="Experience" theme={theme}>
-              <View style={styles.optionColumn}>
-                {EXPERIENCE_OPTIONS.map((option) => (
-                  <OptionRow
-                    key={option.value}
-                    label={option.label}
-                    selected={experience === option.value}
-                    onPress={() => setExperience(option.value)}
-                    theme={theme}
-                  />
-                ))}
               </View>
-              {fieldMessage('experience')}
-            </Field>
-          </Section>
-
-          <Section title="Training" theme={theme}>
-            <Field label="Days per week" theme={theme}>
-              <View style={styles.chipRow}>
-                {DAY_OPTIONS.map((day) => (
-                  <Chip
-                    key={day}
-                    label={String(day)}
-                    selected={daysPerWeek === day}
-                    onPress={() => setDaysPerWeek(day)}
-                    theme={theme}
-                  />
-                ))}
-              </View>
-              {fieldMessage('daysPerWeek')}
-            </Field>
-
-            <Field label="Weekly distance (km)" theme={theme}>
-              <NumberField
-                accessibilityLabel="Weekly distance in kilometres"
-                value={weeklyKm}
-                onChangeValue={setWeeklyKm}
-                mode="decimal"
-                maxIntegerDigits={3}
-                placeholder="e.g. 35"
-                invalid={invalid('weeklyKm')}
-              />
-              {fieldMessage('weeklyKm')}
-            </Field>
-
-          </Section>
-
-          <Section title="Target" theme={theme}>
-            <Field label="Target race" theme={theme}>
-              <View style={styles.chipRow}>
-                {RACE_DISTANCE_OPTIONS.map((option) => (
-                  <Chip
-                    key={option.value}
-                    label={option.label}
-                    selected={raceDistance === option.value}
-                    onPress={() => setRaceDistance(option.value)}
-                    theme={theme}
-                  />
-                ))}
-              </View>
-              {fieldMessage('raceDistance')}
-            </Field>
-
-            <Field label="Race date" optional theme={theme}>
-              <DateField
-                accessibilityLabel="Race date"
-                parts={raceDate}
-                onChange={setRaceDate}
-                invalid={raceDateError !== null || invalid('raceDate')}
-              />
-              {raceDateError ? <FieldMessage message={raceDateError} theme={theme} /> : null}
-              {fieldMessage('raceDate')}
-            </Field>
-
-            <Field label="Goal time" optional theme={theme}>
-              <ClockField
-                accessibilityLabel="Goal time"
-                parts={goalTime}
-                onChange={setGoalTime}
-                invalid={goalTimeError !== null || invalid('goalTime')}
-              />
-              {goalTimeError ? <FieldMessage message={goalTimeError} theme={theme} /> : null}
-              {fieldMessage('goalTime')}
-              {!goalTimeError && goalRealismCopy ? (
-                <Text style={[styles.fieldMessage, { color: theme.text.secondary }]}>
-                  {goalRealismCopy}
-                </Text>
-              ) : null}
-            </Field>
-
-            {/* Only while no race date fixes the length — a runner who gave a date is never asked
-                how long their plan should be (`needsPlanLength`). */}
-            {askPlanLength ? (
-              <Field label="Plan length (weeks)" theme={theme}>
-                <NumberField
-                  accessibilityLabel="Plan length in weeks"
-                  value={planLengthWeeks}
-                  onChangeValue={setPlanLengthWeeks}
-                  maxIntegerDigits={3}
-                  placeholder={String(DEFAULT_PLAN_WEEKS)}
-                  invalid={invalid('planLength')}
-                />
-                {fieldMessage('planLength')}
-              </Field>
-            ) : null}
-          </Section>
-
-          {/* After the target on purpose: the goal-time realism note above needs both, and a
-              runner reads their target before their evidence for it. */}
-          <Section title="Recent result" theme={theme}>
-            <Field label="Recent performance" optional theme={theme}>
-              <View style={styles.chipRow}>
-                {RACE_DISTANCE_OPTIONS.map((option) => (
-                  <Chip
-                    key={option.value}
-                    label={option.label}
-                    selected={recentDistance === option.value}
-                    onPress={() =>
-                      setRecentDistance((current) =>
-                        current === option.value ? undefined : option.value
-                      )
-                    }
-                    theme={theme}
-                  />
-                ))}
-              </View>
-              <View style={styles.recentTimeInput}>
-                <ClockField
-                  accessibilityLabel="Recent performance time"
-                  parts={recentTime}
-                  onChange={setRecentTime}
-                  invalid={recentTimeError !== null || invalid('recent')}
-                />
-              </View>
-              {recentTimeError ? <FieldMessage message={recentTimeError} theme={theme} /> : null}
-              {fieldMessage('recent')}
-            </Field>
-          </Section>
-
-          <Section title="Health" theme={theme}>
-            <Field label="Injuries" theme={theme}>
-              <View style={styles.chipRow}>
-                {INJURY_OPTIONS.map((option) => (
-                  <Chip
-                    key={option.value}
-                    label={option.label}
-                    selected={injuries.includes(option.value)}
-                    onPress={() => toggleInjury(option.value)}
-                    theme={theme}
-                  />
-                ))}
-              </View>
-            </Field>
-
-            <Field label="Injury notes" optional theme={theme}>
-              <TextInput
-                accessibilityLabel="Injury notes"
-                value={injuryNotes}
-                onChangeText={setInjuryNotes}
-                maxLength={2000}
-                placeholder="Anything else worth knowing"
-                placeholderTextColor={theme.text.secondary}
-                multiline
-                style={[styles.input, inputThemeStyle(theme, false), styles.notesInput]}
-              />
-            </Field>
-          </Section>
-
-          <View style={styles.footer}>
-            {error ? (
-              <Text
-                accessibilityRole="alert"
-                accessibilityLiveRegion="assertive"
-                style={[styles.error, { color: theme.status.error }]}
-              >
-                {error.message}
-              </Text>
-            ) : null}
-
-            <PrimaryAction
-              label="Create plan"
-              disabled={submitting}
-              busy={submitting}
-              onPress={handleCreate}
-            />
+            </View>
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -760,7 +809,9 @@ function inputThemeStyle(theme: Theme, invalid: boolean) {
 function Section({ title, theme, children }: { title: string; theme: Theme; children: ReactNode }) {
   return (
     <View style={styles.section}>
-      <Text style={[styles.sectionTitle, { color: theme.text.secondary }]}>{title.toUpperCase()}</Text>
+      <Text style={[styles.sectionTitle, { color: theme.text.secondary }]}>
+        {title.toUpperCase()}
+      </Text>
       <View style={[styles.sectionBody, { borderTopColor: theme.hairline }]}>{children}</View>
     </View>
   );
@@ -925,7 +976,9 @@ function Chip({
         pressed && styles.pressed,
       ]}
     >
-      <Text style={[styles.chipText, { color: selected ? theme.surface.base : theme.text.primary }]}>
+      <Text
+        style={[styles.chipText, { color: selected ? theme.surface.base : theme.text.primary }]}
+      >
         {label}
       </Text>
     </Pressable>
@@ -936,13 +989,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  safeArea: {
+    flex: 1,
+  },
   loadingContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  safeArea: {
-    flex: 1,
   },
   content: {
     paddingHorizontal: Spacing.four,
@@ -955,7 +1008,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.xs,
+    fontSize: FontSize.label,
     letterSpacing: Tracking.label,
   },
   sectionBody: {
@@ -968,7 +1021,7 @@ const styles = StyleSheet.create({
   },
   fieldLabel: {
     fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.xs,
+    fontSize: FontSize.label,
     letterSpacing: Tracking.label,
   },
   input: {
@@ -977,7 +1030,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.control,
     paddingHorizontal: Spacing.three,
     fontFamily: FontFamily.body.regular,
-    fontSize: FontSize.sm,
+    fontSize: FontSize.body,
   },
   notesInput: {
     minHeight: Spacing.six * 1.5,
@@ -999,7 +1052,7 @@ const styles = StyleSheet.create({
   },
   optionRowText: {
     fontFamily: FontFamily.body.medium,
-    fontSize: FontSize.sm,
+    fontSize: FontSize.body,
   },
   chipRow: {
     flexDirection: 'row',
@@ -1016,18 +1069,18 @@ const styles = StyleSheet.create({
   },
   chipText: {
     fontFamily: FontFamily.body.medium,
-    fontSize: FontSize.sm,
+    fontSize: FontSize.body,
   },
   footer: {
     gap: Spacing.three,
   },
   error: {
     fontFamily: FontFamily.body.medium,
-    fontSize: FontSize.xs,
+    fontSize: FontSize.label,
   },
   fieldMessage: {
     fontFamily: FontFamily.body.medium,
-    fontSize: FontSize.xs,
+    fontSize: FontSize.label,
     marginTop: Spacing.half,
   },
   pressed: {
@@ -1055,12 +1108,12 @@ const styles = StyleSheet.create({
   },
   consentBoxMark: {
     fontFamily: FontFamily.body.medium,
-    fontSize: FontSize.xs,
+    fontSize: FontSize.label,
   },
   consentText: {
     flex: 1,
     fontFamily: FontFamily.body.regular,
-    fontSize: FontSize.sm,
+    fontSize: FontSize.body,
   },
   consentLink: {
     fontFamily: FontFamily.body.semiBold,

@@ -66,7 +66,7 @@ const styles = StyleSheet.create({
   summary: {
     flexShrink: 1,
     fontFamily: FontFamily.body.medium,
-    fontSize: FontSize.xs,
+    fontSize: FontSize.label,
   },
   body: {
     paddingTop: Spacing.one,
@@ -74,7 +74,7 @@ const styles = StyleSheet.create({
   },
   text: {
     fontFamily: FontFamily.body.regular,
-    fontSize: FontSize.xs,
+    fontSize: FontSize.label,
   },
   pressed: {
     opacity: PressedOpacity,

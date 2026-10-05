@@ -319,7 +319,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontFamily: FontFamily.body.semiBold,
-    fontSize: FontSize.sm,
+    fontSize: FontSize.body,
     textAlign: 'center',
   },
   divider: {
@@ -333,7 +333,7 @@ const styles = StyleSheet.create({
   },
   dividerLabel: {
     fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.xs,
+    fontSize: FontSize.label,
     letterSpacing: Tracking.label,
   },
   link: {
@@ -343,7 +343,7 @@ const styles = StyleSheet.create({
   },
   linkText: {
     fontFamily: FontFamily.body.regular,
-    fontSize: FontSize.xs,
+    fontSize: FontSize.label,
     textAlign: 'center',
   },
   pressed: {

@@ -49,12 +49,12 @@ const styles = StyleSheet.create({
   },
   arrow: {
     fontFamily: FontFamily.mono.regular,
-    fontSize: 14,
+    fontSize: FontSize.body,
     width: ARROW_WIDTH,
   },
   label: {
     fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.tiny,
+    fontSize: FontSize.label,
     letterSpacing: 2,
   },
   spacer: {

@@ -209,12 +209,12 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: FontFamily.display.semiBold,
-    fontSize: 30,
-    lineHeight: 30 * 1.05,
+    fontSize: FontSize.display,
+    lineHeight: FontSize.display * 1.05,
   },
   meta: {
     fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.tiny,
+    fontSize: FontSize.label,
     letterSpacing: 1.5,
   },
   why: {
@@ -222,13 +222,13 @@ const styles = StyleSheet.create({
   },
   whyLabel: {
     fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.tiny,
+    fontSize: FontSize.label,
     letterSpacing: 2,
   },
   whyBody: {
     fontFamily: FontFamily.body.regular,
-    fontSize: 14,
-    lineHeight: 21,
+    fontSize: FontSize.body,
+    lineHeight: FontSize.title,
   },
   row: {
     flexDirection: 'row',
@@ -244,35 +244,35 @@ const styles = StyleSheet.create({
   day: {
     width: 30,
     fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.tiny,
+    fontSize: FontSize.label,
   },
   rowTitle: {
     flex: 1,
     minWidth: 0,
     fontFamily: FontFamily.body.medium,
-    fontSize: 14,
+    fontSize: FontSize.body,
   },
   detail: {
     fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.tiny,
+    fontSize: FontSize.label,
     flexShrink: 1,
   },
   number: {
     width: 44,
     textAlign: 'right',
     fontFamily: FontFamily.display.semiBold,
-    fontSize: FontSize.lg,
+    fontSize: FontSize.title,
     flexShrink: 0,
   },
   unit: {
     fontFamily: FontFamily.mono.regular,
-    fontSize: 9,
+    fontSize: FontSize.micro,
   },
   chevron: {
     width: 10,
     textAlign: 'right',
     fontFamily: FontFamily.mono.regular,
-    fontSize: 12,
+    fontSize: FontSize.label,
   },
   pressed: {
     opacity: PressedOpacity,

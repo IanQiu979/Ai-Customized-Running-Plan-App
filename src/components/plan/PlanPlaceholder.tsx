@@ -55,11 +55,11 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: FontFamily.display.semiBold,
-    fontSize: FontSize.xl,
+    fontSize: FontSize.title,
   },
   message: {
     fontFamily: FontFamily.body.medium,
-    fontSize: FontSize.sm,
+    fontSize: FontSize.body,
     textAlign: 'center',
   },
 });

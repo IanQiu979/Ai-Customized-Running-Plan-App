@@ -311,17 +311,17 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.xs,
+    fontSize: FontSize.label,
     letterSpacing: Tracking.label,
   },
   title: {
     fontFamily: FontFamily.display.extraBold,
-    fontSize: FontSize.hero,
+    fontSize: FontSize.display,
     letterSpacing: Tracking.display,
   },
   reason: {
     fontFamily: FontFamily.body.regular,
-    fontSize: FontSize.sm,
+    fontSize: FontSize.body,
     marginTop: Spacing.one,
   },
   rule: {
@@ -329,7 +329,7 @@ const styles = StyleSheet.create({
   },
   error: {
     fontFamily: FontFamily.body.medium,
-    fontSize: FontSize.xs,
+    fontSize: FontSize.label,
   },
   tierCard: {
     borderRadius: Radius.card,
@@ -345,7 +345,7 @@ const styles = StyleSheet.create({
   },
   tierTitle: {
     fontFamily: FontFamily.display.extraBold,
-    fontSize: FontSize.xxl,
+    fontSize: FontSize.display,
     letterSpacing: Tracking.display,
   },
   badge: {
@@ -356,7 +356,7 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     fontFamily: FontFamily.mono.bold,
-    fontSize: FontSize.xs,
+    fontSize: FontSize.label,
     letterSpacing: Tracking.label,
   },
   quotaLine: {
@@ -366,12 +366,12 @@ const styles = StyleSheet.create({
   },
   quotaNumber: {
     fontFamily: FontFamily.display.extraBold,
-    fontSize: FontSize.hero,
+    fontSize: FontSize.display,
     letterSpacing: Tracking.display,
   },
   quotaUnit: {
     fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.xs,
+    fontSize: FontSize.label,
     letterSpacing: Tracking.label,
   },
   tierRule: {
@@ -387,12 +387,12 @@ const styles = StyleSheet.create({
   },
   featureMark: {
     fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.sm,
+    fontSize: FontSize.body,
   },
   featureText: {
     flex: 1,
     fontFamily: FontFamily.body.regular,
-    fontSize: FontSize.sm,
+    fontSize: FontSize.body,
   },
   // The button's own shape lives in `ActionButton.tsx`; this only places it in the card.
   tierButton: {
@@ -406,14 +406,14 @@ const styles = StyleSheet.create({
   },
   disclaimerText: {
     fontFamily: FontFamily.body.medium,
-    fontSize: FontSize.xs,
+    fontSize: FontSize.label,
   },
   closeButton: {
     paddingHorizontal: Spacing.two,
   },
   closeButtonText: {
     fontFamily: FontFamily.body.semiBold,
-    fontSize: FontSize.sm,
+    fontSize: FontSize.body,
   },
   pressed: {
     opacity: PressedOpacity,

@@ -98,7 +98,7 @@ const styles = StyleSheet.create({
     paddingBottom: 5,
     textAlign: 'center',
     fontFamily: FontFamily.display.semiBold,
-    fontSize: FontSize.sm,
+    fontSize: FontSize.body,
   },
   dash: {
     height: 2,
@@ -111,7 +111,7 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
     fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.tiny,
+    fontSize: FontSize.label,
     letterSpacing: Tracking.label,
   },
 });

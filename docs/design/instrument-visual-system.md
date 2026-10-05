@@ -60,10 +60,23 @@ Ratios (WCAG 2.x, against the dark surfaces), all asserted by the suite: Ink 17.
 | Body | **IBM Plex Sans** 400–600 | body copy and UI chrome |
 
 Loaded in `src/app/_layout.tsx`; the `FontFamily` keys in `theme.ts` are the exact `fontFamily`
-strings. Scale: `tiny` 10 · `xxs` 11 · `xs` 13 · `sm` 15 · `md` 17 · `lg` 20 · `xl` 24 · `xxl` 32 ·
-`hero` 44 · `numeral` 64 · `giant` 96 — the last two are the one counting Number a hero carries.
-`Tracking.wide` (2.5) is the sheet's most tracked setting (KM / WEEK, PRESS TO CONTINUE); body copy
-is never tracked.
+strings.
+
+**Scale — five sizes, named by role** (2026-10-05, taken from the approved "A few questions
+first" page, V22-03; it replaced an eleven-step scale whose 64/96 hero numerals are now `display`):
+
+| `FontSize` | pt | Role |
+|---|---|---|
+| `micro` | 8 | strip week labels, tiny codes |
+| `label` | 12 | mono labels, eyebrows, messages |
+| `body` | 14 | body copy, controls |
+| `title` | 21 | wordmark, card titles, strip values |
+| `display` | 34 | screen headings and hero numerals |
+
+A component picks a role, never a number:
+`src/constants/__tests__/theme.typography.test.ts` pins these five values and fails on any raw
+numeric `fontSize:` or numeric `*Size={N}` prop under `src/app` or `src/components`.
+`Tracking.wide` (2.5) is the sheet's most tracked setting; body copy is never tracked.
 
 ## B.3 Shape and motion
 

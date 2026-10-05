@@ -1,10 +1,21 @@
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
 
-import { FontFamily, FontSize, Stroke } from '@/constants/theme';
+import {
+  BuildIllustration,
+  FontFamily,
+  FontSize,
+  Stroke,
+  scaledBuildStripGeometry,
+} from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { draw, enter, move } from '@/lib/buildMotion';
-import { ENGINE_CANDIDATES, ENGINE_PICK_INDEX, HERO_WEEK, HERO_WEEK_TOTAL_KM } from '@/lib/weekStrip';
+import {
+  ENGINE_CANDIDATES,
+  ENGINE_PICK_INDEX,
+  HERO_WEEK,
+  HERO_WEEK_TOTAL_KM,
+} from '@/lib/weekStrip';
 
 import { CountUp } from './CountUp';
 import { WeekStrip } from './WeekStrip';
@@ -78,7 +89,13 @@ function SegmentedPress({ t }: { t: SharedValue<number> }) {
       ]}
     >
       {SEGMENTS.map((label, index) => (
-        <Segment key={label} t={t} index={index} label={label} last={index === SEGMENTS.length - 1} />
+        <Segment
+          key={label}
+          t={t}
+          index={index}
+          label={label}
+          last={index === SEGMENTS.length - 1}
+        />
       ))}
     </View>
   );
@@ -116,7 +133,12 @@ function Segment({
   return (
     <Animated.View style={[styles.segment, box]}>
       <Animated.View
-        style={[StyleSheet.absoluteFill, styles.segmentTint, { backgroundColor: theme.text.primary }, tint]}
+        style={[
+          StyleSheet.absoluteFill,
+          styles.segmentTint,
+          { backgroundColor: theme.text.primary },
+          tint,
+        ]}
       />
       <Text style={[styles.segmentText, { color: theme.text.secondary }]}>{label}</Text>
       <Animated.Text
@@ -230,12 +252,18 @@ function WinningTile({ t, index }: { t: SharedValue<number>; index: number }) {
       transform: [{ translateY: (1 - arrive) * 8 }],
     };
   });
-  const code = useAnimatedStyle(() => ({ opacity: 1 - move(t.value, 0.7, 0.45) }));
-  const detail = useAnimatedStyle(() => ({ opacity: enter(t.value, 1.0, 0.3) }));
+  const code = useAnimatedStyle(() => ({
+    opacity: 1 - move(t.value, 0.7, 0.45),
+  }));
+  const detail = useAnimatedStyle(() => ({
+    opacity: enter(t.value, 1.0, 0.3),
+  }));
   const onTile = theme.surface.base;
   return (
     <Animated.View style={[styles.tile, { backgroundColor: theme.session[candidate.tone] }, frame]}>
-      <Animated.Text style={[styles.tileCode, { color: onTile }, code]}>{candidate.code}</Animated.Text>
+      <Animated.Text style={[styles.tileCode, { color: onTile }, code]}>
+        {candidate.code}
+      </Animated.Text>
       <Animated.View style={[styles.card, detail]}>
         <View style={styles.cardRow}>
           <Text style={[styles.cardLabel, { color: onTile }]}>EASY RUN</Text>
@@ -253,7 +281,7 @@ function WinningTile({ t, index }: { t: SharedValue<number>; index: number }) {
 
 // --- 03 Plan ----------------------------------------------------------------------------------
 
-const MINI = { slotWidth: 22, gap: 8, trackHeight: 62, barRadius: 4 } as const;
+const MINI = scaledBuildStripGeometry(BuildIllustration.compact.step);
 const MINI_LEFT = (STEP_PIECE_WIDTH - (MINI.slotWidth * 7 + MINI.gap * 6)) / 2;
 /** The strip's baseline sits 96pt down the 120pt piece; numerals at 104. */
 const MINI_BASELINE_TOP = 96;
@@ -276,7 +304,13 @@ export function StepMiniPlan({ t }: { t: SharedValue<number> }) {
           {HERO_WEEK_TOTAL_KM} KM · 3 RUNS
         </Text>
       </Animated.View>
-      <View style={{ position: 'absolute', left: MINI_LEFT, top: MINI_BASELINE_TOP - MINI.trackHeight }}>
+      <View
+        style={{
+          position: 'absolute',
+          left: MINI_LEFT,
+          top: MINI_BASELINE_TOP - MINI.trackHeight,
+        }}
+      >
         <WeekStrip
           T={t}
           week={HERO_WEEK}
@@ -287,12 +321,12 @@ export function StepMiniPlan({ t }: { t: SharedValue<number> }) {
           blockStagger={0.09}
           labels="value"
           labelDelay={0.2}
-          valueSize={FontSize.xxs}
+          valueSize={FontSize.label}
           labelGap={3}
           numerals
           numeralsAt={0.2}
           numeralStagger={0.04}
-          numeralSize={8}
+          numeralSize={FontSize.micro}
           numeralGap={8}
         />
       </View>
@@ -344,7 +378,7 @@ const styles = StyleSheet.create({
   },
   segmentText: {
     fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.xxs,
+    fontSize: FontSize.label,
   },
   segmentInk: {
     position: 'absolute',
@@ -357,11 +391,11 @@ const styles = StyleSheet.create({
   },
   countValue: {
     fontFamily: FontFamily.display.semiBold,
-    fontSize: FontSize.md,
+    fontSize: FontSize.title,
   },
   countUnit: {
     fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.tiny,
+    fontSize: FontSize.label,
   },
   tile: {
     position: 'absolute',
@@ -375,10 +409,14 @@ const styles = StyleSheet.create({
   tileCode: {
     position: 'absolute',
     fontFamily: FontFamily.mono.medium,
-    fontSize: FontSize.xxs,
+    fontSize: FontSize.label,
   },
   card: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     padding: 14,
     justifyContent: 'space-between',
   },
@@ -394,7 +432,7 @@ const styles = StyleSheet.create({
   },
   cardLabel: {
     fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.tiny,
+    fontSize: FontSize.label,
     letterSpacing: 1.5,
   },
   cardPace: {
@@ -402,8 +440,8 @@ const styles = StyleSheet.create({
   },
   cardNumber: {
     fontFamily: FontFamily.display.semiBold,
-    fontSize: 34,
-    lineHeight: 34,
+    fontSize: FontSize.display,
+    lineHeight: FontSize.display,
   },
   miniHeader: {
     position: 'absolute',
@@ -416,11 +454,11 @@ const styles = StyleSheet.create({
   },
   miniTitle: {
     fontFamily: FontFamily.display.semiBold,
-    fontSize: 16,
+    fontSize: FontSize.title,
   },
   miniMeta: {
     fontFamily: FontFamily.mono.regular,
-    fontSize: 9,
+    fontSize: FontSize.micro,
     letterSpacing: 1.5,
   },
 });

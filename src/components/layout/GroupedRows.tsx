@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
   },
   groupTitle: {
     fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.xs,
+    fontSize: FontSize.label,
     letterSpacing: Tracking.label,
   },
   groupBody: {
@@ -148,7 +148,7 @@ const styles = StyleSheet.create({
   rowLabel: {
     flexShrink: 1,
     fontFamily: FontFamily.body.regular,
-    fontSize: FontSize.sm,
+    fontSize: FontSize.body,
   },
   // The value column is right-aligned, which only shows once a value is short enough not to wrap.
   // A long one ("Unlimited plans during the test pass") shrank and then set its own lines flush
@@ -157,13 +157,13 @@ const styles = StyleSheet.create({
   rowValue: {
     flexShrink: 1,
     fontFamily: FontFamily.body.medium,
-    fontSize: FontSize.sm,
+    fontSize: FontSize.body,
     textAlign: 'right',
   },
   rowValueMono: {
     flexShrink: 1,
     fontFamily: FontFamily.mono.bold,
-    fontSize: FontSize.sm,
+    fontSize: FontSize.body,
     textAlign: 'right',
   },
   actionText: {
@@ -172,15 +172,15 @@ const styles = StyleSheet.create({
   },
   rowAction: {
     fontFamily: FontFamily.body.medium,
-    fontSize: FontSize.sm,
+    fontSize: FontSize.body,
   },
   rowHint: {
     fontFamily: FontFamily.body.regular,
-    fontSize: FontSize.xs,
+    fontSize: FontSize.label,
   },
   chevron: {
     fontFamily: FontFamily.body.regular,
-    fontSize: FontSize.lg,
+    fontSize: FontSize.title,
   },
   pressed: {
     opacity: PressedOpacity,

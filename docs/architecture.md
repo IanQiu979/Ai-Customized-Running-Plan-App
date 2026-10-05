@@ -136,8 +136,9 @@ src/
                               # 2026-08-15). Starts blank every time — GET /api/intake is read once
                               # for a boolean (intake on file → 'repeat', else 'first'), never to
                               # prefill. First entry: the survey intro (V22-03,
-                              # components/build/SurveyIntro) holds until PRESS TO CONTINUE, then
-                              # the questions; no Cancel, swipe-back off, beforeRemove refused
+                              # components/build/SurveyIntro) is the first viewport of the same
+                              # ScrollView, the questions beneath it ("Scroll down", no press
+                              # since 2026-10-05); no Cancel, swipe-back off, beforeRemove refused
                               # until the plan exists. Re-entry (Home's "Create a new plan"):
                               # straight to the questions, with a Cancel back to Home in the
                               # ScreenHeader's action slot (native header hidden). Blueprint
@@ -1230,8 +1231,12 @@ auth hand-off keep one headline and one supporting sentence each; that copy cont
 `src/constants/theme.ts` holds the Blueprint tokens. `Spacing` runs half=2, one=4, two=8, three=16,
 four=24, five=32, six=48, seven=64; `MaxContentWidth = 800` and `BottomTabInset` are unchanged (the
 latter still has zero call sites — see `docs/mvp-progress.md`'s "Known debt"). `DesignWidth = 393`
-is new: the width the V22 pages were composed at, which the build animations lay out against and
-scale *down* to fit, never up.
+and `DesignHeight = 852` are the canvas the V22 pages were composed at, which the build animations
+lay out against and scale *down* to fit, never up — by `buildCanvasScale(viewportW, viewportH)`,
+the one on-screen scale for every illustrative build. `BuildIllustration` (2026-10-05) is the
+strip geometry they share: `strip` (the onboarding hero's) for the hero, the survey intro and My
+Plans, and `compact.step` / `compact.header` ratios of it for the step mini-plan and the Home
+header mark — see [`design/build-animations.md`](design/build-animations.md).
 
 - **Bases**: background `#0B0E12`, raised `#141920` (cards, inputs), hairline
   `rgba(255,255,255,0.10)`, empty slot `rgba(255,255,255,0.14)` (`grid.slot` — a rest day's dash,
@@ -1265,9 +1270,11 @@ scale *down* to fit, never up.
 - **Type** — the sheet's three families, loaded in `_layout.tsx` and named in `FontFamily`:
   **Barlow Condensed** 500/600/700/800 for display and every numeral; **IBM Plex Mono** 400/500/700
   for tracked uppercase labels, units and day numerals; **IBM Plex Sans** 400–700 for body. Scale
-  `tiny` 10 / `xxs` 11 / 13 / 15 / 17 / 20 / 24 / 32 / 44 / `numeral` 64 / `giant` 96 — the last
-  two are the one counting number a hero carries. `Tracking.wide` (2.5) is the sheet's most
-  tracked setting (KM / WEEK, PRESS TO CONTINUE).
+  (2026-10-05): five roles from the approved V22-03 page — `micro` 8, `label` 12, `body` 14,
+  `title` 21, `display` 34 (screen headings and hero numerals alike) — pinned, with raw numeric
+  sizes banned in `src/app` and `src/components`, by
+  `src/constants/__tests__/theme.typography.test.ts`. `Tracking.wide` (2.5) is the sheet's most
+  tracked setting.
 - **Shape** — `Radius.bar` 5 (a session bar's top corners), `control` 8, `button` 12, `card` 14;
   buttons are 52pt tall (the sheet's 48–52).
 - **Motion** — the build animations carry their own timings in `src/lib/buildMotion.ts` (ported

@@ -468,19 +468,19 @@ const styles = StyleSheet.create({
   },
   indexLabel: {
     fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.xxs,
+    fontSize: FontSize.label,
     letterSpacing: 2,
   },
   sectionHeading: {
     fontFamily: FontFamily.display.semiBold,
-    fontSize: 30,
-    lineHeight: 30 * 1.05,
+    fontSize: FontSize.display,
+    lineHeight: FontSize.display * 1.05,
     textAlign: 'center',
   },
   sectionBody: {
     fontFamily: FontFamily.body.regular,
-    fontSize: 14,
-    lineHeight: 14 * 1.5,
+    fontSize: FontSize.body,
+    lineHeight: FontSize.body * 1.5,
     textAlign: 'center',
   },
   actions: {
@@ -499,7 +499,7 @@ const styles = StyleSheet.create({
   },
   skipText: {
     fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.xxs,
+    fontSize: FontSize.label,
     letterSpacing: Tracking.label,
   },
   pressed: {

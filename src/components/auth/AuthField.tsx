@@ -47,7 +47,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.xs,
+    fontSize: FontSize.label,
     letterSpacing: Tracking.label,
   },
   input: {
@@ -56,6 +56,6 @@ const styles = StyleSheet.create({
     borderRadius: Radius.control,
     paddingHorizontal: Spacing.three,
     fontFamily: FontFamily.body.regular,
-    fontSize: FontSize.sm,
+    fontSize: FontSize.body,
   },
 });

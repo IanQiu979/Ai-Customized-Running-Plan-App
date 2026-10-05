@@ -63,17 +63,17 @@ const styles = StyleSheet.create({
   },
   eyebrow: {
     fontFamily: FontFamily.mono.regular,
-    fontSize: FontSize.xs,
+    fontSize: FontSize.label,
     letterSpacing: Tracking.label,
   },
   title: {
     fontFamily: FontFamily.display.semiBold,
-    fontSize: FontSize.hero,
+    fontSize: FontSize.display,
     letterSpacing: Tracking.display,
   },
   supporting: {
     fontFamily: FontFamily.body.regular,
-    fontSize: FontSize.sm,
+    fontSize: FontSize.body,
   },
   hairline: {
     height: Stroke.hairline,

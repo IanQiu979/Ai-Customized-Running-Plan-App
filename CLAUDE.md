@@ -107,6 +107,11 @@ clean `typecheck && lint && test`. Never force-push without explicit user approv
   It does NOT pin the exact documented numbers — that is deliberate, so a legitimate re-tune is not
   a test edit — which means re-running the table and updating the comments is still a human step (the
   ratios were documented-only under Trailhead and drifted anyway — issue #70).
+- **Type is five roles, nothing else** (captain, 2026-10-05): `FontSize` is `micro` 8 / `label` 12
+  / `body` 14 / `title` 21 / `display` 34, the "A few questions first" page's own sizes. Pick a
+  role; never add a step or a raw number — `src/constants/__tests__/theme.typography.test.ts`
+  fails on any numeric `fontSize:` or `*Size={N}` in `src/app` or `src/components`. Illustrative
+  strips take their size from `BuildIllustration.strip` and `buildCanvasScale`, never their own.
 - The primary CTA's shape is `src/components/ui/ActionButton.tsx`'s `PrimaryAction` (or
   `RevealPrimaryAction`, the same slab drawing itself in), and nothing else may paint
   `Accent.fill`. "One accent per screen" is therefore a question about imports, not a review of

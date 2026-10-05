@@ -158,7 +158,7 @@ export const STEP_SCENES = [
 ] as const;
 export const STEP_TIMELINE = timelineFrom(STEP_SCENES);
 
-/** V22-03 Survey intro. Week 1 builds, weeks 2–6 stack below, PRESS TO CONTINUE at hold + 0.8. */
+/** V22-03 Survey intro. Week 1 builds, weeks 2–6 stack below, the "Scroll down" cue at hold + 0.8. */
 export const SURVEY_SCENES = [
   { name: 'Outline', dur: 0.4 },
   { name: 'Blocks', dur: 1.0 },

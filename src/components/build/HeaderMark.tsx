@@ -1,8 +1,11 @@
 import { StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reanimated';
 
+import { BuildIllustration, scaledBuildStripGeometry } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { MARK_CELL_RISE, MARK_CELL_STAGGER, enter } from '@/lib/buildMotion';
+
+const CELL = scaledBuildStripGeometry(BuildIllustration.compact.header);
 
 /**
  * The Home header mark (V22-04): a tiny 7-slot week strip beside the tier / plans-used counter.
@@ -26,15 +29,24 @@ export function HeaderMark({
   scale?: number;
 }) {
   const theme = useTheme();
-  const cell = { width: 6 * scale, height: 10 * scale, borderRadius: 2 * scale };
+  const cell = {
+    width: CELL.slotWidth * scale,
+    height: CELL.trackHeight * scale,
+    borderRadius: CELL.barRadius * scale,
+  };
   return (
     <View
-      style={[styles.row, { gap: 4 * scale }]}
+      testID="header-mark"
+      style={[styles.row, { gap: CELL.gap * scale }]}
       accessible
       accessibilityLabel={`${completedDays} of 7 days into this week`}
     >
       {[0, 1, 2, 3, 4, 5, 6].map((index) => (
-        <View key={index} style={[styles.cell, cell, { backgroundColor: theme.grid.slot }]}>
+        <View
+          key={index}
+          testID="header-mark-cell"
+          style={[styles.cell, cell, { backgroundColor: theme.grid.slot }]}
+        >
           {index < completedDays ? (
             <Fill T={T} at={fillAt + index * MARK_CELL_STAGGER} color={theme.text.primary} />
           ) : null}
@@ -48,7 +60,12 @@ function Fill({ T, at, color }: { T: SharedValue<number>; at: number; color: str
   const style = useAnimatedStyle(() => ({
     height: `${enter(T.value, at, MARK_CELL_RISE) * 100}%`,
   }));
-  return <Animated.View testID="header-mark-fill" style={[styles.fill, { backgroundColor: color }, style]} />;
+  return (
+    <Animated.View
+      testID="header-mark-fill"
+      style={[styles.fill, { backgroundColor: color }, style]}
+    />
+  );
 }
 
 const styles = StyleSheet.create({
