@@ -29,7 +29,7 @@ import { verifyPassword } from 'better-auth/crypto';
 import { isAllUsersUnlimitedAccessEnabled } from './access';
 import { dummyPurchaseGrant, isDummyPurchaseAvailable, type DummyPurchaseGrant } from './dummyPurchase';
 import type { Env } from './env';
-import { deleteAccountThrottle, type AttemptThrottle } from './lib/attemptThrottle';
+import { createDeleteAccountThrottle, type AttemptThrottle } from './lib/attemptThrottle';
 import type { GeneratePlanDeps } from './lib/generate-plan-flow';
 import { createPlanPersonalizer, createTemplateSkeletonBuilder } from './lib/planEngine';
 import { resolveModelCaller } from './lib/model';
@@ -52,7 +52,9 @@ export interface Deps {
   verifyPassword: (input: { hash: string; password: string }) => Promise<boolean>;
   /**
    * Failed-password budget for `POST /api/delete-account` only — see `lib/attemptThrottle.ts`.
-   * A module-level instance so the count survives across requests within the isolate.
+   * Built per request, but its count lives in D1 (`attempt_throttle`, migration 0007), so it
+   * survives isolate restarts and is shared by every isolate. Its digest key is
+   * `BETTER_AUTH_SECRET`, read here like every other secret.
    */
   deleteAccountThrottle: AttemptThrottle;
 }
@@ -72,7 +74,7 @@ export function createDeps(env: Env): Deps {
     purchasesAvailable: (email) => isDummyPurchaseAvailable(env, email),
     purchaseGrant: (email) => dummyPurchaseGrant(env, email),
     verifyPassword,
-    deleteAccountThrottle,
+    deleteAccountThrottle: createDeleteAccountThrottle(env.DB, env.BETTER_AUTH_SECRET),
     generatePlan: {
       store,
       skeleton: createTemplateSkeletonBuilder(), // swap 1 — see the header

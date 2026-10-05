@@ -14,7 +14,6 @@ import { PRIVACY_POLICY_VERSION } from '../../src/constants/legal';
 import { createAuth } from '../src/auth';
 import { normalizeAllowedBrowserOrigin } from '../src/cors';
 import type { Env } from '../src/env';
-import { deleteAccountThrottle } from '../src/lib/attemptThrottle';
 import worker from '../src/index';
 
 const APP_ROUTES: [string, string][] = [
@@ -1299,8 +1298,12 @@ describe('DELETE /api/delete-account password re-auth — captain ruling 2026-09
   });
 
   describe('the per-route attempt budget (5 wrong passwords per 15 minutes)', () => {
-    beforeEach(() => deleteAccountThrottle.reset());
-    afterEach(() => deleteAccountThrottle.reset());
+    // The budget lives in D1 since 2026-10-05 (`attempt_throttle`, migration 0007), and every
+    // request below builds its own `Deps` — so a 429 here is itself proof that the count survives
+    // from one fresh throttle instance to the next, as it must across isolates.
+    const clearBudget = () => env.DB.prepare('DELETE FROM attempt_throttle').run();
+    beforeEach(clearBudget);
+    afterEach(clearBudget);
 
     it('answers 429 after the budget is spent and deletes nothing — even on the correct password', async () => {
       const email = 'brute-force@example.test';
@@ -1345,6 +1348,28 @@ describe('DELETE /api/delete-account password re-auth — captain ruling 2026-09
 
       const elsewhere = await deleteAccount(second, { password: PASSWORD });
       expect(elsewhere.status).toBe(200);
+    });
+
+    it('a success does not hand the connecting IP a fresh budget', async () => {
+      const headers = { 'cf-connecting-ip': '198.51.100.9' };
+      const victim = await signUp('ip-victim@example.test');
+      const throwaway = await signUp('ip-throwaway@example.test');
+      const next = await signUp('ip-next-victim@example.test');
+      const post = (token: string, password: string) =>
+        SELF.fetch('https://example.test/api/delete-account', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', authorization: `Bearer ${token}`, ...headers },
+          body: JSON.stringify({ password }),
+        });
+
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        expect((await post(victim, 'wrong')).status).toBe(401);
+      }
+      // The attacker's own account, deleted with its right password from the same IP.
+      expect((await post(throwaway, PASSWORD)).status).toBe(200);
+
+      // The IP's four failures still stand: one more anywhere spends the budget.
+      expect((await post(next, 'wrong')).status).toBe(429);
     });
 
     it('a correct password inside the budget still deletes and clears the count', async () => {

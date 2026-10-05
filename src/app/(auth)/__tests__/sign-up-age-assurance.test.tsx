@@ -3,6 +3,9 @@
  * in the screen itself — the disabled state of "Sign up", the handler's own refusal when invoked
  * without a complete choice, and the body it hands to `signUpWithAgeAssurance` — with no logic
  * layer underneath to test instead. The Worker re-enforces the same rule; this pins the client half.
+ * Since 2026-10-05 it also pins when the age choice is on screen at all (the captain's "create
+ * account shows too much"): hidden on the empty form, revealed by the first focus of a credential
+ * field and kept from then on — a render branch, again with nothing underneath it to test.
  */
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -67,6 +70,16 @@ function press(tree: ReactTestRenderer, labelOrTestID: string) {
   });
 }
 
+function focus(tree: ReactTestRenderer, label: string) {
+  act(() => {
+    tree.root.findByProps({ accessibilityLabel: label }).props.onFocus?.();
+  });
+}
+
+function ageChoiceShown(tree: ReactTestRenderer): boolean {
+  return tree.root.findAllByProps({ testID: 'signup-age-18-plus' }).length > 0;
+}
+
 function fillCredentials(tree: ReactTestRenderer) {
   change(tree, 'Name', 'Runner');
   change(tree, 'Email', 'runner@example.com');
@@ -91,6 +104,58 @@ describe('SignUpScreen age assurance', () => {
     mockSignInWithGoogle.mockReset().mockResolvedValue({ ok: true });
     mockMarkPostSignupRedirect.mockReset();
     mockClearPostSignupRedirect.mockReset();
+  });
+
+  describe('the age choice appears on first engagement (2026-10-05)', () => {
+    it('is not on the empty form — only the credentials and the actions are', () => {
+      const tree = render();
+      expect(ageChoiceShown(tree)).toBe(false);
+      expect(tree.root.findAllByProps({ testID: 'signup-age-13-17' })).toHaveLength(0);
+      expect(action(tree, 'Sign up')).toBeTruthy();
+      expect(action(tree, 'Continue with Google')).toBeTruthy();
+    });
+
+    it.each(['Name', 'Email', 'Password'])('appears when %s is first focused', (label) => {
+      const tree = render();
+      focus(tree, label);
+      expect(ageChoiceShown(tree)).toBe(true);
+    });
+
+    it('appears when text arrives without a focus event (autofill)', () => {
+      const tree = render();
+      change(tree, 'Email', 'runner@example.com');
+      expect(ageChoiceShown(tree)).toBe(true);
+    });
+
+    it('stays visible once shown, even after every field is emptied again', () => {
+      const tree = render();
+      fillCredentials(tree);
+      change(tree, 'Name', '');
+      change(tree, 'Email', '');
+      change(tree, 'Password', '');
+      expect(ageChoiceShown(tree)).toBe(true);
+    });
+
+    it('keeps the guardian-consent gate once revealed', async () => {
+      const tree = render();
+      focus(tree, 'Name');
+      fillCredentials(tree);
+      await press(tree, 'signup-age-13-17');
+      expect(tree.root.findAllByProps({ testID: 'signup-age-guardian-consent' }).length).toBeGreaterThan(0);
+      expect(action(tree, 'Sign up').props.accessibilityState.disabled).toBe(true);
+    });
+
+    it('the handler still refuses with no age band, however it is reached', async () => {
+      const tree = render();
+      focus(tree, 'Name');
+      await act(async () => {
+        await action(tree, 'Sign up').props.onPress();
+      });
+      expect(mockSignUpWithAgeAssurance).not.toHaveBeenCalled();
+      expect(tree.root.findByProps({ accessibilityRole: 'alert' }).props.children).toBe(
+        'Select your age range before you create this account.'
+      );
+    });
   });
 
   it('keeps the button and handler gated until the age choice is complete', async () => {
@@ -166,6 +231,12 @@ describe('SignUpScreen age assurance', () => {
 
   it('keeps Google signup independent of the incomplete email age selection', async () => {
     const tree = render();
+    // Google never needed the email form's age choice — it stays available untouched, too.
+    await press(tree, 'Continue with Google');
+    expect(mockSignInWithGoogle).toHaveBeenCalledTimes(1);
+    mockSignInWithGoogle.mockClear();
+
+    focus(tree, 'Name');
     await press(tree, 'signup-age-13-17');
     await press(tree, 'Continue with Google');
 

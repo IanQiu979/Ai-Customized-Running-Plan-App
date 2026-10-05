@@ -17,13 +17,15 @@ import OnboardingScreen from '../onboarding';
  * healthy run, and the ceiling releases it — as a fallback, never before the timeline has had
  * every chance to complete — when the clock never reports at all.
  *
- * It also covers the captain's 2026-09-20 first-launch scroll lock: the `ScrollView` itself is
- * disabled while the section currently in view — the hero, first — is still animating, engages on
- * a step only once that step's content is fully on screen (never while it is still below the
- * fold), snaps section to section so a fling cannot carry past the one animating, and stays
- * enabled and free-scrolling on a repeat visit or under reduced motion, where there is nothing to
- * lock. The hero's own "Scroll down" hint and its rendered copy are `build.test.tsx`'s job
- * (`OnboardingHero` is mocked away here to keep this tree to the gate it proves).
+ * It also covers the scroll lock (captain's 2026-09-20 ruling, permanent on every visit since
+ * 2026-10-03): the `ScrollView` itself is disabled while the section currently in view — the hero,
+ * first — is still animating, engages on a step only once that step's content is fully on screen
+ * (never while it is still below the fold), snaps section to section so a fling cannot carry past
+ * the one animating, and stays enabled and free-scrolling under reduced motion, where there is
+ * nothing to lock. And the skip, the lock's only way past: a corner control that jumps to the end
+ * and releases the lock. The hero's own "Scroll down" hint and its rendered copy are
+ * `build.test.tsx`'s job (`OnboardingHero` is mocked away here to keep this tree to the gate it
+ * proves).
  */
 
 // The clock the screen sees. `ready: false` is a hero that mounts and never reports its build
@@ -32,12 +34,8 @@ import OnboardingScreen from '../onboarding';
 let mockReady = false;
 
 // The step and Get started clocks (the ones with no `readyAt`): `false` is a piece still playing,
-// which is what holds the first-launch lock on its section once that section has been seen.
+// which is what holds the lock on its section once that section has been seen.
 let mockStepReady = false;
-
-// The first-launch flag `useFirstOnboardingVisit` resolves to. `true` (or `null`, its loading
-// state) holds the scroll lock; `false` — a repeat visit — never locks regardless of `mockReady`.
-let mockFirstVisit: boolean | null = true;
 
 // Reduced motion bypasses the lock entirely: every clock is already at its end frame, so there is
 // nothing to wait out.
@@ -64,9 +62,6 @@ jest.mock('@/components/build/steps', () => ({
   StepIntake: () => null,
   StepEngine: () => null,
   StepMiniPlan: () => null,
-}));
-jest.mock('@/hooks/use-first-onboarding-visit', () => ({
-  useFirstOnboardingVisit: () => mockFirstVisit,
 }));
 jest.mock('react-native-reanimated', () => {
   const actual = jest.requireActual<typeof import('react-native-reanimated')>(
@@ -101,8 +96,8 @@ function ctaDisabled(node: unknown): boolean | undefined {
   return undefined;
 }
 
-/** The rendered `ScrollView`'s `scrollEnabled` — the first-launch lock's one visible effect on
- * this mocked-down tree. */
+/** The rendered `ScrollView`'s `scrollEnabled` — the lock's one visible effect on this
+ * mocked-down tree. */
 function scrollEnabled(tree: ReactTestRenderer): boolean {
   return tree.root.findByType(ScrollView).props.scrollEnabled;
 }
@@ -179,7 +174,6 @@ describe('OnboardingScreen', () => {
     jest.useFakeTimers();
     mockReady = false;
     mockStepReady = false;
-    mockFirstVisit = true;
     mockReduceMotion = false;
   });
   afterEach(() => jest.useRealTimers());
@@ -215,16 +209,24 @@ describe('OnboardingScreen', () => {
     expect(ctaDisabled(tree.toJSON())).toBe(false);
   });
 
-  describe('first-launch scroll lock (2026-09-20 ruling)', () => {
-    it('locks the scroll on first launch while the hero is still the animation playing', () => {
-      mockFirstVisit = true;
+  describe('scroll lock on every visit (2026-09-20 ruling, permanent since 2026-10-03)', () => {
+    it('locks the scroll while the hero is still the animation playing', () => {
       mockReady = false;
       const tree = mount();
       expect(scrollEnabled(tree)).toBe(false);
     });
 
+    it('locks again on a later visit — nothing remembers that onboarding was seen', () => {
+      // The 2026-10-03 bug: a "seen onboarding" flag, set the instant the screen first rendered,
+      // unlocked every later visit. A second mount must behave exactly like the first.
+      const first = mount();
+      expect(scrollEnabled(first)).toBe(false);
+      act(() => first.unmount());
+      const second = mount();
+      expect(scrollEnabled(second)).toBe(false);
+    });
+
     it('unlocks once the hero reports its build ended, its completion callback', () => {
-      mockFirstVisit = true;
       mockReady = true;
       const tree = mount();
       // Nothing further down has scrolled into view yet, so there is no next animation to hold
@@ -232,22 +234,7 @@ describe('OnboardingScreen', () => {
       expect(scrollEnabled(tree)).toBe(true);
     });
 
-    it('locks while the flag is still loading — `null` is treated as first-visit, not unlocked', () => {
-      mockFirstVisit = null;
-      mockReady = false;
-      const tree = mount();
-      expect(scrollEnabled(tree)).toBe(false);
-    });
-
-    it('never locks a repeat visit, even mid-build', () => {
-      mockFirstVisit = false;
-      mockReady = false;
-      const tree = mount();
-      expect(scrollEnabled(tree)).toBe(true);
-    });
-
-    it('never locks under reduced motion, even on a first visit mid-build', () => {
-      mockFirstVisit = true;
+    it('never locks under reduced motion, even mid-build', () => {
       mockReduceMotion = true;
       mockReady = false;
       const tree = mount();
@@ -301,8 +288,7 @@ describe('OnboardingScreen', () => {
     describe('section-to-section snapping', () => {
       const scrollProps = (tree: ReactTestRenderer) => tree.root.findByType(ScrollView).props;
 
-      it('snaps to every section top, one section per gesture, on first launch', () => {
-        mockFirstVisit = true;
+      it('snaps to every section top, one section per gesture', () => {
         const tree = mount();
         layoutSection(tree, 0, 24, 400);
         layoutSection(tree, 1, 24 + VIEWPORT.height, 400);
@@ -311,23 +297,74 @@ describe('OnboardingScreen', () => {
         expect(props.disableIntervalMomentum).toBe(true);
       });
 
-      it('scrolls freely, with no snapping, on a repeat visit', () => {
-        mockFirstVisit = false;
-        const tree = mount();
-        layoutSection(tree, 0, 24, 400);
-        const props = scrollProps(tree);
-        expect(props.snapToOffsets).toBeUndefined();
-        expect(props.disableIntervalMomentum).toBe(false);
-      });
-
       it('scrolls freely, with no snapping, under reduced motion', () => {
-        mockFirstVisit = true;
         mockReduceMotion = true;
         const tree = mount();
         layoutSection(tree, 0, 24, 400);
         const props = scrollProps(tree);
         expect(props.snapToOffsets).toBeUndefined();
         expect(props.disableIntervalMomentum).toBe(false);
+      });
+    });
+
+    describe('the skip — the only way past the lock (2026-10-03)', () => {
+      const skip = (tree: ReactTestRenderer) =>
+        tree.root.findAll(
+          (node) =>
+            node.props.accessibilityRole === 'button' &&
+            node.props.accessibilityLabel === 'Skip to sign in' &&
+            typeof node.props.onPress === 'function'
+        );
+      const signIn = (tree: ReactTestRenderer) =>
+        tree.root.findAll(
+          (node) => node.props.accessibilityRole === 'link' && typeof node.props.onPress === 'function'
+        );
+
+      it('is offered from the first frame, while the hero still holds the lock', () => {
+        mockReady = false;
+        const tree = mount();
+        expect(scrollEnabled(tree)).toBe(false);
+        expect(skip(tree)).toHaveLength(1);
+      });
+
+      it('jumps to the end, reveals the sign-in beat and releases the lock for the visit', () => {
+        mockReady = false;
+        const tree = mount();
+        const scrollView = tree.root.findByType(ScrollView);
+        // A mid-story lock on a step, too, to prove the skip clears it rather than waiting it out.
+        layoutSection(tree, 0, 24, 400);
+
+        act(() => {
+          (skip(tree)[0].props.onPress as () => void)();
+        });
+
+        expect(scrollView.instance.scrollToEnd).toHaveBeenCalledWith({ animated: false });
+        expect(scrollEnabled(tree)).toBe(true);
+        expect(scrollView.props.snapToOffsets).toBeUndefined();
+        // The end beat is what the skip lands on: its sign-in link is there to press.
+        expect(signIn(tree).length).toBeGreaterThan(0);
+        // And the skip has done its job — the end is reached, so it is gone.
+        expect(skip(tree)).toHaveLength(0);
+
+        // Scrolling back into a step that has not played yet does not lock again.
+        scrollTo(tree, VIEWPORT.height + 24);
+        expect(scrollEnabled(tree)).toBe(true);
+      });
+
+      it('disappears once the runner reaches the end by scrolling', () => {
+        mockReady = true;
+        mockStepReady = true;
+        const tree = mount();
+        layoutSection(tree, 3, 24 + 3 * VIEWPORT.height, 400);
+        expect(skip(tree)).toHaveLength(1);
+        scrollTo(tree, 4 * VIEWPORT.height + 24);
+        expect(skip(tree)).toHaveLength(0);
+      });
+
+      it('is still offered under reduced motion, where there is no lock to escape', () => {
+        mockReduceMotion = true;
+        const tree = mount();
+        expect(skip(tree)).toHaveLength(1);
       });
     });
   });

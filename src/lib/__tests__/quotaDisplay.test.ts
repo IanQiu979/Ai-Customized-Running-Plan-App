@@ -7,7 +7,7 @@
  * quota resets on the purchase-day-anchored window (`quotaPeriod.ts`).
  */
 
-import { formatQuotaLine } from '../quotaDisplay';
+import { formatQuotaLine, isFreeAllowanceUsed } from '../quotaDisplay';
 import type { QuotaStatus } from '../planTypes';
 
 function makeStatus(overrides: Partial<QuotaStatus>): QuotaStatus {
@@ -63,5 +63,31 @@ describe('formatQuotaLine', () => {
     const status = makeStatus({ tier: 'elite', used: 0, limit: null, periodEnd: null, unlimited: true });
 
     expect(formatQuotaLine(status)).toBe('Unlimited plans during the test pass');
+  });
+});
+
+describe('isFreeAllowanceUsed', () => {
+  it('is true once a Free runner has used their one lifetime plan', () => {
+    expect(isFreeAllowanceUsed(makeStatus({ tier: 'free', used: 1, limit: 1 }))).toBe(true);
+    expect(isFreeAllowanceUsed(makeStatus({ tier: 'free', used: 2, limit: 1 }))).toBe(true);
+  });
+
+  it('is false while the Free plan is still unused', () => {
+    expect(isFreeAllowanceUsed(makeStatus({ tier: 'free', used: 0, limit: 1 }))).toBe(false);
+  });
+
+  it('never applies to a paid tier, even at its period limit', () => {
+    expect(isFreeAllowanceUsed(makeStatus({ tier: 'pro', used: 3, limit: 3 }))).toBe(false);
+    expect(isFreeAllowanceUsed(makeStatus({ tier: 'elite', used: 10, limit: 10 }))).toBe(false);
+  });
+
+  it('is false under the unlimited test-pass override', () => {
+    expect(isFreeAllowanceUsed(makeStatus({ tier: 'free', used: 1, limit: null, unlimited: true }))).toBe(
+      false
+    );
+  });
+
+  it('is false while the status is unknown — an unknown tier is not "free, used up"', () => {
+    expect(isFreeAllowanceUsed(null)).toBe(false);
   });
 });

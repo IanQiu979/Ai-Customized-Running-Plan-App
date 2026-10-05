@@ -4,6 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from '@/components/layout/ScreenHeader';
+import { DisclosureArrow } from '@/components/ui/DisclosureArrow';
 import {
   FontFamily,
   FontSize,
@@ -148,25 +149,6 @@ function StructureRow({ symbol, entry }: { symbol: string; entry: StructureSymbo
   );
 }
 
-/** A local, drawn disclosure arrow whose size and stroke come from the Instrument tokens. */
-function DisclosureArrow({ expanded, color }: { expanded: boolean; color: string }) {
-  return (
-    <View
-      style={styles.arrow}
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
-    >
-      <View
-        style={[
-          styles.arrowMark,
-          { borderColor: color },
-          expanded ? styles.arrowMarkUp : styles.arrowMarkDown,
-        ]}
-      />
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -225,24 +207,6 @@ const styles = StyleSheet.create({
   },
   structureBody: {
     paddingLeft: Spacing.six + Spacing.three,
-  },
-  arrow: {
-    width: Spacing.three,
-    height: Spacing.three,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  arrowMark: {
-    width: Spacing.two,
-    height: Spacing.two,
-    borderRightWidth: Stroke.mark,
-    borderBottomWidth: Stroke.mark,
-  },
-  arrowMarkDown: {
-    transform: [{ rotate: '45deg' }],
-  },
-  arrowMarkUp: {
-    transform: [{ rotate: '225deg' }],
   },
   pressed: {
     opacity: PressedOpacity,

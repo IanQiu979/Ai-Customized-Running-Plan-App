@@ -29,7 +29,7 @@ import {
 } from '@/lib/apiClient';
 import { MARK_TIMELINE } from '@/lib/buildMotion';
 import { planProgress } from '@/lib/planProgress';
-import { formatQuotaLine } from '@/lib/quotaDisplay';
+import { formatQuotaLine, isFreeAllowanceUsed } from '@/lib/quotaDisplay';
 import type { QuotaStatus } from '@/lib/planTypes';
 
 /**
@@ -43,13 +43,18 @@ import type { QuotaStatus } from '@/lib/planTypes';
  *     already have sent them there — so a fresh account never gets two intakes stacked.
  *  2. **Shows the subscription box first** — tier, plans used, "See plans" — above the current
  *     plan's summary (the newest plan by `createdAt`, opening it on tap), then the one CTA,
- *     **"Create a new plan"**, which always opens the intake, blank.
+ *     **"Create a new plan"**, which opens the intake, blank — unless the server-reported quota
+ *     shows a Free runner's one lifetime plan already used, when the same slot becomes **"Upgrade
+ *     to create more plans"** and opens the paywall (captain, 2026-10-05: before this, the runner
+ *     answered the whole intake only to be refused at the end).
  *  3. **Links to My Plans.**
  *
  * Gone with that ruling: the read-only "Your target" card and its "Change" link, the plan-length
  * field, the Notes field and its Free-tier locked panel, and the "On Pro & Elite" teaser
  * (`docs/change_log.md`, 2026-09-20). Tier is still a **display** of `getQuotaStatus()`, never a
- * decision made here; quota and paywall outcomes belong to the intake's create press now.
+ * decision made here: the upgrade swap reads the server's own `used`/`limit` (`isFreeAllowanceUsed`)
+ * and enforces nothing — `generate-plan` still refuses an over-quota request, and the intake's
+ * create press still routes that refusal to the paywall.
  */
 export default function HomeScreen() {
   const theme = useTheme();
@@ -242,8 +247,20 @@ export default function HomeScreen() {
                 </Pressable>
               ) : null}
 
-              {/* The screen's one accent. Always the intake, always blank (ruling 2 + 4). */}
-              <PrimaryAction label="Create a new plan" onPress={() => router.push('/intake')} />
+              {/* The screen's one accent. The intake, always blank (ruling 2 + 4) — or, once the
+                  server reports the Free plan used, the paywall, with that status passed through
+                  as the intake's over-quota branch does. */}
+              {quota && isFreeAllowanceUsed(quota) ? (
+                <PrimaryAction
+                  label="Upgrade to create more plans"
+                  accessibilityHint="Your free plan is used. Opens the plan options."
+                  onPress={() =>
+                    router.push({ pathname: '/paywall', params: { quota: JSON.stringify(quota) } })
+                  }
+                />
+              ) : (
+                <PrimaryAction label="Create a new plan" onPress={() => router.push('/intake')} />
+              )}
 
               {/* The push toward My Plans. A row, not a second button — this screen already spent
                   its one accent above, and a competing CTA is exactly what that rule prevents. */}
